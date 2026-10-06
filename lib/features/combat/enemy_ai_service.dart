@@ -40,6 +40,17 @@ class EnemyAiService {
     return null;
   }
 
+  /// Selects a friendly enemy target (for healing / buffs)
+  UnitEntity? selectFriendlyTarget() {
+    final wounded = tickManager.enemies.where((u) => u.isAlive && u.currentHp < u.maxHp).toList();
+    if (wounded.isNotEmpty) {
+      wounded.sort((a, b) => (a.currentHp / a.maxHp).compareTo(b.currentHp / b.maxHp));
+      return wounded.first;
+    }
+    final alive = tickManager.enemies.where((u) => u.isAlive).toList();
+    return alive.isNotEmpty ? alive.first : null;
+  }
+
   /// Executes the active enemy unit's turn and registers combat damage
   ActionResult? executeEnemyTurn({bool autoResume = true}) {
     if (!isEnemyTurn) return null;
@@ -52,9 +63,6 @@ class EnemyAiService {
       return null;
     }
 
-    final target = selectTargetAlly();
-    if (target == null) return null;
-
     // Pick best ready skill (Limit burst > Signature skill > Basic)
     final readySkills = enemy.resolvedSkills.where((s) => s.isReady).toList();
     SkillEntity chosenSkill = readySkills.firstWhere(
@@ -64,6 +72,13 @@ class EnemyAiService {
         orElse: () => readySkills.first,
       ),
     );
+
+    final bool isFriendlySkill = chosenSkill.targetType == SkillTargetType.singleAlly ||
+        chosenSkill.targetType == SkillTargetType.allAllies ||
+        chosenSkill.damageCoefficient == 0.0;
+
+    final target = isFriendlySkill ? selectFriendlyTarget() : selectTargetAlly();
+    if (target == null) return null;
 
     final result = combatService.executeSkill(
       targetUnitId: target.id,

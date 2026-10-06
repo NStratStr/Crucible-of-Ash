@@ -170,41 +170,54 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   Future<void> _handleAiTurn() async {
+    if (_isProcessingAiTurn) return;
     _isProcessingAiTurn = true;
-    final enemy = widget.tickManager.activeUnit;
-    if (enemy == null) {
-      _isProcessingAiTurn = false;
-      return;
-    }
 
-    setState(() {
-      _combatLog = 'HOSTILE ACTION: ${enemy.name} is preparing an assault...';
-    });
-
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-
-    final result = _aiService.executeEnemyTurn(autoResume: true);
-    if (result != null) {
-      _triggerDamagePop(
-        damage: result.damageDealt,
-        isCrit: result.isCritical,
-        isGlancing: result.isGlancing,
-        heal: result.lifestealRecovered,
-      );
+    try {
+      final enemy = widget.tickManager.activeUnit;
+      if (enemy == null || !_aiService.isEnemyTurn) {
+        return;
+      }
 
       setState(() {
-        final glanceText = result.isGlancing ? ' [GLANCING]' : '';
-        final critText = result.isCritical ? ' [CRIT!]' : '';
-        _combatLog =
-            '${result.attacker.name} used ${result.skillName} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText!';
-        if (result.targetDefeated) {
-          _combatLog += ' ${result.target.name} has fallen!';
-        }
+        _combatLog = 'HOSTILE ACTION: ${enemy.name} is preparing an assault...';
       });
-    }
 
-    _isProcessingAiTurn = false;
+      await Future.delayed(const Duration(milliseconds: 550));
+      if (!mounted) return;
+
+      final result = _aiService.executeEnemyTurn(autoResume: true);
+      if (result != null && mounted) {
+        _triggerDamagePop(
+          damage: result.damageDealt,
+          isCrit: result.isCritical,
+          isGlancing: result.isGlancing,
+          heal: result.lifestealRecovered,
+        );
+
+        setState(() {
+          final glanceText = result.isGlancing ? ' [GLANCING]' : '';
+          final critText = result.isCritical ? ' [CRIT!]' : '';
+          _combatLog =
+              '${result.attacker.name} used ${result.skillName} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText!';
+          if (result.targetDefeated) {
+            _combatLog += ' ${result.target.name} has fallen!';
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error during AI turn: $e');
+    } finally {
+      _isProcessingAiTurn = false;
+      if (mounted) {
+        if (_aiService.isEnemyTurn) {
+          // Immediately chain consecutive enemy turns in queue
+          Future.microtask(() => _handleAiTurn());
+        } else if (_autoBattle && _isPlayerTurnNow) {
+          _handleAutoPlayerTurn();
+        }
+      }
+    }
   }
 
   void _handleAutoPlayerTurn() {
@@ -490,16 +503,38 @@ class _BattleScreenState extends State<BattleScreen> {
         color: const Color(0xFF424242),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'ENEMY TURN: ${activeUnit.name} is attacking...',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              'ENEMY TURN: ${activeUnit.name} is attacking...',
-              style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+            GestureDetector(
+              onTap: () {
+                _isProcessingAiTurn = false;
+                _handleAiTurn();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB3261E),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: const Text(
+                  'RESOLVE',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
         ),
