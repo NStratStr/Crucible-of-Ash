@@ -1,17 +1,32 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
 import '../generals/general_command_service.dart';
 
+class FloatingCombatText {
+  final String text;
+  final Color color;
+  final bool isCrit;
+  final Key key = UniqueKey();
+
+  FloatingCombatText({
+    required this.text,
+    required this.color,
+    this.isCrit = false,
+  });
+}
+
 class BattleScreen extends StatefulWidget {
   final InitiativeTickManager tickManager;
   final CombatResolutionService combatService;
   final GeneralCommandService commandService;
   final VoidCallback? onResetEncounter;
+  final VoidCallback? onVictory;
 
   const BattleScreen({
     super.key,
@@ -19,6 +34,7 @@ class BattleScreen extends StatefulWidget {
     required this.combatService,
     required this.commandService,
     this.onResetEncounter,
+    this.onVictory,
   });
 
   @override
@@ -32,6 +48,8 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _isProcessingAiTurn = false;
   bool _autoBattle = false;
   Timer? _autoBattleTimer;
+
+  final List<FloatingCombatText> _floatingPops = [];
 
   @override
   void initState() {
@@ -66,7 +84,6 @@ class _BattleScreenState extends State<BattleScreen> {
   void _onEngineUpdate() {
     if (!mounted) return;
 
-    // Validate selected target
     final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive).toList();
     if (aliveEnemies.isEmpty) {
       _selectedEnemyId = null;
@@ -74,7 +91,6 @@ class _BattleScreenState extends State<BattleScreen> {
       _selectedEnemyId = aliveEnemies.first.id;
     }
 
-    // Check if it is an enemy turn awaiting action
     if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
       _handleAiTurn();
     } else if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
@@ -91,6 +107,34 @@ class _BattleScreenState extends State<BattleScreen> {
         widget.tickManager.allies.any((u) => u.id == active.id && u.isAlive);
   }
 
+  void _triggerDamagePop({
+    required int damage,
+    required bool isCrit,
+    required bool isGlancing,
+    int heal = 0,
+  }) {
+    if (damage > 0) {
+      final text = isCrit ? 'CRIT! -$damage' : (isGlancing ? 'GLANCE -$damage' : '-$damage');
+      final color = isCrit ? const Color(0xFFFFD54F) : (isGlancing ? Colors.white60 : const Color(0xFFEF5350));
+
+      final pop = FloatingCombatText(text: text, color: color, isCrit: isCrit);
+      setState(() => _floatingPops.add(pop));
+
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (mounted) setState(() => _floatingPops.remove(pop));
+      });
+    }
+
+    if (heal > 0) {
+      final pop = FloatingCombatText(text: '+$heal HP', color: const Color(0xFF81C784));
+      setState(() => _floatingPops.add(pop));
+
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (mounted) setState(() => _floatingPops.remove(pop));
+      });
+    }
+  }
+
   Future<void> _handleAiTurn() async {
     _isProcessingAiTurn = true;
     final enemy = widget.tickManager.activeUnit;
@@ -100,20 +144,26 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     setState(() {
-      _combatLog = 'HOSTILE ACTION: ${enemy.name} is preparing to strike...';
+      _combatLog = 'HOSTILE ACTION: ${enemy.name} is preparing an assault...';
     });
 
-    // Dramatic pause so the player sees what the enemy is doing
-    await Future.delayed(const Duration(milliseconds: 650));
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
     final result = _aiService.executeEnemyTurn(autoResume: true);
     if (result != null) {
+      _triggerDamagePop(
+        damage: result.damageDealt,
+        isCrit: result.isCritical,
+        isGlancing: result.isGlancing,
+        heal: result.lifestealRecovered,
+      );
+
       setState(() {
         final glanceText = result.isGlancing ? ' [GLANCING]' : '';
         final critText = result.isCritical ? ' [CRIT!]' : '';
         _combatLog =
-            '${result.attacker.name} struck ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText!';
+            '${result.attacker.name} used ${result.skillName} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText!';
         if (result.targetDefeated) {
           _combatLog += ' ${result.target.name} has fallen!';
         }
@@ -125,32 +175,49 @@ class _BattleScreenState extends State<BattleScreen> {
 
   void _handleAutoPlayerTurn() {
     _autoBattleTimer?.cancel();
-    _autoBattleTimer = Timer(const Duration(milliseconds: 400), () {
+    _autoBattleTimer = Timer(const Duration(milliseconds: 350), () {
       if (mounted && _isPlayerTurnNow) {
-        _executePlayerAttack();
+        final active = widget.tickManager.activeUnit;
+        if (active != null) {
+          final readySkills = active.resolvedSkills.where((s) => s.isReady).toList();
+          final chosen = readySkills.firstWhere((s) => s.cooldownTurns > 0, orElse: () => readySkills.first);
+          _executePlayerSkill(chosen);
+        }
       }
     });
   }
 
-  void _executePlayerAttack() {
+  void _executePlayerSkill(SkillEntity skill) {
     if (_selectedEnemyId == null) return;
     try {
-      final ActionResult result = widget.combatService.executeBasicAttack(
+      final ActionResult result = widget.combatService.executeSkill(
         targetUnitId: _selectedEnemyId!,
+        skill: skill,
         autoResumeTickEngine: true,
       );
 
       widget.commandService.registerCombatDamage(result.damageDealt);
 
+      _triggerDamagePop(
+        damage: result.damageDealt,
+        isCrit: result.isCritical,
+        isGlancing: result.isGlancing,
+        heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
+      );
+
       setState(() {
         final glanceText = result.isGlancing ? ' [GLANCING]' : '';
         final critText = result.isCritical ? ' [CRIT!]' : '';
         _combatLog =
-            '${result.attacker.name} struck ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
+            '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
         if (result.targetDefeated) {
           _combatLog += ' ${result.target.name} was eradicated!';
         }
       });
+
+      if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+        widget.onVictory?.call();
+      }
     } catch (e) {
       setState(() {
         _combatLog = 'Action failed: $e';
@@ -183,39 +250,75 @@ class _BattleScreenState extends State<BattleScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildTopStatusHeader(),
-            // Turn Guidance Banner
-            _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+            Column(
+              children: [
+                _buildTopStatusHeader(),
+                _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                    child: Column(
+                      children: [
+                        // Hostile Squad
+                        _buildSquadSection(
+                          title: 'HOSTILE HORDE (TAP TO TARGET)',
+                          units: widget.tickManager.enemies,
+                          isEnemy: true,
+                          activeUnitId: activeUnit?.id,
+                          selectedTargetId: _selectedEnemyId,
+                          onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
+                        ),
+                        const Divider(color: Color(0xFF2B2B36), thickness: 1.5, height: 14),
+                        // Allied Squad
+                        _buildSquadSection(
+                          title: 'YOUR LINEAGE BRIGADE',
+                          units: widget.tickManager.allies,
+                          isEnemy: false,
+                          activeUnitId: activeUnit?.id,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildCombatLogBanner(),
+                _buildBottomControlBar(isPlayerTurn, selectedEnemy, activeUnit),
+              ],
+            ),
+            // Floating Combat Text Overlay
+            Positioned(
+              top: 140,
+              right: 40,
+              child: IgnorePointer(
                 child: Column(
-                  children: [
-                    // Hostile Horde (Top)
-                    _buildSquadSection(
-                      title: 'HOSTILE HORDE (TAP TO TARGET)',
-                      units: widget.tickManager.enemies,
-                      isEnemy: true,
-                      activeUnitId: activeUnit?.id,
-                      selectedTargetId: _selectedEnemyId,
-                      onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
-                    ),
-                    const Divider(color: Color(0xFF2B2B36), thickness: 1.5, height: 16),
-                    // Allied Brigade (Bottom)
-                    _buildSquadSection(
-                      title: 'YOUR LINEAGE BRIGADE',
-                      units: widget.tickManager.allies,
-                      isEnemy: false,
-                      activeUnitId: activeUnit?.id,
-                    ),
-                  ],
+                  children: _floatingPops.map((pop) {
+                    return AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      opacity: 1.0,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: pop.color, width: pop.isCrit ? 2 : 1),
+                        ),
+                        child: Text(
+                          pop.text,
+                          style: TextStyle(
+                            color: pop.color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: pop.isCrit ? 16 : 13,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-            _buildCombatLogBanner(),
-            _buildBottomControlBar(isPlayerTurn, selectedEnemy),
           ],
         ),
       ),
@@ -253,7 +356,6 @@ class _BattleScreenState extends State<BattleScreen> {
           ),
           Row(
             children: [
-              // Auto Battle Switch
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -339,7 +441,7 @@ class _BattleScreenState extends State<BattleScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'YOUR TURN: ${activeUnit.name} is ready! Tap an enemy and tap STRIKE TARGET below.',
+                'YOUR TURN: ${activeUnit.name} is ready! Choose a skill below to strike.',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
               ),
             ),
@@ -444,7 +546,6 @@ class _BattleScreenState extends State<BattleScreen> {
           Expanded(
             child: Row(
               children: [
-                // Arcanum (Backline - 2 Units)
                 Expanded(
                   flex: 2,
                   child: Row(
@@ -466,7 +567,6 @@ class _BattleScreenState extends State<BattleScreen> {
                   color: const Color(0xFF2B2B36),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                 ),
-                // Vanguard (Frontline - 3 Units)
                 Expanded(
                   flex: 3,
                   child: Row(
@@ -514,7 +614,7 @@ class _BattleScreenState extends State<BattleScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.all(5),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: alive ? const Color(0xFF1E1E26) : const Color(0xFF131318),
             borderRadius: BorderRadius.circular(6),
@@ -571,7 +671,7 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
                 Icon(
                   _archetypeIcon(unit.archetype),
-                  size: 22,
+                  size: 20,
                   color: alive ? Colors.white70 : Colors.white24,
                 ),
                 Text(
@@ -580,7 +680,7 @@ class _BattleScreenState extends State<BattleScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 9,
+                    fontSize: 8,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -612,14 +712,14 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   // ===========================================================================
-  // LOG BANNER & GENERAL COMMAND HUD
+  // LOG BANNER & SKILL ACTIONS BAR
   // ===========================================================================
 
   Widget _buildCombatLogBanner() {
     return Container(
       width: double.infinity,
       color: const Color(0xFF14141B),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
       child: Text(
         _combatLog,
         style: const TextStyle(
@@ -631,112 +731,128 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  Widget _buildBottomControlBar(bool isPlayerTurn, UnitEntity? selectedEnemy) {
+  Widget _buildBottomControlBar(bool isPlayerTurn, UnitEntity? selectedEnemy, UnitEntity? activeUnit) {
     final focus = widget.commandService.currentFocus;
+    final skills = activeUnit?.resolvedSkills ?? [];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(
         color: Color(0xFF181820),
         border: Border(top: BorderSide(color: Color(0xFF2B2B36), width: 1.5)),
       ),
       child: Column(
         children: [
+          // Row 1: Active Hero Skills (A1, A2, Ult)
+          if (isPlayerTurn && skills.isNotEmpty)
+            Row(
+              children: skills.map((skill) {
+                final bool isReady = skill.isReady;
+                final bool canCast = isPlayerTurn && isReady && _selectedEnemyId != null;
+
+                return Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: skill.isLimitBurst
+                            ? const Color(0xFFE5A93C)
+                            : (skill.cooldownTurns > 0 ? const Color(0xFFB3261E) : const Color(0xFF388E3C)),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF2A2A38),
+                        disabledForegroundColor: Colors.white30,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                      onPressed: canCast ? () => _executePlayerSkill(skill) : null,
+                      child: Column(
+                        children: [
+                          Text(
+                            skill.name.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                          Text(
+                            skill.currentCooldown > 0 ? '${skill.currentCooldown} CD' : (skill.isLimitBurst ? 'ULTIMATE' : '${skill.damageCoefficient}x DMG'),
+                            style: const TextStyle(fontSize: 8, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('WAITING FOR INITIATIVE...', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                Text(selectedEnemy != null ? 'TARGET: ${selectedEnemy.name}' : 'NO TARGET', style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10)),
+              ],
+            ),
+          const SizedBox(height: 8),
+          // Row 2: General Orders & Focus
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Text(
-                    'FOCUS:',
-                    style: TextStyle(
-                      color: Color(0xFF8E8EA0),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
                   for (int i = 0; i < widget.commandService.maxFocus; i++)
                     Container(
-                      margin: const EdgeInsets.only(right: 5),
-                      width: 13,
-                      height: 13,
+                      margin: const EdgeInsets.only(right: 4),
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: i < focus ? const Color(0xFFB3261E) : Colors.transparent,
-                        border: Border.all(
-                          color: const Color(0xFFB3261E),
-                          width: 1.5,
-                        ),
-                        boxShadow: i < focus
-                            ? [
-                                const BoxShadow(
-                                  color: Color(0xFFB3261E),
-                                  blurRadius: 5,
-                                  spreadRadius: 1,
-                                )
-                              ]
-                            : null,
+                        border: Border.all(color: const Color(0xFFB3261E), width: 1.5),
                       ),
                     ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: (isPlayerTurn && _selectedEnemyId != null) ? _executePlayerAttack : null,
-                icon: const Icon(Icons.flash_on, size: 16),
-                label: Text(
-                  selectedEnemy != null ? 'STRIKE ${selectedEnemy.name.toUpperCase()}' : 'SELECT TARGET',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB3261E),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF2A2A38),
-                  disabledForegroundColor: Colors.white30,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildOrderButton(
-                  title: 'SIPHON',
-                  cost: 1,
-                  availableFocus: focus,
-                  onPressed: () => _executeOrder(() {
-                    if (_selectedEnemyId == null) return;
-                    final res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
-                    setState(() => _combatLog = res.summary);
-                  }),
-                ),
-              ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildOrderButton(
-                  title: 'WARD',
-                  cost: 2,
-                  availableFocus: focus,
-                  onPressed: () => _executeOrder(() {
-                    final res = widget.commandService.executeSanguineWard();
-                    setState(() => _combatLog = res.summary);
-                  }),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildOrderButton(
-                  title: 'EXECUTE',
-                  cost: 3,
-                  availableFocus: focus,
-                  onPressed: () => _executeOrder(() {
-                    if (_selectedEnemyId == null) return;
-                    final res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
-                    setState(() => _combatLog = res.summary);
-                  }),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildOrderButton(
+                        title: 'SIPHON',
+                        cost: 1,
+                        availableFocus: focus,
+                        onPressed: () => _executeOrder(() {
+                          if (_selectedEnemyId == null) return;
+                          final res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
+                          setState(() => _combatLog = res.summary);
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: _buildOrderButton(
+                        title: 'WARD',
+                        cost: 2,
+                        availableFocus: focus,
+                        onPressed: () => _executeOrder(() {
+                          final res = widget.commandService.executeSanguineWard();
+                          setState(() => _combatLog = res.summary);
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: _buildOrderButton(
+                        title: 'EXECUTE',
+                        cost: 3,
+                        availableFocus: focus,
+                        onPressed: () => _executeOrder(() {
+                          if (_selectedEnemyId == null) return;
+                          final res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
+                          setState(() => _combatLog = res.summary);
+                        }),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -763,12 +879,12 @@ class _BattleScreenState extends State<BattleScreen> {
           color: canCast ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
           width: 1.2,
         ),
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
       child: Column(
         children: [
-          Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
           Text(
             '$cost FOCUS',
             style: TextStyle(

@@ -1,0 +1,314 @@
+import 'package:flutter/material.dart';
+import 'campaign_node.dart';
+
+class CampaignMapScreen extends StatelessWidget {
+  final List<CampaignNode> nodes;
+  final ValueChanged<CampaignNode> onSelectNode;
+  final int totalIchor;
+
+  const CampaignMapScreen({
+    super.key,
+    required this.nodes,
+    required this.onSelectNode,
+    this.totalIchor = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF111114),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF181820),
+        title: const Text(
+          'ASHEN EXPEDITION TRAIL',
+          style: TextStyle(letterSpacing: 2.0, fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 14.0),
+            child: Row(
+              children: [
+                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  '$totalIchor ICHOR',
+                  style: const TextStyle(
+                    color: Color(0xFFE5A93C),
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double mapWidth = constraints.maxWidth;
+          final double mapHeight = constraints.maxHeight;
+
+          return Stack(
+            children: [
+              // Background Parchment Grid
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _CampaignPathPainter(nodes: nodes),
+                ),
+              ),
+              // Node interactive badges
+              ...nodes.map((node) {
+                // Calculate position: depth (X axis: 0 to 4), verticalRatio (Y axis: 0.1 to 0.9)
+                final double x = (node.depth / 4.0) * (mapWidth - 80) + 40;
+                final double y = node.verticalRatio * (mapHeight - 80) + 40;
+
+                return Positioned(
+                  left: x - 26,
+                  top: y - 26,
+                  child: _buildNodeBadge(context, node),
+                );
+              }),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNodeBadge(BuildContext context, CampaignNode node) {
+    final bool canTap = node.isReachable && !node.isVisited;
+
+    Color borderColor = const Color(0xFF2B2B36);
+    Color bgColor = const Color(0xFF181820);
+    IconData icon = _nodeIcon(node.type);
+
+    if (node.isVisited) {
+      borderColor = const Color(0xFF4CAF50);
+      bgColor = const Color(0xFF1B5E20).withValues(alpha: 0.3);
+      icon = Icons.check;
+    } else if (node.isCurrent) {
+      borderColor = const Color(0xFFE5A93C);
+      bgColor = const Color(0xFFE5A93C).withValues(alpha: 0.2);
+    } else if (node.isReachable) {
+      borderColor = const Color(0xFFB3261E);
+      bgColor = const Color(0xFF2A1515);
+    }
+
+    return GestureDetector(
+      onTap: canTap ? () => _showNodeEncounterDialog(context, node) : null,
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: node.type == CampaignNodeType.boss ? 56 : 46,
+            height: node.type == CampaignNodeType.boss ? 56 : 46,
+            decoration: BoxDecoration(
+              color: bgColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: borderColor,
+                width: (canTap || node.isCurrent) ? 2.5 : 1.2,
+              ),
+              boxShadow: canTap
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFB3261E).withValues(alpha: 0.45),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              icon,
+              size: node.type == CampaignNodeType.boss ? 28 : 22,
+              color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14141B).withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              node.name,
+              style: TextStyle(
+                color: canTap ? Colors.white : Colors.white38,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNodeEncounterDialog(BuildContext context, CampaignNode node) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF181820),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: Color(0xFFB3261E), width: 1.5),
+          ),
+          title: Row(
+            children: [
+              Icon(_nodeIcon(node.type), color: const Color(0xFFB3261E), size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  node.name.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                node.description,
+                style: const TextStyle(color: Color(0xFFB0B0C0), fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    'REWARD: +${node.rewardIchor} BLOODLINE ICHOR',
+                    style: const TextStyle(
+                      color: Color(0xFFE5A93C),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('RETREAT', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFB3261E),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                onSelectNode(node);
+              },
+              child: Text(
+                _actionLabel(node.type),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _actionLabel(CampaignNodeType type) {
+    switch (type) {
+      case CampaignNodeType.skirmish:
+      case CampaignNodeType.elite:
+      case CampaignNodeType.boss:
+        return 'ENGAGE HOSTILES';
+      case CampaignNodeType.altar:
+        return 'APPROACH ALTAR';
+      case CampaignNodeType.restHaven:
+        return 'BIND WOUNDS';
+      case CampaignNodeType.crypt:
+        return 'PRY SARCOPHAGUS';
+    }
+  }
+
+  IconData _nodeIcon(CampaignNodeType type) {
+    switch (type) {
+      case CampaignNodeType.skirmish:
+        return Icons.sports_kabaddi;
+      case CampaignNodeType.elite:
+        return Icons.local_fire_department;
+      case CampaignNodeType.altar:
+        return Icons.fireplace;
+      case CampaignNodeType.restHaven:
+        return Icons.healing;
+      case CampaignNodeType.crypt:
+        return Icons.vpn_key;
+      case CampaignNodeType.boss:
+        return Icons.shield;
+    }
+  }
+}
+
+class _CampaignPathPainter extends CustomPainter {
+  final List<CampaignNode> nodes;
+
+  _CampaignPathPainter({required this.nodes});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Map<String, Offset> nodePositions = {};
+
+    for (final node in nodes) {
+      final double x = (node.depth / 4.0) * (size.width - 80) + 40;
+      final double y = node.verticalRatio * (size.height - 80) + 40;
+      nodePositions[node.id] = Offset(x, y);
+    }
+
+    final Paint pathPaint = Paint()
+      ..color = const Color(0xFF2B2B36)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final Paint activePathPaint = Paint()
+      ..color = const Color(0xFFB3261E).withValues(alpha: 0.6)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    for (final node in nodes) {
+      final from = nodePositions[node.id];
+      if (from == null) continue;
+
+      for (final nextId in node.nextNodeIds) {
+        final to = nodePositions[nextId];
+        if (to == null) continue;
+
+        final Path path = Path();
+        path.moveTo(from.dx, from.dy);
+
+        final double controlX1 = from.dx + (to.dx - from.dx) * 0.5;
+        final double controlY1 = from.dy;
+        final double controlX2 = from.dx + (to.dx - from.dx) * 0.5;
+        final double controlY2 = to.dy;
+
+        path.cubicTo(controlX1, controlY1, controlX2, controlY2, to.dx, to.dy);
+
+        final targetNode = nodes.where((n) => n.id == nextId).firstOrNull;
+        final bool isActivePath = node.isVisited && (targetNode?.isReachable ?? false);
+
+        canvas.drawPath(path, isActivePath ? activePathPaint : pathPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CampaignPathPainter oldDelegate) => true;
+}

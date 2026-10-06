@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import 'combat_resolution_service.dart';
 import 'initiative_tick_manager.dart';
@@ -43,11 +44,30 @@ class EnemyAiService {
   ActionResult? executeEnemyTurn({bool autoResume = true}) {
     if (!isEnemyTurn) return null;
 
+    final enemy = tickManager.activeUnit;
+    if (enemy == null) return null;
+
+    // Check for Stun first
+    if (combatService.checkAndHandleStun()) {
+      return null;
+    }
+
     final target = selectTargetAlly();
     if (target == null) return null;
 
-    final result = combatService.executeBasicAttack(
+    // Pick best ready skill (Limit burst > Signature skill > Basic)
+    final readySkills = enemy.resolvedSkills.where((s) => s.isReady).toList();
+    SkillEntity chosenSkill = readySkills.firstWhere(
+      (s) => s.isLimitBurst && enemy.ultimateCharge >= 100.0,
+      orElse: () => readySkills.firstWhere(
+        (s) => s.cooldownTurns > 0,
+        orElse: () => readySkills.first,
+      ),
+    );
+
+    final result = combatService.executeSkill(
       targetUnitId: target.id,
+      skill: chosenSkill,
       autoResumeTickEngine: autoResume,
     );
 

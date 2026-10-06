@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../features/campaign/campaign_map_generator.dart';
+import '../../features/campaign/campaign_map_screen.dart';
+import '../../features/campaign/campaign_node.dart';
 import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
@@ -17,22 +20,26 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
+  int _totalIchor = 450;
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
   late GeneralCommandService _commandService;
   late List<UnitEntity> _inventory;
+  late List<CampaignNode> _campaignNodes;
+  CampaignNode? _activeNode;
 
   @override
   void initState() {
     super.initState();
     _resetEncounter();
     _inventory = StarterBrigades.createReserveInventory();
+    _campaignNodes = CampaignMapGenerator.generateCuratedCampaign();
   }
 
-  void _resetEncounter() {
+  void _resetEncounter([List<UnitEntity>? customEnemies]) {
     final allies = StarterBrigades.createPlayerSquad();
-    final enemies = StarterBrigades.createTutorialEnemies();
+    final enemies = customEnemies ?? StarterBrigades.createTutorialEnemies();
 
     _tickManager = InitiativeTickManager(
       initialAllies: allies,
@@ -55,6 +62,156 @@ class _AppShellState extends State<AppShell> {
     _tickManager.dispose();
     _commandService.dispose();
     super.dispose();
+  }
+
+  void _onSelectCampaignNode(CampaignNode node) {
+    setState(() {
+      _activeNode = node;
+    });
+
+    if (node.type == CampaignNodeType.skirmish ||
+        node.type == CampaignNodeType.elite ||
+        node.type == CampaignNodeType.boss) {
+      // Launch Combat with relevant enemy setup
+      _resetEncounter();
+      setState(() {
+        _currentIndex = 1; // Switch to Combat Arena
+      });
+    } else if (node.type == CampaignNodeType.altar) {
+      // Switch to Crucible Altar
+      setState(() {
+        _totalIchor += node.rewardIchor;
+        _markNodeCompleted(node.id);
+        _currentIndex = 2; // Switch to Altar
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Altar of Blood awakened! +${node.rewardIchor} Ichor granted.'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+    } else if (node.type == CampaignNodeType.restHaven) {
+      // Heal squad
+      _healSquad();
+      _markNodeCompleted(node.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Haven reached: Squad restored to full vitality!'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+    } else if (node.type == CampaignNodeType.crypt) {
+      // Crypt discovery: grants a rare thrall
+      _unlockCryptThrall();
+      _markNodeCompleted(node.id);
+    }
+  }
+
+  void _markNodeCompleted(String nodeId) {
+    setState(() {
+      _campaignNodes = _campaignNodes.map((n) {
+        if (n.id == nodeId) {
+          return n.copyWith(isVisited: true, isCurrent: false);
+        }
+        return n;
+      }).toList();
+
+      // Unlock forward nodes
+      final completed = _campaignNodes.firstWhere((n) => n.id == nodeId);
+      for (final nextId in completed.nextNodeIds) {
+        _campaignNodes = _campaignNodes.map((n) {
+          if (n.id == nextId) {
+            return n.copyWith(isReachable: true);
+          }
+          return n;
+        }).toList();
+      }
+    });
+  }
+
+  void _onCombatVictory() {
+    if (_activeNode != null) {
+      final reward = _activeNode!.rewardIchor;
+      setState(() {
+        _totalIchor += reward;
+      });
+      _markNodeCompleted(_activeNode!.id);
+      _captureThrallAfterBattle();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('EXPEDITION VICTORY! +$reward Ichor and a captured Thrall bound to Roster!'),
+          backgroundColor: const Color(0xFF1B5E20),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _captureThrallAfterBattle() {
+    final newThrall = UnitEntity(
+      id: 'captured_thrall_${DateTime.now().millisecondsSinceEpoch}',
+      speciesId: 'feral_hound',
+      name: 'Captured War-Hound',
+      generation: 1,
+      archetype: Archetype.juggernaut,
+      slot: FormationSlot.front1,
+      level: 10,
+      maxLevel: 10,
+      currentHp: 750,
+      maxHp: 750,
+      attack: 140,
+      defense: 110,
+      speed: 105,
+      nativeTraitId: 'rend_flesh',
+      lineageAncestors: const [],
+    );
+
+    setState(() {
+      _inventory.insert(0, newThrall);
+    });
+  }
+
+  void _healSquad() {
+    // Restores squad HP
+    final healed = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+    _tickManager.consumeTurn(
+      retainedOverflow: true,
+      updatedAllies: healed,
+      autoResume: false,
+    );
+  }
+
+  void _unlockCryptThrall() {
+    final cryptGhoul = UnitEntity(
+      id: 'crypt_ghoul_${DateTime.now().millisecondsSinceEpoch}',
+      speciesId: 'decayed_ghoul',
+      name: 'Crypt Sarcophagus Ghoul',
+      generation: 1,
+      archetype: Archetype.assassin,
+      slot: FormationSlot.front2,
+      level: 10,
+      maxLevel: 10,
+      currentHp: 650,
+      maxHp: 650,
+      attack: 160,
+      defense: 90,
+      speed: 118,
+      nativeTraitId: 'shadow_strike',
+      lineageAncestors: const [],
+    );
+
+    setState(() {
+      _inventory.insert(0, cryptGhoul);
+      _totalIchor += 250;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sarcophagus unsealed: Unlocked Crypt Ghoul & +250 Ichor!'),
+        backgroundColor: Color(0xFFB3261E),
+      ),
+    );
   }
 
   void _onFusionComplete(UnitEntity child) {
@@ -80,21 +237,28 @@ class _AppShellState extends State<AppShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          // Tab 0: Tactical Combat
+          // Tab 0: Campaign Map
+          CampaignMapScreen(
+            nodes: _campaignNodes,
+            onSelectNode: _onSelectCampaignNode,
+            totalIchor: _totalIchor,
+          ),
+          // Tab 1: Tactical Arena
           BattleScreen(
             tickManager: _tickManager,
             combatService: _combatService,
             commandService: _commandService,
             onResetEncounter: () => setState(_resetEncounter),
+            onVictory: _onCombatVictory,
           ),
-          // Tab 1: Crucible Altar
+          // Tab 2: Crucible Altar
           CrucibleScreen(
             availableInventory: allPlayerUnits,
             onFusionComplete: _onFusionComplete,
           ),
-          // Tab 2: Full Roster Inspection
+          // Tab 3: Brigade Roster
           _buildRosterScreen(allPlayerUnits),
-          // Tab 3: Codices & Wheel
+          // Tab 4: Codices
           _buildCodexView(),
         ],
       ),
@@ -111,8 +275,12 @@ class _AppShellState extends State<AppShell> {
         },
         items: const [
           BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Campaign Map',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.shield),
-            label: 'Tactical Arena',
+            label: 'Battle Arena',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.fireplace),
@@ -215,7 +383,7 @@ class _AppShellState extends State<AppShell> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Native Trait: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
+                        'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
                         '${unit.graftedTraitId != null ? ' • Grafted: ${unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()}' : ''}',
                         style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10),
                       ),
@@ -293,7 +461,7 @@ class _AppShellState extends State<AppShell> {
                 onPressed: () {
                   setState(() {
                     _resetEncounter();
-                    _currentIndex = 0;
+                    _currentIndex = 1;
                   });
                 },
               ),
