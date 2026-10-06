@@ -55,6 +55,8 @@ class _AppShellState extends State<AppShell> {
       generalName: 'Lord Vladislav',
       initialFocus: 1,
     );
+
+    _tickManager.start();
   }
 
   @override
@@ -72,8 +74,16 @@ class _AppShellState extends State<AppShell> {
     if (node.type == CampaignNodeType.skirmish ||
         node.type == CampaignNodeType.elite ||
         node.type == CampaignNodeType.boss) {
-      // Launch Combat with relevant enemy setup
-      _resetEncounter();
+      List<UnitEntity> enemies;
+      if (node.type == CampaignNodeType.boss) {
+        enemies = StarterBrigades.createBossEnemies();
+      } else if (node.type == CampaignNodeType.elite) {
+        enemies = StarterBrigades.createEliteEnemies();
+      } else {
+        enemies = StarterBrigades.createTutorialEnemies();
+      }
+
+      _resetEncounter(enemies);
       setState(() {
         _currentIndex = 1; // Switch to Combat Arena
       });
@@ -245,6 +255,7 @@ class _AppShellState extends State<AppShell> {
           ),
           // Tab 1: Tactical Arena
           BattleScreen(
+            key: ValueKey(_tickManager),
             tickManager: _tickManager,
             combatService: _combatService,
             commandService: _commandService,

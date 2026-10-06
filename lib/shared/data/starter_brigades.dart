@@ -152,7 +152,7 @@ class StarterBrigades {
     ];
   }
 
-  /// Hostile Encounter 1: Ghouls & Marauders
+  /// Standard Skirmish Enemies
   static List<UnitEntity> createTutorialEnemies() {
     return [
       const UnitEntity(
@@ -160,7 +160,7 @@ class StarterBrigades {
         speciesId: 'decayed_ghoul',
         name: 'Decayed Ghoul',
         generation: 1,
-        archetype: Archetype.assassin, // Juggernaut counters this (+30%)
+        archetype: Archetype.assassin,
         slot: FormationSlot.front1,
         level: 8,
         maxLevel: 20,
@@ -194,7 +194,7 @@ class StarterBrigades {
         speciesId: 'blood_bat',
         name: 'Blighted Bat',
         generation: 1,
-        archetype: Archetype.skirmisher, // Marksman counters this (+30%)
+        archetype: Archetype.skirmisher,
         slot: FormationSlot.front3,
         level: 9,
         maxLevel: 20,
@@ -228,7 +228,7 @@ class StarterBrigades {
         speciesId: 'cultist_chanter',
         name: 'Dark Chanter',
         generation: 1,
-        archetype: Archetype.support, // Skirmisher counters this (+30%)
+        archetype: Archetype.support,
         slot: FormationSlot.back2,
         level: 9,
         maxLevel: 20,
@@ -238,6 +238,120 @@ class StarterBrigades {
         defense: 60,
         speed: 90,
         nativeTraitId: 'dark_heal',
+        lineageAncestors: [],
+      ),
+    ];
+  }
+
+  /// Elite Encounter
+  static List<UnitEntity> createEliteEnemies() {
+    return [
+      const UnitEntity(
+        id: 'elite_colossus',
+        speciesId: 'abyssal_juggernaut',
+        name: 'Abyssal Colossus',
+        generation: 2,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 15,
+        maxLevel: 30,
+        currentHp: 1600,
+        maxHp: 1600,
+        attack: 160,
+        defense: 160,
+        speed: 85,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'elite_assassin',
+        speciesId: 'shadow_stalker',
+        name: 'Shadow Stalker',
+        generation: 2,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 15,
+        maxLevel: 30,
+        currentHp: 900,
+        maxHp: 900,
+        attack: 180,
+        defense: 70,
+        speed: 120,
+        nativeTraitId: 'death_mark',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'elite_witch',
+        speciesId: 'blight_witch',
+        name: 'Blight Witch',
+        generation: 2,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 15,
+        maxLevel: 30,
+        currentHp: 800,
+        maxHp: 800,
+        attack: 175,
+        defense: 60,
+        speed: 95,
+        nativeTraitId: 'plague_hex',
+        lineageAncestors: [],
+      ),
+    ];
+  }
+
+  /// Chapter Gatekeeper Boss
+  static List<UnitEntity> createBossEnemies() {
+    return [
+      const UnitEntity(
+        id: 'boss_gorgoroth',
+        speciesId: 'chapter_titan',
+        name: 'Gorgoroth the Flayed',
+        generation: 3,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 25,
+        maxLevel: 40,
+        currentHp: 2800,
+        maxHp: 2800,
+        attack: 210,
+        defense: 180,
+        speed: 100,
+        nativeTraitId: 'blood_sovereign',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'boss_guard_1',
+        speciesId: 'iron_vanguard',
+        name: 'Dread Guardian',
+        generation: 2,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 1100,
+        maxHp: 1100,
+        attack: 160,
+        defense: 100,
+        speed: 115,
+        nativeTraitId: 'vicious_strike',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'boss_priest',
+        speciesId: 'death_priest',
+        name: 'Blood Priestess',
+        generation: 2,
+        archetype: Archetype.support,
+        slot: FormationSlot.back1,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 1000,
+        maxHp: 1000,
+        attack: 120,
+        defense: 90,
+        speed: 105,
+        nativeTraitId: 'sanguine_mend',
         lineageAncestors: [],
       ),
     ];

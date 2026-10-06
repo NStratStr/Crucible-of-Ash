@@ -69,8 +69,42 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.tickManager.start();
+      if (widget.tickManager.phase == CombatPhase.idle) {
+        widget.tickManager.start();
+      }
     });
+  }
+
+  @override
+  void didUpdateWidget(BattleScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tickManager != widget.tickManager) {
+      oldWidget.tickManager.removeListener(_onEngineUpdate);
+      oldWidget.commandService.removeListener(_onEngineUpdate);
+
+      _aiService = EnemyAiService(
+        tickManager: widget.tickManager,
+        combatService: widget.combatService,
+        commandService: widget.commandService,
+      );
+
+      widget.tickManager.addListener(_onEngineUpdate);
+      widget.commandService.addListener(_onEngineUpdate);
+
+      final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive);
+      if (aliveEnemies.isNotEmpty) {
+        _selectedEnemyId = aliveEnemies.first.id;
+      }
+
+      _isProcessingAiTurn = false;
+      _combatLog = 'Encounter engaged! The Crucible awakens.';
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (widget.tickManager.phase == CombatPhase.idle) {
+          widget.tickManager.start();
+        }
+      });
+    }
   }
 
   @override
