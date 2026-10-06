@@ -45,6 +45,23 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       parent: _shakeController,
       curve: Curves.easeInOut,
     ));
+
+    // Pre-slot available matching pair if nothing selected
+    _autoSlotFirstCompatiblePair();
+  }
+
+  void _autoSlotFirstCompatiblePair() {
+    final list = widget.availableInventory;
+    for (int i = 0; i < list.length; i++) {
+      for (int j = i + 1; j < list.length; j++) {
+        if (list[i].speciesId == list[j].speciesId) {
+          _progenitorA = list[i];
+          _progenitorB = list[j];
+          _selectedGraftTraitId = list[i].nativeTraitId;
+          return;
+        }
+      }
+    }
   }
 
   @override
@@ -60,122 +77,35 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       _selectedGraftTraitId != null &&
       !_isPerformingRitual;
 
-  void _openUnitSelectionModal({required bool isSlotA}) {
-    final available = widget.availableInventory.where((u) {
-      if (isSlotA) {
-        return u.id != _progenitorB?.id;
+  void _selectUnit(UnitEntity unit) {
+    setState(() {
+      if (_progenitorA == null) {
+        _progenitorA = unit;
+        if (_progenitorB != null && _progenitorB!.speciesId != unit.speciesId) {
+          _progenitorB = null;
+        }
+      } else if (_progenitorA!.id == unit.id) {
+        _progenitorA = null;
+      } else if (_progenitorB == null) {
+        if (unit.speciesId == _progenitorA!.speciesId) {
+          _progenitorB = unit;
+        } else {
+          // Switch Progenitor A to new species
+          _progenitorA = unit;
+        }
+      } else if (_progenitorB!.id == unit.id) {
+        _progenitorB = null;
       } else {
-        return u.id != _progenitorA?.id &&
-            (_progenitorA == null || u.speciesId == _progenitorA!.speciesId);
+        // Replace B if matching species, or reset A
+        if (unit.speciesId == _progenitorA!.speciesId) {
+          _progenitorB = unit;
+        } else {
+          _progenitorA = unit;
+          _progenitorB = null;
+        }
       }
-    }).toList();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF14141B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        side: BorderSide(color: Color(0xFF2B2B36), width: 1.5),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isSlotA ? 'SELECT FIRST PROGENITOR' : 'SELECT COMPATIBLE MATE',
-                style: const TextStyle(
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: available.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No compatible lineage vessels found in inventory.',
-                          style: TextStyle(color: Colors.white38),
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: available.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final unit = available[index];
-                          final bool isMaxLevel = unit.level >= unit.maxLevel;
-
-                          return ListTile(
-                            tileColor: const Color(0xFF1C1C24),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              side: const BorderSide(color: Color(0xFF2B2B36)),
-                            ),
-                            leading: CircleAvatar(
-                              backgroundColor: const Color(0xFF2B2B36),
-                              child: Text(
-                                'G${unit.generation}',
-                                style: const TextStyle(
-                                  color: Color(0xFFE5A93C),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              unit.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Lv. ${unit.level}/${unit.maxLevel} • ATK: ${unit.attack} • HP: ${unit.maxHp}',
-                              style: const TextStyle(
-                                color: Color(0xFF8E8EA0),
-                                fontSize: 12,
-                              ),
-                            ),
-                            trailing: isMaxLevel
-                                ? const Chip(
-                                    label: Text('MAX POTENCY (10%)',
-                                        style: TextStyle(fontSize: 10)),
-                                    backgroundColor: Color(0xFF1B5E20),
-                                    labelStyle: TextStyle(color: Colors.white),
-                                  )
-                                : const Chip(
-                                    label: Text('UNFINISHED (5%)',
-                                        style: TextStyle(fontSize: 10)),
-                                    backgroundColor: Color(0xFF424242),
-                                    labelStyle: TextStyle(color: Colors.white54),
-                                  ),
-                            onTap: () {
-                              setState(() {
-                                if (isSlotA) {
-                                  _progenitorA = unit;
-                                  if (_progenitorB != null &&
-                                      _progenitorB!.speciesId != unit.speciesId) {
-                                    _progenitorB = null;
-                                  }
-                                } else {
-                                  _progenitorB = unit;
-                                }
-                                _updateDefaultGraft();
-                              });
-                              Navigator.pop(context);
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+      _updateDefaultGraft();
+    });
   }
 
   void _updateDefaultGraft() {
@@ -194,7 +124,6 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     setState(() => _isPerformingRitual = true);
     await _shakeController.forward(from: 0.0);
 
-    // Compute final descendant using CrucibleService
     final UnitEntity child = CrucibleService.fuseUnits(
       parentA: _progenitorA!,
       parentB: _progenitorB!,
@@ -249,14 +178,15 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Generation ${child.generation} • Pureblood Ancestry',
+                'Generation ${child.generation} • Pureblood Lineage',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               _buildStatMetricRow('MAX HP', child.maxHp.toString()),
               _buildStatMetricRow('ATTACK', child.attack.toString()),
               _buildStatMetricRow('DEFENSE', child.defense.toString()),
-              _buildStatMetricRow('GRAFTED TRAIT', child.graftedTraitId ?? 'None'),
+              _buildStatMetricRow('SPEED', child.speed.toString()),
+              _buildStatMetricRow('GRAFTED TRAIT', child.graftedTraitId?.replaceAll('_', ' ').toUpperCase() ?? 'None'),
             ],
           ),
           actions: [
@@ -278,14 +208,14 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
   Widget _buildStatMetricRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 12)),
+          Text(label, style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11)),
           Text(value,
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
         ],
       ),
     );
@@ -310,24 +240,27 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             style: TextStyle(
               letterSpacing: 2.0,
               fontWeight: FontWeight.bold,
-              fontSize: 15,
+              fontSize: 14,
             ),
           ),
           centerTitle: true,
           elevation: 0,
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(14.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Altar Slots
               _buildProgenitorSelectionAltar(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Trait & Projected Potency (if both slotted)
               if (_progenitorA != null && _progenitorB != null) ...[
                 _buildTraitGraftSelector(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 _buildInheritancePreviewCard(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: _canFuse ? _executeFusionRitual : null,
                   icon: const Icon(Icons.fireplace, color: Colors.white),
@@ -342,31 +275,15 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: const Color(0xFF2A2A38),
                     disabledForegroundColor: Colors.white24,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
                 ),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF181820),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF2B2B36)),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(Icons.auto_fix_high, color: Color(0xFF8E8EA0), size: 36),
-                      SizedBox(height: 12),
-                      Text(
-                        'Select two duplicate lineage vessels above to awaken the crucible.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
+                const SizedBox(height: 20),
               ],
+
+              // Visible Roster Section
+              _buildVisibleRosterSection(),
             ],
           ),
         ),
@@ -385,7 +302,6 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           child: _buildProgenitorSlot(
             label: 'PROGENITOR ALPHA',
             unit: _progenitorA,
-            onTap: () => _openUnitSelectionModal(isSlotA: true),
             onClear: () => setState(() {
               _progenitorA = null;
               _updateDefaultGraft();
@@ -393,14 +309,13 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           ),
         ),
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10.0),
-          child: Icon(Icons.add, color: Color(0xFFB3261E), size: 28),
+          padding: EdgeInsets.symmetric(horizontal: 8.0),
+          child: Icon(Icons.compare_arrows, color: Color(0xFFB3261E), size: 26),
         ),
         Expanded(
           child: _buildProgenitorSlot(
             label: 'PROGENITOR BETA',
             unit: _progenitorB,
-            onTap: () => _openUnitSelectionModal(isSlotA: false),
             onClear: () => setState(() {
               _progenitorB = null;
               _updateDefaultGraft();
@@ -414,87 +329,249 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   Widget _buildProgenitorSlot({
     required String label,
     required UnitEntity? unit,
-    required VoidCallback onTap,
     required VoidCallback onClear,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 170,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF181820),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: unit != null ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
-            width: 1.5,
-          ),
+    return Container(
+      height: 140,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF181820),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: unit != null ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
+          width: 1.5,
         ),
-        child: unit == null
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add_circle_outline, color: Color(0xFF8E8EA0), size: 32),
-                  const SizedBox(height: 8),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFF8E8EA0),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('Tap to bind',
-                      style: TextStyle(color: Colors.white30, fontSize: 10)),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('G${unit.generation}',
-                          style: const TextStyle(
-                              color: Color(0xFFE5A93C),
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 16, color: Colors.white54),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: onClear,
-                      ),
-                    ],
-                  ),
-                  const Icon(Icons.shield, color: Colors.white70, size: 28),
-                  Text(
-                    unit.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                  Text(
-                    'Lv. ${unit.level}/${unit.maxLevel}',
-                    style: TextStyle(
-                      color: unit.level >= unit.maxLevel
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFF8E8EA0),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'ATK ${unit.attack} • HP ${unit.maxHp}',
-                    style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9),
-                  ),
-                ],
-              ),
       ),
+      child: unit == null
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.add_circle_outline, color: Color(0xFF8E8EA0), size: 28),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF8E8EA0),
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text('Select below',
+                    style: TextStyle(color: Colors.white30, fontSize: 9)),
+              ],
+            )
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('GEN ${unit.generation}',
+                        style: const TextStyle(
+                            color: Color(0xFFE5A93C),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 14, color: Colors.white54),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: onClear,
+                    ),
+                  ],
+                ),
+                Text(
+                  unit.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                ),
+                Text(
+                  'Lv. ${unit.level}/${unit.maxLevel}',
+                  style: TextStyle(
+                    color: unit.level >= unit.maxLevel
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFF8E8EA0),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'ATK ${unit.attack} • HP ${unit.maxHp}',
+                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9),
+                ),
+              ],
+            ),
+    );
+  }
+
+  // ===========================================================================
+  // VISIBLE ROSTER & BRIGADE SECTION
+  // ===========================================================================
+
+  Widget _buildVisibleRosterSection() {
+    final list = widget.availableInventory;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'YOUR BRIGADE & THRALL ROSTER',
+              style: TextStyle(
+                color: Color(0xFFE5A93C),
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 1.2,
+              ),
+            ),
+            Text(
+              '${list.length} VESSELS',
+              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Tap any vessel below to slot it into the Crucible Altar. Matching species can be fused.',
+          style: TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+        const SizedBox(height: 10),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: list.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final unit = list[index];
+            final bool isSlottedA = _progenitorA?.id == unit.id;
+            final bool isSlottedB = _progenitorB?.id == unit.id;
+            final bool isSlotted = isSlottedA || isSlottedB;
+            final bool isMaxLevel = unit.level >= unit.maxLevel;
+            final bool isCompatibleWithA = _progenitorA != null &&
+                _progenitorA!.id != unit.id &&
+                _progenitorA!.speciesId == unit.speciesId;
+
+            return GestureDetector(
+              onTap: () => _selectUnit(unit),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isSlotted ? const Color(0xFF261C1C) : const Color(0xFF181820),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSlotted
+                        ? const Color(0xFFB3261E)
+                        : (isCompatibleWithA
+                            ? const Color(0xFFE5A93C)
+                            : const Color(0xFF2B2B36)),
+                    width: isSlotted || isCompatibleWithA ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: const Color(0xFF2B2B36),
+                      child: Text(
+                        'G${unit.generation}',
+                        style: const TextStyle(
+                          color: Color(0xFFE5A93C),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                unit.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              if (isCompatibleWithA)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: const Text('COMPATIBLE MATE',
+                                      style: TextStyle(
+                                          color: Color(0xFFE5A93C),
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Lv. ${unit.level}/${unit.maxLevel} • ATK ${unit.attack} • DEF ${unit.defense} • HP ${unit.maxHp}',
+                            style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                          ),
+                          Text(
+                            'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}',
+                            style: const TextStyle(color: Color(0xFF616161), fontSize: 9),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (isSlotted)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFB3261E),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isSlottedA ? 'SLOT A' : 'SLOT B',
+                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          )
+                        else
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              side: const BorderSide(color: Color(0xFF2B2B36)),
+                            ),
+                            onPressed: () => _selectUnit(unit),
+                            child: const Text('SLOT', style: TextStyle(fontSize: 10)),
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isMaxLevel ? '10% YIELD' : '5% YIELD',
+                          style: TextStyle(
+                            color: isMaxLevel ? const Color(0xFF4CAF50) : const Color(0xFF8E8EA0),
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -509,32 +586,32 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     }.toList();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xFF181820),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFF2B2B36)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'SELECT TRAIT TO GRAFT',
+            'SELECT TRAIT TO GRAFT TO CHILD',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+              letterSpacing: 1.1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             children: traits.map((trait) {
               final isSelected = _selectedGraftTraitId == trait;
               return ChoiceChip(
                 label: Text(trait.replaceAll('_', ' ').toUpperCase(),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
                 selected: isSelected,
                 selectedColor: const Color(0xFFB3261E),
                 backgroundColor: const Color(0xFF2B2B36),
@@ -571,10 +648,10 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         1;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF181820),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFE5A93C), width: 1.2),
       ),
       child: Column(
@@ -588,7 +665,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                 style: TextStyle(
                   color: Color(0xFFE5A93C),
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 11,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -598,27 +675,27 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'monospace',
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _buildStatMetricRow('MAX HP (Base 800)', '800 + $bonusHp = ${800 + bonusHp}'),
           _buildStatMetricRow('ATTACK (Base 150)', '150 + $bonusAtk = ${150 + bonusAtk}'),
           _buildStatMetricRow('DEFENSE (Base 100)', '100 + $bonusDef = ${100 + bonusDef}'),
           _buildStatMetricRow('SPEED (Base 100)', '100 + $bonusSpd = ${100 + bonusSpd}'),
-          const Divider(color: Color(0xFF2B2B36), height: 16),
+          const Divider(color: Color(0xFF2B2B36), height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Inheritance Potency: A(${(ratioA * 100).toInt()}%) + B(${(ratioB * 100).toInt()}%)',
-                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10)),
+                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9)),
               Text(
                 ratioA == 0.10 && ratioB == 0.10 ? 'PUREBLOOD RITE' : 'IMPURE TRANSFER',
                 style: TextStyle(
                   color: ratioA == 0.10 && ratioB == 0.10 ? const Color(0xFF4CAF50) : const Color(0xFFE5A93C),
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
               ),
