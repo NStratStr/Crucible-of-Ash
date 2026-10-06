@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/widgets/pedigree_inspector_dialog.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
@@ -50,6 +51,7 @@ class _BattleScreenState extends State<BattleScreen> {
   Timer? _autoBattleTimer;
 
   final List<FloatingCombatText> _floatingPops = [];
+  final List<Timer> _popTimers = [];
 
   @override
   void initState() {
@@ -110,6 +112,10 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void dispose() {
     _autoBattleTimer?.cancel();
+    for (final t in _popTimers) {
+      t.cancel();
+    }
+    _popTimers.clear();
     widget.tickManager.removeListener(_onEngineUpdate);
     widget.commandService.removeListener(_onEngineUpdate);
     super.dispose();
@@ -149,70 +155,73 @@ class _BattleScreenState extends State<BattleScreen> {
   }) {
     if (damage > 0) {
       final text = isCrit ? 'CRIT! -$damage' : (isGlancing ? 'GLANCE -$damage' : '-$damage');
-      final color = isCrit ? const Color(0xFFFFD54F) : (isGlancing ? Colors.white60 : const Color(0xFFEF5350));
+      final color = isCrit
+          ? const Color(0xFFFFD54F)
+          : (isGlancing ? Colors.white60 : const Color(0xFFEF5350));
 
       final pop = FloatingCombatText(text: text, color: color, isCrit: isCrit);
       setState(() => _floatingPops.add(pop));
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
+      final timer = Timer(const Duration(milliseconds: 1400), () {
         if (mounted) setState(() => _floatingPops.remove(pop));
       });
+      _popTimers.add(timer);
     }
 
     if (heal > 0) {
-      final pop = FloatingCombatText(text: '+$heal HP', color: const Color(0xFF81C784));
-      setState(() => _floatingPops.add(pop));
+      final healPop = FloatingCombatText(
+        text: '+$heal HP',
+        color: const Color(0xFF81C784),
+      );
+      setState(() => _floatingPops.add(healPop));
 
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (mounted) setState(() => _floatingPops.remove(pop));
+      final healTimer = Timer(const Duration(milliseconds: 1400), () {
+        if (mounted) setState(() => _floatingPops.remove(healPop));
       });
+      _popTimers.add(healTimer);
     }
   }
 
   Future<void> _handleAiTurn() async {
-    if (_isProcessingAiTurn) return;
+    if (_isProcessingAiTurn || !_aiService.isEnemyTurn) return;
     _isProcessingAiTurn = true;
 
     try {
-      final enemy = widget.tickManager.activeUnit;
-      if (enemy == null || !_aiService.isEnemyTurn) {
-        return;
-      }
-
-      setState(() {
-        _combatLog = 'HOSTILE ACTION: ${enemy.name} is preparing an assault...';
-      });
-
       await Future.delayed(const Duration(milliseconds: 550));
       if (!mounted) return;
 
-      final result = _aiService.executeEnemyTurn(autoResume: true);
-      if (result != null && mounted) {
+      final activeBefore = widget.tickManager.activeUnit;
+      if (activeBefore == null || !_aiService.isEnemyTurn) return;
+
+      final result = _aiService.executeEnemyTurn();
+
+      if (result != null) {
         _triggerDamagePop(
           damage: result.damageDealt,
           isCrit: result.isCritical,
           isGlancing: result.isGlancing,
-          heal: result.lifestealRecovered,
+          heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
         );
 
         setState(() {
           final glanceText = result.isGlancing ? ' [GLANCING]' : '';
           final critText = result.isCritical ? ' [CRIT!]' : '';
           _combatLog =
-              '${result.attacker.name} used ${result.skillName} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText!';
+              '${result.attacker.name} attacked ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
           if (result.targetDefeated) {
-            _combatLog += ' ${result.target.name} has fallen!';
+            _combatLog += ' ${result.target.name} fell in combat!';
           }
         });
       }
     } catch (e) {
-      debugPrint('Error during AI turn: $e');
-    } finally {
-      _isProcessingAiTurn = false;
       if (mounted) {
+        setState(() => _combatLog = 'Enemy action paused: $e');
+      }
+    } finally {
+      if (mounted) {
+        _isProcessingAiTurn = false;
         if (_aiService.isEnemyTurn) {
-          // Immediately chain consecutive enemy turns in queue
-          Future.microtask(() => _handleAiTurn());
+          _handleAiTurn();
         } else if (_autoBattle && _isPlayerTurnNow) {
           _handleAutoPlayerTurn();
         }
@@ -221,27 +230,46 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   void _handleAutoPlayerTurn() {
-    _autoBattleTimer?.cancel();
-    _autoBattleTimer = Timer(const Duration(milliseconds: 350), () {
-      if (mounted && _isPlayerTurnNow) {
-        final active = widget.tickManager.activeUnit;
-        if (active != null) {
-          final readySkills = active.resolvedSkills.where((s) => s.isReady).toList();
-          final chosen = readySkills.firstWhere((s) => s.cooldownTurns > 0, orElse: () => readySkills.first);
-          _executePlayerSkill(chosen);
-        }
+    if (!_isPlayerTurnNow || _isProcessingAiTurn) return;
+
+    final active = widget.tickManager.activeUnit;
+    if (active == null) return;
+
+    final skills = active.resolvedSkills;
+    final readySkill = skills.reversed.firstWhere((s) => s.isReady, orElse: () => skills.first);
+
+    if (_selectedEnemyId == null) {
+      final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive).toList();
+      if (aliveEnemies.isNotEmpty) {
+        _selectedEnemyId = aliveEnemies.first.id;
       }
-    });
+    }
+
+    if (_selectedEnemyId != null) {
+      _executePlayerSkill(readySkill);
+    }
   }
 
   void _executePlayerSkill(SkillEntity skill) {
-    if (_selectedEnemyId == null) return;
-    try {
-      final ActionResult result = widget.combatService.executeSkill(
-        targetUnitId: _selectedEnemyId!,
-        skill: skill,
-        autoResumeTickEngine: true,
+    if (!_isPlayerTurnNow) return;
+
+    final targetId = skill.targetType == SkillTargetType.singleAlly
+        ? widget.tickManager.allies.firstWhere((u) => u.isAlive).id
+        : _selectedEnemyId;
+
+    if (targetId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select an enemy vessel first.'),
+          backgroundColor: Color(0xFFB3261E),
+          duration: Duration(milliseconds: 1200),
+        ),
       );
+      return;
+    }
+
+    try {
+      final result = widget.combatService.executeSkill(skill: skill, targetUnitId: targetId);
 
       widget.commandService.registerCombatDamage(result.damageDealt);
 
@@ -286,6 +314,161 @@ class _BattleScreenState extends State<BattleScreen> {
     }
   }
 
+  void _dispatchOrder(GeneralOrderDefinition order) {
+    _executeOrder(() {
+      OrderResult res;
+      switch (widget.commandService.activeGeneralType) {
+        case GeneralType.vladislav:
+          if (order.id == 'siphon_vitality') {
+            if (_selectedEnemyId == null) {
+              throw StateError('Select an enemy to siphon.');
+            }
+            res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
+          } else if (order.id == 'sanguine_ward') {
+            res = widget.commandService.executeSanguineWard();
+          } else {
+            if (_selectedEnemyId == null) {
+              throw StateError('Select an enemy to execute.');
+            }
+            res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
+          }
+          break;
+        case GeneralType.valeria:
+          if (order.id == 'stand_resolute') {
+            final firstAliveAlly = widget.tickManager.allies.firstWhere(
+              (a) => a.isAlive,
+              orElse: () => throw StateError('No living ally to fortify.'),
+            );
+            res = widget.commandService.executeStandResolute(firstAliveAlly.id);
+          } else if (order.id == 'retributive_stride') {
+            res = widget.commandService.executeRetributiveStride();
+          } else {
+            if (_selectedEnemyId == null) {
+              throw StateError('Select an enemy to smite.');
+            }
+            res = widget.commandService.executeSmiteTheWicked(_selectedEnemyId!);
+          }
+          break;
+        case GeneralType.malakor:
+          if (order.id == 'corpse_burst') {
+            res = widget.commandService.executeCorpseBurst();
+          } else if (order.id == 'virulent_cascade') {
+            res = widget.commandService.executeVirulentCascade();
+          } else {
+            res = widget.commandService.executeRebindFlesh();
+          }
+          break;
+        case GeneralType.morrigan:
+          if (order.id == 'quicken') {
+            final livingAllies = widget.tickManager.allies.where((a) => a.isAlive).toList();
+            if (livingAllies.isEmpty) throw StateError('No living allies.');
+            final target = livingAllies.firstWhere(
+              (a) => a.turnMeter < 90,
+              orElse: () => livingAllies.first,
+            );
+            res = widget.commandService.executeQuicken(target.id);
+          } else if (order.id == 'unravel_hex') {
+            res = widget.commandService.executeUnravelHex();
+          } else {
+            res = widget.commandService.executeEchoingHourglass();
+          }
+          break;
+      }
+      setState(() => _combatLog = res.summary);
+    });
+  }
+
+  void _showGeneralSelectionDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131318),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        side: BorderSide(color: Color(0xFFB3261E), width: 1.5),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.shield_moon, color: Color(0xFFE5A93C), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'SELECT YOUR BRIGADE COMMANDER',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...GeneralProfile.allGenerals.map((profile) {
+                final isCurrent = widget.commandService.activeGeneralType == profile.type;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? profile.themeColor.withValues(alpha: 0.18)
+                        : const Color(0xFF1E1E26),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isCurrent ? profile.themeColor : const Color(0xFF2B2B36),
+                      width: isCurrent ? 2 : 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: profile.themeColor.withValues(alpha: 0.25),
+                      child: Icon(profile.icon, color: profile.themeColor),
+                    ),
+                    title: Row(
+                      children: [
+                        Text(
+                          profile.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          profile.title,
+                          style: TextStyle(color: profile.themeColor, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      'AURA: ${profile.auraName} — ${profile.auraDescription}',
+                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                    ),
+                    trailing: isCurrent
+                        ? const Icon(Icons.check_circle, color: Color(0xFF81C784), size: 20)
+                        : null,
+                    onTap: () {
+                      widget.commandService.setActiveGeneral(profile.type);
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _combatLog = 'Commander sworn: ${profile.name} took command of the brigade.';
+                      });
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeUnit = widget.tickManager.activeUnit;
@@ -305,22 +488,22 @@ class _BattleScreenState extends State<BattleScreen> {
                 _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                     child: Column(
                       children: [
                         // Hostile Squad
                         _buildSquadSection(
-                          title: 'HOSTILE HORDE (TAP TO TARGET)',
+                          title: 'HOSTILE HORDE (TAP TO TARGET • LONG-PRESS TO INSPECT)',
                           units: widget.tickManager.enemies,
                           isEnemy: true,
                           activeUnitId: activeUnit?.id,
                           selectedTargetId: _selectedEnemyId,
                           onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
                         ),
-                        const Divider(color: Color(0xFF2B2B36), thickness: 1.5, height: 14),
+                        const Divider(color: Color(0xFF2B2B36), thickness: 1.5, height: 12),
                         // Allied Squad
                         _buildSquadSection(
-                          title: 'YOUR LINEAGE BRIGADE',
+                          title: 'YOUR LINEAGE BRIGADE (TAP TO INSPECT PEDIGREE)',
                           units: widget.tickManager.allies,
                           isEnemy: false,
                           activeUnitId: activeUnit?.id,
@@ -335,8 +518,8 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
             // Floating Combat Text Overlay
             Positioned(
-              top: 140,
-              right: 40,
+              top: 130,
+              right: 30,
               child: IgnorePointer(
                 child: Column(
                   children: _floatingPops.map((pop) {
@@ -347,16 +530,16 @@ class _BattleScreenState extends State<BattleScreen> {
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.75),
+                          color: Colors.black.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: pop.color, width: pop.isCrit ? 2 : 1),
+                          border: Border.all(color: pop.color.withValues(alpha: 0.6)),
                         ),
                         child: Text(
                           pop.text,
                           style: TextStyle(
                             color: pop.color,
                             fontWeight: FontWeight.bold,
-                            fontSize: pop.isCrit ? 16 : 13,
+                            fontSize: pop.isCrit ? 14 : 12,
                             fontFamily: 'monospace',
                           ),
                         ),
@@ -377,6 +560,8 @@ class _BattleScreenState extends State<BattleScreen> {
   // ===========================================================================
 
   Widget _buildTopStatusHeader() {
+    final profile = widget.commandService.currentProfile;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
       decoration: const BoxDecoration(
@@ -386,20 +571,38 @@ class _BattleScreenState extends State<BattleScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.shield_moon_outlined, color: Color(0xFFB3261E), size: 20),
-              const SizedBox(width: 6),
-              Text(
-                widget.commandService.generalName.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
+          GestureDetector(
+            onTap: _showGeneralSelectionDialog,
+            child: Row(
+              children: [
+                Icon(profile.icon, color: profile.themeColor, size: 20),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          profile.name.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 16),
+                      ],
+                    ),
+                    Text(
+                      profile.title,
+                      style: TextStyle(color: profile.themeColor, fontSize: 8),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           Row(
             children: [
@@ -464,13 +667,17 @@ class _BattleScreenState extends State<BattleScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              alliesWon ? 'VICTORY! All hostile vessels eradicated.' : 'DEFEAT! Your lineage has fallen.',
+              alliesWon
+                  ? 'VICTORY! All hostile vessels eradicated.'
+                  : 'DEFEAT! Your lineage has fallen.',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
             ),
             if (widget.onResetEncounter != null)
               GestureDetector(
                 onTap: widget.onResetEncounter,
-                child: const Text('REPLAY', style: TextStyle(color: Colors.yellowAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                child: const Text('REPLAY',
+                    style: TextStyle(
+                        color: Colors.yellowAccent, fontWeight: FontWeight.bold, fontSize: 11)),
               ),
           ],
         ),
@@ -515,7 +722,8 @@ class _BattleScreenState extends State<BattleScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'ENEMY TURN: ${activeUnit.name} is attacking...',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -600,18 +808,18 @@ class _BattleScreenState extends State<BattleScreen> {
                 title,
                 style: TextStyle(
                   color: isEnemy ? const Color(0xFFE57373) : const Color(0xFF81C784),
-                  fontSize: 10,
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 1.1,
+                  letterSpacing: 1.0,
                 ),
               ),
               Text(
                 isEnemy ? 'Backline ← | → Frontline' : 'Frontline ← | → Backline',
-                style: const TextStyle(color: Color(0xFF616161), fontSize: 9),
+                style: const TextStyle(color: Color(0xFF616161), fontSize: 8.5),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Expanded(
             child: Row(
               children: [
@@ -632,7 +840,7 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
                 Container(
                   width: 1,
-                  height: 50,
+                  height: 60,
                   color: const Color(0xFF2B2B36),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                 ),
@@ -669,27 +877,39 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool alive = unit.isAlive;
     final double hpRatio = (unit.currentHp / unit.maxHp).clamp(0.0, 1.0);
     final double tmRatio = (unit.turnMeter / 100.0).clamp(0.0, 1.0);
+    final bool ultReady = unit.ultimateCharge >= 100.0 && alive;
 
     Color borderColor = const Color(0xFF2B2B36);
     if (isActive) {
       borderColor = const Color(0xFFE5A93C);
     } else if (isSelectedTarget) {
       borderColor = const Color(0xFFD32F2F);
+    } else if (ultReady) {
+      borderColor = const Color(0xFFFFD54F);
     }
 
     return Expanded(
       child: GestureDetector(
-        onTap: (isEnemy && alive) ? onTap : null,
+        onTap: () {
+          if (isEnemy && alive) {
+            onTap?.call();
+          } else {
+            PedigreeInspectorDialog.show(context, unit, isEnemy: isEnemy);
+          }
+        },
+        onLongPress: () {
+          PedigreeInspectorDialog.show(context, unit, isEnemy: isEnemy);
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: alive ? const Color(0xFF1E1E26) : const Color(0xFF131318),
+            color: alive ? const Color(0xFF1E1E26) : const Color(0xFF121216),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: borderColor,
-              width: (isActive || isSelectedTarget) ? 2.2 : 1.0,
+              width: (isActive || isSelectedTarget || ultReady) ? 2.0 : 1.0,
             ),
             boxShadow: isActive
                 ? [
@@ -707,73 +927,186 @@ class _BattleScreenState extends State<BattleScreen> {
                           spreadRadius: 1,
                         )
                       ]
-                    : null),
+                    : (ultReady
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            )
+                          ]
+                        : null)),
           ),
-          child: Opacity(
-            opacity: alive ? 1.0 : 0.35,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+          child: Stack(
+            children: [
+              Opacity(
+                opacity: alive ? 1.0 : 0.25,
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // Row 1: Archetype + G# / Target icon
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _archetypeShortCode(unit.archetype),
+                          style: TextStyle(
+                            color: _archetypeColor(unit.archetype),
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (isSelectedTarget)
+                          const Icon(Icons.gps_fixed, size: 10, color: Color(0xFFD32F2F))
+                        else if (ultReady)
+                          const Text(
+                            'ULT',
+                            style: TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        else
+                          Text(
+                            'G${unit.generation}',
+                            style: const TextStyle(
+                              color: Color(0xFF8E8EA0),
+                              fontSize: 7.5,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    // Icon & Name
+                    Icon(
+                      _archetypeIcon(unit.archetype),
+                      size: 18,
+                      color: alive ? Colors.white70 : Colors.white24,
+                    ),
+
                     Text(
-                      _archetypeShortCode(unit.archetype),
-                      style: TextStyle(
-                        color: _archetypeColor(unit.archetype),
+                      unit.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 8,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (isSelectedTarget)
-                      const Icon(Icons.gps_fixed, size: 10, color: Color(0xFFD32F2F))
-                    else
-                      Text(
-                        'G${unit.generation}',
-                        style: const TextStyle(
-                          color: Color(0xFF8E8EA0),
-                          fontSize: 8,
-                          fontFamily: 'monospace',
-                        ),
+
+                    // Status Effect Chips (if active)
+                    if (unit.activeEffects.isNotEmpty && alive)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: unit.activeEffects.take(3).map((eff) {
+                          final Color color = _statusColor(eff.type);
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 1),
+                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: color, width: 0.5),
+                            ),
+                            child: Text(
+                              _statusAbbr(eff.type),
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 6.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
+
+                    // Numbers overlay: HP and TM %
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${unit.currentHp}/${unit.maxHp}',
+                            style: TextStyle(
+                              color: hpRatio > 0.35
+                                  ? Colors.white70
+                                  : const Color(0xFFEF5350),
+                              fontSize: 6.5,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${unit.turnMeter.toInt()}%',
+                            style: const TextStyle(
+                              color: Color(0xFF64B5F6),
+                              fontSize: 6.5,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Progress Bars
+                    Column(
+                      children: [
+                        LinearProgressIndicator(
+                          value: hpRatio,
+                          minHeight: 3.5,
+                          backgroundColor: const Color(0xFF2A2A38),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            hpRatio > 0.4
+                                ? const Color(0xFF2E7D32)
+                                : const Color(0xFFC62828),
+                          ),
+                        ),
+                        const SizedBox(height: 1.5),
+                        LinearProgressIndicator(
+                          value: tmRatio,
+                          minHeight: 2.5,
+                          backgroundColor: const Color(0xFF2A2A38),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1976D2)),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                Icon(
-                  _archetypeIcon(unit.archetype),
-                  size: 20,
-                  color: alive ? Colors.white70 : Colors.white24,
-                ),
-                Text(
-                  unit.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
+              ),
+
+              // Fallen / Defeated overlay
+              if (!alive)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.dangerous, size: 14, color: Color(0xFFEF5350)),
+                          SizedBox(height: 1),
+                          Text(
+                            'FALLEN',
+                            style: TextStyle(
+                              color: Color(0xFFEF5350),
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                Column(
-                  children: [
-                    LinearProgressIndicator(
-                      value: hpRatio,
-                      minHeight: 4,
-                      backgroundColor: const Color(0xFF2A2A38),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        hpRatio > 0.4 ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    LinearProgressIndicator(
-                      value: tmRatio,
-                      minHeight: 3,
-                      backgroundColor: const Color(0xFF2A2A38),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1976D2)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -800,8 +1133,10 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  Widget _buildBottomControlBar(bool isPlayerTurn, UnitEntity? selectedEnemy, UnitEntity? activeUnit) {
+  Widget _buildBottomControlBar(
+      bool isPlayerTurn, UnitEntity? selectedEnemy, UnitEntity? activeUnit) {
     final focus = widget.commandService.currentFocus;
+    final profile = widget.commandService.currentProfile;
     final skills = activeUnit?.resolvedSkills ?? [];
 
     return Container(
@@ -826,7 +1161,9 @@ class _BattleScreenState extends State<BattleScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: skill.isLimitBurst
                             ? const Color(0xFFE5A93C)
-                            : (skill.cooldownTurns > 0 ? const Color(0xFFB3261E) : const Color(0xFF388E3C)),
+                            : (skill.cooldownTurns > 0
+                                ? const Color(0xFFB3261E)
+                                : const Color(0xFF388E3C)),
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: const Color(0xFF2A2A38),
                         disabledForegroundColor: Colors.white30,
@@ -843,7 +1180,11 @@ class _BattleScreenState extends State<BattleScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                           ),
                           Text(
-                            skill.currentCooldown > 0 ? '${skill.currentCooldown} CD' : (skill.isLimitBurst ? 'ULTIMATE' : '${skill.damageCoefficient}x DMG'),
+                            skill.currentCooldown > 0
+                                ? '${skill.currentCooldown} CD'
+                                : (skill.isLimitBurst
+                                    ? 'ULTIMATE'
+                                    : '${skill.damageCoefficient}x DMG'),
                             style: const TextStyle(fontSize: 8, color: Colors.white70),
                           ),
                         ],
@@ -857,71 +1198,53 @@ class _BattleScreenState extends State<BattleScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('WAITING FOR INITIATIVE...', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                Text(selectedEnemy != null ? 'TARGET: ${selectedEnemy.name}' : 'NO TARGET', style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10)),
+                const Text('WAITING FOR INITIATIVE...',
+                    style: TextStyle(color: Colors.white38, fontSize: 11)),
+                Text(
+                  selectedEnemy != null ? 'TARGET: ${selectedEnemy.name}' : 'NO TARGET',
+                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                ),
               ],
             ),
           const SizedBox(height: 8),
           // Row 2: General Orders & Focus
           Row(
             children: [
-              Row(
-                children: [
-                  for (int i = 0; i < widget.commandService.maxFocus; i++)
-                    Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: i < focus ? const Color(0xFFB3261E) : Colors.transparent,
-                        border: Border.all(color: const Color(0xFFB3261E), width: 1.5),
+              GestureDetector(
+                onTap: _showGeneralSelectionDialog,
+                child: Row(
+                  children: [
+                    for (int i = 0; i < widget.commandService.maxFocus; i++)
+                      Container(
+                        margin: const EdgeInsets.only(right: 3),
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i < focus ? profile.themeColor : Colors.transparent,
+                          border: Border.all(color: profile.themeColor, width: 1.5),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildOrderButton(
-                        title: 'SIPHON',
-                        cost: 1,
-                        availableFocus: focus,
-                        onPressed: () => _executeOrder(() {
-                          if (_selectedEnemyId == null) return;
-                          final res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
-                          setState(() => _combatLog = res.summary);
-                        }),
+                  children: profile.orders.map((order) {
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: _buildOrderButton(
+                          title: order.name,
+                          cost: order.focusCost,
+                          availableFocus: focus,
+                          borderColor: profile.themeColor,
+                          onPressed: () => _dispatchOrder(order),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: _buildOrderButton(
-                        title: 'WARD',
-                        cost: 2,
-                        availableFocus: focus,
-                        onPressed: () => _executeOrder(() {
-                          final res = widget.commandService.executeSanguineWard();
-                          setState(() => _combatLog = res.summary);
-                        }),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: _buildOrderButton(
-                        title: 'EXECUTE',
-                        cost: 3,
-                        availableFocus: focus,
-                        onPressed: () => _executeOrder(() {
-                          if (_selectedEnemyId == null) return;
-                          final res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
-                          setState(() => _combatLog = res.summary);
-                        }),
-                      ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
               ),
             ],
@@ -935,6 +1258,7 @@ class _BattleScreenState extends State<BattleScreen> {
     required String title,
     required int cost,
     required int availableFocus,
+    required Color borderColor,
     required VoidCallback onPressed,
   }) {
     final bool canCast = availableFocus >= cost;
@@ -945,7 +1269,7 @@ class _BattleScreenState extends State<BattleScreen> {
         foregroundColor: Colors.white,
         disabledForegroundColor: Colors.white24,
         side: BorderSide(
-          color: canCast ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
+          color: canCast ? borderColor : const Color(0xFF2B2B36),
           width: 1.2,
         ),
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1014,6 +1338,36 @@ class _BattleScreenState extends State<BattleScreen> {
         return Icons.healing;
       case Archetype.occultist:
         return Icons.auto_awesome;
+    }
+  }
+
+  Color _statusColor(StatusEffectType type) {
+    switch (type) {
+      case StatusEffectType.bleed:
+        return const Color(0xFFE53935);
+      case StatusEffectType.blight:
+        return const Color(0xFF43A047);
+      case StatusEffectType.stun:
+        return const Color(0xFFFFB300);
+      case StatusEffectType.defenseUp:
+        return const Color(0xFF1E88E5);
+      case StatusEffectType.speedUp:
+        return const Color(0xFF00ACC1);
+    }
+  }
+
+  String _statusAbbr(StatusEffectType type) {
+    switch (type) {
+      case StatusEffectType.bleed:
+        return 'BLD';
+      case StatusEffectType.blight:
+        return 'BLT';
+      case StatusEffectType.stun:
+        return 'STN';
+      case StatusEffectType.defenseUp:
+        return 'ARM';
+      case StatusEffectType.speedUp:
+        return 'SPD';
     }
   }
 }

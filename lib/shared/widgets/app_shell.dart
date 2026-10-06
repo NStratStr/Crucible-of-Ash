@@ -10,6 +10,7 @@ import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../data/starter_brigades.dart';
 import '../models/unit_entity.dart';
+import 'pedigree_inspector_dialog.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -310,7 +311,105 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _showGeneralSelectionDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF131318),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        side: BorderSide(color: Color(0xFFB3261E), width: 1.5),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.shield_moon, color: Color(0xFFE5A93C), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'SELECT YOUR BRIGADE COMMANDER',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...GeneralProfile.allGenerals.map((profile) {
+                final isCurrent = _commandService.activeGeneralType == profile.type;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? profile.themeColor.withValues(alpha: 0.18)
+                        : const Color(0xFF1E1E26),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isCurrent ? profile.themeColor : const Color(0xFF2B2B36),
+                      width: isCurrent ? 2 : 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: profile.themeColor.withValues(alpha: 0.25),
+                      child: Icon(profile.icon, color: profile.themeColor),
+                    ),
+                    title: Row(
+                      children: [
+                        Text(
+                          profile.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          profile.title,
+                          style: TextStyle(color: profile.themeColor, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      'AURA: ${profile.auraName} — ${profile.auraDescription}',
+                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                    ),
+                    trailing: isCurrent
+                        ? const Icon(Icons.check_circle, color: Color(0xFF81C784), size: 20)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _commandService.setActiveGeneral(profile.type);
+                      });
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${profile.name} took command of the Brigade!'),
+                          backgroundColor: profile.themeColor,
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildRosterScreen(List<UnitEntity> allUnits) {
+    final profile = _commandService.currentProfile;
+
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
       appBar: AppBar(
@@ -321,36 +420,23 @@ class _AppShellState extends State<AppShell> {
         ),
         centerTitle: true,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(14),
-        itemCount: allUnits.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final unit = allUnits[index];
-          final inActiveSquad = _tickManager.allies.any((u) => u.id == unit.id);
-
-          return Container(
-            padding: const EdgeInsets.all(12),
+      body: Column(
+        children: [
+          // Commander Bar
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF181820),
+              color: profile.themeColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: inActiveSquad ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
-                width: inActiveSquad ? 1.5 : 1.0,
-              ),
+              border: Border.all(color: profile.themeColor, width: 1.5),
             ),
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFF2B2B36),
-                  child: Text(
-                    'G${unit.generation}',
-                    style: const TextStyle(
-                      color: Color(0xFFE5A93C),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
+                  radius: 18,
+                  backgroundColor: profile.themeColor.withValues(alpha: 0.3),
+                  child: Icon(profile.icon, color: profile.themeColor, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -360,51 +446,151 @@ class _AppShellState extends State<AppShell> {
                       Row(
                         children: [
                           Text(
-                            unit.name,
+                            profile.name.toUpperCase(),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: 12,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: inActiveSquad
-                                  ? const Color(0xFFB3261E).withValues(alpha: 0.25)
-                                  : const Color(0xFF424242),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              inActiveSquad ? 'ACTIVE BRIGADE' : 'RESERVE THRALL',
-                              style: TextStyle(
-                                color: inActiveSquad ? const Color(0xFFEF5350) : Colors.white60,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '• ${profile.title}',
+                            style: TextStyle(color: profile.themeColor, fontSize: 9.5),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Lv. ${unit.level}/${unit.maxLevel} • ATK: ${unit.attack} • DEF: ${unit.defense} • HP: ${unit.maxHp} • SPD: ${unit.speed}',
-                        style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
-                      ),
                       const SizedBox(height: 2),
                       Text(
-                        'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
-                        '${unit.graftedTraitId != null ? ' • Grafted: ${unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()}' : ''}',
-                        style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10),
+                        'AURA: ${profile.auraName} — ${profile.auraDescription}',
+                        style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
+                OutlinedButton(
+                  onPressed: _showGeneralSelectionDialog,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: profile.themeColor),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                  child: const Text('SWITCH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
-          );
-        },
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'THRALLS & PROGENITORS (${allUnits.length})',
+                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+                const Text(
+                  'TAP UNIT TO INSPECT PEDIGREE',
+                  style: TextStyle(color: Color(0xFFE5A93C), fontSize: 9, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+              itemCount: allUnits.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final unit = allUnits[index];
+                final inActiveSquad = _tickManager.allies.any((u) => u.id == unit.id);
+
+                return InkWell(
+                  onTap: () => PedigreeInspectorDialog.show(context, unit),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF181820),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: inActiveSquad ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
+                        width: inActiveSquad ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: const Color(0xFF2B2B36),
+                          child: Text(
+                            'G${unit.generation}',
+                            style: const TextStyle(
+                              color: Color(0xFFE5A93C),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    unit.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: inActiveSquad
+                                          ? const Color(0xFFB3261E).withValues(alpha: 0.25)
+                                          : const Color(0xFF424242),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      inActiveSquad ? 'ACTIVE BRIGADE' : 'RESERVE THRALL',
+                                      style: TextStyle(
+                                        color: inActiveSquad ? const Color(0xFFEF5350) : Colors.white60,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Lv. ${unit.level}/${unit.maxLevel} • ATK: ${unit.attack} • DEF: ${unit.defense} • HP: ${unit.maxHp} • SPD: ${unit.speed}',
+                                style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
+                                '${unit.graftedTraitId != null ? ' • Grafted: ${unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()}' : ''}',
+                                style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -415,7 +601,7 @@ class _AppShellState extends State<AppShell> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF181820),
         title: const Text(
-          'HEXAGONAL AFFINITY CODEX',
+          'HEXAGONAL AFFINITY & COMMAND CODEX',
           style: TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         centerTitle: true,
@@ -460,6 +646,62 @@ class _AppShellState extends State<AppShell> {
             _buildCodexItem(Archetype.skirmisher, 'Dives onto Supports (+30%). Weak to Marksmen fire (-25%).'),
             _buildCodexItem(Archetype.support, 'Purges Occultists (+30%). Weak to Skirmisher dives (-25%).'),
             _buildCodexItem(Archetype.occultist, 'Melts Juggernauts (+30%). Weak to Support wards (-25%).'),
+            const SizedBox(height: 16),
+            const Text(
+              'COMMANDERS & BATTLEFIELD AURAS',
+              style: TextStyle(
+                color: Color(0xFFE5A93C),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...GeneralProfile.allGenerals.map((g) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF181820),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: g.themeColor.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: g.themeColor.withValues(alpha: 0.25),
+                      child: Icon(g.icon, color: g.themeColor, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                g.name,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(g.title, style: TextStyle(color: g.themeColor, fontSize: 10)),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text('Aura: ${g.auraName} — ${g.auraDescription}', style: const TextStyle(color: Colors.white70, fontSize: 10.5)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Orders: ${g.orders.map((o) => "${o.name} (${o.focusCost}F)").join(" • ")}',
+                            style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 16),
             Center(
               child: ElevatedButton.icon(

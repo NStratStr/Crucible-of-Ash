@@ -23,6 +23,16 @@ class CombatMath {
     return 1.00;
   }
 
+  /// Returns the archetype that this role is strong against (+1 clockwise)
+  static Archetype getPreyArchetype(Archetype role) {
+    return Archetype.values[(role.index + 1) % 6];
+  }
+
+  /// Returns the archetype that this role is weak against (-1 counter-clockwise)
+  static Archetype getPredatorArchetype(Archetype role) {
+    return Archetype.values[(role.index + 5) % 6];
+  }
+
   /// Evaluates whether an attack glances due to affinity disadvantage.
   static bool isGlancingBlow(Archetype attacker, Archetype defender, [Random? rng]) {
     if (getAffinityMultiplier(attacker, defender) == 0.75) {

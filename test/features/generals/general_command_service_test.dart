@@ -166,5 +166,81 @@ void main() {
       expect(result.updatedAllies[0].turnMeter, equals(50.0));
       expect(result.updatedAllies[1].turnMeter, equals(50.0));
     });
+
+    test('Switching active general updates profile and orders', () {
+      expect(commandService.activeGeneralType, equals(GeneralType.vladislav));
+      commandService.setActiveGeneral(GeneralType.valeria);
+      expect(commandService.activeGeneralType, equals(GeneralType.valeria));
+      expect(commandService.generalName, equals('Lady Valeria'));
+      expect(commandService.currentProfile.orders.length, equals(3));
+    });
+
+    test('Lady Valeria: Stand Resolute fortifies target ally armor', () {
+      commandService.setActiveGeneral(GeneralType.valeria);
+      final res = commandService.executeStandResolute('ally_tank');
+      expect(res.updatedAllies.first.defense, equals(140)); // 100 + 40
+    });
+
+    test('Lady Valeria: Retributive Stride counters with vanguard attack', () {
+      commandService.setActiveGeneral(GeneralType.valeria);
+      commandService.grantFocus(2);
+      final res = commandService.executeRetributiveStride();
+      expect(res.updatedEnemies.first.currentHp, equals(2000 - 150)); // boss took 150 from ally_tank
+    });
+
+    test('Lady Valeria: Smite the Wicked scales with total brigade armor', () {
+      commandService.setActiveGeneral(GeneralType.valeria);
+      commandService.grantFocus(3);
+      // Total armor = 100 + 40 = 140. Smite deals 80% = 112 -> clamped min 150
+      final res = commandService.executeSmiteTheWicked('enemy_boss');
+      expect(res.updatedEnemies.first.currentHp, equals(2000 - 150));
+    });
+
+    test('Malakor: Corpse Burst damages and blights all enemies', () {
+      commandService.setActiveGeneral(GeneralType.malakor);
+      final res = commandService.executeCorpseBurst();
+      expect(res.updatedEnemies.first.currentHp, equals(2000 - 140));
+      expect(res.updatedEnemies.first.isBlighted, isTrue);
+    });
+
+    test('Malakor: Rebind Flesh resurrects fallen ally with 40% HP and 100 TM', () {
+      commandService.setActiveGeneral(GeneralType.malakor);
+      final deadTank = vanguardHero.copyWith(currentHp: 0);
+      tickManager = InitiativeTickManager(
+        initialAllies: [deadTank, arcanumHero],
+        initialEnemies: [enemyBoss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+        initialFocus: 3,
+      );
+
+      final res = commandService.executeRebindFlesh();
+      expect(res.updatedAllies.first.isAlive, isTrue);
+      expect(res.updatedAllies.first.currentHp, equals(400));
+      expect(res.updatedAllies.first.turnMeter, equals(100.0));
+    });
+
+    test('Morrigan: Quicken surges ally to 100% Turn Meter', () {
+      commandService.setActiveGeneral(GeneralType.morrigan);
+      final res = commandService.executeQuicken('ally_mage');
+      expect(res.updatedAllies[1].turnMeter, equals(100.0));
+    });
+
+    test('Morrigan: Unravel Hex cleanses allies and shreds enemy armor', () {
+      commandService.setActiveGeneral(GeneralType.morrigan);
+      commandService.grantFocus(2);
+      final res = commandService.executeUnravelHex();
+      expect(res.updatedEnemies.first.defense, equals(56)); // 80 - 30% (24) = 56
+    });
+
+    test('Morrigan: Echoing Hourglass grants +40% TM to team', () {
+      commandService.setActiveGeneral(GeneralType.morrigan);
+      commandService.grantFocus(3);
+      final res = commandService.executeEchoingHourglass();
+      expect(res.updatedAllies[0].turnMeter, equals(40.0));
+      expect(res.updatedAllies[1].turnMeter, equals(40.0));
+    });
   });
 }

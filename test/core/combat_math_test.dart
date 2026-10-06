@@ -55,5 +55,16 @@ void main() {
       // variance around 190 - 205
       expect(damage, inInclusiveRange(180, 215));
     });
+
+    test('getPreyArchetype and getPredatorArchetype follow hexagonal ring', () {
+      expect(CombatMath.getPreyArchetype(Archetype.juggernaut), equals(Archetype.assassin));
+      expect(CombatMath.getPredatorArchetype(Archetype.juggernaut), equals(Archetype.occultist));
+
+      expect(CombatMath.getPreyArchetype(Archetype.assassin), equals(Archetype.marksman));
+      expect(CombatMath.getPredatorArchetype(Archetype.assassin), equals(Archetype.juggernaut));
+
+      expect(CombatMath.getPreyArchetype(Archetype.occultist), equals(Archetype.juggernaut));
+      expect(CombatMath.getPredatorArchetype(Archetype.occultist), equals(Archetype.support));
+    });
   });
 }
