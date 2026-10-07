@@ -235,14 +235,26 @@ class GeneralCommandService extends ChangeNotifier {
   int _currentFocus;
   double _accumulatedDamageProgress = 0.0;
 
+  final Map<GeneralType, int> _phylacteryRanks = {
+    GeneralType.vladislav: 1,
+    GeneralType.valeria: 1,
+    GeneralType.malakor: 1,
+    GeneralType.morrigan: 1,
+  };
+
   GeneralCommandService({
     required this.tickManager,
     String? generalId,
     String? generalName,
     GeneralType generalType = GeneralType.vladislav,
     int initialFocus = 1,
+    Map<GeneralType, int>? initialPhylacteryRanks,
   })  : _activeGeneralType = generalType,
-        _currentFocus = initialFocus.clamp(0, maxFocusCap);
+        _currentFocus = initialFocus.clamp(0, maxFocusCap) {
+    if (initialPhylacteryRanks != null) {
+      _phylacteryRanks.addAll(initialPhylacteryRanks);
+    }
+  }
 
   GeneralType get activeGeneralType => _activeGeneralType;
   GeneralProfile get currentProfile => GeneralProfile.getByType(_activeGeneralType);
@@ -253,6 +265,22 @@ class GeneralCommandService extends ChangeNotifier {
   int get maxFocus => maxFocusCap;
   double get focusProgressRatio =>
       (_accumulatedDamageProgress / focusChargeThreshold).clamp(0.0, 1.0);
+
+  Map<GeneralType, int> get allPhylacteryRanks => Map.unmodifiable(_phylacteryRanks);
+
+  int get activePhylacteryRank => getPhylacteryRank(_activeGeneralType);
+
+  int getPhylacteryRank(GeneralType type) => _phylacteryRanks[type] ?? 1;
+
+  double get potencyMultiplier => activePhylacteryRank >= 2 ? 1.20 : 1.0;
+
+  bool upgradePhylactery(GeneralType type) {
+    final current = getPhylacteryRank(type);
+    if (current >= 3) return false;
+    _phylacteryRanks[type] = current + 1;
+    notifyListeners();
+    return true;
+  }
 
   void setActiveGeneral(GeneralType type) {
     if (_activeGeneralType == type) return;
@@ -311,7 +339,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     final UnitEntity target = enemies[enemyIdx];
-    final int drainAmount = max(1, (target.currentHp * 0.15).round());
+    final int drainAmount = max(1, ((target.currentHp * 0.15) * potencyMultiplier).round());
     final UnitEntity updatedTarget = target.copyWith(
       currentHp: max(0, target.currentHp - drainAmount),
     );
@@ -360,7 +388,7 @@ class GeneralCommandService extends ChangeNotifier {
       return unit.copyWith(currentHp: newHp);
     }).toList();
 
-    final int defenseBuffPerUnit = max(5, ((totalSacrificedHp * 2.0) / allies.length).round());
+    final int defenseBuffPerUnit = max(5, (((totalSacrificedHp * 2.0) * potencyMultiplier) / allies.length).round());
     allies = allies.map((unit) {
       if (!unit.isAlive) return unit;
       return unit.copyWith(defense: unit.defense + defenseBuffPerUnit);
@@ -439,7 +467,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     final UnitEntity target = allies[allyIdx];
-    final int armorBoost = max(10, (target.defense * 0.40).round());
+    final int armorBoost = max(10, ((target.defense * 0.40) * potencyMultiplier).round());
     allies[allyIdx] = target.copyWith(defense: target.defense + armorBoost);
 
     final List<UnitEntity> enemies = List.of(tickManager.enemies);
@@ -514,7 +542,7 @@ class GeneralCommandService extends ChangeNotifier {
       }
     }
 
-    final int radiantDamage = max(150, (totalBrigadeArmor * 0.80).round());
+    final int radiantDamage = max(150, ((totalBrigadeArmor * 0.80) * potencyMultiplier).round());
     final target = enemies[enemyIdx];
     final int newHp = max(0, target.currentHp - radiantDamage);
     enemies[enemyIdx] = target.copyWith(currentHp: newHp);
@@ -542,7 +570,7 @@ class GeneralCommandService extends ChangeNotifier {
     const int cost = 1;
     _spendFocus(cost);
 
-    const int burstDamage = 140;
+    final int burstDamage = max(1, (140 * potencyMultiplier).round());
     final List<UnitEntity> allies = List.of(tickManager.allies);
     List<UnitEntity> enemies = List.of(tickManager.enemies);
 
@@ -573,7 +601,7 @@ class GeneralCommandService extends ChangeNotifier {
     const int cost = 2;
     _spendFocus(cost);
 
-    const int cascadeDamage = 160;
+    final int cascadeDamage = max(1, (160 * potencyMultiplier).round());
     final List<UnitEntity> allies = List.of(tickManager.allies);
     List<UnitEntity> enemies = List.of(tickManager.enemies);
 

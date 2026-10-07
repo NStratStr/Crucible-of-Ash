@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'general_command_service.dart';
 
-/// Modal dialog allowing the player to awaken and appoint their General Commander.
-class GeneralSelectionDialog extends StatelessWidget {
+/// Modal dialog allowing the player to awaken, appoint, and anoint their General Commander.
+class GeneralSelectionDialog extends StatefulWidget {
   final GeneralType currentGeneralType;
   final ValueChanged<GeneralType> onGeneralSelected;
+  final GeneralCommandService? commandService;
 
   const GeneralSelectionDialog({
     super.key,
     required this.currentGeneralType,
     required this.onGeneralSelected,
+    this.commandService,
   });
 
   static Future<GeneralType?> show(
     BuildContext context, {
     required GeneralType currentGeneralType,
+    GeneralCommandService? commandService,
   }) {
     return showModalBottomSheet<GeneralType>(
       context: context,
@@ -22,11 +25,17 @@ class GeneralSelectionDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => GeneralSelectionDialog(
         currentGeneralType: currentGeneralType,
+        commandService: commandService,
         onGeneralSelected: (type) => Navigator.pop(ctx, type),
       ),
     );
   }
 
+  @override
+  State<GeneralSelectionDialog> createState() => _GeneralSelectionDialogState();
+}
+
+class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -81,7 +90,7 @@ class GeneralSelectionDialog extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Appoint the General overseeing your brigade',
+                        'Appoint and Anoint the General overseeing your brigade',
                         style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
                       ),
                     ],
@@ -105,7 +114,7 @@ class GeneralSelectionDialog extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 final gen = GeneralProfile.allGenerals[index];
-                final isSelected = gen.type == currentGeneralType;
+                final isSelected = gen.type == widget.currentGeneralType;
 
                 return _buildGeneralCard(context, gen, isSelected);
               },
@@ -117,75 +126,66 @@ class GeneralSelectionDialog extends StatelessWidget {
   }
 
   Widget _buildGeneralCard(BuildContext context, GeneralProfile gen, bool isSelected) {
+    final int rank = widget.commandService?.getPhylacteryRank(gen.type) ?? 1;
+
+    String rankBonus;
+    if (rank >= 3) {
+      rankBonus = 'Rank 3: +1 Initial Focus & +20% Potency';
+    } else if (rank == 2) {
+      rankBonus = 'Rank 2: +20% Order Potency';
+    } else {
+      rankBonus = 'Rank 1: Baseline Potency';
+    }
+
     return Container(
       decoration: BoxDecoration(
-        color: isSelected
-            ? gen.themeColor.withValues(alpha: 0.12)
-            : const Color(0xFF16161E),
+        color: const Color(0xFF16161F),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected ? gen.themeColor : const Color(0xFF2B2B36),
-          width: isSelected ? 2.0 : 1.0,
+          width: isSelected ? 1.8 : 1.0,
         ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: gen.themeColor.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Avatar icon + Name + Select Button
+            // Top Row
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
-                    color: gen.themeColor.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(10),
+                    color: gen.themeColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: gen.themeColor),
                   ),
-                  child: Icon(gen.icon, color: gen.themeColor, size: 28),
+                  child: Icon(gen.icon, color: gen.themeColor, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              gen.name.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                letterSpacing: 0.8,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (isSelected) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFE5A93C), width: 1),
-                              ),
-                              child: const Text(
-                                'ACTIVE',
-                                style: TextStyle(
-                                  color: Color(0xFFE5A93C),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        gen.name.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
                         gen.title,
                         style: TextStyle(
@@ -197,38 +197,108 @@ class GeneralSelectionDialog extends StatelessWidget {
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isSelected
-                        ? const Color(0xFF2B2B36)
-                        : gen.themeColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                if (isSelected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF261010),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFB3261E)),
+                    ),
+                    child: const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Color(0xFFE5A93C),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  )
+                else
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: gen.themeColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    onPressed: () => widget.onGeneralSelected(gen.type),
+                    child: const Text('APPOINT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: isSelected ? null : () => onGeneralSelected(gen.type),
-                  child: Text(
-                    isSelected ? 'APPOINTED' : 'APPOINT',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // Passive Aura
+            // Phylactery Rank Badge & Anoint Action
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF101014),
+                color: const Color(0xFF101016),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: gen.themeColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.workspace_premium, size: 14, color: const Color(0xFFE5A93C)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'PHYLACTERY: $rankBonus',
+                      style: const TextStyle(
+                        color: Color(0xFFE5A93C),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (widget.commandService != null && rank < 3) ...[
+                    InkWell(
+                      onTap: () {
+                        widget.commandService!.upgradePhylactery(gen.type);
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${gen.name}\'s Phylactery anointed to Rank ${rank + 1}!'),
+                            backgroundColor: gen.themeColor,
+                            duration: const Duration(milliseconds: 1400),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: gen.themeColor.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: gen.themeColor),
+                        ),
+                        child: const Text(
+                          'ANOINT +1',
+                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Aura
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF101016),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white10),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.auto_awesome, color: Color(0xFFE5A93C), size: 14),
+                  Icon(Icons.auto_awesome, size: 14, color: gen.themeColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: RichText(
@@ -236,7 +306,7 @@ class GeneralSelectionDialog extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, height: 1.3),
                         children: [
                           TextSpan(
-                            text: '${gen.auraName}: ',
+                            text: 'AURA (${gen.auraName}): ',
                             style: const TextStyle(
                               color: Color(0xFFE5A93C),
                               fontWeight: FontWeight.bold,

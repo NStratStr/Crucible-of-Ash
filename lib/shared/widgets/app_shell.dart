@@ -17,6 +17,10 @@ import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
 import '../../features/relics/relic_forge_screen.dart';
 import '../../features/relics/relic_service.dart';
+import '../../features/ftue/awakening_dialog.dart';
+import '../../features/ftue/ftue_guidance_banner.dart';
+import '../../features/ftue/ftue_service.dart';
+import '../../features/ftue/ftue_stage.dart';
 import '../data/starter_brigades.dart';
 import '../models/relic_entity.dart';
 import '../models/unit_entity.dart';
@@ -32,11 +36,19 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
   int _totalIchor = 450;
+  GeneralType _activeGeneralType = GeneralType.vladislav;
+  Map<GeneralType, int> _phylacteryRanks = {
+    GeneralType.vladislav: 1,
+    GeneralType.valeria: 1,
+    GeneralType.malakor: 1,
+    GeneralType.morrigan: 1,
+  };
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
   late GeneralCommandService _commandService;
   late RelicService _relicService;
+  late FtueService _ftueService;
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
   CampaignNode? _activeNode;
@@ -45,6 +57,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _relicService = RelicService();
+    _ftueService = FtueService();
     _resetEncounter();
     _inventory = StarterBrigades.createReserveInventory();
     _campaignNodes = CampaignMapGenerator.generateCuratedCampaign();
@@ -56,6 +69,10 @@ class _AppShellState extends State<AppShell> {
         unitId: _tickManager.allies.first.id,
       );
     }
+
+    _ftueService.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _resetEncounter([List<UnitEntity>? customEnemies]) {
@@ -68,11 +85,13 @@ class _AppShellState extends State<AppShell> {
       tickInterval: const Duration(milliseconds: 140),
     );
 
+    final startingFocus = (_phylacteryRanks[_activeGeneralType] ?? 1) >= 3 ? 2 : 1;
+
     _commandService = GeneralCommandService(
       tickManager: _tickManager,
-      generalId: 'vladislav_01',
-      generalName: 'Lord Vladislav',
-      initialFocus: 1,
+      generalType: _activeGeneralType,
+      initialFocus: startingFocus,
+      initialPhylacteryRanks: _phylacteryRanks,
     );
 
     _combatService = CombatResolutionService(
@@ -89,7 +108,109 @@ class _AppShellState extends State<AppShell> {
     _tickManager.dispose();
     _commandService.dispose();
     _relicService.dispose();
+    _ftueService.dispose();
     super.dispose();
+  }
+
+  void _launchFtueEncounter(int step) {
+    List<UnitEntity> enemies;
+    String name;
+    String desc;
+    int ichorReward;
+
+    switch (step) {
+      case 1:
+        enemies = StarterBrigades.createFtueEncounter1Enemies();
+        name = 'Screen 2: The Ashlands (Tutorial Skirmish)';
+        desc = 'Tutorial skirmish teaching Speed ticks and Vanguard/Arcanum layout.';
+        ichorReward = 150;
+        break;
+      case 2:
+        enemies = StarterBrigades.createFtueEncounter2Enemies();
+        name = 'Screen 3: Ironwatch Outpost (Affinity Check)';
+        desc = 'Affinity trial teaching the 6-role Hex Wheel and Commander Focus.';
+        ichorReward = 200;
+        break;
+      case 3:
+      default:
+        enemies = StarterBrigades.createFtueGatekeeperEnemies();
+        name = 'Screen 5: The Ashen Gatekeeper Colossus';
+        desc = 'Gatekeeper boss battle to unleash your newly evolved Gen 2 Cerberus Spawn!';
+        ichorReward = 500;
+        break;
+    }
+
+    final ftueNode = CampaignNode(
+      id: 'ftue_node_$step',
+      depth: step,
+      verticalRatio: 0.5,
+      type: step == 3 ? CampaignNodeType.boss : CampaignNodeType.skirmish,
+      name: name,
+      description: desc,
+      nextNodeIds: const [],
+      rewardIchor: ichorReward,
+      isCurrent: true,
+      isReachable: true,
+    );
+
+    setState(() {
+      _activeNode = ftueNode;
+      _resetEncounter(enemies);
+      _currentIndex = 1; // Switch to Battle Arena
+    });
+  }
+
+  void _handleLaunchFtueStageAction() {
+    switch (_ftueService.currentStage) {
+      case FtueStage.awakening:
+        _showAwakeningDialog();
+        break;
+      case FtueStage.encounter1:
+        _launchFtueEncounter(1);
+        break;
+      case FtueStage.encounter2:
+        _launchFtueEncounter(2);
+        break;
+      case FtueStage.crucibleFusion:
+        setState(() => _currentIndex = 2); // Switch to Crucible Altar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The Crucible awaits! Select Feral War-Hound Alpha and Beta to fuse Gen 2 Cerberus Spawn.'),
+            backgroundColor: Color(0xFFB3261E),
+          ),
+        );
+        break;
+      case FtueStage.encounter3:
+        _launchFtueEncounter(3);
+        break;
+      case FtueStage.completed:
+        _showAwakeningDialog();
+        break;
+    }
+  }
+
+  Future<void> _showAwakeningDialog() async {
+    final chosen = await AwakeningDialog.show(
+      context,
+      initialSelected: _activeGeneralType,
+    );
+    if (!mounted || chosen == null) return;
+
+    setState(() {
+      _activeGeneralType = chosen;
+      _commandService.setActiveGeneral(chosen);
+      if (_ftueService.currentStage == FtueStage.awakening) {
+        _ftueService.advanceStage();
+      }
+    });
+
+    final profile = _commandService.currentProfile;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Covenant sealed with ${profile.name}! Starter brigade bound under ${profile.auraName}.'),
+        backgroundColor: profile.themeColor,
+      ),
+    );
   }
 
   void _onSelectCampaignNode(CampaignNode node) {
@@ -305,6 +426,14 @@ class _AppShellState extends State<AppShell> {
         extraReward = ' • LEGENDARY DROP: ${drop.displayName}!';
       }
 
+      if (_ftueService.currentStage == FtueStage.encounter1) {
+        _ftueService.advanceStage();
+      } else if (_ftueService.currentStage == FtueStage.encounter2) {
+        _ftueService.advanceStage();
+      } else if (_ftueService.currentStage == FtueStage.encounter3) {
+        _ftueService.advanceStage();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('EXPEDITION VICTORY! +$reward Ichor, +$xpReward XP, Captured Thrall bound$extraReward'),
@@ -384,6 +513,11 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _inventory.insert(0, child);
     });
+
+    if (_ftueService.currentStage == FtueStage.crucibleFusion) {
+      _ftueService.advanceStage();
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Transmutation complete: ${child.name} added to Roster!'),
@@ -393,7 +527,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _handleOpenEndgameGauntlet() async {
-    final trial = await EndgameGauntletDialog.show(context);
+    final trial = await EndgameGauntletDialog.show(context, activeSquad: _tickManager.allies);
     if (!mounted || trial == null) return;
 
     List<UnitEntity> enemies;
@@ -452,43 +586,56 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          // Tab 0: Campaign Map
-          CampaignMapScreen(
-            nodes: _campaignNodes,
-            onSelectNode: _onSelectCampaignNode,
-            totalIchor: _totalIchor,
-            onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
-          ),
-          // Tab 1: Tactical Arena
-          BattleScreen(
-            key: ValueKey(_tickManager),
-            tickManager: _tickManager,
-            combatService: _combatService,
-            commandService: _commandService,
-            relicService: _relicService,
-            onResetEncounter: () => setState(_resetEncounter),
-            onVictory: _onCombatVictory,
-          ),
-          // Tab 2: Crucible Altar
-          CrucibleScreen(
-            availableInventory: allPlayerUnits,
-            onFusionComplete: _onFusionComplete,
-          ),
-          // Tab 3: Relic Forge
-          RelicForgeScreen(
-            relicService: _relicService,
-            brigadeUnits: allPlayerUnits,
-            totalIchor: _totalIchor,
-            onIchorChanged: (val) => setState(() => _totalIchor = val),
-          ),
-          // Tab 4: Brigade Roster
-          _buildRosterScreen(allPlayerUnits),
-          // Tab 5: Codices
-          _buildCodexView(),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            FtueGuidanceBanner(
+              ftueService: _ftueService,
+              onLaunchStageAction: _handleLaunchFtueStageAction,
+              onReplayAwakening: _showAwakeningDialog,
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: [
+                  // Tab 0: Campaign Map
+                  CampaignMapScreen(
+                    nodes: _campaignNodes,
+                    onSelectNode: _onSelectCampaignNode,
+                    totalIchor: _totalIchor,
+                    onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
+                  ),
+                  // Tab 1: Tactical Arena
+                  BattleScreen(
+                    key: ValueKey(_tickManager),
+                    tickManager: _tickManager,
+                    combatService: _combatService,
+                    commandService: _commandService,
+                    relicService: _relicService,
+                    onResetEncounter: () => setState(_resetEncounter),
+                    onVictory: _onCombatVictory,
+                  ),
+                  // Tab 2: Crucible Altar
+                  CrucibleScreen(
+                    availableInventory: allPlayerUnits,
+                    onFusionComplete: _onFusionComplete,
+                  ),
+                  // Tab 3: Relic Forge
+                  RelicForgeScreen(
+                    relicService: _relicService,
+                    brigadeUnits: allPlayerUnits,
+                    totalIchor: _totalIchor,
+                    onIchorChanged: (val) => setState(() => _totalIchor = val),
+                  ),
+                  // Tab 4: Brigade Roster
+                  _buildRosterScreen(allPlayerUnits),
+                  // Tab 5: Codices
+                  _buildCodexView(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -535,11 +682,14 @@ class _AppShellState extends State<AppShell> {
     final chosen = await GeneralSelectionDialog.show(
       context,
       currentGeneralType: _commandService.activeGeneralType,
+      commandService: _commandService,
     );
     if (!mounted || chosen == null) return;
 
     setState(() {
+      _activeGeneralType = chosen;
       _commandService.setActiveGeneral(chosen);
+      _phylacteryRanks = Map.of(_commandService.allPhylacteryRanks);
     });
     final profile = _commandService.currentProfile;
     ScaffoldMessenger.of(context).showSnackBar(

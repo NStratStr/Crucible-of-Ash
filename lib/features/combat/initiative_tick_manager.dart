@@ -228,6 +228,24 @@ class InitiativeTickManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates squads in-place (e.g., after turn-start DoT, HoT, or trait procs).
+  void updateSquads({List<UnitEntity>? allies, List<UnitEntity>? enemies}) {
+    if (allies != null) _allies = List.unmodifiable(allies);
+    if (enemies != null) _enemies = List.unmodifiable(enemies);
+    if (_activeUnit != null) {
+      final inAllies = _allies.where((u) => u.id == _activeUnit!.id);
+      if (inAllies.isNotEmpty) {
+        _activeUnit = inAllies.first;
+      } else {
+        final inEnemies = _enemies.where((u) => u.id == _activeUnit!.id);
+        if (inEnemies.isNotEmpty) {
+          _activeUnit = inEnemies.first;
+        }
+      }
+    }
+    notifyListeners();
+  }
+
   bool _isBattleOver() {
     final bool alliesDefeated = _allies.every((u) => !u.isAlive);
     final bool enemiesDefeated = _enemies.every((u) => !u.isAlive);

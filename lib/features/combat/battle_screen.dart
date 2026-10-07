@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
@@ -149,6 +150,8 @@ class _BattleScreenState extends State<BattleScreen> {
     super.dispose();
   }
 
+  String? _lastProcessedTurnStartUnitId;
+
   void _onEngineUpdate() {
     if (!mounted) return;
 
@@ -157,6 +160,29 @@ class _BattleScreenState extends State<BattleScreen> {
       _selectedEnemyId = null;
     } else if (_selectedEnemyId == null || !aliveEnemies.any((u) => u.id == _selectedEnemyId)) {
       _selectedEnemyId = aliveEnemies.first.id;
+    }
+
+    final active = widget.tickManager.activeUnit;
+    if (active != null && widget.tickManager.phase == CombatPhase.awaitingAction) {
+      if (_lastProcessedTurnStartUnitId != active.id) {
+        _lastProcessedTurnStartUnitId = active.id;
+        final startRes = widget.combatService.processTurnStart(unitId: active.id);
+        if (startRes.dotDamage > 0) {
+          _triggerDamagePop(damage: startRes.dotDamage, isCrit: false, isGlancing: false);
+        }
+        if (startRes.healAmount > 0) {
+          _triggerDamagePop(damage: 0, isCrit: false, isGlancing: false, heal: startRes.healAmount);
+        }
+        if (startRes.isDefeated) {
+          _combatLog = startRes.message ?? '${active.name} succumbed to internal rot!';
+        } else if (startRes.isStunned) {
+          _combatLog = startRes.message ?? '${active.name} is Stunned! Turn skipped.';
+        } else if (startRes.triggeredTraits.isNotEmpty) {
+          _combatLog = '${active.name} triggered ${startRes.triggeredTraits.join(', ')}!';
+        }
+      }
+    } else if (active == null) {
+      _lastProcessedTurnStartUnitId = null;
     }
 
     if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
@@ -182,6 +208,14 @@ class _BattleScreenState extends State<BattleScreen> {
     int heal = 0,
   }) {
     if (damage > 0) {
+      if (isCrit) {
+        HapticFeedback.heavyImpact();
+      } else if (isGlancing) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.mediumImpact();
+      }
+
       final text = isCrit ? 'CRIT! -$damage' : (isGlancing ? 'GLANCE -$damage' : '-$damage');
       final color = isCrit
           ? const Color(0xFFFFD54F)

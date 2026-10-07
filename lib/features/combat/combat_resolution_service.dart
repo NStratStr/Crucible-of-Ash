@@ -36,6 +36,27 @@ class ActionResult {
   });
 }
 
+@immutable
+class TurnStartResult {
+  final UnitEntity unit;
+  final int dotDamage;
+  final int healAmount;
+  final bool isDefeated;
+  final bool isStunned;
+  final String? message;
+  final List<String> triggeredTraits;
+
+  const TurnStartResult({
+    required this.unit,
+    this.dotDamage = 0,
+    this.healAmount = 0,
+    this.isDefeated = false,
+    this.isStunned = false,
+    this.message,
+    this.triggeredTraits = const [],
+  });
+}
+
 class CombatResolutionService {
   final InitiativeTickManager tickManager;
   final GeneralCommandService? commandService;
@@ -69,36 +90,171 @@ class CombatResolutionService {
     );
   }
 
-  /// Checks if active unit is stunned and skips turn if so
+  /// Backwards-compatible check if active unit is stunned
   bool checkAndHandleStun() {
     final active = tickManager.activeUnit;
     if (active == null || !active.isStunned) return false;
+    final res = processTurnStart(unitId: active.id);
+    return res.isStunned || res.isDefeated;
+  }
 
-    final updatedEffects = active.activeEffects
-        .map((e) => e.type == StatusEffectType.stun
-            ? StatusEffect(type: e.type, durationTurns: e.durationTurns - 1, value: e.value)
-            : e)
+  /// Resolves turn-start effects: regeneration traits (dark_heal, sanguine_mend),
+  /// damage-over-time effects (Bleed, Blight), status effect duration ticks, and Stun.
+  TurnStartResult processTurnStart({
+    required String unitId,
+    bool autoResumeIfTurnSkipped = true,
+  }) {
+    final bool isAlly = tickManager.allies.any((u) => u.id == unitId);
+    final List<UnitEntity> friendlySquad = isAlly ? tickManager.allies : tickManager.enemies;
+    final List<UnitEntity> opposingSquad = isAlly ? tickManager.enemies : tickManager.allies;
+
+    final unitIndex = friendlySquad.indexWhere((u) => u.id == unitId);
+    if (unitIndex == -1) {
+      throw ArgumentError('Unit $unitId not found in active combatants.');
+    }
+
+    final UnitEntity currentUnit = friendlySquad[unitIndex];
+    if (!currentUnit.isAlive) {
+      return TurnStartResult(unit: currentUnit, isDefeated: true);
+    }
+
+    int healAmount = 0;
+    int dotDamage = 0;
+    final List<String> triggeredTraits = [];
+    final traits = [
+      currentUnit.nativeTraitId,
+      if (currentUnit.graftedTraitId != null) currentUnit.graftedTraitId!,
+    ];
+
+    // Trait: Sanguine Bloom (dark_heal) - regenerates 8% max HP at turn start
+    if (traits.contains('dark_heal') && currentUnit.currentHp < currentUnit.maxHp) {
+      final reg = max(1, (currentUnit.maxHp * 0.08).round());
+      healAmount += reg;
+      triggeredTraits.add('dark_heal');
+    }
+
+    // Trait: Vitae Regeneration (sanguine_mend) - heals self by 6% and lowest HP ally by 6%
+    UnitEntity? healedAlly;
+    if (traits.contains('sanguine_mend')) {
+      final regSelf = max(1, (currentUnit.maxHp * 0.06).round());
+      healAmount += regSelf;
+      triggeredTraits.add('sanguine_mend');
+
+      final livingOthers = friendlySquad.where((u) => u.id != currentUnit.id && u.isAlive).toList();
+      if (livingOthers.isNotEmpty) {
+        livingOthers.sort((a, b) => (a.currentHp / a.maxHp).compareTo(b.currentHp / b.maxHp));
+        final targetAlly = livingOthers.first;
+        final allyHeal = max(1, (targetAlly.maxHp * 0.06).round());
+        healedAlly = targetAlly.copyWith(
+          currentHp: min(targetAlly.maxHp, targetAlly.currentHp + allyHeal),
+        );
+      }
+    }
+
+    // Damage-Over-Time (Bleed and Blight)
+    for (final effect in currentUnit.activeEffects) {
+      if (effect.type == StatusEffectType.bleed) {
+        final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.05).round());
+        dotDamage += dmg;
+      } else if (effect.type == StatusEffectType.blight) {
+        final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.06).round());
+        dotDamage += dmg;
+      }
+    }
+
+    // Decrement durations on active effects
+    final bool wasStunned = currentUnit.isStunned;
+    final updatedEffects = currentUnit.activeEffects
+        .map((e) => StatusEffect(type: e.type, durationTurns: e.durationTurns - 1, value: e.value))
         .where((e) => e.durationTurns > 0)
         .toList();
 
-    final updatedActive = active.copyWith(activeEffects: updatedEffects);
-
-    final bool isAlly = tickManager.allies.any((u) => u.id == active.id);
-    final updatedAllies = isAlly
-        ? tickManager.allies.map((u) => u.id == active.id ? updatedActive : u).toList()
-        : tickManager.allies;
-    final updatedEnemies = !isAlly
-        ? tickManager.enemies.map((u) => u.id == active.id ? updatedActive : u).toList()
-        : tickManager.enemies;
-
-    tickManager.consumeTurn(
-      retainedOverflow: false,
-      updatedAllies: updatedAllies,
-      updatedEnemies: updatedEnemies,
-      autoResume: true,
+    // Calculate final HP
+    final int netHp = (currentUnit.currentHp + healAmount - dotDamage).clamp(0, currentUnit.maxHp);
+    final updatedUnit = currentUnit.copyWith(
+      currentHp: netHp,
+      activeEffects: updatedEffects,
     );
 
-    return true;
+    // Update squads
+    List<UnitEntity> updatedFriendly = friendlySquad.map((u) {
+      if (u.id == currentUnit.id) return updatedUnit;
+      if (healedAlly != null && u.id == healedAlly.id) return healedAlly;
+      return u;
+    }).toList();
+
+    List<UnitEntity> updatedOpposing = List.of(opposingSquad);
+
+    // If unit died from DoT
+    if (netHp <= 0) {
+      // Malakor's Carrion Miasma: When an ally falls, all enemies gain 2 stacks of Blight
+      if (isAlly && commandService?.activeGeneralType == GeneralType.malakor) {
+        updatedOpposing = updatedOpposing.map((foe) {
+          if (!foe.isAlive) return foe;
+          final currentBlights = List<StatusEffect>.from(foe.activeEffects)
+            ..add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40))
+            ..add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40));
+          return foe.copyWith(activeEffects: currentBlights);
+        }).toList();
+      }
+
+      final updatedAllies = isAlly ? updatedFriendly : updatedOpposing;
+      final updatedEnemies = isAlly ? updatedOpposing : updatedFriendly;
+
+      tickManager.consumeTurn(
+        retainedOverflow: false,
+        updatedAllies: updatedAllies,
+        updatedEnemies: updatedEnemies,
+        autoResume: autoResumeIfTurnSkipped,
+      );
+
+      return TurnStartResult(
+        unit: updatedUnit,
+        dotDamage: dotDamage,
+        healAmount: healAmount,
+        isDefeated: true,
+        message: '${currentUnit.name} succumbed to internal rot and wounds!',
+        triggeredTraits: triggeredTraits,
+      );
+    }
+
+    // If unit was stunned, turn is skipped
+    if (wasStunned) {
+      final updatedAllies = isAlly ? updatedFriendly : updatedOpposing;
+      final updatedEnemies = isAlly ? updatedOpposing : updatedFriendly;
+
+      tickManager.consumeTurn(
+        retainedOverflow: false,
+        updatedAllies: updatedAllies,
+        updatedEnemies: updatedEnemies,
+        autoResume: autoResumeIfTurnSkipped,
+      );
+
+      return TurnStartResult(
+        unit: updatedUnit,
+        dotDamage: dotDamage,
+        healAmount: healAmount,
+        isStunned: true,
+        message: '${currentUnit.name} is Stunned and unable to act!',
+        triggeredTraits: triggeredTraits,
+      );
+    }
+
+    // Alive and not stunned: update tickManager without consuming turn
+    if (isAlly) {
+      tickManager.updateSquads(allies: updatedFriendly, enemies: updatedOpposing);
+    } else {
+      tickManager.updateSquads(allies: updatedOpposing, enemies: updatedFriendly);
+    }
+
+    return TurnStartResult(
+      unit: updatedUnit,
+      dotDamage: dotDamage,
+      healAmount: healAmount,
+      isDefeated: false,
+      isStunned: false,
+      triggeredTraits: triggeredTraits,
+    );
   }
 
   /// Executes a designated skill from the active unit

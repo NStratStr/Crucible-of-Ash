@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/combat_math.dart';
+import '../../shared/models/unit_entity.dart';
 
 enum EndgameTrialType {
   worldTitan,
@@ -29,7 +31,9 @@ class EndgameTrialDefinition {
 }
 
 class EndgameGauntletDialog extends StatelessWidget {
-  const EndgameGauntletDialog({super.key});
+  final List<UnitEntity>? activeSquad;
+
+  const EndgameGauntletDialog({super.key, this.activeSquad});
 
   static const List<EndgameTrialDefinition> trials = [
     EndgameTrialDefinition(
@@ -45,8 +49,8 @@ class EndgameGauntletDialog extends StatelessWidget {
     EndgameTrialDefinition(
       type: EndgameTrialType.lineageCrypt,
       title: 'LINEAGE CRYPT: DEN OF FANGS',
-      subtitle: 'Beastline Lineage Trial',
-      description: 'A dark cavern teeming with Cerberus Alpha and stealth predators that inflict heavy bleed affictions.',
+      subtitle: 'Beastline Lineage Trial (2+ Beasts or Skirmishers Required)',
+      description: 'A dark cavern teeming with Cerberus Alpha and stealth predators that inflict heavy bleed afflictions.',
       modifier: 'BLOOD MOON: All critical strike damage is amplified by +50%.',
       rewardsText: 'Pureblood War-Hound Thrall • +800 Ichor • +800 Brigade XP',
       icon: Icons.pets,
@@ -64,13 +68,73 @@ class EndgameGauntletDialog extends StatelessWidget {
     ),
   ];
 
-  static Future<EndgameTrialType?> show(BuildContext context) {
+  static Future<EndgameTrialType?> show(BuildContext context, {List<UnitEntity>? activeSquad}) {
     return showModalBottomSheet<EndgameTrialType>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const EndgameGauntletDialog(),
+      builder: (_) => EndgameGauntletDialog(activeSquad: activeSquad),
     );
+  }
+
+  int get _beastAndSkirmisherCount {
+    if (activeSquad == null) return 2;
+    return activeSquad!.where((u) {
+      final isSkirm = u.archetype == Archetype.skirmisher;
+      final isBeast = u.speciesId.contains('hound') ||
+          u.speciesId.contains('cerberus') ||
+          u.speciesId.contains('beast') ||
+          u.speciesId.contains('bat') ||
+          u.speciesId.contains('wolf');
+      return isSkirm || isBeast;
+    }).length;
+  }
+
+  void _onEngageTrial(BuildContext context, EndgameTrialDefinition trial) {
+    if (trial.type == EndgameTrialType.lineageCrypt) {
+      final count = _beastAndSkirmisherCount;
+      if (count < 2) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF14141A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xFFFB8C00), width: 1.5),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.lock, color: Color(0xFFFB8C00), size: 24),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'LINEAGE BARRIER SEALED',
+                    style: TextStyle(
+                      color: Color(0xFFFB8C00),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'The Den of Fangs strictly permits only feral beasts and skirmishers to tread its hallowed earth.\n\nYour active squad has $count / 2 required units. Please configure at least 2 Beast or Skirmisher units in your brigade.',
+              style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('UNDERSTOOD', style: TextStyle(color: Color(0xFFFB8C00))),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
+    Navigator.pop(context, trial.type);
   }
 
   @override
@@ -127,23 +191,25 @@ class EndgameGauntletDialog extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'High-stakes mastery trials & World Titan sieges',
-                        style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
+                        'Section 2.3 Macro-Loop: Mastery & Retention',
+                        style: TextStyle(
+                          color: Color(0xFF8E8EA0),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
+                  icon: const Icon(Icons.close, color: Colors.white60, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
+          const Divider(color: Colors.white12, height: 1),
 
-          const Divider(color: Color(0xFF2B2B36), height: 1),
-
-          // Trial list
+          // Trial Cards
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -161,6 +227,10 @@ class EndgameGauntletDialog extends StatelessWidget {
   }
 
   Widget _buildTrialCard(BuildContext context, EndgameTrialDefinition trial) {
+    final bool isLineageCrypt = trial.type == EndgameTrialType.lineageCrypt;
+    final int beastCount = _beastAndSkirmisherCount;
+    final bool lineageRestricted = isLineageCrypt && beastCount < 2;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF16161E),
@@ -217,6 +287,46 @@ class EndgameGauntletDialog extends StatelessWidget {
               style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
             ),
             const SizedBox(height: 8),
+
+            // Lineage Restriction info badge if applicable
+            if (isLineageCrypt) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: lineageRestricted
+                      ? const Color(0xFF2E1010)
+                      : const Color(0xFF102810),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: lineageRestricted ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      lineageRestricted ? Icons.lock : Icons.check_circle,
+                      size: 13,
+                      color: lineageRestricted ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        lineageRestricted
+                            ? 'RESTRICTION: 2+ Beasts/Skirmishers Required ($beastCount / 2 in squad)'
+                            : 'RESTRICTION MET: $beastCount Beasts/Skirmishers Ready',
+                        style: TextStyle(
+                          color: lineageRestricted ? const Color(0xFFE57373) : const Color(0xFF81C784),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Modifier badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -243,6 +353,7 @@ class EndgameGauntletDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+
             // Rewards
             Row(
               children: [
@@ -260,15 +371,18 @@ class EndgameGauntletDialog extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.sports_kabaddi, size: 16),
-                label: const Text('ENGAGE TRIAL', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                icon: Icon(lineageRestricted ? Icons.lock_outline : Icons.sports_kabaddi, size: 16),
+                label: Text(
+                  lineageRestricted ? 'LINEAGE SEALED' : 'ENGAGE TRIAL',
+                  style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: trial.themeColor,
+                  backgroundColor: lineageRestricted ? const Color(0xFF424242) : trial.themeColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => Navigator.pop(context, trial.type),
+                onPressed: () => _onEngageTrial(context, trial),
               ),
             ),
           ],
