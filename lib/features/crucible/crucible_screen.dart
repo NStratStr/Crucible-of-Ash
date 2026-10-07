@@ -4,6 +4,7 @@ import '../../core/combat_math.dart';
 import '../../shared/models/trait_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/gothic_card_frame_widget.dart';
+import '../../shared/widgets/living_atmosphere_background.dart';
 import 'crucible_service.dart';
 
 class CrucibleScreen extends StatefulWidget {
@@ -364,56 +365,66 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           centerTitle: true,
           elevation: 0,
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(14.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Tri-Currency Status Bar
-              _buildCurrencyStatusBar(),
+        body: LivingAtmosphereBackground(
+          imageAsset: 'assets/images/crucible_ritual_chamber.jpg',
+          enableBreathing: true,
+          enableFlicker: true,
+          flickerColor: const Color(0xFFFF3D00),
+          flickerCenter: const Alignment(0.0, -0.2),
+          particleColor: const Color(0xFFFF5252),
+          particleCount: 26,
+          vignetteOpacity: 0.78,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Tri-Currency Status Bar
+                _buildCurrencyStatusBar(),
 
-              // Altar Slots
-              _buildProgenitorSelectionAltar(),
-              const SizedBox(height: 16),
+                // Altar Slots
+                _buildProgenitorSelectionAltar(),
+                const SizedBox(height: 16),
 
-              // Trait, Cost, & Projected Potency (if both slotted)
-              if (_progenitorA != null && _progenitorB != null) ...[
-                _buildTraitGraftSelector(),
-                const SizedBox(height: 14),
-                _buildInheritancePreviewCard(),
-                const SizedBox(height: 14),
-                _buildResourceCostCard(),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  onPressed: _canFuse ? _executeFusionRitual : null,
-                  icon: const Icon(Icons.fireplace, color: Colors.white),
-                  label: Text(
-                    _isPerformingRitual
-                        ? 'TRANSMUTING SOULS...'
-                        : (!_hasSufficientResources
-                            ? 'INSUFFICIENT RESOURCES'
-                            : (_requiredSigilsCost > 0
-                                ? '👑 CONSECRATE PUREBLOOD SOVEREIGN'
-                                : 'IGNITE CRUCIBLE OF BLOOD')),
-                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                // Trait, Cost, & Projected Potency (if both slotted)
+                if (_progenitorA != null && _progenitorB != null) ...[
+                  _buildTraitGraftSelector(),
+                  const SizedBox(height: 14),
+                  _buildInheritancePreviewCard(),
+                  const SizedBox(height: 14),
+                  _buildResourceCostCard(),
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    onPressed: _canFuse ? _executeFusionRitual : null,
+                    icon: const Icon(Icons.fireplace, color: Colors.white),
+                    label: Text(
+                      _isPerformingRitual
+                          ? 'TRANSMUTING SOULS...'
+                          : (!_hasSufficientResources
+                              ? 'INSUFFICIENT RESOURCES'
+                              : (_requiredSigilsCost > 0
+                                  ? '👑 CONSECRATE PUREBLOOD SOVEREIGN'
+                                  : 'IGNITE CRUCIBLE OF BLOOD')),
+                      style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _requiredSigilsCost > 0
+                          ? const Color(0xFFC67C00)
+                          : const Color(0xFFB3261E),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFF2A2A38),
+                      disabledForegroundColor: Colors.white24,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _requiredSigilsCost > 0
-                        ? const Color(0xFFC67C00)
-                        : const Color(0xFFB3261E),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF2A2A38),
-                    disabledForegroundColor: Colors.white24,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+                ],
+
+                // Visible Roster Section
+                _buildVisibleRosterSection(),
               ],
-
-              // Visible Roster Section
-              _buildVisibleRosterSection(),
-            ],
+            ),
           ),
         ),
       ),

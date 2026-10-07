@@ -6,6 +6,7 @@ import '../../shared/models/expedition_boon.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
+import '../../shared/widgets/living_atmosphere_background.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
@@ -602,10 +603,17 @@ class _BattleScreenState extends State<BattleScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
+      body: LivingAtmosphereBackground(
+        imageAsset: 'assets/images/gothic_arch_battlefield.jpg',
+        enableBreathing: true,
+        enableFlicker: false,
+        particleColor: const Color(0xFFFF7043),
+        particleCount: 24,
+        vignetteOpacity: 0.72,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Column(
               children: [
                 _buildTopStatusHeader(),
                 _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
@@ -721,7 +729,8 @@ class _BattleScreenState extends State<BattleScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildGeneralOrderBanner(GeneralOrderBannerData banner) {

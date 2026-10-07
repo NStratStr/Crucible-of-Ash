@@ -14,6 +14,7 @@ class ChapterTheme {
   final Color pathColor;
   final Color activePathColor;
   final IconData chapterIcon;
+  final String backgroundAsset;
 
   const ChapterTheme({
     required this.chapter,
@@ -26,6 +27,7 @@ class ChapterTheme {
     required this.pathColor,
     required this.activePathColor,
     required this.chapterIcon,
+    this.backgroundAsset = 'assets/images/ashen_trail_desolation.jpg',
   });
 
   static ChapterTheme forChapter(int chapter) {
@@ -42,6 +44,7 @@ class ChapterTheme {
           pathColor: Color(0xFF1C3432),
           activePathColor: Color(0xFF00BFA5),
           chapterIcon: Icons.water,
+          backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
         );
       case 3:
         return const ChapterTheme(
@@ -55,6 +58,7 @@ class ChapterTheme {
           pathColor: Color(0xFF2C193C),
           activePathColor: Color(0xFFD500F9),
           chapterIcon: Icons.dark_mode,
+          backgroundAsset: 'assets/images/realm_overworld_map.jpg',
         );
       case 1:
       default:
@@ -69,6 +73,7 @@ class ChapterTheme {
           pathColor: Color(0xFF2B2B36),
           activePathColor: Color(0xFFEF5350),
           chapterIcon: Icons.local_fire_department,
+          backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
         );
     }
   }
@@ -239,7 +244,18 @@ class CampaignMapScreen extends StatelessWidget {
 
           return Stack(
             children: [
-              // Background Parchment Grid
+              // Thematic Chapter Background Artwork
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.32,
+                  child: Image.asset(
+                    theme.backgroundAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+              // Background Parchment Grid & Leylines
               Positioned.fill(
                 child: CustomPaint(
                   painter: _CampaignPathPainter(
