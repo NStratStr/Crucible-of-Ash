@@ -22,6 +22,7 @@ import '../../features/ftue/ftue_guidance_banner.dart';
 import '../../features/ftue/ftue_service.dart';
 import '../../features/ftue/ftue_stage.dart';
 import '../data/starter_brigades.dart';
+import '../models/expedition_boon.dart';
 import '../models/relic_entity.dart';
 import '../models/unit_entity.dart';
 import 'hexagonal_affinity_wheel_widget.dart';
@@ -39,6 +40,7 @@ class _AppShellState extends State<AppShell> {
   int _totalIchor = 450;
   int _cursedOre = 75;
   int _bloodlineSigils = 2;
+  final Set<ExpeditionBoon> _activeExpeditionBoons = {};
   GeneralType _activeGeneralType = GeneralType.vladislav;
   Map<GeneralType, int> _phylacteryRanks = {
     GeneralType.vladislav: 1,
@@ -114,6 +116,7 @@ class _AppShellState extends State<AppShell> {
       commandService: _commandService,
       relicService: _relicService,
       battleModifier: battleModifier,
+      activeBoons: _activeExpeditionBoons,
     );
 
     _tickManager.start();
@@ -364,6 +367,37 @@ class _AppShellState extends State<AppShell> {
           backgroundColor: const Color(0xFFAB47BC),
         ),
       );
+    } else if (choice == BloodAltarChoice.covenantBlessing) {
+      final sacrificedAllies = _tickManager.allies.map((u) {
+        if (!u.isAlive) return u;
+        final sacrifice = max(1, (u.currentHp * 0.30).round());
+        return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
+      }).toList();
+
+      _tickManager.consumeTurn(
+        retainedOverflow: true,
+        updatedAllies: sacrificedAllies,
+        autoResume: false,
+      );
+
+      setState(() {
+        _activeExpeditionBoons.add(ExpeditionBoon.sanguineCovenant);
+      });
+      _combatService = CombatResolutionService(
+        tickManager: _tickManager,
+        commandService: _commandService,
+        relicService: _relicService,
+        battleModifier: _combatService.battleModifier,
+        activeBoons: _activeExpeditionBoons,
+      );
+      _markNodeCompleted(node.id);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Covenant Sealed: Sacrificed 30% HP for permanent +15% Attack & +25% Crit DMG this expedition!'),
+          backgroundColor: Color(0xFFB3261E),
+        ),
+      );
     } else {
       _markNodeCompleted(node.id);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -456,7 +490,12 @@ class _AppShellState extends State<AppShell> {
       _markNodeCompleted(_activeNode!.id);
 
       UnitEntity? purebloodDrop;
-      if (_activeNode?.name.contains('Lineage Crypt') == true) {
+      if (_activeNode?.name.contains('Tomb of the Deathless') == true) {
+        purebloodDrop = StarterBrigades.createDeathlessCryptReward();
+        setState(() {
+          _inventory.insert(0, purebloodDrop!);
+        });
+      } else if (_activeNode?.name.contains('Lineage Crypt') == true) {
         purebloodDrop = StarterBrigades.createPurebloodCryptReward();
         setState(() {
           _inventory.insert(0, purebloodDrop!);
@@ -588,6 +627,7 @@ class _AppShellState extends State<AppShell> {
               Navigator.of(ctx).pop();
               setState(() {
                 _currentChapter = nextChapter;
+                _activeExpeditionBoons.clear();
                 _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(nextChapter);
                 _currentIndex = 0; // Return to Campaign Map
               });
@@ -659,6 +699,7 @@ class _AppShellState extends State<AppShell> {
               setState(() {
                 final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
                 _tickManager.updateSquads(allies: revivedAllies);
+                _activeExpeditionBoons.clear();
                 _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
                 _activeNode = null;
                 _currentIndex = 0; // Return to campaign map
@@ -900,6 +941,14 @@ class _AppShellState extends State<AppShell> {
         rewardOre = 60;
         rewardSigils = 1;
         modifier = BattleModifier.bloodMoon;
+        break;
+      case EndgameTrialType.deathlessCrypt:
+        enemies = StarterBrigades.createDeathlessCryptEnemies();
+        trialName = 'Lineage Crypt: Tomb of the Deathless';
+        rewardIchor = 900;
+        rewardOre = 75;
+        rewardSigils = 2;
+        modifier = BattleModifier.corrosiveMiasma;
         break;
       case EndgameTrialType.abyssalDescent:
         enemies = StarterBrigades.createAbyssalDescentEnemies();

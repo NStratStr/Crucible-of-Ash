@@ -938,5 +938,85 @@ class StarterBrigades {
       lineageAncestors: const ['Alpha_Hound_Prime', 'Beta_Hound_Prime', 'Cerberus_Spawn_Ascendant'],
     );
   }
+
+  /// Generates the Tomb of the Deathless completion prize: Pureblood Lich Sovereign (Gen 4 Pureblood Occultist)
+  static UnitEntity createDeathlessCryptReward() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return UnitEntity(
+      id: 'pureblood_lich_$timestamp',
+      speciesId: 'sunken_lich',
+      name: 'Pureblood Lich Sovereign',
+      generation: 4,
+      archetype: Archetype.occultist,
+      slot: FormationSlot.front1,
+      level: 1,
+      maxLevel: 50,
+      currentHp: 1050,
+      maxHp: 1050,
+      attack: 340,
+      defense: 190,
+      speed: 120,
+      nativeTraitId: 'shadow_bolt',
+      graftedTraitId: 'plague_hex',
+      lineageAncestors: const ['Acolyte_of_Blight', 'Crypt_Necrolyte', 'Archon_Malgok'],
+    );
+  }
+
+  /// Enemies for Tomb of the Deathless (Undead & Occultist Lineage Trial)
+  static List<UnitEntity> createDeathlessCryptEnemies() {
+    return [
+      const UnitEntity(
+        id: 'trial_arch_lich',
+        speciesId: 'sunken_lich',
+        name: 'Deathless Arch-Lich',
+        generation: 3,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.front1,
+        level: 28,
+        maxLevel: 45,
+        currentHp: 2600,
+        maxHp: 2600,
+        attack: 220,
+        defense: 140,
+        speed: 105,
+        nativeTraitId: 'plague_hex',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'trial_tomb_revenant',
+        speciesId: 'decayed_ghoul',
+        name: 'Tomb Revenant',
+        generation: 2,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front2,
+        level: 24,
+        maxLevel: 35,
+        currentHp: 1600,
+        maxHp: 1600,
+        attack: 160,
+        defense: 160,
+        speed: 90,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'trial_crypt_siphonist',
+        speciesId: 'death_priest',
+        name: 'Crypt Siphonist',
+        generation: 2,
+        archetype: Archetype.support,
+        slot: FormationSlot.back1,
+        level: 24,
+        maxLevel: 35,
+        currentHp: 1100,
+        maxHp: 1100,
+        attack: 130,
+        defense: 100,
+        speed: 110,
+        nativeTraitId: 'dark_heal',
+        lineageAncestors: [],
+      ),
+    ];
+  }
 }
 

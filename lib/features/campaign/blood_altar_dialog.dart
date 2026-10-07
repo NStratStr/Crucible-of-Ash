@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 enum BloodAltarChoice {
   bloodTithe,       // Sacrifice 25% squad HP for 350 Ichor + 2 Focus
   sanguineOffering, // Sacrifice 40% squad HP for Epic Relic
+  covenantBlessing, // Sacrifice 30% squad HP for Permanent Expedition Boon
   walkAway,         // Leave unharmed
 }
 
@@ -99,6 +100,15 @@ class BloodAltarDialog extends StatelessWidget {
               icon: Icons.token,
               color: const Color(0xFFAB47BC),
               onTap: () => Navigator.pop(context, BloodAltarChoice.sanguineOffering),
+            ),
+            const SizedBox(height: 10),
+            _buildChoiceButton(
+              context: context,
+              title: 'COVENANT OF SANGUINE & ASH (SACRIFICE 30% HP)',
+              subtitle: 'Seal eternal blood covenant: +15% Squad ATK & +15% Crit DMG for this Chapter Expedition.',
+              icon: Icons.whatshot,
+              color: const Color(0xFFFF7043),
+              onTap: () => Navigator.pop(context, BloodAltarChoice.covenantBlessing),
             ),
             const SizedBox(height: 10),
             _buildChoiceButton(

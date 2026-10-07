@@ -5,6 +5,7 @@ import '../../shared/models/unit_entity.dart';
 enum EndgameTrialType {
   worldTitan,
   lineageCrypt,
+  deathlessCrypt,
   abyssalDescent,
 }
 
@@ -57,6 +58,16 @@ class EndgameGauntletDialog extends StatelessWidget {
       themeColor: Color(0xFFFB8C00),
     ),
     EndgameTrialDefinition(
+      type: EndgameTrialType.deathlessCrypt,
+      title: 'LINEAGE CRYPT: TOMB OF THE DEATHLESS',
+      subtitle: 'Undead & Occultist Trial (2+ Undead/Occultists Required)',
+      description: 'Ancient sepulcher guarded by deathless sorcerers who wield soul-siphoning curses and necrotic rot.',
+      modifier: 'GRAVE CHILL: Fallen enemies explode in frigid miasma; healing potency reduced by 25%.',
+      rewardsText: 'Pureblood Lich Sovereign • +900 Ichor • +2 Bloodline Sigils',
+      icon: Icons.brightness_3,
+      themeColor: Color(0xFF7E57C2),
+    ),
+    EndgameTrialDefinition(
       type: EndgameTrialType.abyssalDescent,
       title: 'ABYSSAL DESCENT: TORMENT I',
       subtitle: 'Affinity Shift Trial',
@@ -87,6 +98,21 @@ class EndgameGauntletDialog extends StatelessWidget {
           u.speciesId.contains('bat') ||
           u.speciesId.contains('wolf');
       return isSkirm || isBeast;
+    }).length;
+  }
+
+  int get _undeadAndOccultistCount {
+    if (activeSquad == null) return 2;
+    return activeSquad!.where((u) {
+      final isOccultist = u.archetype == Archetype.occultist;
+      final isUndead = u.speciesId.contains('ghoul') ||
+          u.speciesId.contains('lich') ||
+          u.speciesId.contains('skeleton') ||
+          u.speciesId.contains('undead') ||
+          u.speciesId.contains('vampire') ||
+          u.speciesId.contains('necro') ||
+          u.speciesId.contains('grave');
+      return isOccultist || isUndead;
     }).length;
   }
 
@@ -126,6 +152,47 @@ class EndgameGauntletDialog extends StatelessWidget {
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('UNDERSTOOD', style: TextStyle(color: Color(0xFFFB8C00))),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    } else if (trial.type == EndgameTrialType.deathlessCrypt) {
+      final count = _undeadAndOccultistCount;
+      if (count < 2) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF14141A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xFF7E57C2), width: 1.5),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.lock, color: Color(0xFF7E57C2), size: 24),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'SEPULCHRAL BARRIER SEALED',
+                    style: TextStyle(
+                      color: Color(0xFF7E57C2),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'The Tomb of the Deathless strictly permits only undead and occultist soul-binders to cross its threshold.\n\nYour active squad has $count / 2 required units. Please configure at least 2 Undead or Occultist units in your brigade.',
+              style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('UNDERSTOOD', style: TextStyle(color: Color(0xFF7E57C2))),
               ),
             ],
           ),
@@ -307,8 +374,10 @@ class EndgameGauntletDialog extends StatelessWidget {
 
   Widget _buildTrialCard(BuildContext context, EndgameTrialDefinition trial) {
     final bool isLineageCrypt = trial.type == EndgameTrialType.lineageCrypt;
+    final bool isDeathlessCrypt = trial.type == EndgameTrialType.deathlessCrypt;
     final int beastCount = _beastAndSkirmisherCount;
-    final bool lineageRestricted = isLineageCrypt && beastCount < 2;
+    final int undeadCount = _undeadAndOccultistCount;
+    final bool lineageRestricted = (isLineageCrypt && beastCount < 2) || (isDeathlessCrypt && undeadCount < 2);
 
     return Container(
       decoration: BoxDecoration(
@@ -373,29 +442,67 @@ class EndgameGauntletDialog extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
-                  color: lineageRestricted
+                  color: beastCount < 2
                       ? const Color(0xFF2E1010)
                       : const Color(0xFF102810),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: lineageRestricted ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                    color: beastCount < 2 ? const Color(0xFFE53935) : const Color(0xFF43A047),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      lineageRestricted ? Icons.lock : Icons.check_circle,
+                      beastCount < 2 ? Icons.lock : Icons.check_circle,
                       size: 13,
-                      color: lineageRestricted ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                      color: beastCount < 2 ? const Color(0xFFE53935) : const Color(0xFF43A047),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        lineageRestricted
+                        beastCount < 2
                             ? 'RESTRICTION: 2+ Beasts/Skirmishers Required ($beastCount / 2 in squad)'
                             : 'RESTRICTION MET: $beastCount Beasts/Skirmishers Ready',
                         style: TextStyle(
-                          color: lineageRestricted ? const Color(0xFFE57373) : const Color(0xFF81C784),
+                          color: beastCount < 2 ? const Color(0xFFE57373) : const Color(0xFF81C784),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            if (isDeathlessCrypt) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: undeadCount < 2
+                      ? const Color(0xFF2E1010)
+                      : const Color(0xFF102810),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: undeadCount < 2 ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      undeadCount < 2 ? Icons.lock : Icons.check_circle,
+                      size: 13,
+                      color: undeadCount < 2 ? const Color(0xFFE53935) : const Color(0xFF43A047),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        undeadCount < 2
+                            ? 'RESTRICTION: 2+ Undead/Occultists Required ($undeadCount / 2 in squad)'
+                            : 'RESTRICTION MET: $undeadCount Undead/Occultists Ready',
+                        style: TextStyle(
+                          color: undeadCount < 2 ? const Color(0xFFE57373) : const Color(0xFF81C784),
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -452,7 +559,9 @@ class EndgameGauntletDialog extends StatelessWidget {
               child: ElevatedButton.icon(
                 icon: Icon(lineageRestricted ? Icons.lock_outline : Icons.sports_kabaddi, size: 16),
                 label: Text(
-                  lineageRestricted ? 'LINEAGE SEALED' : 'ENGAGE TRIAL',
+                  lineageRestricted
+                      ? (isDeathlessCrypt ? 'SEPULCHRE SEALED' : 'LINEAGE SEALED')
+                      : 'ENGAGE TRIAL',
                   style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
                 ),
                 style: ElevatedButton.styleFrom(

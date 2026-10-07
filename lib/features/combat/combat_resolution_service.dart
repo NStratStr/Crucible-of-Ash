@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/models/expedition_boon.dart';
 import '../generals/general_command_service.dart';
 import '../relics/relic_service.dart';
 import 'initiative_tick_manager.dart';
@@ -69,6 +70,7 @@ class CombatResolutionService {
   final GeneralCommandService? commandService;
   final RelicService? relicService;
   final BattleModifier battleModifier;
+  final Set<ExpeditionBoon> activeBoons;
   final Random _rng;
 
   CombatResolutionService({
@@ -76,6 +78,7 @@ class CombatResolutionService {
     this.commandService,
     this.relicService,
     this.battleModifier = BattleModifier.none,
+    this.activeBoons = const {},
     Random? rng,
   }) : _rng = rng ?? Random();
 
@@ -430,6 +433,9 @@ class CombatResolutionService {
     if (attackerTraits.contains('vicious_strike')) {
       effectiveCritDmg += 0.35;
     }
+    if (attackerIsAlly && activeBoons.contains(ExpeditionBoon.sanguineCovenant)) {
+      effectiveCritDmg += 0.15;
+    }
 
     final bool isCritical = !isGlancing && (_rng.nextDouble() < effectiveCritRate);
     double critMod = isCritical ? effectiveCritDmg : 1.0;
@@ -454,6 +460,11 @@ class CombatResolutionService {
       baseDefense = (baseDefense * 1.25).round();
     }
 
+    // Expedition Boon: Obsidian Aegis (+20% Defense to all ally targets)
+    if (!attackerIsAlly && activeBoons.contains(ExpeditionBoon.obsidianAegis)) {
+      baseDefense = (baseDefense * 1.20).round();
+    }
+
     // Trait: Piercing Arrow (ignores 50% defense)
     final bool bypassArmor = skill.ignoresArmor || attackerTraits.contains('piercing_arrow');
     final int effectiveDefense = bypassArmor ? (baseDefense * 0.5).round() : baseDefense;
@@ -465,6 +476,11 @@ class CombatResolutionService {
     if (attackerTraits.contains('pack_instinct') || attackerTraits.contains('pack_hunter')) {
       final int livingAllies = friendlySquad.where((u) => u.isAlive).length;
       effectiveAttack = (effectiveAttack * (1.0 + (0.10 * livingAllies))).round();
+    }
+
+    // Expedition Boon: Sanguine Covenant (+15% Attack to all allies)
+    if (attackerIsAlly && activeBoons.contains(ExpeditionBoon.sanguineCovenant)) {
+      effectiveAttack = (effectiveAttack * 1.15).round();
     }
 
     double baseDamage = effectiveAttack * skill.damageCoefficient * mitigation;
@@ -540,6 +556,11 @@ class CombatResolutionService {
     // Trait: Blood Sovereign (+12% Lifesteal)
     if (attackerTraits.contains('blood_sovereign')) {
       effectiveLifestealRatio += 0.12;
+    }
+
+    // Expedition Boon: Vitality Wellspring (+15% Lifesteal)
+    if (attackerIsAlly && activeBoons.contains(ExpeditionBoon.vitalityWellspring)) {
+      effectiveLifestealRatio += 0.15;
     }
 
     // Vladislav's Crimson Tithe: +8% Lifesteal against wounded or bleeding targets
