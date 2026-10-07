@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
 import 'package:ashen_crucible/features/campaign/blood_altar_dialog.dart';
+import 'package:ashen_crucible/features/campaign/campaign_map_screen.dart';
 import 'package:ashen_crucible/features/combat/combat_resolution_service.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/shared/models/expedition_boon.dart';
@@ -133,6 +134,23 @@ void main() {
 
       // Vitality Wellspring gives 10% lifesteal
       expect(boonResult.lifestealRecovered, greaterThan(0));
+    });
+
+    testWidgets('CampaignMapScreen renders active covenants banner when boons present', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CampaignMapScreen(
+              nodes: const [],
+              onSelectNode: (_) {},
+              activeBoons: const {ExpeditionBoon.sanguineCovenant},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('ACTIVE COVENANTS:'), findsOneWidget);
+      expect(find.textContaining('Sanguine Covenant'), findsOneWidget);
     });
   });
 }

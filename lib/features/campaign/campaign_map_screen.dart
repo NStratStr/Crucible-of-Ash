@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../shared/models/expedition_boon.dart';
 import 'campaign_node.dart';
 
 class CampaignMapScreen extends StatelessWidget {
@@ -12,6 +13,7 @@ class CampaignMapScreen extends StatelessWidget {
   final int currentChapter;
   final int maxUnlockedChapter;
   final ValueChanged<int>? onChapterChanged;
+  final Set<ExpeditionBoon> activeBoons;
 
   const CampaignMapScreen({
     super.key,
@@ -24,6 +26,7 @@ class CampaignMapScreen extends StatelessWidget {
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
     this.onChapterChanged,
+    this.activeBoons = const {},
   });
 
   static String chapterTitle(int ch) {
@@ -135,8 +138,12 @@ class CampaignMapScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
+      body: Column(
+        children: [
+          if (activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
           final double mapWidth = constraints.maxWidth;
           final double mapHeight = constraints.maxHeight;
           final double maxD = nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
@@ -181,6 +188,61 @@ class CampaignMapScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    ),
+  ],
+),
+);
+}
+
+  Widget _buildActiveBoonsBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1B1015),
+        border: Border(bottom: BorderSide(color: Color(0xFFB3261E), width: 1.0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, color: Color(0xFFFF7043), size: 14),
+          const SizedBox(width: 8),
+          const Text(
+            'ACTIVE COVENANTS:',
+            style: TextStyle(
+              color: Color(0xFFFF7043),
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: activeBoons.map((b) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: b.color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: b.color, width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(b.icon, color: b.color, size: 11),
+                    const SizedBox(width: 4),
+                    Text(
+                      b.displayName,
+                      style: TextStyle(color: b.color, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              )).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }

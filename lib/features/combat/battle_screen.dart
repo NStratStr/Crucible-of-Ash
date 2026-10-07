@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/combat_math.dart';
+import '../../shared/models/expedition_boon.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
@@ -509,6 +510,7 @@ class _BattleScreenState extends State<BattleScreen> {
                 _buildTopStatusHeader(),
                 _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
                 _buildBattleModifierBanner(),
+                _buildActiveBoonsBanner(),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -864,6 +866,60 @@ class _BattleScreenState extends State<BattleScreen> {
               description,
               style: const TextStyle(color: Colors.white70, fontSize: 9.5),
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveBoonsBanner() {
+    final boons = widget.combatService.activeBoons;
+    if (boons.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1B1015),
+        border: Border(bottom: BorderSide(color: Color(0xFFB3261E), width: 1.0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, color: Color(0xFFFF7043), size: 13),
+          const SizedBox(width: 6),
+          const Text(
+            'COVENANTS: ',
+            style: TextStyle(
+              color: Color(0xFFFF7043),
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              children: boons.map((b) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: b.color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: b.color, width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(b.icon, color: b.color, size: 10),
+                    const SizedBox(width: 3),
+                    Text(
+                      b.displayName,
+                      style: TextStyle(color: b.color, fontSize: 8.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              )).toList(),
             ),
           ),
         ],

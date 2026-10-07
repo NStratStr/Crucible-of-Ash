@@ -1016,6 +1016,7 @@ class _AppShellState extends State<AppShell> {
                     totalIchor: _totalIchor,
                     cursedOre: _cursedOre,
                     bloodlineSigils: _bloodlineSigils,
+                    activeBoons: _activeExpeditionBoons,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
                     currentChapter: _currentChapter,
                     maxUnlockedChapter: _maxUnlockedChapter,
