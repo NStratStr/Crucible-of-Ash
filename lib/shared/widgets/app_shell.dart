@@ -1591,6 +1591,50 @@ class _AppShellState extends State<AppShell> {
               );
             }),
             const SizedBox(height: 16),
+            const Text(
+              'RELIC SET SYNERGY MATRIX (SPEC 9.2)',
+              style: TextStyle(
+                color: Color(0xFFE5A93C),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildCodexRelicSetItem('Bloodleech (2-Piece)', '+15% Lifesteal on all physical and skill strikes.', const Color(0xFFE53935), Icons.water_drop),
+            _buildCodexRelicSetItem('Ironclad (2-Piece)', '+20% Armor defense (+25 flat Defense bonus).', const Color(0xFF1E88E5), Icons.shield),
+            _buildCodexRelicSetItem('Tempest (2-Piece)', '+12 Speed initiative acceleration.', const Color(0xFF00ACC1), Icons.air),
+            _buildCodexRelicSetItem('Shadowstalker (2-Piece)', '+15% Critical Strike Rate, +10 Speed.', const Color(0xFF8E24AA), Icons.flash_on),
+            _buildCodexRelicSetItem('Executioner (4-Piece)', '+30% Critical Damage, +10% Critical Strike Rate.', const Color(0xFFFFB300), Icons.colorize),
+            _buildCodexRelicSetItem('Blightweaver (4-Piece)', '+15% ATK (+20 flat); all strikes inflict 3-turn Blight; +30% DMG vs Blighted.', const Color(0xFF43A047), Icons.bubble_chart),
+            _buildCodexRelicSetItem('Dreadnought (4-Piece)', '+30% Maximum HP (+150 flat); reflects 20% incoming damage back to attacker.', const Color(0xFF78909C), Icons.security),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF181820),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF2B2B36)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'COMBAT MITIGATION & TICK ENGINE (SPEC 4)',
+                    style: TextStyle(color: Color(0xFFE5A93C), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.1),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '• Mitigation Multiplier = 1000 / (1000 + 3.5 * Defender Defense)\n'
+                    '• Turn-Meter Delta = (Speed / 100) * 10 per tick\n'
+                    '• Glancing Blow: 25% chance on Disadvantage (-30% DMG, cannot crit, debuffs fail)\n'
+                    '• Command Focus: 500 damage dealt or taken = 1 Focus point (cap 3)',
+                    style: TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.45),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Center(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.refresh),
@@ -1674,6 +1718,43 @@ class _AppShellState extends State<AppShell> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCodexRelicSetItem(String title, String effect, Color color, IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF181820),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 13,
+            backgroundColor: color.withValues(alpha: 0.2),
+            child: Icon(icon, color: color, size: 14),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  effect,
+                  style: const TextStyle(color: Colors.white70, fontSize: 9.5),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
