@@ -8,10 +8,13 @@ enum RelicSlot {
 }
 
 enum RelicSetType {
-  bloodleech,  // 2-pc: +15% Lifesteal
-  ironclad,    // 2-pc: +20% Defense
-  tempest,     // 2-pc: +12 Speed
-  executioner, // 4-pc: +30% Crit DMG, +10% Crit Rate
+  bloodleech,    // 2-pc: +15% Lifesteal
+  ironclad,      // 2-pc: +20% Defense
+  tempest,       // 2-pc: +12 Speed
+  executioner,   // 4-pc: +30% Crit DMG, +10% Crit Rate
+  blightweaver,  // 4-pc: Attacks inflict Blight; +30% DMG vs Blighted foes
+  dreadnought,   // 4-pc: +30% Max HP; reflects 20% damage back to attackers
+  shadowstalker, // 2-pc: +15% Crit Rate, +10 Speed
 }
 
 enum RelicRarity {
@@ -126,6 +129,12 @@ class RelicEntity {
         return '2-Piece: +12 Initiative Speed';
       case RelicSetType.executioner:
         return '4-Piece: +30% Crit Damage & +10% Crit Rate';
+      case RelicSetType.blightweaver:
+        return '4-Piece: Strikes inflict Blight; +30% damage vs Blighted foes';
+      case RelicSetType.dreadnought:
+        return '4-Piece: +30% Max HP; reflects 20% damage to attackers';
+      case RelicSetType.shadowstalker:
+        return '2-Piece: +15% Crit Rate & +10 Speed';
     }
   }
 
@@ -139,6 +148,12 @@ class RelicEntity {
         return 'Tempest Weaver';
       case RelicSetType.executioner:
         return 'Executioner Set';
+      case RelicSetType.blightweaver:
+        return 'Blightweaver Set';
+      case RelicSetType.dreadnought:
+        return 'Dreadnought Bastion';
+      case RelicSetType.shadowstalker:
+        return 'Shadowstalker Set';
     }
   }
 }

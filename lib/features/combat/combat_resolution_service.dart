@@ -4,6 +4,7 @@ import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/models/expedition_boon.dart';
+import '../../shared/models/relic_entity.dart';
 import '../generals/general_command_service.dart';
 import '../relics/relic_service.dart';
 import 'initiative_tick_manager.dart';
@@ -60,9 +61,11 @@ class TurnStartResult {
 
 enum BattleModifier {
   none,
-  titanicFury,    // Boss attacks cleave all frontline Vanguard units
-  bloodMoon,      // +50% critical strike damage amplification
-  corrosiveMiasma // Non-Occultists suffer 30 poison damage at start of turn
+  titanicFury,      // Boss attacks cleave all frontline Vanguard units
+  bloodMoon,        // +50% critical strike damage amplification
+  corrosiveMiasma,  // Non-Occultists suffer 30 poison damage at start of turn
+  voidCorruption,   // Non-Occultists take 45 poison at turn start; Occultist strikes apply Blight
+  abyssalEclipse,   // Boss attacks cleave frontlines AND non-Occultists suffer 40 poison damage
 }
 
 class CombatResolutionService {
@@ -174,10 +177,16 @@ class CombatResolutionService {
       }
     }
 
-    // Battle Modifier: Corrosive Miasma (Non-Occultists suffer 30 poison damage at start of turn)
-    if (battleModifier == BattleModifier.corrosiveMiasma && currentUnit.archetype != Archetype.occultist) {
-      dotDamage += 30;
+    // Battle Modifier: Corrosive Miasma / Void Corruption / Abyssal Eclipse
+    if ((battleModifier == BattleModifier.corrosiveMiasma ||
+            battleModifier == BattleModifier.abyssalEclipse) &&
+        currentUnit.archetype != Archetype.occultist) {
+      final poison = battleModifier == BattleModifier.abyssalEclipse ? 40 : 30;
+      dotDamage += poison;
       triggeredTraits.add('corrosive_miasma');
+    } else if (battleModifier == BattleModifier.voidCorruption && currentUnit.archetype != Archetype.occultist) {
+      dotDamage += 45;
+      triggeredTraits.add('void_corruption');
     }
 
     // Decrement durations on active effects
@@ -510,6 +519,19 @@ class CombatResolutionService {
       }
     }
 
+    // Relic Set: Blightweaver (4-pc: +30% damage vs Blighted foes)
+    if (attackerRelics.activeSetBonuses.contains(RelicSetType.blightweaver)) {
+      final bool hasDoT = target.isBleeding || target.activeEffects.any((e) => e.type == StatusEffectType.blight);
+      if (hasDoT) {
+        totalDamage *= 1.30;
+      }
+    }
+
+    // Battle Modifier: Void Corruption (Non-Occultist targets suffer +20% damage)
+    if (battleModifier == BattleModifier.voidCorruption && target.archetype != Archetype.occultist) {
+      totalDamage *= 1.20;
+    }
+
     if (isGlancing) {
       totalDamage *= 0.70;
     }
@@ -521,6 +543,16 @@ class CombatResolutionService {
     List<StatusEffect> targetEffects = List.of(target.activeEffects);
     if (skill.appliedStatus != null && !isGlancing && newTargetHp > 0) {
       targetEffects.add(skill.appliedStatus!);
+    }
+
+    // Relic Set: Blightweaver (4-pc: Strikes inflict Blight)
+    if (attackerRelics.activeSetBonuses.contains(RelicSetType.blightweaver) && !isGlancing && newTargetHp > 0) {
+      targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 3, value: 45));
+    }
+
+    // Battle Modifier: Void Corruption (Occultist strikes inflict Blight)
+    if (battleModifier == BattleModifier.voidCorruption && attacker.archetype == Archetype.occultist && !isGlancing && newTargetHp > 0) {
+      targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40));
     }
 
     // Trait: Rend Flesh / Rend (Applies Bleed on hit)
@@ -583,6 +615,12 @@ class CombatResolutionService {
       attackerHp = max(0, attackerHp - reflected);
     }
 
+    // Relic Set: Dreadnought (4-pc: Reflects 20% incoming damage back to attacker)
+    if (targetRelics.activeSetBonuses.contains(RelicSetType.dreadnought) && attacker.isAlive) {
+      final int reflected = max(1, (finalDamage * 0.20).round());
+      attackerHp = max(0, attackerHp - reflected);
+    }
+
     // Morrigan's Temporal Threads: Crits grant +5% Turn Meter
     double bonusTmFromCrit = 0.0;
     if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.morrigan && isCritical) {
@@ -627,8 +665,8 @@ class CombatResolutionService {
       updatedEnemies = updatedEnemies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
       updatedAllies = updatedAllies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
 
-      // Battle Modifier: Titanic Fury (Boss attacks strike all frontline Vanguard units simultaneously)
-      if (battleModifier == BattleModifier.titanicFury && target.isVanguard) {
+      // Battle Modifier: Titanic Fury / Abyssal Eclipse (Boss attacks strike all frontline Vanguard units simultaneously)
+      if ((battleModifier == BattleModifier.titanicFury || battleModifier == BattleModifier.abyssalEclipse) && target.isVanguard) {
         final cleaveDmg = max(1, (finalDamage * 0.75).round());
         updatedAllies = updatedAllies.map((ally) {
           if (ally.id != updatedTarget.id && ally.isVanguard && ally.isAlive) {

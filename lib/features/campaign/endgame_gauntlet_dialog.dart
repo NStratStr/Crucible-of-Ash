@@ -7,6 +7,8 @@ enum EndgameTrialType {
   lineageCrypt,
   deathlessCrypt,
   abyssalDescent,
+  abyssalDescentII,
+  abyssalDescentIII,
 }
 
 class EndgameTrialDefinition {
@@ -76,6 +78,26 @@ class EndgameGauntletDialog extends StatelessWidget {
       rewardsText: 'Epic Relic • +1,200 Ichor • +1,000 Brigade XP',
       icon: Icons.dark_mode,
       themeColor: Color(0xFF8E24AA),
+    ),
+    EndgameTrialDefinition(
+      type: EndgameTrialType.abyssalDescentII,
+      title: 'ABYSSAL DESCENT: TORMENT II',
+      subtitle: 'Void Corruption Trial',
+      description: 'Mutated abyss where void-warped champions deal heavy rot and occult strikes automatically blight.',
+      modifier: 'VOID CORRUPTION: Non-Occultists take 45 poison at turn start; Occultist strikes apply Blight.',
+      rewardsText: 'Epic/Legendary Relic • +1,600 Ichor • +2 Bloodline Sigils',
+      icon: Icons.grain,
+      themeColor: Color(0xFF5E35B1),
+    ),
+    EndgameTrialDefinition(
+      type: EndgameTrialType.abyssalDescentIII,
+      title: 'ABYSSAL DESCENT: TORMENT III',
+      subtitle: 'Abyssal Eclipse Siege',
+      description: 'Pinnacle abyssal nightmare where the Colossal Void Archon and Arch-Lich unleash dual catastrophic modifiers.',
+      modifier: 'ABYSSAL ECLIPSE: Boss cleaves all frontline Vanguard units AND non-Occultists suffer 40 poison damage.',
+      rewardsText: 'Guaranteed Legendary Relic • +2,500 Ichor • +3 Bloodline Sigils',
+      icon: Icons.brightness_auto,
+      themeColor: Color(0xFFB71C1C),
     ),
   ];
 

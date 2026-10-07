@@ -645,6 +645,122 @@ class StarterBrigades {
     ];
   }
 
+  /// Endgame Gauntlet: Abyssal Descent Tier 2 (Torment II: Void Corruption)
+  static List<UnitEntity> createAbyssalDescentTier2Enemies() {
+    return [
+      const UnitEntity(
+        id: 'abyss_t2_malgok',
+        speciesId: 'void_lich',
+        name: 'Void-Warped Malgok',
+        generation: 4,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 35,
+        maxLevel: 50,
+        currentHp: 2900,
+        maxHp: 2900,
+        attack: 290,
+        defense: 150,
+        speed: 118,
+        nativeTraitId: 'blight_curse',
+        graftedTraitId: 'shadow_bolt',
+        lineageAncestors: ['Necromancer', 'Blight Witch', 'Void Harbinger'],
+      ),
+      const UnitEntity(
+        id: 'abyss_t2_golem',
+        speciesId: 'corrupted_golem',
+        name: 'Void Golem Colossus',
+        generation: 4,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 32,
+        maxLevel: 50,
+        currentHp: 3800,
+        maxHp: 3800,
+        attack: 200,
+        defense: 260,
+        speed: 80,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'abyss_t2_predator',
+        speciesId: 'void_stalker',
+        name: 'Void Stalker Infiltrator',
+        generation: 3,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 30,
+        maxLevel: 45,
+        currentHp: 1500,
+        maxHp: 1500,
+        attack: 240,
+        defense: 110,
+        speed: 135,
+        nativeTraitId: 'death_mark',
+        lineageAncestors: [],
+      ),
+    ];
+  }
+
+  /// Endgame Gauntlet: Abyssal Descent Tier 3 (Torment III: Abyssal Eclipse Siege)
+  static List<UnitEntity> createAbyssalDescentTier3Enemies() {
+    return [
+      const UnitEntity(
+        id: 'abyss_t3_sovereign',
+        speciesId: 'abyssal_sovereign',
+        name: 'Archon of the Eclipse Malgok',
+        generation: 4,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 40,
+        maxLevel: 50,
+        currentHp: 3500,
+        maxHp: 3500,
+        attack: 330,
+        defense: 180,
+        speed: 125,
+        nativeTraitId: 'blight_curse',
+        graftedTraitId: 'plague_hex',
+        lineageAncestors: ['Void Archon Prime', 'Abyssal Overlord'],
+      ),
+      const UnitEntity(
+        id: 'abyss_t3_titan',
+        speciesId: 'world_titan',
+        name: 'Ashen Eclipse Colossus',
+        generation: 4,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 38,
+        maxLevel: 50,
+        currentHp: 4400,
+        maxHp: 4400,
+        attack: 240,
+        defense: 290,
+        speed: 85,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      ),
+      const UnitEntity(
+        id: 'abyss_t3_siphonist',
+        speciesId: 'death_priest',
+        name: 'Abyssal Blood Siphonist',
+        generation: 4,
+        archetype: Archetype.support,
+        slot: FormationSlot.front2,
+        level: 36,
+        maxLevel: 50,
+        currentHp: 1900,
+        maxHp: 1900,
+        attack: 180,
+        defense: 140,
+        speed: 120,
+        nativeTraitId: 'sanguine_mend',
+        lineageAncestors: [],
+      ),
+    ];
+  }
+
   /// FTUE Screen 2: Encounter 1 (Tutorial Skirmish: Speed Ticks & Vanguard Protection)
   static List<UnitEntity> createFtueEncounter1Enemies() {
     return [

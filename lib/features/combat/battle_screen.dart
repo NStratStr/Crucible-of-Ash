@@ -842,6 +842,22 @@ class _BattleScreenState extends State<BattleScreen> {
         title = 'CORROSIVE MIASMA';
         description = 'Non-Occultist units suffer 30 poison damage at start of turn.';
         break;
+      case BattleModifier.voidCorruption:
+        bgColor = const Color(0xFF140D26);
+        borderColor = const Color(0xFF673AB7);
+        textColor = const Color(0xFFB39DDB);
+        icon = Icons.grain;
+        title = 'VOID CORRUPTION';
+        description = 'Non-Occultists take 45 poison damage; Occultist strikes inflict Blight.';
+        break;
+      case BattleModifier.abyssalEclipse:
+        bgColor = const Color(0xFF2A0D15);
+        borderColor = const Color(0xFFD50000);
+        textColor = const Color(0xFFFF5252);
+        icon = Icons.dark_mode;
+        title = 'ABYSSAL ECLIPSE';
+        description = 'Boss cleaves frontlines AND non-Occultists suffer 40 poison damage.';
+        break;
       case BattleModifier.none:
         return const SizedBox.shrink();
     }

@@ -958,6 +958,22 @@ class _AppShellState extends State<AppShell> {
         rewardSigils = 2;
         modifier = BattleModifier.corrosiveMiasma;
         break;
+      case EndgameTrialType.abyssalDescentII:
+        enemies = StarterBrigades.createAbyssalDescentTier2Enemies();
+        trialName = 'Abyssal Descent: Torment II';
+        rewardIchor = 1600;
+        rewardOre = 120;
+        rewardSigils = 2;
+        modifier = BattleModifier.voidCorruption;
+        break;
+      case EndgameTrialType.abyssalDescentIII:
+        enemies = StarterBrigades.createAbyssalDescentTier3Enemies();
+        trialName = 'Abyssal Descent: Torment III';
+        rewardIchor = 2500;
+        rewardOre = 180;
+        rewardSigils = 3;
+        modifier = BattleModifier.abyssalEclipse;
+        break;
     }
 
     final gauntletNode = CampaignNode(

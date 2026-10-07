@@ -103,7 +103,11 @@ class RelicService extends ChangeNotifier {
 
   /// Computes all stat bonuses and active set effects for a given unit
   UnitRelicBonuses calculateBonuses(String unitId) {
-    final equipped = getRelicsForUnit(unitId);
+    return calculateBonusesForRelics(getRelicsForUnit(unitId));
+  }
+
+  /// Computes all stat bonuses and active set effects for a given collection of relics
+  UnitRelicBonuses calculateBonusesForRelics(List<RelicEntity> equipped) {
     if (equipped.isEmpty) return const UnitRelicBonuses();
 
     int atk = 0;
@@ -141,11 +145,24 @@ class RelicService extends ChangeNotifier {
       spd += 12;
       activeSets.add(RelicSetType.tempest);
     }
+    if ((setCounts[RelicSetType.shadowstalker] ?? 0) >= 2) {
+      critRate += 0.15;
+      spd += 10;
+      activeSets.add(RelicSetType.shadowstalker);
+    }
     // Check 4-piece sets
     if ((setCounts[RelicSetType.executioner] ?? 0) >= 4) {
       critDmg += 0.30;
       critRate += 0.10;
       activeSets.add(RelicSetType.executioner);
+    }
+    if ((setCounts[RelicSetType.blightweaver] ?? 0) >= 4) {
+      atk += (atk * 0.15).round() + 20;
+      activeSets.add(RelicSetType.blightweaver);
+    }
+    if ((setCounts[RelicSetType.dreadnought] ?? 0) >= 4) {
+      hp += (hp * 0.30).round() + 150;
+      activeSets.add(RelicSetType.dreadnought);
     }
 
     return UnitRelicBonuses(

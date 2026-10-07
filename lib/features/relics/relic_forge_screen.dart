@@ -300,7 +300,8 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
           const SizedBox(height: 4),
 
           // Set Synergy Filter Bar
-          Padding(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
@@ -308,7 +309,10 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 _buildSetFilterChip('BLOOD (2)', RelicSetType.bloodleech, const Color(0xFFEF5350)),
                 _buildSetFilterChip('IRON (2)', RelicSetType.ironclad, const Color(0xFF90A4AE)),
                 _buildSetFilterChip('TEMP (2)', RelicSetType.tempest, const Color(0xFF29B6F6)),
+                _buildSetFilterChip('SHADOW (2)', RelicSetType.shadowstalker, const Color(0xFFFFB300)),
                 _buildSetFilterChip('EXEC (4)', RelicSetType.executioner, const Color(0xFFAB47BC)),
+                _buildSetFilterChip('BLIGHT (4)', RelicSetType.blightweaver, const Color(0xFF66BB6A)),
+                _buildSetFilterChip('DREAD (4)', RelicSetType.dreadnought, const Color(0xFF7E57C2)),
               ],
             ),
           ),
@@ -492,28 +496,26 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   Widget _buildSetFilterChip(String label, RelicSetType? setType, Color accentColor) {
     final bool isSelected = _setTypeFilter == setType;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _setTypeFilter = setType),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: isSelected ? accentColor.withValues(alpha: 0.25) : const Color(0xFF1E1E26),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: isSelected ? accentColor : Colors.transparent,
-              width: 1,
-            ),
+    return GestureDetector(
+      onTap: () => setState(() => _setTypeFilter = setType),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? accentColor.withValues(alpha: 0.25) : const Color(0xFF1E1E26),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? accentColor : Colors.transparent,
+            width: 1,
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? accentColor : Colors.white60,
-                fontSize: 8.0,
-                fontWeight: FontWeight.bold,
-              ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? accentColor : Colors.white60,
+              fontSize: 8.0,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
