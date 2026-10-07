@@ -103,20 +103,30 @@ class GothicCardFrameWidget extends StatelessWidget {
                 ),
               ),
 
-              // 2. Subtle Gothic Vignette Gradient Overlay
+              // 2. Carved Iron Gothic Frame Overlay (with transparent window)
               Positioned.fill(
+                child: Image.asset(
+                  'assets/images/card_frame.png',
+                  fit: BoxFit.fill,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+
+              // 3. Subtle bottom shadow for name readability
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 54,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.25),
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.85),
-                        Colors.black.withValues(alpha: 0.98),
+                        Colors.black.withValues(alpha: 0.92),
                       ],
-                      stops: const [0.0, 0.35, 0.75, 1.0],
                     ),
                   ),
                 ),

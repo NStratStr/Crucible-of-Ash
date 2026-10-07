@@ -56,6 +56,30 @@ class _BattleScreenState extends State<BattleScreen> {
   final List<FloatingCombatText> _floatingPops = [];
   final List<Timer> _popTimers = [];
 
+  String? _attackingUnitId;
+  String? _damagedUnitId;
+  String? _screenFlashType;
+
+  void _triggerAttackAnimation(String attackerId, String targetId, {String? vfx}) {
+    if (!mounted) return;
+    setState(() {
+      _attackingUnitId = attackerId;
+      _damagedUnitId = targetId;
+      _screenFlashType = vfx ?? 'slash';
+    });
+
+    final timer = Timer(const Duration(milliseconds: 320), () {
+      if (mounted) {
+        setState(() {
+          _attackingUnitId = null;
+          _damagedUnitId = null;
+          _screenFlashType = null;
+        });
+      }
+    });
+    _popTimers.add(timer);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -199,6 +223,12 @@ class _BattleScreenState extends State<BattleScreen> {
       final result = _aiService.executeEnemyTurn();
 
       if (result != null) {
+        _triggerAttackAnimation(
+          result.attacker.id,
+          result.target.id,
+          vfx: result.isCritical ? 'crit' : 'slash',
+        );
+
         _triggerDamagePop(
           damage: result.damageDealt,
           isCrit: result.isCritical,
@@ -275,6 +305,12 @@ class _BattleScreenState extends State<BattleScreen> {
       final result = widget.combatService.executeSkill(skill: skill, targetUnitId: targetId);
 
       widget.commandService.registerCombatDamage(result.damageDealt);
+
+      _triggerAttackAnimation(
+        result.attacker.id,
+        result.target.id,
+        vfx: result.isCritical ? 'crit' : (skill.isLimitBurst ? 'crit' : 'slash'),
+      );
 
       _triggerDamagePop(
         damage: result.damageDealt,
@@ -552,6 +588,35 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ),
             ),
+            // Full-screen Attack / Crit Strike VFX Overlay
+            if (_screenFlashType != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color: _screenFlashType == 'crit'
+                          ? const Color(0xFFFFD54F).withValues(alpha: 0.20)
+                          : const Color(0xFFB3261E).withValues(alpha: 0.16),
+                      border: Border.all(
+                        color: _screenFlashType == 'crit'
+                            ? const Color(0xFFFFD54F)
+                            : const Color(0xFFB3261E),
+                        width: 2.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        _screenFlashType == 'crit' ? Icons.flash_on : Icons.colorize,
+                        size: 64,
+                        color: _screenFlashType == 'crit'
+                            ? const Color(0xFFFFD54F).withValues(alpha: 0.8)
+                            : const Color(0xFFEF5350).withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -882,8 +947,20 @@ class _BattleScreenState extends State<BattleScreen> {
     final double tmRatio = (unit.turnMeter / 100.0).clamp(0.0, 1.0);
     final bool ultReady = unit.ultimateCharge >= 100.0 && alive;
 
+    final bool isAttacking = _attackingUnitId == unit.id;
+    final bool isDamaged = _damagedUnitId == unit.id;
+    final double lungeY = isAttacking ? (isEnemy ? 14.0 : -14.0) : 0.0;
+    final double shakeX = isDamaged ? 3.5 : 0.0;
+    final bool isCriticalHp = hpRatio < 0.25 && alive;
+
     Color borderColor = const Color(0xFF2B2B36);
-    if (isActive) {
+    if (isDamaged) {
+      borderColor = const Color(0xFFFF1744);
+    } else if (isAttacking) {
+      borderColor = const Color(0xFFFFD54F);
+    } else if (isCriticalHp) {
+      borderColor = const Color(0xFFD50000);
+    } else if (isActive) {
       borderColor = const Color(0xFFE5A93C);
     } else if (isSelectedTarget) {
       borderColor = const Color(0xFFD32F2F);
@@ -913,232 +990,320 @@ class _BattleScreenState extends State<BattleScreen> {
             relicService: widget.relicService,
           );
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: alive ? const Color(0xFF1E1E26) : const Color(0xFF121216),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: borderColor,
-              width: (isActive || isSelectedTarget || ultReady) ? 2.0 : 1.0,
-            ),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFFE5A93C).withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    )
-                  ]
-                : (isSelectedTarget
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFFD32F2F).withValues(alpha: 0.45),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        )
-                      ]
-                    : (ultReady
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            )
-                          ]
-                        : null)),
-          ),
-          child: Stack(
-            children: [
-              Opacity(
-                opacity: alive ? 1.0 : 0.25,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Row 1: Archetype + G# / Target icon
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _archetypeShortCode(unit.archetype),
-                          style: TextStyle(
-                            color: _archetypeColor(unit.archetype),
-                            fontSize: 7.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (isSelectedTarget)
-                          const Icon(Icons.gps_fixed, size: 10, color: Color(0xFFD32F2F))
-                        else if (ultReady)
-                          const Text(
-                            'ULT',
-                            style: TextStyle(
-                              color: Color(0xFFFFD54F),
-                              fontSize: 7,
-                              fontWeight: FontWeight.bold,
-                            ),
+        child: Transform.translate(
+          offset: Offset(shakeX, lungeY),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: borderColor,
+                width: (isActive || isSelectedTarget || ultReady || isDamaged || isAttacking) ? 2.0 : 1.0,
+              ),
+              boxShadow: isDamaged
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFFF1744).withValues(alpha: 0.6),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  : (isActive
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFFE5A93C).withValues(alpha: 0.45),
+                            blurRadius: 10,
+                            spreadRadius: 1.5,
                           )
-                        else
-                          Text(
-                            'G${unit.generation}',
-                            style: const TextStyle(
-                              color: Color(0xFF8E8EA0),
-                              fontSize: 7.5,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                      ],
+                        ]
+                      : (isCriticalHp
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFD50000).withValues(alpha: 0.45),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              )
+                            ]
+                          : (isSelectedTarget
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFFD32F2F).withValues(alpha: 0.45),
+                                    blurRadius: 6,
+                                    spreadRadius: 1,
+                                  )
+                                ]
+                              : null))),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: Stack(
+                children: [
+                  // LAYER 1 (Bottom): The Character Portrait Artwork
+                  Positioned.fill(
+                    child: Image.asset(
+                      unit.effectiveAvatarAsset,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                    ),
+                  ),
+
+                  // LAYER 1.5: Ambient Vignette & Status Tint
+                  Positioned.fill(
+                    child: Container(
+                      color: alive
+                          ? (isCriticalHp
+                              ? const Color(0xFFB3261E).withValues(alpha: 0.28)
+                              : Colors.black.withValues(alpha: 0.20))
+                          : Colors.black.withValues(alpha: 0.82),
+                    ),
+                  ),
+
+                  // LAYER 2 (Middle): The Carved Iron Gothic Frame Overlay
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/card_frame.png',
+                      fit: BoxFit.fill,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+
+                  // LAYER 2.5: Red Hit Flash when Damaged
+                  if (isDamaged)
+                    Positioned.fill(
+                      child: Container(
+                        color: const Color(0xFFB3261E).withValues(alpha: 0.55),
+                      ),
                     ),
 
-                    // Hero Portrait Token / Icon
-                    Container(
-                      width: 24,
-                      height: 24,
+                  // LAYER 2.8: Bottom Readability Gradient
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 44,
+                    child: Container(
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: alive
-                              ? (isActive ? const Color(0xFFE5A93C) : _archetypeColor(unit.archetype))
-                              : Colors.white24,
-                          width: 1.2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          unit.effectiveAvatarAsset,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
-                            _archetypeIcon(unit.archetype),
-                            size: 14,
-                            color: alive ? Colors.white70 : Colors.white24,
-                          ),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.92),
+                          ],
                         ),
                       ),
                     ),
+                  ),
 
-                    Text(
-                      unit.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                    // Status Effect Chips (if active)
-                    if (unit.activeEffects.isNotEmpty && alive)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: unit.activeEffects.take(3).map((eff) {
-                          final Color color = _statusColor(eff.type);
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 1),
-                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(color: color, width: 0.5),
-                            ),
-                            child: Text(
-                              _statusAbbr(eff.type),
-                              style: TextStyle(
-                                color: color,
-                                fontSize: 6.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-
-                    // Numbers overlay: HP and TM %
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1.0),
-                      child: Row(
+                  // LAYER 3 (Top): Dynamic Flutter UI
+                  Opacity(
+                    opacity: alive ? 1.0 : 0.25,
+                    child: Padding(
+                      padding: const EdgeInsets.all(2.5),
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '${unit.currentHp}/${unit.maxHp}',
-                            style: TextStyle(
-                              color: hpRatio > 0.35
-                                  ? Colors.white70
-                                  : const Color(0xFFEF5350),
-                              fontSize: 6.5,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.bold,
-                            ),
+                          // Top Header: Archetype Badge (Left) & State Badge (Right)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.75),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: _archetypeColor(unit.archetype), width: 0.8),
+                                ),
+                                child: Text(
+                                  _archetypeShortCode(unit.archetype),
+                                  style: TextStyle(
+                                    color: _archetypeColor(unit.archetype),
+                                    fontSize: 7.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              if (isSelectedTarget)
+                                Container(
+                                  padding: const EdgeInsets.all(1.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.75),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.gps_fixed, size: 9, color: Color(0xFFEF5350)),
+                                )
+                              else if (ultReady)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.75),
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                                  ),
+                                  child: const Text(
+                                    'ULT',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFD54F),
+                                      fontSize: 6.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.75),
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
+                                  ),
+                                  child: Text(
+                                    'G${unit.generation}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFE5A93C),
+                                      fontSize: 6.5,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                          Text(
-                            '${unit.turnMeter.toInt()}%',
-                            style: const TextStyle(
-                              color: Color(0xFF64B5F6),
-                              fontSize: 6.5,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    // Progress Bars
-                    Column(
-                      children: [
-                        LinearProgressIndicator(
-                          value: hpRatio,
-                          minHeight: 3.5,
-                          backgroundColor: const Color(0xFF2A2A38),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            hpRatio > 0.4
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFC62828),
-                          ),
-                        ),
-                        const SizedBox(height: 1.5),
-                        LinearProgressIndicator(
-                          value: tmRatio,
-                          minHeight: 2.5,
-                          backgroundColor: const Color(0xFF2A2A38),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1976D2)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+                          // Center: Status Effect Chips (if active)
+                          if (unit.activeEffects.isNotEmpty && alive)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: unit.activeEffects.take(3).map((eff) {
+                                final Color color = _statusColor(eff.type);
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(2),
+                                    border: Border.all(color: color, width: 0.6),
+                                  ),
+                                  child: Text(
+                                    _statusAbbr(eff.type),
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 6.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            )
+                          else
+                            const SizedBox.shrink(),
 
-              // Fallen / Defeated overlay
-              if (!alive)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.dangerous, size: 14, color: Color(0xFFEF5350)),
-                          SizedBox(height: 1),
-                          Text(
-                            'FALLEN',
-                            style: TextStyle(
-                              color: Color(0xFFEF5350),
-                              fontSize: 7,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
-                            ),
+                          // Bottom: Unit Name, HP/TM Numbers & Progress Bars
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                unit.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [
+                                    Shadow(color: Colors.black, blurRadius: 4),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${unit.currentHp}/${unit.maxHp}',
+                                      style: TextStyle(
+                                        color: hpRatio > 0.35
+                                            ? Colors.white70
+                                            : const Color(0xFFEF5350),
+                                        fontSize: 6.5,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                        shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                                      ),
+                                    ),
+                                    Text(
+                                      '${unit.turnMeter.toInt()}%',
+                                      style: const TextStyle(
+                                        color: Color(0xFF64B5F6),
+                                        fontSize: 6.5,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 1.5),
+                              LinearProgressIndicator(
+                                value: hpRatio,
+                                minHeight: 3.5,
+                                backgroundColor: const Color(0xFF2A2A38),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  hpRatio > 0.4
+                                      ? const Color(0xFF2E7D32)
+                                      : const Color(0xFFC62828),
+                                ),
+                              ),
+                              const SizedBox(height: 1.5),
+                              LinearProgressIndicator(
+                                value: tmRatio,
+                                minHeight: 2.5,
+                                backgroundColor: const Color(0xFF2A2A38),
+                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1976D2)),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-            ],
+
+                  // Fallen / Defeated overlay
+                  if (!alive)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.70),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.dangerous, size: 14, color: Color(0xFFEF5350)),
+                              SizedBox(height: 1),
+                              Text(
+                                'FALLEN',
+                                style: TextStyle(
+                                  color: Color(0xFFEF5350),
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
