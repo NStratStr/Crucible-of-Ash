@@ -6,6 +6,7 @@ import '../models/skill_entity.dart';
 import '../models/trait_entity.dart';
 import '../models/unit_entity.dart';
 import 'gothic_card_frame_widget.dart';
+import 'hexagonal_affinity_wheel_widget.dart';
 
 class PedigreeInspectorDialog extends StatelessWidget {
   final UnitEntity unit;
@@ -313,8 +314,15 @@ class PedigreeInspectorDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: const Color(0xFF2B2B36)),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
+                      HexagonalAffinityWheelWidget(
+                        activeArchetype: unit.archetype,
+                        size: 190,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,7 +379,9 @@ class PedigreeInspectorDialog extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
+                ],
+              ),
+            ),
 
                 const SizedBox(height: 16),
 

@@ -24,6 +24,7 @@ import '../../features/ftue/ftue_stage.dart';
 import '../data/starter_brigades.dart';
 import '../models/relic_entity.dart';
 import '../models/unit_entity.dart';
+import 'hexagonal_affinity_wheel_widget.dart';
 import 'pedigree_inspector_dialog.dart';
 
 class AppShell extends StatefulWidget {
@@ -54,6 +55,7 @@ class _AppShellState extends State<AppShell> {
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
   CampaignNode? _activeNode;
+  Archetype _codexSelectedArchetype = Archetype.juggernaut;
 
   @override
   void initState() {
@@ -1039,7 +1041,14 @@ class _AppShellState extends State<AppShell> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+            HexagonalAffinityWheelWidget(
+              activeArchetype: _codexSelectedArchetype,
+              onSelectArchetype: (archetype) {
+                setState(() => _codexSelectedArchetype = archetype);
+              },
+            ),
+            const SizedBox(height: 16),
             _buildCodexItem(Archetype.juggernaut, 'Crushes Assassins (+30%). Weak to Occultist rot (-25%).'),
             _buildCodexItem(Archetype.assassin, 'Guts Marksmen (+30%). Weak to Juggernaut armor (-25%).'),
             _buildCodexItem(Archetype.marksman, 'Shoots down Skirmishers (+30%). Weak to Assassin burst (-25%).'),
@@ -1126,37 +1135,66 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildCodexItem(Archetype archetype, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF181820),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF2B2B36)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFF2B2B36),
-            child: Text(
-              archetype.name.substring(0, 3).toUpperCase(),
-              style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10, fontWeight: FontWeight.bold),
-            ),
+    final isSelected = archetype == _codexSelectedArchetype;
+    return InkWell(
+      onTap: () {
+        setState(() => _codexSelectedArchetype = archetype);
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF231C14) : const Color(0xFF181820),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF2B2B36),
+            width: isSelected ? 1.5 : 1.0,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  archetype.name.toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: isSelected ? const Color(0xFFE5A93C).withValues(alpha: 0.25) : const Color(0xFF2B2B36),
+              child: Text(
+                archetype.name.substring(0, 3).toUpperCase(),
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFFE5A93C),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
-                Text(description, style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11)),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        archetype.name.toUpperCase(),
+                        style: TextStyle(
+                          color: isSelected ? const Color(0xFFE5A93C) : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        const Text(
+                          '• SELECTED ON WHEEL',
+                          style: TextStyle(color: Color(0xFFE5A93C), fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(description, style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

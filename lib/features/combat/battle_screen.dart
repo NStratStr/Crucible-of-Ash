@@ -455,6 +455,9 @@ class _BattleScreenState extends State<BattleScreen> {
           break;
       }
       setState(() => _combatLog = res.summary);
+      if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+        widget.onVictory?.call();
+      }
     });
   }
 

@@ -211,17 +211,96 @@ class EndgameGauntletDialog extends StatelessWidget {
 
           // Trial Cards
           Expanded(
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: trials.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (context, index) {
-                final trial = trials[index];
-                return _buildTrialCard(context, trial);
-              },
+              children: [
+                _buildGauntletHeroBanner(),
+                ...trials.map((t) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _buildTrialCard(context, t),
+                    )),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGauntletHeroBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      height: 100,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFB3261E), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFB3261E).withValues(alpha: 0.3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/flayed_butcher.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.90),
+                      Colors.black.withValues(alpha: 0.45),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'THE MACRO TRIALS',
+                    style: TextStyle(
+                      color: Color(0xFFE5A93C),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'ENDGAME SIEGE & LINEAGE CRYPTS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'High-stakes daily boss encounters with strict roster requirements and unique battle modifiers.',
+                    style: TextStyle(color: Colors.white70, fontSize: 9.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
