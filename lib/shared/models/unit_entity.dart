@@ -38,6 +38,7 @@ class UnitEntity {
   final String nativeTraitId;
   final String? graftedTraitId;
   final List<String> lineageAncestors;
+  final String? customAvatarAsset;
 
   const UnitEntity({
     required this.id,
@@ -62,7 +63,38 @@ class UnitEntity {
     required this.nativeTraitId,
     this.graftedTraitId,
     required this.lineageAncestors,
+    this.customAvatarAsset,
   });
+
+  String get effectiveAvatarAsset {
+    if (customAvatarAsset != null) return customAvatarAsset!;
+    if (speciesId.contains('cerberus') || (generation >= 2 && speciesId.contains('hound'))) {
+      return 'assets/images/cerberus_progenitor.jpg';
+    }
+    if (speciesId.contains('hound') || speciesId.contains('wolf') || speciesId.contains('beast')) {
+      return 'assets/images/feral_warhound.jpg';
+    }
+    if (archetype == Archetype.occultist ||
+        speciesId.contains('ghoul') ||
+        speciesId.contains('apothecary') ||
+        speciesId.contains('plague') ||
+        speciesId.contains('warlock') ||
+        speciesId.contains('witch')) {
+      return 'assets/images/plague_occultist.jpg';
+    }
+    if (archetype == Archetype.juggernaut ||
+        speciesId.contains('knight') ||
+        speciesId.contains('golem') ||
+        speciesId.contains('titan') ||
+        speciesId.contains('footman') ||
+        speciesId.contains('guardian')) {
+      return 'assets/images/ironclad_dreadnought.jpg';
+    }
+    if (archetype == Archetype.marksman || archetype == Archetype.skirmisher) {
+      return 'assets/images/feral_warhound.jpg';
+    }
+    return 'assets/images/ironclad_dreadnought.jpg';
+  }
 
   bool get isVanguard => slot.index < 3;
   bool get isArcanum => slot.index >= 3;
@@ -243,6 +275,7 @@ class UnitEntity {
     List<SkillEntity>? skills,
     String? graftedTraitId,
     FormationSlot? slot,
+    String? customAvatarAsset,
   }) {
     return UnitEntity(
       id: id,
@@ -267,6 +300,7 @@ class UnitEntity {
       nativeTraitId: nativeTraitId,
       graftedTraitId: graftedTraitId ?? this.graftedTraitId,
       lineageAncestors: lineageAncestors,
+      customAvatarAsset: customAvatarAsset ?? this.customAvatarAsset,
     );
   }
 }

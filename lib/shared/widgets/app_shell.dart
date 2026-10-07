@@ -672,16 +672,50 @@ class _AppShellState extends State<AppShell> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          backgroundColor: const Color(0xFF2B2B36),
-                          child: Text(
-                            'G${unit.generation}',
-                            style: const TextStyle(
-                              color: Color(0xFFE5A93C),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: inActiveSquad
+                                      ? const Color(0xFFB3261E)
+                                      : const Color(0xFFE5A93C).withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6.5),
+                                child: Image.asset(
+                                  unit.effectiveAvatarAsset,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: const Color(0xFF2B2B36),
+                                    child: const Icon(Icons.shield, color: Colors.white24, size: 24),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
+                              ),
+                              child: Text(
+                                'G${unit.generation}',
+                                style: const TextStyle(
+                                  color: Color(0xFFE5A93C),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 12),
                         Expanded(

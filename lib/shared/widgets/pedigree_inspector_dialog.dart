@@ -4,6 +4,7 @@ import '../../features/relics/relic_service.dart';
 import '../models/relic_entity.dart';
 import '../models/skill_entity.dart';
 import '../models/unit_entity.dart';
+import 'gothic_card_frame_widget.dart';
 
 class PedigreeInspectorDialog extends StatelessWidget {
   final UnitEntity unit;
@@ -203,6 +204,17 @@ class PedigreeInspectorDialog extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Section 0: Grand Portrait Card
+                Center(
+                  child: GothicCardFrameWidget(
+                    unit: unit,
+                    width: 210,
+                    height: 280,
+                    showStats: false,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Section 1: Affinity Wheel Matchup
                 _buildSectionHeader('HEXAGONAL AFFINITY MATCHUP', Icons.sync_alt),
                 const SizedBox(height: 8),

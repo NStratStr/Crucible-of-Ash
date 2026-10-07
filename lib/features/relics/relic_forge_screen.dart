@@ -182,15 +182,33 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                         width: isSelected ? 1.5 : 1.0,
                       ),
                     ),
-                    child: Center(
-                      child: Text(
-                        unit.name,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.white60,
-                          fontSize: 11,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 22,
+                          height: 22,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? const Color(0xFFE5A93C) : Colors.white24,
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(unit.effectiveAvatarAsset, fit: BoxFit.cover),
+                          ),
                         ),
-                      ),
+                        Text(
+                          unit.name,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white60,
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );

@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/widgets/gothic_card_frame_widget.dart';
 import 'crucible_service.dart';
 
 class CrucibleScreen extends StatefulWidget {
@@ -124,11 +126,20 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     setState(() => _isPerformingRitual = true);
     await _shakeController.forward(from: 0.0);
 
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    final isHoundLineage = _progenitorA!.speciesId.contains('hound');
+    final String childName = isHoundLineage
+        ? 'Cerberus Progenitor G$nextGen'
+        : '${_progenitorA!.name} Descendant G$nextGen';
+    final String childSpeciesId = isHoundLineage
+        ? 'cerberus_hound'
+        : _progenitorA!.speciesId;
+
     final UnitEntity child = CrucibleService.fuseUnits(
       parentA: _progenitorA!,
       parentB: _progenitorB!,
-      childSpeciesId: _progenitorA!.speciesId,
-      childName: '${_progenitorA!.name} Descendant',
+      childSpeciesId: childSpeciesId,
+      childName: childName,
       childArchetype: _progenitorA!.archetype,
       assignedSlot: _progenitorA!.slot,
       speciesBaseHp: 800,
@@ -174,20 +185,33 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               fontSize: 16,
             ),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Generation ${child.generation} • Pureblood Lineage',
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              _buildStatMetricRow('MAX HP', child.maxHp.toString()),
-              _buildStatMetricRow('ATTACK', child.attack.toString()),
-              _buildStatMetricRow('DEFENSE', child.defense.toString()),
-              _buildStatMetricRow('SPEED', child.speed.toString()),
-              _buildStatMetricRow('GRAFTED TRAIT', child.graftedTraitId?.replaceAll('_', ' ').toUpperCase() ?? 'None'),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GothicCardFrameWidget(
+                  unit: child,
+                  width: 170,
+                  height: 230,
+                  showStats: false,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Generation ${child.generation} • Pureblood Lineage',
+                  style: const TextStyle(
+                    color: Color(0xFFE5A93C),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _buildStatMetricRow('MAX HP', child.maxHp.toString()),
+                _buildStatMetricRow('ATTACK', child.attack.toString()),
+                _buildStatMetricRow('DEFENSE', child.defense.toString()),
+                _buildStatMetricRow('SPEED', child.speed.toString()),
+                _buildStatMetricRow('GRAFTED TRAIT', child.graftedTraitId?.replaceAll('_', ' ').toUpperCase() ?? 'None'),
+              ],
+            ),
           ),
           actions: [
             Center(
@@ -332,7 +356,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     required VoidCallback onClear,
   }) {
     return Container(
-      height: 140,
+      height: 156,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: const Color(0xFF181820),
@@ -382,6 +406,18 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     ),
                   ],
                 ),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFE5A93C), width: 1),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: Image.asset(unit.effectiveAvatarAsset, fit: BoxFit.cover),
+                  ),
+                ),
                 Text(
                   unit.name,
                   textAlign: TextAlign.center,
@@ -395,13 +431,9 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     color: unit.level >= unit.maxLevel
                         ? const Color(0xFF4CAF50)
                         : const Color(0xFF8E8EA0),
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w600,
                   ),
-                ),
-                Text(
-                  'ATK ${unit.attack} • HP ${unit.maxHp}',
-                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9),
                 ),
               ],
             ),
@@ -475,16 +507,44 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                 ),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      backgroundColor: const Color(0xFF2B2B36),
-                      child: Text(
-                        'G${unit.generation}',
-                        style: const TextStyle(
-                          color: Color(0xFFE5A93C),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isSlotted
+                                  ? const Color(0xFFB3261E)
+                                  : (isCompatibleWithA
+                                      ? const Color(0xFFE5A93C)
+                                      : const Color(0xFF2B2B36)),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(5),
+                            child: Image.asset(unit.effectiveAvatarAsset, fit: BoxFit.cover),
+                          ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            'G${unit.generation}',
+                            style: const TextStyle(
+                              color: Color(0xFFE5A93C),
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(width: 10),
                     Expanded(

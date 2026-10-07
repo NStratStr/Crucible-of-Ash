@@ -992,11 +992,30 @@ class _BattleScreenState extends State<BattleScreen> {
                       ],
                     ),
 
-                    // Icon & Name
-                    Icon(
-                      _archetypeIcon(unit.archetype),
-                      size: 18,
-                      color: alive ? Colors.white70 : Colors.white24,
+                    // Hero Portrait Token / Icon
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: alive
+                              ? (isActive ? const Color(0xFFE5A93C) : _archetypeColor(unit.archetype))
+                              : Colors.white24,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          unit.effectiveAvatarAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            _archetypeIcon(unit.archetype),
+                            size: 14,
+                            color: alive ? Colors.white70 : Colors.white24,
+                          ),
+                        ),
+                      ),
                     ),
 
                     Text(
