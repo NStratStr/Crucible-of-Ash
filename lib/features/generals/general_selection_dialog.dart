@@ -109,8 +109,16 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 12),
-                                const SizedBox(width: 3),
+                                ClipOval(
+                                  child: Image.asset(
+                                    'assets/images/blood_altar_sigil.jpg',
+                                    width: 14,
+                                    height: 14,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 12),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
                                 Text(
                                   '${widget.bloodlineSigils} SIGILS',
                                   style: const TextStyle(

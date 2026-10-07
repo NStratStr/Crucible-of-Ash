@@ -70,7 +70,15 @@ class CampaignMapScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 // Bloodline Sigils
-                const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 14),
+                ClipOval(
+                  child: Image.asset(
+                    'assets/images/blood_altar_sigil.jpg',
+                    width: 14,
+                    height: 14,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 14),
+                  ),
+                ),
                 const SizedBox(width: 3),
                 Text(
                   '$bloodlineSigils',

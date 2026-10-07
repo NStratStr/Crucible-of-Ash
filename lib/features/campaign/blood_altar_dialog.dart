@@ -51,7 +51,32 @@ class BloodAltarDialog extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            Center(
+              child: Container(
+                width: 86,
+                height: 86,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFB3261E), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFB3261E).withValues(alpha: 0.5),
+                      blurRadius: 14,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/blood_altar_sigil.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.fireplace, color: Color(0xFFB3261E), size: 40),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             const Text(
               'A jagged obsidian slab groans as raw vitae pulses through carved stone gutters. '
               'The ancient slumbering entity demands sacrifice in exchange for dark power.',

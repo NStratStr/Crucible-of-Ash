@@ -112,6 +112,16 @@ class UnitEntity {
 
   String get effectiveAvatarAsset {
     if (customAvatarAsset != null) return customAvatarAsset!;
+    if (speciesId.contains('butcher') ||
+        speciesId.contains('flayed') ||
+        speciesId.contains('executioner') ||
+        speciesId.contains('titan') ||
+        name.contains('Flayed') ||
+        name.contains('Butcher') ||
+        name.contains('Executioner') ||
+        name.contains('Titan')) {
+      return 'assets/images/flayed_butcher.jpg';
+    }
     if (speciesId.contains('cerberus') || (generation >= 2 && speciesId.contains('hound'))) {
       return 'assets/images/cerberus_progenitor.jpg';
     }
@@ -126,10 +136,15 @@ class UnitEntity {
         speciesId.contains('witch')) {
       return 'assets/images/plague_occultist.jpg';
     }
+    if (archetype == Archetype.assassin ||
+        speciesId.contains('stalker') ||
+        speciesId.contains('slayer') ||
+        speciesId.contains('reaper')) {
+      return 'assets/images/flayed_butcher.jpg';
+    }
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||
         speciesId.contains('golem') ||
-        speciesId.contains('titan') ||
         speciesId.contains('footman') ||
         speciesId.contains('guardian')) {
       return 'assets/images/ironclad_dreadnought.jpg';

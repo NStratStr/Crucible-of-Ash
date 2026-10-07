@@ -360,9 +360,35 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             }),
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8.0),
-          child: Icon(Icons.compare_arrows, color: Color(0xFFB3261E), size: 26),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _canFuse ? const Color(0xFFFF5252) : const Color(0xFF4A4A58),
+                width: 1.5,
+              ),
+              boxShadow: _canFuse
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFFF1744).withValues(alpha: 0.6),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/crucible_aperture.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.compare_arrows, color: Color(0xFFB3261E), size: 26),
+              ),
+            ),
+          ),
         ),
         Expanded(
           child: _buildProgenitorSlot(
