@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/features/campaign/campaign_map_generator.dart';
 import 'package:ashen_crucible/features/campaign/campaign_node.dart';
+import 'package:ashen_crucible/shared/data/starter_brigades.dart';
 
 void main() {
   group('CampaignMapGenerator Tests', () {
@@ -87,6 +88,25 @@ void main() {
       expect(bossNode.depth, equals(6));
       expect(bossNode.name, contains('Titan Sovereign'));
       expect(bossNode.rewardSigils, equals(4));
+    });
+
+    test('StarterBrigades scales skirmish and elite enemies across Chapters 1, 2, and 3', () {
+      final ch1Skirmish = StarterBrigades.createSkirmishEnemiesForChapter(1);
+      final ch2Skirmish = StarterBrigades.createSkirmishEnemiesForChapter(2);
+      final ch3Skirmish = StarterBrigades.createSkirmishEnemiesForChapter(3);
+
+      expect(ch1Skirmish.first.level, lessThan(ch2Skirmish.first.level));
+      expect(ch2Skirmish.first.level, lessThan(ch3Skirmish.first.level));
+      expect(ch2Skirmish.first.generation, equals(2));
+      expect(ch3Skirmish.first.generation, equals(3));
+
+      final ch1Elite = StarterBrigades.createEliteEnemiesForChapter(1);
+      final ch2Elite = StarterBrigades.createEliteEnemiesForChapter(2);
+      final ch3Elite = StarterBrigades.createEliteEnemiesForChapter(3);
+
+      expect(ch1Elite.first.maxHp, lessThan(ch2Elite.first.maxHp));
+      expect(ch2Elite.first.maxHp, lessThan(ch3Elite.first.maxHp));
+      expect(ch3Elite.first.generation, equals(3));
     });
   });
 }

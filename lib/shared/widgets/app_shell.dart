@@ -244,9 +244,9 @@ class _AppShellState extends State<AppShell> {
       if (node.type == CampaignNodeType.boss) {
         enemies = StarterBrigades.createChapterBossEnemies(_currentChapter);
       } else if (node.type == CampaignNodeType.elite) {
-        enemies = StarterBrigades.createEliteEnemies();
+        enemies = StarterBrigades.createEliteEnemiesForChapter(_currentChapter);
       } else {
-        enemies = StarterBrigades.createTutorialEnemies();
+        enemies = StarterBrigades.createSkirmishEnemiesForChapter(_currentChapter);
       }
 
       // If all allies were fallen, revive squad before entering next battle
