@@ -295,6 +295,38 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     );
   }
 
+  void _refineRelic(RelicEntity relic) {
+    if (!relic.canUpgrade) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Relic has reached maximum refinement tier (+5).'),
+          backgroundColor: Color(0xFFE5A93C),
+        ),
+      );
+      return;
+    }
+
+    final cost = relic.upgradeCostIchor;
+    if (widget.totalIchor < cost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Insufficient Ichor! Refinement requires $cost Ichor.'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
+    widget.onIchorChanged?.call(widget.totalIchor - cost);
+    final upgraded = widget.relicService.upgradeRelic(relic.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Refined to ${upgraded.displayName}! Attributes increased by +25%.'),
+        backgroundColor: upgraded.rarityColor,
+      ),
+    );
+  }
+
   Widget _buildEquipmentSlotCard({
     required RelicSlot slot,
     required RelicEntity? relic,
@@ -326,14 +358,20 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                   size: 14,
                   color: hasRelic ? relic.rarityColor : Colors.white38),
               Text(
-                slot.name.substring(0, 3).toUpperCase(),
-                style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 8, fontWeight: FontWeight.bold),
+                hasRelic && relic.upgradeLevel > 0
+                    ? '+${relic.upgradeLevel}'
+                    : slot.name.substring(0, 3).toUpperCase(),
+                style: TextStyle(
+                  color: hasRelic && relic.upgradeLevel > 0 ? const Color(0xFFE5A93C) : const Color(0xFF8E8EA0),
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            hasRelic ? relic.name : 'EMPTY',
+            hasRelic ? relic.displayName : 'EMPTY',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -344,9 +382,21 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
           ),
           const SizedBox(height: 4),
           if (hasRelic)
-            GestureDetector(
-              onTap: () => widget.relicService.unequipRelic(relic.id),
-              child: const Text('REMOVE', style: TextStyle(color: Color(0xFFEF5350), fontSize: 8, fontWeight: FontWeight.bold)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                if (relic.canUpgrade)
+                  GestureDetector(
+                    onTap: () => _refineRelic(relic),
+                    child: const Text('REFINE',
+                        style: TextStyle(color: Color(0xFFE5A93C), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                  ),
+                GestureDetector(
+                  onTap: () => widget.relicService.unequipRelic(relic.id),
+                  child: const Text('REMOVE',
+                      style: TextStyle(color: Color(0xFFEF5350), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                ),
+              ],
             )
           else
             const Text('UNSLOTTED', style: TextStyle(color: Colors.white24, fontSize: 8)),
@@ -407,9 +457,12 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      relic.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    Flexible(
+                      child: Text(
+                        relic.displayName,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Container(
@@ -423,6 +476,21 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                         style: TextStyle(color: relic.rarityColor, fontSize: 7.5, fontWeight: FontWeight.bold),
                       ),
                     ),
+                    if (relic.upgradeLevel > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFFE5A93C), width: 0.5),
+                        ),
+                        child: Text(
+                          '+${relic.upgradeLevel}',
+                          style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 7.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
@@ -438,17 +506,38 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              widget.relicService.equipRelic(relicId: relic.id, unitId: targetUnitId);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2B2B36),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            ),
-            child: const Text('EQUIP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 6),
+          Column(
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  widget.relicService.equipRelic(relicId: relic.id, unitId: targetUnitId);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2B2B36),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+                child: const Text('EQUIP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+              if (relic.canUpgrade) ...[
+                const SizedBox(height: 4),
+                OutlinedButton(
+                  onPressed: () => _refineRelic(relic),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE5A93C), width: 1),
+                    foregroundColor: const Color(0xFFE5A93C),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: Text(
+                    'REFINE (${relic.upgradeCostIchor}I)',
+                    style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),

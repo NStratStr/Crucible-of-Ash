@@ -8,6 +8,7 @@ import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
 import '../generals/general_command_service.dart';
+import '../generals/general_selection_dialog.dart';
 import '../relics/relic_service.dart';
 
 class FloatingCombatText {
@@ -417,95 +418,18 @@ class _BattleScreenState extends State<BattleScreen> {
     });
   }
 
-  void _showGeneralSelectionDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF131318),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        side: BorderSide(color: Color(0xFFB3261E), width: 1.5),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.shield_moon, color: Color(0xFFE5A93C), size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'SELECT YOUR BRIGADE COMMANDER',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...GeneralProfile.allGenerals.map((profile) {
-                final isCurrent = widget.commandService.activeGeneralType == profile.type;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: isCurrent
-                        ? profile.themeColor.withValues(alpha: 0.18)
-                        : const Color(0xFF1E1E26),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCurrent ? profile.themeColor : const Color(0xFF2B2B36),
-                      width: isCurrent ? 2 : 1,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: profile.themeColor.withValues(alpha: 0.25),
-                      child: Icon(profile.icon, color: profile.themeColor),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(
-                          profile.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          profile.title,
-                          style: TextStyle(color: profile.themeColor, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      'AURA: ${profile.auraName} — ${profile.auraDescription}',
-                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
-                    ),
-                    trailing: isCurrent
-                        ? const Icon(Icons.check_circle, color: Color(0xFF81C784), size: 20)
-                        : null,
-                    onTap: () {
-                      widget.commandService.setActiveGeneral(profile.type);
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _combatLog = 'Commander sworn: ${profile.name} took command of the brigade.';
-                      });
-                    },
-                  ),
-                );
-              }),
-            ],
-          ),
-        );
-      },
+  Future<void> _showGeneralSelectionDialog() async {
+    final chosen = await GeneralSelectionDialog.show(
+      context,
+      currentGeneralType: widget.commandService.activeGeneralType,
     );
+    if (!mounted || chosen == null) return;
+
+    widget.commandService.setActiveGeneral(chosen);
+    final profile = widget.commandService.currentProfile;
+    setState(() {
+      _combatLog = 'Commander sworn: ${profile.name} (${profile.title}) took command!';
+    });
   }
 
   @override
