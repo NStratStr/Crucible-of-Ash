@@ -220,3 +220,46 @@ Progression is represented as a Directed Acyclic Graph (DAG) across 12 to 15 ver
 - **Screen 3**: Encounter 2 — Affinity check teaching the Hex Wheel and Commander Focus.
 - **Screen 4**: The Crucible of Blood — Fuse duplicate hounds into Generation 2 Cerberus Spawn.
 - **Screen 5**: Encounter 3 — Gatekeeper boss defeated by the newly evolved Gen 2 powerhouse.
+
+---
+
+## 9. Economy & Long-term Progression Systems
+
+### 9.1 Tri-Currency Architecture
+Progression balances three distinct resource loops to ensure high-agency decision-making across tactical campaigns and metagame preparation:
+1. **Crucible Ichor (Visceral Currency)**:
+   - Primary fluid harvested from battles, blood altars, and node victories.
+   - Utilized for breeding, fusion in the Crucible of Blood, forging new relics, and early-tier equipment upgrades.
+2. **Cursed Ore (Abyssal Mineral)**:
+   - Extracted from Elite fiends, Defiled Crypt sarcophagi, and Watchtower caches.
+   - Mandatory material for refining relics from $+1$ to $+5$, amplifying base item attributes by $+25\%$ per tier.
+3. **Bloodline Sigils (Sacred Relic Currency)**:
+   - Rare consecrated seals awarded by Chapter World Titans, Lineage Crypts, and Endgame Gauntlet descents.
+   - Consumed in the **Phylactery** to anoint Generals (unlocking Tier 2 and Tier 3 battlefield Orders) and to crown Generation 4 **Pureblood** sovereigns with $+15\%$ all-stat resonance.
+
+### 9.2 Relic Synergy Matrix (2-Piece & 4-Piece Sets)
+Units equip up to 4 relic items across standard slots (**Weapon**, **Armor**, **Talisman**, **Sigil**). Synergistic sets grant compounding passive and combat perks:
+- **Bloodleech (2-Piece)**: $+15\%$ Lifesteal on all physical and skill strikes.
+- **Ironclad (2-Piece)**: $+20\%$ Armor defense ($+25$ flat Defense).
+- **Tempest (2-Piece)**: $+12$ Speed initiative acceleration.
+- **Shadowstalker (2-Piece)**: $+15\%$ Critical Strike Rate, $+10$ Speed.
+- **Executioner (4-Piece)**: $+30\%$ Critical Damage multiplier, $+10\%$ Critical Strike Rate.
+- **Blightweaver (4-Piece)**: $+15\%$ Attack ($+20$ flat Attack); all strikes inflict 3-turn Blight on targets; deals $+30\%$ damage against Blighted foes.
+- **Dreadnought (4-Piece)**: $+30\%$ Maximum HP ($+150$ flat HP); reflects $20\%$ of incoming damage back to the attacker.
+
+---
+
+## 10. Endgame Gauntlet & Torment Descents
+
+High-stakes trials outside the linear campaign test squad specialization and generational breeding:
+1. **The Ashen World Titan**:
+   - Boss siege encounter with titanic health pools and enrage counters.
+   - Rewards: High Ichor yield, Cursed Ore caches, and 3 Bloodline Sigils.
+2. **Lineage Crypts (Den of Fangs & Tomb of the Deathless)**:
+   - Faction and bloodline restricted trials requiring verified lineage ancestors (e.g. Feral Hound lineage or Deathless Undead lineage).
+   - Prevents generic "one-squad-solves-all" strategies.
+3. **Tiered Abyssal Descents**:
+   - **Torment I (Corrosive Miasma)**: Inflicts 30 poison damage at turn start to all non-Occultists.
+   - **Torment II (Void Corruption)**: Inflicts 45 poison damage at turn start to non-Occultists; Occultist attacks automatically inflict Blight; non-Occultists suffer $+20\%$ damage.
+   - **Torment III (Abyssal Eclipse)**: Attacks cleave $75\%$ damage across all frontline Vanguard defenders; non-Occultists suffer 40 poison damage at turn start.
+
