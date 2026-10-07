@@ -9,6 +9,8 @@ class WatchtowerDialog extends StatelessWidget {
   final RelicService relicService;
   final GeneralCommandService commandService;
   final ValueChanged<int> onGainIchor;
+  final ValueChanged<int>? onGainOre;
+  final VoidCallback? onScoutForwardNodes;
   final VoidCallback onDismiss;
 
   const WatchtowerDialog({
@@ -17,6 +19,8 @@ class WatchtowerDialog extends StatelessWidget {
     required this.relicService,
     required this.commandService,
     required this.onGainIchor,
+    this.onGainOre,
+    this.onScoutForwardNodes,
     required this.onDismiss,
   });
 
@@ -26,6 +30,8 @@ class WatchtowerDialog extends StatelessWidget {
     required RelicService relicService,
     required GeneralCommandService commandService,
     required ValueChanged<int> onGainIchor,
+    ValueChanged<int>? onGainOre,
+    VoidCallback? onScoutForwardNodes,
     required VoidCallback onDismiss,
   }) {
     return showDialog(
@@ -36,6 +42,8 @@ class WatchtowerDialog extends StatelessWidget {
         relicService: relicService,
         commandService: commandService,
         onGainIchor: onGainIchor,
+        onGainOre: onGainOre,
+        onScoutForwardNodes: onScoutForwardNodes,
         onDismiss: onDismiss,
       ),
     );
@@ -91,10 +99,52 @@ class WatchtowerDialog extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Choice 1: Chart Enemy Blindspots (+250 Ichor)
+            // Choice 1: Deploy Reconnaissance (Reveal Affinities)
+            _buildChoiceButton(
+              icon: Icons.travel_explore,
+              color: const Color(0xFF00E5FF),
+              title: 'Deploy Forward Reconnaissance',
+              subtitle: 'Clear Fog of War across upcoming tiers to unmask enemy brigade affinities and roles.',
+              onTap: () {
+                Navigator.pop(context);
+                onScoutForwardNodes?.call();
+                onDismiss();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Scouts deployed: Upcoming enemy brigade affinities unmasked!'),
+                    backgroundColor: Color(0xFF006064),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Choice 2: Excavate Cursed Ore Vein (+60 Cursed Ore)
+            _buildChoiceButton(
+              icon: Icons.diamond_outlined,
+              color: const Color(0xFF26A69A),
+              title: 'Excavate Cursed Ore Vein',
+              subtitle: 'Mine volcanic metallic ore: Harvest +60 Cursed Ore for Relic Forging.',
+              onTap: () {
+                Navigator.pop(context);
+                onGainOre?.call(60);
+                onDismiss();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Volcanic vein mined: Harvested +60 Cursed Ore!'),
+                    backgroundColor: Color(0xFF004D40),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // Choice 3: Chart Enemy Blindspots (+250 Ichor)
             _buildChoiceButton(
               icon: Icons.radar,
-              color: const Color(0xFF00E5FF),
+              color: const Color(0xFF4FC3F7),
               title: 'Chart Enemy Blindspots',
               subtitle: 'Extract tactical routes: Harvest +250 Ichor from mapped supply veins.',
               onTap: () {
@@ -112,7 +162,7 @@ class WatchtowerDialog extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // Choice 2: Signal the Commander (Gain +1 Focus)
+            // Choice 4: Signal the Commander (Gain +1 Focus)
             _buildChoiceButton(
               icon: Icons.shield_moon,
               color: const Color(0xFFE5A93C),
@@ -133,7 +183,7 @@ class WatchtowerDialog extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // Choice 3: Plunder Spire Armory (Forge Rare Relic)
+            // Choice 5: Plunder Spire Armory (Forge Rare Relic)
             _buildChoiceButton(
               icon: Icons.inventory_2,
               color: const Color(0xFFAB47BC),

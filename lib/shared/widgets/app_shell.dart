@@ -36,6 +36,8 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
   int _totalIchor = 450;
+  int _cursedOre = 75;
+  int _bloodlineSigils = 2;
   GeneralType _activeGeneralType = GeneralType.vladislav;
   Map<GeneralType, int> _phylacteryRanks = {
     GeneralType.vladislav: 1,
@@ -75,7 +77,7 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _resetEncounter([List<UnitEntity>? customEnemies]) {
+  void _resetEncounter([List<UnitEntity>? customEnemies, BattleModifier battleModifier = BattleModifier.none]) {
     final allies = StarterBrigades.createPlayerSquad();
     final enemies = customEnemies ?? StarterBrigades.createTutorialEnemies();
 
@@ -98,6 +100,7 @@ class _AppShellState extends State<AppShell> {
       tickManager: _tickManager,
       commandService: _commandService,
       relicService: _relicService,
+      battleModifier: battleModifier,
     );
 
     _tickManager.start();
@@ -263,8 +266,21 @@ class _AppShellState extends State<AppShell> {
       relicService: _relicService,
       commandService: _commandService,
       onGainIchor: (amount) => setState(() => _totalIchor += amount),
+      onGainOre: (amount) => setState(() => _cursedOre += amount),
+      onScoutForwardNodes: _scoutForwardCampaignNodes,
       onDismiss: () => _markNodeCompleted(node.id),
     );
+  }
+
+  void _scoutForwardCampaignNodes() {
+    setState(() {
+      _campaignNodes = _campaignNodes.map((n) {
+        if (!n.isVisited) {
+          return n.copyWith(isScouted: true);
+        }
+        return n;
+      }).toList();
+    });
   }
 
   void _grantBrigadeXp(int amount) {
@@ -406,6 +422,8 @@ class _AppShellState extends State<AppShell> {
   void _onCombatVictory() {
     if (_activeNode != null) {
       final reward = _activeNode!.rewardIchor;
+      final oreReward = _activeNode!.rewardOre;
+      final sigilsReward = _activeNode!.rewardSigils;
       final xpReward = _activeNode!.type == CampaignNodeType.boss
           ? 1000
           : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250);
@@ -413,17 +431,22 @@ class _AppShellState extends State<AppShell> {
 
       setState(() {
         _totalIchor += reward;
+        _cursedOre += oreReward;
+        _bloodlineSigils += sigilsReward;
       });
       _markNodeCompleted(_activeNode!.id);
-      _captureThrallAfterBattle();
+      final captured = _captureThrallAfterBattle(scoutedAffinities: _activeNode?.scoutedAffinities);
 
       String extraReward = '';
+      if (sigilsReward > 0) {
+        extraReward += ' • +$sigilsReward Sigil(s)';
+      }
       if (_activeNode!.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
-        extraReward = ' • Dropped ${drop.displayName}!';
+        extraReward += ' • Dropped ${drop.displayName}!';
       } else if (_activeNode!.type == CampaignNodeType.boss) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
-        extraReward = ' • LEGENDARY DROP: ${drop.displayName}!';
+        extraReward += ' • LEGENDARY DROP: ${drop.displayName}!';
       }
 
       if (_ftueService.currentStage == FtueStage.encounter1) {
@@ -436,7 +459,7 @@ class _AppShellState extends State<AppShell> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('EXPEDITION VICTORY! +$reward Ichor, +$xpReward XP, Captured Thrall bound$extraReward'),
+          content: Text('EXPEDITION VICTORY! +$reward Ichor, +$oreReward Ore, +$xpReward XP • Bound ${captured.name} (${captured.archetype.name.toUpperCase()})$extraReward'),
           backgroundColor: const Color(0xFF1B5E20),
           duration: const Duration(seconds: 4),
         ),
@@ -444,28 +467,17 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  void _captureThrallAfterBattle() {
-    final newThrall = UnitEntity(
-      id: 'captured_thrall_${DateTime.now().millisecondsSinceEpoch}',
-      speciesId: 'feral_hound',
-      name: 'Captured War-Hound',
-      generation: 1,
-      archetype: Archetype.juggernaut,
-      slot: FormationSlot.front1,
-      level: 1,
-      maxLevel: 10,
-      currentHp: 650,
-      maxHp: 650,
-      attack: 110,
-      defense: 95,
-      speed: 100,
-      nativeTraitId: 'rend_flesh',
-      lineageAncestors: const [],
-    );
+  UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
+    Archetype? targetRole;
+    if (scoutedAffinities != null && scoutedAffinities.isNotEmpty) {
+      targetRole = scoutedAffinities[DateTime.now().millisecond % scoutedAffinities.length];
+    }
+    final newThrall = StarterBrigades.createCapturedThrall(archetype: targetRole);
 
     setState(() {
       _inventory.insert(0, newThrall);
     });
+    return newThrall;
   }
 
   void _healSquad() {
@@ -533,21 +545,33 @@ class _AppShellState extends State<AppShell> {
     List<UnitEntity> enemies;
     String trialName;
     int rewardIchor;
+    int rewardOre;
+    int rewardSigils;
+    BattleModifier modifier;
     switch (trial) {
       case EndgameTrialType.worldTitan:
         enemies = StarterBrigades.createWorldTitanEnemies();
         trialName = 'The Ashen World Titan';
         rewardIchor = 2000;
+        rewardOre = 150;
+        rewardSigils = 3;
+        modifier = BattleModifier.titanicFury;
         break;
       case EndgameTrialType.lineageCrypt:
         enemies = StarterBrigades.createLineageCryptEnemies();
         trialName = 'Lineage Crypt: Den of Fangs';
         rewardIchor = 800;
+        rewardOre = 60;
+        rewardSigils = 1;
+        modifier = BattleModifier.bloodMoon;
         break;
       case EndgameTrialType.abyssalDescent:
         enemies = StarterBrigades.createAbyssalDescentEnemies();
         trialName = 'Abyssal Descent: Torment I';
         rewardIchor = 1200;
+        rewardOre = 90;
+        rewardSigils = 2;
+        modifier = BattleModifier.corrosiveMiasma;
         break;
     }
 
@@ -560,13 +584,15 @@ class _AppShellState extends State<AppShell> {
       description: 'High-stakes Endgame Gauntlet trial.',
       nextNodeIds: const [],
       rewardIchor: rewardIchor,
+      rewardOre: rewardOre,
+      rewardSigils: rewardSigils,
       isCurrent: true,
       isReachable: true,
     );
 
     setState(() {
       _activeNode = gauntletNode;
-      _resetEncounter(enemies);
+      _resetEncounter(enemies, modifier);
       _currentIndex = 1; // Switch to Battle Arena
     });
 
@@ -603,6 +629,8 @@ class _AppShellState extends State<AppShell> {
                     nodes: _campaignNodes,
                     onSelectNode: _onSelectCampaignNode,
                     totalIchor: _totalIchor,
+                    cursedOre: _cursedOre,
+                    bloodlineSigils: _bloodlineSigils,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
                   ),
                   // Tab 1: Tactical Arena
@@ -612,6 +640,8 @@ class _AppShellState extends State<AppShell> {
                     combatService: _combatService,
                     commandService: _commandService,
                     relicService: _relicService,
+                    bloodlineSigils: _bloodlineSigils,
+                    onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onResetEncounter: () => setState(_resetEncounter),
                     onVictory: _onCombatVictory,
                   ),
@@ -625,7 +655,9 @@ class _AppShellState extends State<AppShell> {
                     relicService: _relicService,
                     brigadeUnits: allPlayerUnits,
                     totalIchor: _totalIchor,
+                    cursedOre: _cursedOre,
                     onIchorChanged: (val) => setState(() => _totalIchor = val),
+                    onOreChanged: (val) => setState(() => _cursedOre = val),
                   ),
                   // Tab 4: Brigade Roster
                   _buildRosterScreen(allPlayerUnits),
@@ -683,6 +715,8 @@ class _AppShellState extends State<AppShell> {
       context,
       currentGeneralType: _commandService.activeGeneralType,
       commandService: _commandService,
+      bloodlineSigils: _bloodlineSigils,
+      onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
     );
     if (!mounted || chosen == null) return;
 

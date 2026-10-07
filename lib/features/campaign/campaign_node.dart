@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../core/combat_math.dart';
 
 enum CampaignNodeType {
   skirmish,    // Standard brigade fight
@@ -23,6 +24,10 @@ class CampaignNode {
   final bool isReachable;
   final bool isCurrent;
   final int rewardIchor;
+  final int rewardOre;           // Cursed Ore for Relic Forge
+  final int rewardSigils;        // Bloodline Sigils for Phylactery / Pureblood
+  final bool isScouted;          // Revealed via Watchtower reconnaissance
+  final List<Archetype> scoutedAffinities; // Enemy brigade roles at this node
 
   const CampaignNode({
     required this.id,
@@ -36,12 +41,21 @@ class CampaignNode {
     this.isReachable = false,
     this.isCurrent = false,
     this.rewardIchor = 150,
+    this.rewardOre = 25,
+    this.rewardSigils = 0,
+    this.isScouted = false,
+    this.scoutedAffinities = const [],
   });
 
   CampaignNode copyWith({
     bool? isVisited,
     bool? isReachable,
     bool? isCurrent,
+    bool? isScouted,
+    List<Archetype>? scoutedAffinities,
+    int? rewardIchor,
+    int? rewardOre,
+    int? rewardSigils,
   }) {
     return CampaignNode(
       id: id,
@@ -54,7 +68,11 @@ class CampaignNode {
       isVisited: isVisited ?? this.isVisited,
       isReachable: isReachable ?? this.isReachable,
       isCurrent: isCurrent ?? this.isCurrent,
-      rewardIchor: rewardIchor,
+      rewardIchor: rewardIchor ?? this.rewardIchor,
+      rewardOre: rewardOre ?? this.rewardOre,
+      rewardSigils: rewardSigils ?? this.rewardSigils,
+      isScouted: isScouted ?? this.isScouted,
+      scoutedAffinities: scoutedAffinities ?? this.scoutedAffinities,
     );
   }
 }

@@ -684,5 +684,122 @@ class StarterBrigades {
       ),
     ];
   }
+
+  /// Generates a thematic captured thrall across the 6-Role Hexagonal Wheel.
+  static UnitEntity createCapturedThrall({Archetype? archetype, int generation = 1}) {
+    final role = archetype ?? Archetype.values[DateTime.now().millisecond % 6];
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    switch (role) {
+      case Archetype.juggernaut:
+        return UnitEntity(
+          id: 'captured_jug_$timestamp',
+          speciesId: 'feral_hound',
+          name: 'Captured Pit-Hound',
+          generation: generation,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front1,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 750,
+          maxHp: 750,
+          attack: 120,
+          defense: 110,
+          speed: 100,
+          nativeTraitId: 'rend_flesh',
+          lineageAncestors: const [],
+        );
+      case Archetype.assassin:
+        return UnitEntity(
+          id: 'captured_asn_$timestamp',
+          speciesId: 'decayed_ghoul',
+          name: 'Captured Ghoul Stalker',
+          generation: generation,
+          archetype: Archetype.assassin,
+          slot: FormationSlot.front2,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 620,
+          maxHp: 620,
+          attack: 155,
+          defense: 80,
+          speed: 120,
+          nativeTraitId: 'vicious_strike',
+          lineageAncestors: const [],
+        );
+      case Archetype.marksman:
+        return UnitEntity(
+          id: 'captured_mrk_$timestamp',
+          speciesId: 'ashen_archer',
+          name: 'Captured Ashen Crossbowman',
+          generation: generation,
+          archetype: Archetype.marksman,
+          slot: FormationSlot.back1,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 580,
+          maxHp: 580,
+          attack: 165,
+          defense: 65,
+          speed: 112,
+          nativeTraitId: 'piercing_arrow',
+          lineageAncestors: const [],
+        );
+      case Archetype.skirmisher:
+        return UnitEntity(
+          id: 'captured_skm_$timestamp',
+          speciesId: 'gargoyle_stalker',
+          name: 'Captured Carrion Gargoyle',
+          generation: generation,
+          archetype: Archetype.skirmisher,
+          slot: FormationSlot.front3,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 640,
+          maxHp: 640,
+          attack: 140,
+          defense: 85,
+          speed: 122,
+          nativeTraitId: 'dive_bomb',
+          lineageAncestors: const [],
+        );
+      case Archetype.support:
+        return UnitEntity(
+          id: 'captured_sup_$timestamp',
+          speciesId: 'blood_alchemist',
+          name: 'Captured Blood Alchemist',
+          generation: generation,
+          archetype: Archetype.support,
+          slot: FormationSlot.back2,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 680,
+          maxHp: 680,
+          attack: 110,
+          defense: 95,
+          speed: 105,
+          nativeTraitId: 'sanguine_mend',
+          lineageAncestors: const [],
+        );
+      case Archetype.occultist:
+        return UnitEntity(
+          id: 'captured_occ_$timestamp',
+          speciesId: 'grave_disciple',
+          name: 'Captured Blight Cultist',
+          generation: generation,
+          archetype: Archetype.occultist,
+          slot: FormationSlot.back2,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 600,
+          maxHp: 600,
+          attack: 150,
+          defense: 75,
+          speed: 98,
+          nativeTraitId: 'plague_hex',
+          lineageAncestors: const [],
+        );
+    }
+  }
 }
 

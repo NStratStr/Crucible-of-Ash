@@ -34,7 +34,18 @@ class CrucibleService {
     final int bonusDef = ((parentA.defense * ratioA) + (parentB.defense * ratioB)).round();
     final int bonusSpd = ((parentA.speed * ratioA) + (parentB.speed * ratioB)).round();
 
-    final int finalMaxHp = speciesBaseHp + bonusHp;
+    int finalMaxHp = speciesBaseHp + bonusHp;
+    int finalAtk = speciesBaseAtk + bonusAtk;
+    int finalDef = speciesBaseDef + bonusDef;
+    int finalSpd = speciesBaseSpd + bonusSpd;
+
+    // Pureblood Resonance (Gen 4 pinnacle lineage bonus)
+    if (nextGeneration >= 4) {
+      finalMaxHp = (finalMaxHp * 1.15).round();
+      finalAtk = (finalAtk * 1.15).round();
+      finalDef = (finalDef * 1.15).round();
+      finalSpd = (finalSpd * 1.15).round();
+    }
 
     final List<String> combinedPedigree = [
       ...parentA.lineageAncestors,
@@ -42,6 +53,8 @@ class CrucibleService {
       ...parentB.lineageAncestors,
       parentB.id,
     ];
+
+    final int maxLvl = nextGeneration >= 4 ? 50 : 30 + (nextGeneration * 5);
 
     return UnitEntity(
       id: "unit_${DateTime.now().millisecondsSinceEpoch}",
@@ -51,12 +64,12 @@ class CrucibleService {
       archetype: childArchetype,
       slot: assignedSlot,
       level: 1,
-      maxLevel: 30 + (nextGeneration * 5),
+      maxLevel: maxLvl,
       currentHp: finalMaxHp,
       maxHp: finalMaxHp,
-      attack: speciesBaseAtk + bonusAtk,
-      defense: speciesBaseDef + bonusDef,
-      speed: speciesBaseSpd + bonusSpd,
+      attack: finalAtk,
+      defense: finalDef,
+      speed: finalSpd,
       nativeTraitId: childNativeTraitId,
       graftedTraitId: selectedGraftTraitId,
       lineageAncestors: combinedPedigree,

@@ -57,16 +57,25 @@ class TurnStartResult {
   });
 }
 
+enum BattleModifier {
+  none,
+  titanicFury,    // Boss attacks cleave all frontline Vanguard units
+  bloodMoon,      // +50% critical strike damage amplification
+  corrosiveMiasma // Non-Occultists suffer 30 poison damage at start of turn
+}
+
 class CombatResolutionService {
   final InitiativeTickManager tickManager;
   final GeneralCommandService? commandService;
   final RelicService? relicService;
+  final BattleModifier battleModifier;
   final Random _rng;
 
   CombatResolutionService({
     required this.tickManager,
     this.commandService,
     this.relicService,
+    this.battleModifier = BattleModifier.none,
     Random? rng,
   }) : _rng = rng ?? Random();
 
@@ -160,6 +169,12 @@ class CombatResolutionService {
         final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.06).round());
         dotDamage += dmg;
       }
+    }
+
+    // Battle Modifier: Corrosive Miasma (Non-Occultists suffer 30 poison damage at start of turn)
+    if (battleModifier == BattleModifier.corrosiveMiasma && currentUnit.archetype != Archetype.occultist) {
+      dotDamage += 30;
+      triggeredTraits.add('corrosive_miasma');
     }
 
     // Decrement durations on active effects
@@ -417,7 +432,11 @@ class CombatResolutionService {
     }
 
     final bool isCritical = !isGlancing && (_rng.nextDouble() < effectiveCritRate);
-    final double critMod = isCritical ? effectiveCritDmg : 1.0;
+    double critMod = isCritical ? effectiveCritDmg : 1.0;
+    // Battle Modifier: Blood Moon (All critical strike damage is amplified by +50%)
+    if (battleModifier == BattleModifier.bloodMoon && isCritical) {
+      critMod += 0.50;
+    }
 
     // 3. Compute Defense Mitigation
     int baseDefense = target.defense + targetRelics.bonusDefense;
@@ -586,6 +605,18 @@ class CombatResolutionService {
     } else {
       updatedEnemies = updatedEnemies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
       updatedAllies = updatedAllies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
+
+      // Battle Modifier: Titanic Fury (Boss attacks strike all frontline Vanguard units simultaneously)
+      if (battleModifier == BattleModifier.titanicFury && target.isVanguard) {
+        final cleaveDmg = max(1, (finalDamage * 0.75).round());
+        updatedAllies = updatedAllies.map((ally) {
+          if (ally.id != updatedTarget.id && ally.isVanguard && ally.isAlive) {
+            final newHp = max(0, ally.currentHp - cleaveDmg);
+            return ally.copyWith(currentHp: newHp);
+          }
+          return ally;
+        }).toList();
+      }
     }
 
     // Malakor's Carrion Miasma: When an ally falls, all enemies gain 2 stacks of Blight

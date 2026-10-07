@@ -146,6 +146,8 @@ class UnitEntity {
   bool get isStunned => activeEffects.any((e) => e.type == StatusEffectType.stun);
   bool get isBleeding => activeEffects.any((e) => e.type == StatusEffectType.bleed);
   bool get isBlighted => activeEffects.any((e) => e.type == StatusEffectType.blight);
+  bool get isPureblood => generation >= 4;
+  String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
 
   List<SkillEntity> get resolvedSkills {
     if (skills.isNotEmpty) return skills;

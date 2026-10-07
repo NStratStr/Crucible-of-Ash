@@ -263,8 +263,10 @@ class GeneralCommandService extends ChangeNotifier {
   String get generalName => currentProfile.name;
   int get currentFocus => _currentFocus;
   int get maxFocus => maxFocusCap;
+  bool get isFocusMaxed => _currentFocus >= maxFocusCap;
   double get focusProgressRatio =>
       (_accumulatedDamageProgress / focusChargeThreshold).clamp(0.0, 1.0);
+  double get focusChargeProgress => focusProgressRatio;
 
   Map<GeneralType, int> get allPhylacteryRanks => Map.unmodifiable(_phylacteryRanks);
 

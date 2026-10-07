@@ -30,6 +30,8 @@ class BattleScreen extends StatefulWidget {
   final CombatResolutionService combatService;
   final GeneralCommandService commandService;
   final RelicService? relicService;
+  final int bloodlineSigils;
+  final ValueChanged<int>? onSigilsChanged;
   final VoidCallback? onResetEncounter;
   final VoidCallback? onVictory;
 
@@ -39,6 +41,8 @@ class BattleScreen extends StatefulWidget {
     required this.combatService,
     required this.commandService,
     this.relicService,
+    this.bloodlineSigils = 0,
+    this.onSigilsChanged,
     this.onResetEncounter,
     this.onVictory,
   });
@@ -258,6 +262,8 @@ class _BattleScreenState extends State<BattleScreen> {
       final result = _aiService.executeEnemyTurn();
 
       if (result != null) {
+        widget.commandService.registerCombatDamage(result.damageDealt);
+
         _triggerAttackAnimation(
           result.attacker.id,
           result.target.id,
@@ -272,7 +278,7 @@ class _BattleScreenState extends State<BattleScreen> {
         );
 
         setState(() {
-          final glanceText = result.isGlancing ? ' [GLANCING]' : '';
+          final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
           final critText = result.isCritical ? ' [CRIT!]' : '';
           _combatLog =
               '${result.attacker.name} attacked ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
@@ -355,7 +361,7 @@ class _BattleScreenState extends State<BattleScreen> {
       );
 
       setState(() {
-        final glanceText = result.isGlancing ? ' [GLANCING]' : '';
+        final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
         final critText = result.isCritical ? ' [CRIT!]' : '';
         _combatLog =
             '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
@@ -456,6 +462,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final chosen = await GeneralSelectionDialog.show(
       context,
       currentGeneralType: widget.commandService.activeGeneralType,
+      commandService: widget.commandService,
+      bloodlineSigils: widget.bloodlineSigils,
+      onSigilsChanged: widget.onSigilsChanged,
     );
     if (!mounted || chosen == null) return;
 
@@ -483,6 +492,7 @@ class _BattleScreenState extends State<BattleScreen> {
               children: [
                 _buildTopStatusHeader(),
                 _buildTurnGuidanceBanner(activeUnit, isPlayerTurn),
+                _buildBattleModifierBanner(),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -776,6 +786,73 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildBattleModifierBanner() {
+    final modifier = widget.combatService.battleModifier;
+    if (modifier == BattleModifier.none) return const SizedBox.shrink();
+
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+    IconData icon;
+    String title;
+    String description;
+
+    switch (modifier) {
+      case BattleModifier.titanicFury:
+        bgColor = const Color(0xFF261010);
+        borderColor = const Color(0xFFD32F2F);
+        textColor = const Color(0xFFEF5350);
+        icon = Icons.warning_amber_rounded;
+        title = 'TITANIC FURY';
+        description = 'Boss attacks strike all frontline Vanguard units simultaneously.';
+        break;
+      case BattleModifier.bloodMoon:
+        bgColor = const Color(0xFF261808);
+        borderColor = const Color(0xFFFB8C00);
+        textColor = const Color(0xFFFFB74D);
+        icon = Icons.brightness_2;
+        title = 'BLOOD MOON';
+        description = 'All critical strike damage is amplified by +50%.';
+        break;
+      case BattleModifier.corrosiveMiasma:
+        bgColor = const Color(0xFF1F1026);
+        borderColor = const Color(0xFF8E24AA);
+        textColor = const Color(0xFFBA68C8);
+        icon = Icons.coronavirus_outlined;
+        title = 'CORROSIVE MIASMA';
+        description = 'Non-Occultist units suffer 30 poison damage at start of turn.';
+        break;
+      case BattleModifier.none:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: textColor, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            '$title: ',
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 10),
+          ),
+          Expanded(
+            child: Text(
+              description,
+              style: const TextStyle(color: Colors.white70, fontSize: 9.5),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPhaseIndicator() {
@@ -1306,20 +1383,37 @@ class _BattleScreenState extends State<BattleScreen> {
           if (isPlayerTurn && skills.isNotEmpty)
             Row(
               children: skills.map((skill) {
-                final bool isReady = skill.isReady;
+                final bool isUlt = skill.isLimitBurst;
+                final bool ultReady = (activeUnit?.ultimateCharge ?? 0.0) >= 100.0;
+                final bool isReady = isUlt ? ultReady : skill.isReady;
                 final bool canCast = isPlayerTurn && isReady && _selectedEnemyId != null;
 
                 return Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: isUlt && ultReady
+                        ? BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          )
+                        : null,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: skill.isLimitBurst
-                            ? const Color(0xFFE5A93C)
+                        backgroundColor: isUlt
+                            ? (ultReady ? const Color(0xFFE5A93C) : const Color(0xFF2E2416))
                             : (skill.cooldownTurns > 0
                                 ? const Color(0xFFB3261E)
                                 : const Color(0xFF388E3C)),
-                        foregroundColor: Colors.white,
+                        foregroundColor: isUlt && ultReady ? Colors.black : Colors.white,
+                        side: isUlt && ultReady
+                            ? const BorderSide(color: Color(0xFFFFD54F), width: 1.5)
+                            : null,
                         disabledBackgroundColor: const Color(0xFF2A2A38),
                         disabledForegroundColor: Colors.white30,
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1329,18 +1423,28 @@ class _BattleScreenState extends State<BattleScreen> {
                       child: Column(
                         children: [
                           Text(
-                            skill.name.toUpperCase(),
+                            isUlt && ultReady ? 'LIMIT BURST' : skill.name.toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              color: isUlt && ultReady ? Colors.black : Colors.white,
+                            ),
                           ),
                           Text(
-                            skill.currentCooldown > 0
-                                ? '${skill.currentCooldown} CD'
-                                : (skill.isLimitBurst
-                                    ? 'ULTIMATE'
+                            isUlt
+                                ? (ultReady
+                                    ? 'READY (100%)'
+                                    : '${(activeUnit?.ultimateCharge ?? 0).toInt()}% GAUGE')
+                                : (skill.currentCooldown > 0
+                                    ? '${skill.currentCooldown} CD'
                                     : '${skill.damageCoefficient}x DMG'),
-                            style: const TextStyle(fontSize: 8, color: Colors.white70),
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: isUlt && ultReady ? Colors.black87 : Colors.white70,
+                              fontWeight: isUlt && ultReady ? FontWeight.bold : FontWeight.normal,
+                            ),
                           ),
                         ],
                       ),

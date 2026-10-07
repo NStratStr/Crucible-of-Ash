@@ -6,18 +6,24 @@ class GeneralSelectionDialog extends StatefulWidget {
   final GeneralType currentGeneralType;
   final ValueChanged<GeneralType> onGeneralSelected;
   final GeneralCommandService? commandService;
+  final int bloodlineSigils;
+  final ValueChanged<int>? onSigilsChanged;
 
   const GeneralSelectionDialog({
     super.key,
     required this.currentGeneralType,
     required this.onGeneralSelected,
     this.commandService,
+    this.bloodlineSigils = 0,
+    this.onSigilsChanged,
   });
 
   static Future<GeneralType?> show(
     BuildContext context, {
     required GeneralType currentGeneralType,
     GeneralCommandService? commandService,
+    int bloodlineSigils = 0,
+    ValueChanged<int>? onSigilsChanged,
   }) {
     return showModalBottomSheet<GeneralType>(
       context: context,
@@ -26,6 +32,8 @@ class GeneralSelectionDialog extends StatefulWidget {
       builder: (ctx) => GeneralSelectionDialog(
         currentGeneralType: currentGeneralType,
         commandService: commandService,
+        bloodlineSigils: bloodlineSigils,
+        onSigilsChanged: onSigilsChanged,
         onGeneralSelected: (type) => Navigator.pop(ctx, type),
       ),
     );
@@ -75,21 +83,49 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
                   child: const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'PHYLACTERY OF COMMANDERS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          letterSpacing: 1.1,
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'PHYLACTERY OF COMMANDERS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${widget.bloodlineSigils} SIGILS',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD54F),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 2),
-                      Text(
+                      const SizedBox(height: 2),
+                      const Text(
                         'Appoint and Anoint the General overseeing your brigade',
                         style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
                       ),
@@ -255,30 +291,49 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
                     ),
                   ),
                   if (widget.commandService != null && rank < 3) ...[
-                    InkWell(
-                      onTap: () {
-                        widget.commandService!.upgradePhylactery(gen.type);
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${gen.name}\'s Phylactery anointed to Rank ${rank + 1}!'),
-                            backgroundColor: gen.themeColor,
-                            duration: const Duration(milliseconds: 1400),
+                    Builder(
+                      builder: (ctx) {
+                        final sigilCost = rank == 1 ? 1 : 2;
+                        final label = widget.onSigilsChanged != null
+                            ? 'ANOINT ($sigilCost SIGIL${sigilCost > 1 ? 'S' : ''})'
+                            : 'ANOINT +1';
+
+                        return InkWell(
+                          onTap: () {
+                            if (widget.onSigilsChanged != null && widget.bloodlineSigils < sigilCost) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Insufficient Bloodline Sigils! Requires $sigilCost Sigils from Elite/Boss victories.'),
+                                  backgroundColor: const Color(0xFFB3261E),
+                                ),
+                              );
+                              return;
+                            }
+                            widget.onSigilsChanged?.call(widget.bloodlineSigils - sigilCost);
+                            widget.commandService!.upgradePhylactery(gen.type);
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${gen.name}\'s Phylactery anointed to Rank ${rank + 1}!'),
+                                backgroundColor: gen.themeColor,
+                                duration: const Duration(milliseconds: 1400),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: gen.themeColor.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: gen.themeColor),
+                            ),
+                            child: Text(
+                              label,
+                              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: gen.themeColor.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: gen.themeColor),
-                        ),
-                        child: const Text(
-                          'ANOINT +1',
-                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      ),
                     ),
                   ],
                 ],

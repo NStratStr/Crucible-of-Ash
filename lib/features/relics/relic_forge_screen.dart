@@ -7,14 +7,18 @@ class RelicForgeScreen extends StatefulWidget {
   final RelicService relicService;
   final List<UnitEntity> brigadeUnits;
   final int totalIchor;
+  final int cursedOre;
   final ValueChanged<int>? onIchorChanged;
+  final ValueChanged<int>? onOreChanged;
 
   const RelicForgeScreen({
     super.key,
     required this.relicService,
     required this.brigadeUnits,
     required this.totalIchor,
+    this.cursedOre = 0,
     this.onIchorChanged,
+    this.onOreChanged,
   });
 
   @override
@@ -45,23 +49,34 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   }
 
   void _forgeNewRelic() {
-    const int forgeCost = 150;
-    if (widget.totalIchor < forgeCost) {
+    const int ichorCost = 100;
+    const int oreCost = 25;
+    if (widget.totalIchor < ichorCost) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Insufficient Ichor! Requires 150 Ichor to forge a Relic.'),
+          content: Text('Insufficient Ichor! Requires 100 Ichor to forge a Relic.'),
           backgroundColor: Color(0xFFB3261E),
         ),
       );
       return;
     }
+    if (widget.cursedOre < oreCost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient Cursed Ore! Requires 25 Cursed Ore from expedition skirmishes.'),
+          backgroundColor: Color(0xFF00695C),
+        ),
+      );
+      return;
+    }
 
-    widget.onIchorChanged?.call(widget.totalIchor - forgeCost);
+    widget.onIchorChanged?.call(widget.totalIchor - ichorCost);
+    widget.onOreChanged?.call(widget.cursedOre - oreCost);
     final forged = widget.relicService.forgeRandomRelic();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Forged ${forged.name} (${forged.rarity.name.toUpperCase()})!'),
+        content: Text('Forged ${forged.name} (${forged.rarity.name.toUpperCase()})! Spent 100 Ichor & 25 Ore.'),
         backgroundColor: forged.rarityColor,
       ),
     );
@@ -95,9 +110,9 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             margin: const EdgeInsets.only(right: 14),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFB3261E).withValues(alpha: 0.25),
+              color: const Color(0xFF181820),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFB3261E)),
+              border: Border.all(color: const Color(0xFF2B2B36)),
             ),
             child: Row(
               children: [
@@ -109,7 +124,19 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                     color: Colors.white,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                    fontSize: 10.5,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  '${widget.cursedOre} ORE',
+                  style: const TextStyle(
+                    color: Color(0xFF80CBC4),
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10.5,
                   ),
                 ),
               ],
@@ -138,7 +165,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Transmute Ichor into rare armaments with 2-piece and 4-piece set synergies.',
+                        'Transmute Ichor & Cursed Ore into rare armaments with 2-piece and 4-piece set synergies.',
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10),
                       ),
                     ],
@@ -147,11 +174,11 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 ElevatedButton.icon(
                   onPressed: _forgeNewRelic,
                   icon: const Icon(Icons.fireplace, size: 16),
-                  label: const Text('FORGE (150)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  label: const Text('FORGE (100 / 25)', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB3261E),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
                 ),
               ],
@@ -307,6 +334,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     }
 
     final cost = relic.upgradeCostIchor;
+    const int oreCost = 15;
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -316,8 +344,18 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
       );
       return;
     }
+    if (widget.cursedOre < oreCost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient Cursed Ore! Refinement requires 15 Cursed Ore.'),
+          backgroundColor: Color(0xFF00695C),
+        ),
+      );
+      return;
+    }
 
     widget.onIchorChanged?.call(widget.totalIchor - cost);
+    widget.onOreChanged?.call(widget.cursedOre - oreCost);
     final upgraded = widget.relicService.upgradeRelic(relic.id);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

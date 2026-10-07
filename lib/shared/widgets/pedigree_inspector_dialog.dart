@@ -740,6 +740,51 @@ class PedigreeInspectorDialog extends StatelessWidget {
                         }
                       }(),
                       const SizedBox(height: 10),
+                      if (unit.isPureblood) ...[
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3E0A0A),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFFD700), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF1744).withValues(alpha: 0.35),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 18),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'PUREBLOOD SOVEREIGNTY ACTIVE',
+                                      style: TextStyle(
+                                        color: Color(0xFFFFD700),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Compounded across 4 generations. Bestows +15% Pureblood resonance across all attributes with level cap extended to Lv. 50.',
+                                      style: TextStyle(color: Colors.white70, fontSize: 9.5),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const Divider(color: Color(0xFF2B2B36), height: 1),
                       const SizedBox(height: 8),
                       const Text(

@@ -168,18 +168,43 @@ class GothicCardFrameWidget extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
+                    color: unit.isPureblood
+                        ? const Color(0xFF3E0A0A)
+                        : Colors.black.withValues(alpha: 0.75),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFE5A93C), width: 1),
-                  ),
-                  child: Text(
-                    'GEN ${unit.generation}',
-                    style: const TextStyle(
-                      color: Color(0xFFE5A93C),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
+                    border: Border.all(
+                      color: unit.isPureblood
+                          ? const Color(0xFFFF5252)
+                          : const Color(0xFFE5A93C),
+                      width: unit.isPureblood ? 1.5 : 1,
                     ),
+                    boxShadow: unit.isPureblood
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFFFF1744).withValues(alpha: 0.5),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unit.isPureblood) ...[
+                        const Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 10),
+                        const SizedBox(width: 3),
+                      ],
+                      Text(
+                        unit.isPureblood ? 'PUREBLOOD' : 'GEN ${unit.generation}',
+                        style: TextStyle(
+                          color: unit.isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -234,26 +259,32 @@ class GothicCardFrameWidget extends StatelessWidget {
                           color: const Color(0xFF1E1E26).withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(3),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Text(
-                              'HP ${unit.maxHp}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 8),
-                            ),
-                            Text(
-                              'ATK ${unit.attack}',
-                              style: const TextStyle(color: Color(0xFFEF5350), fontSize: 8),
-                            ),
-                            Text(
-                              'DEF ${unit.defense}',
-                              style: const TextStyle(color: Color(0xFF81C784), fontSize: 8),
-                            ),
-                            Text(
-                              'SPD ${unit.speed}',
-                              style: const TextStyle(color: Color(0xFF64B5F6), fontSize: 8),
-                            ),
-                          ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Text(
+                                'HP ${unit.maxHp}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'ATK ${unit.attack}',
+                                style: const TextStyle(color: Color(0xFFEF5350), fontSize: 8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'DEF ${unit.defense}',
+                                style: const TextStyle(color: Color(0xFF81C784), fontSize: 8),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'SPD ${unit.speed}',
+                                style: const TextStyle(color: Color(0xFF64B5F6), fontSize: 8),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

@@ -1,3 +1,4 @@
+import '../../core/combat_math.dart';
 import 'campaign_node.dart';
 
 class CampaignMapGenerator {
@@ -15,6 +16,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['node_1_a', 'node_1_b'],
         isReachable: true,
         rewardIchor: 100,
+        rewardOre: 20,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.marksman],
       ),
       const CampaignNode(
         id: 'node_0_b',
@@ -26,6 +29,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['node_1_b', 'node_1_c'],
         isReachable: true,
         rewardIchor: 100,
+        rewardOre: 25,
+        scoutedAffinities: [Archetype.skirmisher, Archetype.occultist],
       ),
 
       // Depth 1: Scouting & Sacrifice
@@ -38,6 +43,7 @@ class CampaignMapGenerator {
         description: 'Ancient stone altar dripping with essence.',
         nextNodeIds: ['node_2_a'],
         rewardIchor: 200,
+        rewardOre: 15,
       ),
       const CampaignNode(
         id: 'node_1_b',
@@ -48,6 +54,8 @@ class CampaignMapGenerator {
         description: 'Ambushed scavengers guarding cursed relics.',
         nextNodeIds: ['node_2_a', 'node_2_b'],
         rewardIchor: 150,
+        rewardOre: 35,
+        scoutedAffinities: [Archetype.assassin, Archetype.support],
       ),
       const CampaignNode(
         id: 'node_1_c',
@@ -58,6 +66,8 @@ class CampaignMapGenerator {
         description: 'Crypt seal containing lost generational lore.',
         nextNodeIds: ['node_2_b'],
         rewardIchor: 250,
+        rewardOre: 40,
+        rewardSigils: 1,
       ),
 
       // Depth 2: Divergence
@@ -70,6 +80,9 @@ class CampaignMapGenerator {
         description: 'Heavily armored titan wielding an iron slab.',
         nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 350,
+        rewardOre: 60,
+        rewardSigils: 1,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.occultist],
       ),
       const CampaignNode(
         id: 'node_2_b',
@@ -80,6 +93,8 @@ class CampaignMapGenerator {
         description: 'Flock of winged skirmishers swooping low.',
         nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 180,
+        rewardOre: 30,
+        scoutedAffinities: [Archetype.skirmisher, Archetype.marksman],
       ),
 
       // Depth 3: Sanctuary or Scouting Spire
@@ -92,6 +107,7 @@ class CampaignMapGenerator {
         description: 'Rest threshold to bind wounds or refine armaments.',
         nextNodeIds: ['node_4_boss'],
         rewardIchor: 100,
+        rewardOre: 20,
       ),
       const CampaignNode(
         id: 'node_3_b',
@@ -102,6 +118,7 @@ class CampaignMapGenerator {
         description: 'Scout upcoming Titan weak points or harvest supplies.',
         nextNodeIds: ['node_4_boss'],
         rewardIchor: 150,
+        rewardOre: 50,
       ),
 
       // Depth 4: Chapter Gatekeeper Boss
@@ -114,6 +131,9 @@ class CampaignMapGenerator {
         description: 'The Chapter World Titan towering over the Ashen Rift.',
         nextNodeIds: [],
         rewardIchor: 800,
+        rewardOre: 120,
+        rewardSigils: 2,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
       ),
     ];
   }

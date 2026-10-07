@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/combat_math.dart';
 import 'campaign_node.dart';
 
 class CampaignMapScreen extends StatelessWidget {
   final List<CampaignNode> nodes;
   final ValueChanged<CampaignNode> onSelectNode;
   final int totalIchor;
+  final int cursedOre;
+  final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
 
   const CampaignMapScreen({
@@ -12,6 +15,8 @@ class CampaignMapScreen extends StatelessWidget {
     required this.nodes,
     required this.onSelectNode,
     this.totalIchor = 0,
+    this.cursedOre = 0,
+    this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
   });
 
@@ -33,19 +38,47 @@ class CampaignMapScreen extends StatelessWidget {
               tooltip: 'Endgame Gauntlet',
               onPressed: onOpenEndgameGauntlet,
             ),
+          // Tri-Currency Display
           Padding(
-            padding: const EdgeInsets.only(right: 14.0),
+            padding: const EdgeInsets.only(right: 12.0),
             child: Row(
               children: [
-                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 16),
-                const SizedBox(width: 4),
+                // Ichor
+                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
+                const SizedBox(width: 3),
                 Text(
-                  '$totalIchor ICHOR',
+                  '$totalIchor',
                   style: const TextStyle(
-                    color: Color(0xFFE5A93C),
+                    color: Color(0xFFEF5350),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                    fontSize: 10.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Cursed Ore
+                const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
+                const SizedBox(width: 3),
+                Text(
+                  '$cursedOre',
+                  style: const TextStyle(
+                    color: Color(0xFF80CBC4),
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Bloodline Sigils
+                const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 14),
+                const SizedBox(width: 3),
+                Text(
+                  '$bloodlineSigils',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10.5,
                   ),
                 ),
               ],
@@ -152,7 +185,27 @@ class CampaignMapScreen extends StatelessWidget {
               color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
+          // Scouted Badge
+          if (node.isScouted && !node.isVisited)
+            Container(
+              margin: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF006064).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: const Color(0xFF00E5FF), width: 0.7),
+              ),
+              child: const Text(
+                'SCOUTED',
+                style: TextStyle(
+                  color: Color(0xFF00E5FF),
+                  fontSize: 6.5,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
             decoration: BoxDecoration(
@@ -168,6 +221,33 @@ class CampaignMapScreen extends StatelessWidget {
               ),
             ),
           ),
+          // Scouted Affinities Chips
+          if (node.isScouted && !node.isVisited && node.scoutedAffinities.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: node.scoutedAffinities.take(3).map((aff) {
+                final color = _affinityColor(aff);
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: color, width: 0.6),
+                  ),
+                  child: Text(
+                    _affinityAbbr(aff),
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 6,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -208,20 +288,104 @@ class CampaignMapScreen extends StatelessWidget {
                 node.description,
                 style: const TextStyle(color: Color(0xFFB0B0C0), fontSize: 12),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    'REWARD: +${node.rewardIchor} BLOODLINE ICHOR',
-                    style: const TextStyle(
-                      color: Color(0xFFE5A93C),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                    ),
+              const SizedBox(height: 10),
+              // Scouted Enemy Formation details
+              if (node.isScouted && node.scoutedAffinities.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF101920),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF00ACC1), width: 1),
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.visibility, color: Color(0xFF00E5FF), size: 14),
+                          SizedBox(width: 6),
+                          Text(
+                            'SCOUTED FORMATION AFFINITIES',
+                            style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: node.scoutedAffinities.map((aff) {
+                          final color = _affinityColor(aff);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(color: color, width: 0.8),
+                            ),
+                            child: Text(
+                              '${aff.name.toUpperCase()} (${_counterAdvice(aff)})',
+                              style: TextStyle(color: color, fontSize: 8.5, fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF14141B),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF2B2B36)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      '+${node.rewardIchor} ICHOR',
+                      style: const TextStyle(
+                        color: Color(0xFFE5A93C),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      '+${node.rewardOre} ORE',
+                      style: const TextStyle(
+                        color: Color(0xFF80CBC4),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                    if (node.rewardSigils > 0) ...[
+                      const SizedBox(width: 10),
+                      const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        '+${node.rewardSigils} SIGIL',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -283,6 +447,57 @@ class CampaignMapScreen extends StatelessWidget {
         return Icons.visibility;
       case CampaignNodeType.boss:
         return Icons.shield;
+    }
+  }
+
+  static Color _affinityColor(Archetype archetype) {
+    switch (archetype) {
+      case Archetype.juggernaut:
+        return const Color(0xFF1E88E5);
+      case Archetype.assassin:
+        return const Color(0xFFE53935);
+      case Archetype.marksman:
+        return const Color(0xFFFB8C00);
+      case Archetype.skirmisher:
+        return const Color(0xFF00897B);
+      case Archetype.support:
+        return const Color(0xFF43A047);
+      case Archetype.occultist:
+        return const Color(0xFF8E24AA);
+    }
+  }
+
+  static String _affinityAbbr(Archetype archetype) {
+    switch (archetype) {
+      case Archetype.juggernaut:
+        return 'JUG';
+      case Archetype.assassin:
+        return 'ASN';
+      case Archetype.marksman:
+        return 'MRK';
+      case Archetype.skirmisher:
+        return 'SKR';
+      case Archetype.support:
+        return 'SUP';
+      case Archetype.occultist:
+        return 'OCC';
+    }
+  }
+
+  static String _counterAdvice(Archetype archetype) {
+    switch (archetype) {
+      case Archetype.juggernaut:
+        return 'Occultists rot heavy armor';
+      case Archetype.assassin:
+        return 'Juggernauts deflect strikes';
+      case Archetype.marksman:
+        return 'Assassins dive artillery';
+      case Archetype.skirmisher:
+        return 'Marksmen snipe flyers';
+      case Archetype.support:
+        return 'Skirmishers flank casters';
+      case Archetype.occultist:
+        return 'Supports cleanse hexes';
     }
   }
 }

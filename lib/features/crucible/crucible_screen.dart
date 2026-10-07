@@ -129,9 +129,11 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
     final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
     final isHoundLineage = _progenitorA!.speciesId.contains('hound');
-    final String childName = isHoundLineage
-        ? 'Cerberus Progenitor G$nextGen'
-        : '${_progenitorA!.name} Descendant G$nextGen';
+    final String childName = nextGen >= 4
+        ? (isHoundLineage ? 'Pureblood Cerberus Sovereign' : '${_progenitorA!.name} Pureblood Sovereign')
+        : (isHoundLineage
+            ? 'Cerberus Progenitor G$nextGen'
+            : '${_progenitorA!.name} Descendant G$nextGen');
     final String childSpeciesId = isHoundLineage
         ? 'cerberus_hound'
         : _progenitorA!.speciesId;
@@ -174,16 +176,19 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           backgroundColor: const Color(0xFF14141B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFB3261E), width: 2),
+            side: BorderSide(
+              color: child.isPureblood ? const Color(0xFFFFD700) : const Color(0xFFB3261E),
+              width: child.isPureblood ? 2.5 : 2,
+            ),
           ),
-          title: const Text(
-            'LINEAGE DESCENDANT AWAKENED',
+          title: Text(
+            child.isPureblood ? '👑 PUREBLOOD SOVEREIGN ASCENDED' : 'LINEAGE DESCENDANT AWAKENED',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFE5A93C),
+              color: child.isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C),
               letterSpacing: 1.5,
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 15,
             ),
           ),
           content: SingleChildScrollView(
@@ -197,19 +202,41 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                   showStats: false,
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Generation ${child.generation} • Pureblood Lineage',
-                  style: const TextStyle(
-                    color: Color(0xFFE5A93C),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                if (child.isPureblood)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3E0A0A),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                    ),
+                    child: const Text(
+                      '⚡ PUREBLOOD RESONANCE (+15% STATS & LV. 50 CAP)',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFFFFD700),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    'Generation ${child.generation} • Chimeric Lineage',
+                    style: const TextStyle(
+                      color: Color(0xFFE5A93C),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 10),
                 _buildStatMetricRow('MAX HP', child.maxHp.toString()),
                 _buildStatMetricRow('ATTACK', child.attack.toString()),
                 _buildStatMetricRow('DEFENSE', child.defense.toString()),
                 _buildStatMetricRow('SPEED', child.speed.toString()),
+                _buildStatMetricRow('MAX LEVEL', 'Lv. ${child.maxLevel}'),
                 _buildStatMetricRow('GRAFTED TRAIT', child.graftedTraitId?.replaceAll('_', ' ').toUpperCase() ?? 'None'),
               ],
             ),
