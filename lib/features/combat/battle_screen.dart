@@ -8,6 +8,7 @@ import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
 import '../generals/general_command_service.dart';
+import '../relics/relic_service.dart';
 
 class FloatingCombatText {
   final String text;
@@ -26,6 +27,7 @@ class BattleScreen extends StatefulWidget {
   final InitiativeTickManager tickManager;
   final CombatResolutionService combatService;
   final GeneralCommandService commandService;
+  final RelicService? relicService;
   final VoidCallback? onResetEncounter;
   final VoidCallback? onVictory;
 
@@ -34,6 +36,7 @@ class BattleScreen extends StatefulWidget {
     required this.tickManager,
     required this.combatService,
     required this.commandService,
+    this.relicService,
     this.onResetEncounter,
     this.onVictory,
   });
@@ -894,11 +897,21 @@ class _BattleScreenState extends State<BattleScreen> {
           if (isEnemy && alive) {
             onTap?.call();
           } else {
-            PedigreeInspectorDialog.show(context, unit, isEnemy: isEnemy);
+            PedigreeInspectorDialog.show(
+              context,
+              unit,
+              isEnemy: isEnemy,
+              relicService: widget.relicService,
+            );
           }
         },
         onLongPress: () {
-          PedigreeInspectorDialog.show(context, unit, isEnemy: isEnemy);
+          PedigreeInspectorDialog.show(
+            context,
+            unit,
+            isEnemy: isEnemy,
+            relicService: widget.relicService,
+          );
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),

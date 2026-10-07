@@ -1,14 +1,20 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../features/campaign/blood_altar_dialog.dart';
 import '../../features/campaign/campaign_map_generator.dart';
 import '../../features/campaign/campaign_map_screen.dart';
 import '../../features/campaign/campaign_node.dart';
+import '../../features/campaign/defiled_crypt_dialog.dart';
 import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
+import '../../features/relics/relic_forge_screen.dart';
+import '../../features/relics/relic_service.dart';
 import '../data/starter_brigades.dart';
+import '../models/relic_entity.dart';
 import '../models/unit_entity.dart';
 import 'pedigree_inspector_dialog.dart';
 
@@ -26,6 +32,7 @@ class _AppShellState extends State<AppShell> {
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
   late GeneralCommandService _commandService;
+  late RelicService _relicService;
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
   CampaignNode? _activeNode;
@@ -33,9 +40,18 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    _relicService = RelicService();
     _resetEncounter();
     _inventory = StarterBrigades.createReserveInventory();
     _campaignNodes = CampaignMapGenerator.generateCuratedCampaign();
+
+    // Equip starter weapon to lead frontliner
+    if (_tickManager.allies.isNotEmpty && _relicService.unequippedRelics.isNotEmpty) {
+      _relicService.equipRelic(
+        relicId: _relicService.unequippedRelics.first.id,
+        unitId: _tickManager.allies.first.id,
+      );
+    }
   }
 
   void _resetEncounter([List<UnitEntity>? customEnemies]) {
@@ -48,13 +64,17 @@ class _AppShellState extends State<AppShell> {
       tickInterval: const Duration(milliseconds: 140),
     );
 
-    _combatService = CombatResolutionService(tickManager: _tickManager);
-
     _commandService = GeneralCommandService(
       tickManager: _tickManager,
       generalId: 'vladislav_01',
       generalName: 'Lord Vladislav',
       initialFocus: 1,
+    );
+
+    _combatService = CombatResolutionService(
+      tickManager: _tickManager,
+      commandService: _commandService,
+      relicService: _relicService,
     );
 
     _tickManager.start();
@@ -64,6 +84,7 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     _tickManager.dispose();
     _commandService.dispose();
+    _relicService.dispose();
     super.dispose();
   }
 
@@ -89,20 +110,10 @@ class _AppShellState extends State<AppShell> {
         _currentIndex = 1; // Switch to Combat Arena
       });
     } else if (node.type == CampaignNodeType.altar) {
-      // Switch to Crucible Altar
-      setState(() {
-        _totalIchor += node.rewardIchor;
-        _markNodeCompleted(node.id);
-        _currentIndex = 2; // Switch to Altar
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Altar of Blood awakened! +${node.rewardIchor} Ichor granted.'),
-          backgroundColor: const Color(0xFFB3261E),
-        ),
-      );
+      _handleBloodAltarNode(node);
+    } else if (node.type == CampaignNodeType.crypt) {
+      _handleDefiledCryptNode(node);
     } else if (node.type == CampaignNodeType.restHaven) {
-      // Heal squad
       _healSquad();
       _markNodeCompleted(node.id);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,10 +122,111 @@ class _AppShellState extends State<AppShell> {
           backgroundColor: Color(0xFF2E7D32),
         ),
       );
-    } else if (node.type == CampaignNodeType.crypt) {
-      // Crypt discovery: grants a rare thrall
+    }
+  }
+
+  Future<void> _handleBloodAltarNode(CampaignNode node) async {
+    final livingAllies = _tickManager.allies.where((u) => u.isAlive).toList();
+    final choice = await BloodAltarDialog.show(context, squadLivingCount: livingAllies.length);
+
+    if (!mounted || choice == null) return;
+
+    if (choice == BloodAltarChoice.bloodTithe) {
+      final sacrificedAllies = _tickManager.allies.map((u) {
+        if (!u.isAlive) return u;
+        final sacrifice = max(1, (u.currentHp * 0.25).round());
+        return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
+      }).toList();
+
+      _tickManager.consumeTurn(
+        retainedOverflow: true,
+        updatedAllies: sacrificedAllies,
+        autoResume: false,
+      );
+
+      setState(() {
+        _totalIchor += 350;
+      });
+      _commandService.grantFocus(2);
+      _markNodeCompleted(node.id);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Blood Tithe accepted: Sacrificed 25% HP for +350 Ichor and +2 Focus!'),
+          backgroundColor: Color(0xFFB3261E),
+        ),
+      );
+    } else if (choice == BloodAltarChoice.sanguineOffering) {
+      final sacrificedAllies = _tickManager.allies.map((u) {
+        if (!u.isAlive) return u;
+        final sacrifice = max(1, (u.currentHp * 0.40).round());
+        return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
+      }).toList();
+
+      _tickManager.consumeTurn(
+        retainedOverflow: true,
+        updatedAllies: sacrificedAllies,
+        autoResume: false,
+      );
+
+      final epicRelic = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
+      _markNodeCompleted(node.id);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Offering forged: Sacrificed 40% HP to manifest ${epicRelic.name}!'),
+          backgroundColor: const Color(0xFFAB47BC),
+        ),
+      );
+    } else {
+      _markNodeCompleted(node.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You departed the altar untouched by the dark entity.'),
+          backgroundColor: Color(0xFF424242),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleDefiledCryptNode(CampaignNode node) async {
+    final choice = await DefiledCryptDialog.show(context);
+    if (!mounted || choice == null) return;
+
+    if (choice == DefiledCryptChoice.desecrateTomb) {
+      final relic = _relicService.forgeRandomRelic(rarity: RelicRarity.rare);
+      setState(() {
+        _totalIchor += 250;
+      });
+      _markNodeCompleted(node.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tomb desecrated! Plundered ${relic.name} & +250 Ichor.'),
+          backgroundColor: const Color(0xFFFFB300),
+        ),
+      );
+    } else if (choice == DefiledCryptChoice.rebindThrall) {
       _unlockCryptThrall();
       _markNodeCompleted(node.id);
+    } else if (choice == DefiledCryptChoice.purifyTomb) {
+      final healed = _tickManager.allies.map((u) {
+        if (!u.isAlive) return u;
+        final heal = (u.maxHp * 0.40).round();
+        return u.copyWith(currentHp: min(u.maxHp, u.currentHp + heal));
+      }).toList();
+
+      _tickManager.consumeTurn(
+        retainedOverflow: true,
+        updatedAllies: healed,
+        autoResume: false,
+      );
+      _markNodeCompleted(node.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Purification rites performed: Restored 40% squad HP!'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
     }
   }
 
@@ -149,11 +261,20 @@ class _AppShellState extends State<AppShell> {
       _markNodeCompleted(_activeNode!.id);
       _captureThrallAfterBattle();
 
+      String extraReward = '';
+      if (_activeNode!.type == CampaignNodeType.elite) {
+        final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
+        extraReward = ' • Dropped ${drop.name}!';
+      } else if (_activeNode!.type == CampaignNodeType.boss) {
+        final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
+        extraReward = ' • LEGENDARY DROP: ${drop.name}!';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('EXPEDITION VICTORY! +$reward Ichor and a captured Thrall bound to Roster!'),
+          content: Text('EXPEDITION VICTORY! +$reward Ichor, Captured Thrall bound$extraReward'),
           backgroundColor: const Color(0xFF1B5E20),
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -184,7 +305,6 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _healSquad() {
-    // Restores squad HP
     final healed = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
     _tickManager.consumeTurn(
       retainedOverflow: true,
@@ -260,6 +380,7 @@ class _AppShellState extends State<AppShell> {
             tickManager: _tickManager,
             combatService: _combatService,
             commandService: _commandService,
+            relicService: _relicService,
             onResetEncounter: () => setState(_resetEncounter),
             onVictory: _onCombatVictory,
           ),
@@ -268,9 +389,16 @@ class _AppShellState extends State<AppShell> {
             availableInventory: allPlayerUnits,
             onFusionComplete: _onFusionComplete,
           ),
-          // Tab 3: Brigade Roster
+          // Tab 3: Relic Forge
+          RelicForgeScreen(
+            relicService: _relicService,
+            brigadeUnits: allPlayerUnits,
+            totalIchor: _totalIchor,
+            onIchorChanged: (val) => setState(() => _totalIchor = val),
+          ),
+          // Tab 4: Brigade Roster
           _buildRosterScreen(allPlayerUnits),
-          // Tab 4: Codices
+          // Tab 5: Codices
           _buildCodexView(),
         ],
       ),
@@ -280,8 +408,8 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: const Color(0xFF14141B),
         selectedItemColor: const Color(0xFFB3261E),
         unselectedItemColor: const Color(0xFF8E8EA0),
-        selectedFontSize: 11,
-        unselectedFontSize: 10,
+        selectedFontSize: 10,
+        unselectedFontSize: 9,
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
@@ -297,6 +425,10 @@ class _AppShellState extends State<AppShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.fireplace),
             label: 'Crucible Altar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome),
+            label: 'Relic Forge',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_alt),
@@ -487,13 +619,26 @@ class _AppShellState extends State<AppShell> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'THRALLS & PROGENITORS (${allUnits.length})',
-                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'THRALLS & PROGENITORS (${allUnits.length})',
+                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'TAP UNIT TO INSPECT PEDIGREE',
+                      style: TextStyle(color: Color(0xFFE5A93C), fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
-                const Text(
-                  'TAP UNIT TO INSPECT PEDIGREE',
-                  style: TextStyle(color: Color(0xFFE5A93C), fontSize: 9, fontWeight: FontWeight.bold),
+                GestureDetector(
+                  onTap: () => setState(() => _currentIndex = 3), // Switch to Relic Forge
+                  child: const Text(
+                    'OPEN FORGE ➔',
+                    style: TextStyle(color: Color(0xFFE5A93C), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -506,9 +651,14 @@ class _AppShellState extends State<AppShell> {
               itemBuilder: (context, index) {
                 final unit = allUnits[index];
                 final inActiveSquad = _tickManager.allies.any((u) => u.id == unit.id);
+                final relics = _relicService.getRelicsForUnit(unit.id);
 
                 return InkWell(
-                  onTap: () => PedigreeInspectorDialog.show(context, unit),
+                  onTap: () => PedigreeInspectorDialog.show(
+                    context,
+                    unit,
+                    relicService: _relicService,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.all(12),
@@ -574,10 +724,31 @@ class _AppShellState extends State<AppShell> {
                                 style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
-                                '${unit.graftedTraitId != null ? ' • Grafted: ${unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()}' : ''}',
-                                style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Native: ${unit.nativeTraitId.replaceAll('_', ' ').toUpperCase()}'
+                                      '${unit.graftedTraitId != null ? ' • Grafted: ${unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()}' : ''}',
+                                      style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (relics.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2E7D32).withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(color: const Color(0xFF2E7D32), width: 0.8),
+                                      ),
+                                      child: Text(
+                                        '${relics.length} RELIC${relics.length > 1 ? "S" : ""}',
+                                        style: const TextStyle(color: Color(0xFF81C784), fontSize: 8, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),

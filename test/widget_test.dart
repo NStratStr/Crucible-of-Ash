@@ -11,6 +11,7 @@ void main() {
     expect(find.text('Campaign Map'), findsOneWidget);
     expect(find.text('Battle Arena'), findsOneWidget);
     expect(find.text('Crucible Altar'), findsOneWidget);
+    expect(find.text('Relic Forge'), findsOneWidget);
     expect(find.text('Brigade Roster'), findsOneWidget);
     expect(find.text('Affinity Codex'), findsOneWidget);
   });

@@ -1,24 +1,37 @@
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../features/relics/relic_service.dart';
+import '../models/relic_entity.dart';
 import '../models/skill_entity.dart';
 import '../models/unit_entity.dart';
 
 class PedigreeInspectorDialog extends StatelessWidget {
   final UnitEntity unit;
   final bool isEnemy;
+  final RelicService? relicService;
 
   const PedigreeInspectorDialog({
     super.key,
     required this.unit,
     this.isEnemy = false,
+    this.relicService,
   });
 
-  static Future<void> show(BuildContext context, UnitEntity unit, {bool isEnemy = false}) {
+  static Future<void> show(
+    BuildContext context,
+    UnitEntity unit, {
+    bool isEnemy = false,
+    RelicService? relicService,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => PedigreeInspectorDialog(unit: unit, isEnemy: isEnemy),
+      builder: (_) => PedigreeInspectorDialog(
+        unit: unit,
+        isEnemy: isEnemy,
+        relicService: relicService,
+      ),
     );
   }
 
@@ -77,9 +90,12 @@ class PedigreeInspectorDialog extends StatelessWidget {
     final prey = CombatMath.getPreyArchetype(unit.archetype);
     final predator = CombatMath.getPredatorArchetype(unit.archetype);
 
+    final equippedRelics = relicService?.getRelicsForUnit(unit.id) ?? const <RelicEntity>[];
+    final relicBonuses = relicService?.calculateBonuses(unit.id) ?? const UnitRelicBonuses();
+
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
+        maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       decoration: BoxDecoration(
         color: const Color(0xFF131318),
@@ -274,16 +290,16 @@ class PedigreeInspectorDialog extends StatelessWidget {
                       Row(
                         children: [
                           _buildStatCell('HP VITALITY', '${unit.currentHp} / ${unit.maxHp}', Colors.greenAccent),
-                          _buildStatCell('ATTACK POWER', '${unit.attack}', Colors.redAccent),
-                          _buildStatCell('ARMOR DEFENSE', '${unit.defense}', Colors.blueAccent),
+                          _buildStatCell('ATTACK POWER', '${unit.attack}${relicBonuses.bonusAttack > 0 ? " (+${relicBonuses.bonusAttack})" : ""}', Colors.redAccent),
+                          _buildStatCell('ARMOR DEFENSE', '${unit.defense}${relicBonuses.bonusDefense > 0 ? " (+${relicBonuses.bonusDefense})" : ""}', Colors.blueAccent),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          _buildStatCell('INITIATIVE SPEED', '${unit.speed}', Colors.amberAccent),
-                          _buildStatCell('CRIT CHANCE', '${(unit.critRate * 100).toInt()}%', Colors.purpleAccent),
-                          _buildStatCell('CRIT DAMAGE', '${(unit.critDamage * 100).toInt()}%', Colors.orangeAccent),
+                          _buildStatCell('INITIATIVE SPEED', '${unit.speed}${relicBonuses.bonusSpeed > 0 ? " (+${relicBonuses.bonusSpeed})" : ""}', Colors.amberAccent),
+                          _buildStatCell('CRIT CHANCE', '${((unit.critRate + relicBonuses.bonusCritRate) * 100).toInt()}%', Colors.purpleAccent),
+                          _buildStatCell('CRIT DAMAGE', '${((unit.critDamage + relicBonuses.bonusCritDamage) * 100).toInt()}%', Colors.orangeAccent),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -449,7 +465,69 @@ class PedigreeInspectorDialog extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Section 5: Ancestral Lineage & Traits
+                // Section 5: Equipped Relics & Synergies
+                _buildSectionHeader('EQUIPPED RELICS & ACTIVE SYNERGY', Icons.security),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF181820),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2B2B36)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (equippedRelics.isEmpty)
+                        const Text(
+                          'No relics slotted. Visit the Relic Forge to equip weapons and armor.',
+                          style: TextStyle(color: Colors.white38, fontSize: 10, fontStyle: FontStyle.italic),
+                        )
+                      else ...[
+                        ...equippedRelics.map((r) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                Icon(r.slotIcon, size: 14, color: r.rarityColor),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${r.slot.name.toUpperCase()}: ',
+                                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  r.name,
+                                  style: TextStyle(color: r.rarityColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        if (relicBonuses.activeSetBonuses.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          const Divider(color: Color(0xFF2B2B36), height: 1),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.flash_on, size: 14, color: Color(0xFF81C784)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'SET SYNERGY: ${relicBonuses.activeSetBonuses.map((s) => RelicEntity.setName(s)).join(", ")}',
+                                  style: const TextStyle(color: Color(0xFF81C784), fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Section 6: Ancestral Lineage & Traits
                 _buildSectionHeader('ANCESTRAL PEDIGREE & TRAITS', Icons.account_tree),
                 const SizedBox(height: 8),
                 Container(

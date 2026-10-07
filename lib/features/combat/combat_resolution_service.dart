@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
+import '../generals/general_command_service.dart';
+import '../relics/relic_service.dart';
 import 'initiative_tick_manager.dart';
 
 @immutable
@@ -36,10 +38,14 @@ class ActionResult {
 
 class CombatResolutionService {
   final InitiativeTickManager tickManager;
+  final GeneralCommandService? commandService;
+  final RelicService? relicService;
   final Random _rng;
 
   CombatResolutionService({
     required this.tickManager,
+    this.commandService,
+    this.relicService,
     Random? rng,
   }) : _rng = rng ?? Random();
 
@@ -68,7 +74,6 @@ class CombatResolutionService {
     final active = tickManager.activeUnit;
     if (active == null || !active.isStunned) return false;
 
-    // Decrement or remove stun
     final updatedEffects = active.activeEffects
         .map((e) => e.type == StatusEffectType.stun
             ? StatusEffect(type: e.type, durationTurns: e.durationTurns - 1, value: e.value)
@@ -123,106 +128,13 @@ class CombatResolutionService {
       );
     }
 
-    final int targetIndex = opposingSquad.indexWhere((u) => u.id == targetUnitId && u.isAlive);
-    if (targetIndex == -1) {
-      throw ArgumentError('Target unit $targetUnitId is either not found or already defeated.');
-    }
-
-    final UnitEntity target = opposingSquad[targetIndex];
-
-    // 1. Evaluate Hex Affinity and Glancing Blow status
-    final double affinityMod = CombatMath.getAffinityMultiplier(attacker.archetype, target.archetype);
-    final bool isGlancing = CombatMath.isGlancingBlow(attacker.archetype, target.archetype, _rng);
-
-    // 2. Evaluate Critical Strike
-    final bool isCritical = !isGlancing && (_rng.nextDouble() < attacker.critRate);
-    final double critMod = isCritical ? attacker.critDamage : 1.0;
-
-    // 3. Compute Defense Mitigation
-    final int effectiveDefense = skill.ignoresArmor ? (target.defense * 0.5).round() : target.defense;
-    final double mitigation = CombatMath.calculateMitigation(effectiveDefense);
-
-    // 4. Compute Base and Final Damage
-    final double baseDamage = attacker.attack * skill.damageCoefficient * mitigation;
-    final double variance = 0.95 + (_rng.nextDouble() * 0.10);
-
-    double totalDamage = baseDamage * affinityMod * critMod * variance;
-    if (isGlancing) {
-      totalDamage *= 0.70;
-    }
-
-    final int finalDamage = max(1, totalDamage.round());
-
-    // 5. Apply Damage to Defender & Status Effects
-    final int newTargetHp = max(0, target.currentHp - finalDamage);
-    List<StatusEffect> targetEffects = List.of(target.activeEffects);
-    if (skill.appliedStatus != null && !isGlancing && newTargetHp > 0) {
-      targetEffects.add(skill.appliedStatus!);
-    }
-
-    final UnitEntity updatedTarget = target.copyWith(
-      currentHp: newTargetHp,
-      activeEffects: targetEffects,
-    );
-
-    // 6. Resolve Lifesteal
-    int lifestealRecovered = 0;
-    int attackerHp = attacker.currentHp;
-    if (skill.lifestealRatio > 0.0 && attacker.isAlive) {
-      lifestealRecovered = (finalDamage * skill.lifestealRatio).round();
-      attackerHp = min(attacker.maxHp, attackerHp + lifestealRecovered);
-    }
-
-    // 7. Update Cooldowns and Ultimate Charge
-    final double newUltimate = skill.isLimitBurst
-        ? 0.0
-        : (attacker.ultimateCharge + 25.0).clamp(0.0, 100.0);
-
-    final List<SkillEntity> updatedSkills = attacker.resolvedSkills.map((s) {
-      if (s.id == skill.id) {
-        return s.copyWith(currentCooldown: s.cooldownTurns);
-      } else if (s.currentCooldown > 0) {
-        return s.copyWith(currentCooldown: s.currentCooldown - 1);
-      }
-      return s;
-    }).toList();
-
-    final UnitEntity updatedAttacker = attacker.copyWith(
-      currentHp: attackerHp,
-      ultimateCharge: newUltimate,
-      skills: updatedSkills,
-    );
-
-    // 8. Reconstruct Squad State
-    List<UnitEntity> updatedAllies = List.of(tickManager.allies);
-    List<UnitEntity> updatedEnemies = List.of(tickManager.enemies);
-
-    if (attackerIsAlly) {
-      updatedAllies = updatedAllies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
-      updatedEnemies = updatedEnemies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
-    } else {
-      updatedEnemies = updatedEnemies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
-      updatedAllies = updatedAllies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
-    }
-
-    tickManager.consumeTurn(
-      retainedOverflow: false,
-      updatedAllies: updatedAllies,
-      updatedEnemies: updatedEnemies,
-      autoResume: autoResumeTickEngine,
-    );
-
-    return ActionResult(
-      attacker: updatedAttacker,
-      target: updatedTarget,
-      damageDealt: finalDamage,
-      isCritical: isCritical,
-      isGlancing: isGlancing,
-      affinityMultiplier: affinityMod,
-      targetDefeated: updatedTarget.currentHp == 0,
-      lifestealRecovered: lifestealRecovered,
-      skillName: skill.name,
-      appliedStatusName: skill.appliedStatus?.displayName,
+    return _executeOffensiveSkill(
+      attacker: attacker,
+      opposingSquad: opposingSquad,
+      targetUnitId: targetUnitId,
+      skill: skill,
+      attackerIsAlly: attackerIsAlly,
+      autoResumeTickEngine: autoResumeTickEngine,
     );
   }
 
@@ -237,9 +149,8 @@ class CombatResolutionService {
     final int targetIndex = friendlySquad.indexWhere((u) => u.id == targetUnitId && u.isAlive);
     final UnitEntity target = targetIndex != -1 ? friendlySquad[targetIndex] : attacker;
 
-    final int healAmount = (target.maxHp * 0.25).round();
-    final int newHp = min(target.maxHp, target.currentHp + healAmount);
-
+    final int healValue = max(50, (target.maxHp * 0.25).round());
+    final int newHp = min(target.maxHp, target.currentHp + healValue);
     List<StatusEffect> effects = List.of(target.activeEffects);
     if (skill.appliedStatus != null) {
       effects.add(skill.appliedStatus!);
@@ -253,11 +164,13 @@ class CombatResolutionService {
     final List<SkillEntity> updatedSkills = attacker.resolvedSkills.map((s) {
       if (s.id == skill.id) {
         return s.copyWith(currentCooldown: s.cooldownTurns);
+      } else if (s.currentCooldown > 0) {
+        return s.copyWith(currentCooldown: s.currentCooldown - 1);
       }
       return s;
     }).toList();
 
-    final UnitEntity updatedAttacker = attacker.id == target.id
+    final UnitEntity updatedAttacker = attacker.id == updatedTarget.id
         ? updatedTarget.copyWith(skills: updatedSkills)
         : attacker.copyWith(skills: updatedSkills);
 
@@ -289,12 +202,170 @@ class CombatResolutionService {
       attacker: updatedAttacker,
       target: updatedTarget,
       damageDealt: 0,
-      healAmount: healAmount,
       isCritical: false,
       isGlancing: false,
       affinityMultiplier: 1.0,
       targetDefeated: false,
       lifestealRecovered: 0,
+      healAmount: healValue,
+      skillName: skill.name,
+      appliedStatusName: skill.appliedStatus?.displayName,
+    );
+  }
+
+  ActionResult _executeOffensiveSkill({
+    required UnitEntity attacker,
+    required List<UnitEntity> opposingSquad,
+    required String targetUnitId,
+    required SkillEntity skill,
+    required bool attackerIsAlly,
+    required bool autoResumeTickEngine,
+  }) {
+    final int targetIndex = opposingSquad.indexWhere((u) => u.id == targetUnitId && u.isAlive);
+    if (targetIndex == -1) {
+      throw ArgumentError('Target unit $targetUnitId is either not found or already defeated.');
+    }
+
+    final UnitEntity target = opposingSquad[targetIndex];
+
+    final attackerRelics = relicService?.calculateBonuses(attacker.id) ?? const UnitRelicBonuses();
+    final targetRelics = relicService?.calculateBonuses(target.id) ?? const UnitRelicBonuses();
+
+    // 1. Evaluate Hex Affinity and Glancing Blow status
+    final double affinityMod = CombatMath.getAffinityMultiplier(attacker.archetype, target.archetype);
+    final bool isGlancing = CombatMath.isGlancingBlow(attacker.archetype, target.archetype, _rng);
+
+    // 2. Evaluate Critical Strike
+    final double effectiveCritRate = (attacker.critRate + attackerRelics.bonusCritRate).clamp(0.0, 1.0);
+    final double effectiveCritDmg = attacker.critDamage + attackerRelics.bonusCritDamage;
+    final bool isCritical = !isGlancing && (_rng.nextDouble() < effectiveCritRate);
+    final double critMod = isCritical ? effectiveCritDmg : 1.0;
+
+    // 3. Compute Defense Mitigation
+    int baseDefense = target.defense + targetRelics.bonusDefense;
+    // Valeria's Iron Aegis: Frontline Vanguard allies gain +25% Armor
+    if (!attackerIsAlly && commandService?.activeGeneralType == GeneralType.valeria && target.isVanguard) {
+      baseDefense = (baseDefense * 1.25).round();
+    }
+    final int effectiveDefense = skill.ignoresArmor ? (baseDefense * 0.5).round() : baseDefense;
+    final double mitigation = CombatMath.calculateMitigation(effectiveDefense);
+
+    // 4. Compute Base and Final Damage
+    final int effectiveAttack = attacker.attack + attackerRelics.bonusAttack;
+    final double baseDamage = effectiveAttack * skill.damageCoefficient * mitigation;
+    final double variance = 0.95 + (_rng.nextDouble() * 0.10);
+
+    double totalDamage = baseDamage * affinityMod * critMod * variance;
+    if (isGlancing) {
+      totalDamage *= 0.70;
+    }
+
+    final int finalDamage = max(1, totalDamage.round());
+
+    // 5. Apply Damage to Defender & Status Effects
+    final int newTargetHp = max(0, target.currentHp - finalDamage);
+    List<StatusEffect> targetEffects = List.of(target.activeEffects);
+    if (skill.appliedStatus != null && !isGlancing && newTargetHp > 0) {
+      targetEffects.add(skill.appliedStatus!);
+    }
+
+    final UnitEntity updatedTarget = target.copyWith(
+      currentHp: newTargetHp,
+      activeEffects: targetEffects,
+    );
+
+    // 6. Resolve Lifesteal
+    double effectiveLifestealRatio = skill.lifestealRatio + attackerRelics.bonusLifesteal;
+    // Vladislav's Crimson Tithe: +8% Lifesteal against wounded or bleeding targets
+    if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.vladislav) {
+      if (target.isBleeding || target.currentHp < target.maxHp) {
+        effectiveLifestealRatio += 0.08;
+      }
+    }
+
+    int lifestealRecovered = 0;
+    int attackerHp = attacker.currentHp;
+    if (effectiveLifestealRatio > 0.0 && attacker.isAlive) {
+      lifestealRecovered = (finalDamage * effectiveLifestealRatio).round();
+      attackerHp = min(attacker.maxHp, attackerHp + lifestealRecovered);
+    }
+
+    // Valeria's Iron Aegis: If enemy attacks an allied Vanguard, 15% physical damage reflected back to attacker
+    if (!attackerIsAlly && commandService?.activeGeneralType == GeneralType.valeria && target.isVanguard) {
+      final int reflected = max(1, (finalDamage * 0.15).round());
+      attackerHp = max(0, attackerHp - reflected);
+    }
+
+    // Morrigan's Temporal Threads: Crits grant +5% Turn Meter
+    double bonusTmFromCrit = 0.0;
+    if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.morrigan && isCritical) {
+      bonusTmFromCrit = 5.0;
+    }
+
+    // 7. Update Cooldowns and Ultimate Charge
+    final double newUltimate = skill.isLimitBurst
+        ? 0.0
+        : (attacker.ultimateCharge + 25.0).clamp(0.0, 100.0);
+
+    final List<SkillEntity> updatedSkills = attacker.resolvedSkills.map((s) {
+      if (s.id == skill.id) {
+        return s.copyWith(currentCooldown: s.cooldownTurns);
+      } else if (s.currentCooldown > 0) {
+        return s.copyWith(currentCooldown: s.currentCooldown - 1);
+      }
+      return s;
+    }).toList();
+
+    final UnitEntity updatedAttacker = attacker.copyWith(
+      currentHp: attackerHp,
+      turnMeter: attacker.turnMeter + bonusTmFromCrit,
+      ultimateCharge: newUltimate,
+      skills: updatedSkills,
+    );
+
+    // 8. Reconstruct Squad State
+    List<UnitEntity> updatedAllies = List.of(tickManager.allies);
+    List<UnitEntity> updatedEnemies = List.of(tickManager.enemies);
+
+    if (attackerIsAlly) {
+      updatedAllies = updatedAllies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
+      updatedEnemies = updatedEnemies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
+    } else {
+      updatedEnemies = updatedEnemies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
+      updatedAllies = updatedAllies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
+    }
+
+    // Malakor's Carrion Miasma: When an ally falls, all enemies gain 2 stacks of Blight
+    if (commandService?.activeGeneralType == GeneralType.malakor) {
+      final bool allyJustDied = (attackerIsAlly && updatedAttacker.currentHp == 0) ||
+          (!attackerIsAlly && updatedTarget.currentHp == 0);
+      if (allyJustDied) {
+        updatedEnemies = updatedEnemies.map((e) {
+          if (!e.isAlive) return e;
+          final effects = List<StatusEffect>.from(e.activeEffects)
+            ..add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40))
+            ..add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40));
+          return e.copyWith(activeEffects: effects);
+        }).toList();
+      }
+    }
+
+    tickManager.consumeTurn(
+      retainedOverflow: false,
+      updatedAllies: updatedAllies,
+      updatedEnemies: updatedEnemies,
+      autoResume: autoResumeTickEngine,
+    );
+
+    return ActionResult(
+      attacker: updatedAttacker,
+      target: updatedTarget,
+      damageDealt: finalDamage,
+      isCritical: isCritical,
+      isGlancing: isGlancing,
+      affinityMultiplier: affinityMod,
+      targetDefeated: updatedTarget.currentHp == 0,
+      lifestealRecovered: lifestealRecovered,
       skillName: skill.name,
       appliedStatusName: skill.appliedStatus?.displayName,
     );
