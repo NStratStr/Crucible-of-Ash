@@ -34,6 +34,7 @@ class BattleScreen extends StatefulWidget {
   final ValueChanged<int>? onSigilsChanged;
   final VoidCallback? onResetEncounter;
   final VoidCallback? onVictory;
+  final VoidCallback? onDefeat;
 
   const BattleScreen({
     super.key,
@@ -45,6 +46,7 @@ class BattleScreen extends StatefulWidget {
     this.onSigilsChanged,
     this.onResetEncounter,
     this.onVictory,
+    this.onDefeat,
   });
 
   @override
@@ -58,6 +60,7 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _isProcessingAiTurn = false;
   bool _autoBattle = false;
   Timer? _autoBattleTimer;
+  bool _hasDispatchedEndOutcome = false;
 
   final List<FloatingCombatText> _floatingPops = [];
   final List<Timer> _popTimers = [];
@@ -193,6 +196,16 @@ class _BattleScreenState extends State<BattleScreen> {
       _handleAiTurn();
     } else if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
       _handleAutoPlayerTurn();
+    }
+
+    if (widget.tickManager.phase == CombatPhase.battleEnded && !_hasDispatchedEndOutcome) {
+      if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+        _hasDispatchedEndOutcome = true;
+        widget.onVictory?.call();
+      } else if (widget.tickManager.allies.every((u) => !u.isAlive)) {
+        _hasDispatchedEndOutcome = true;
+        widget.onDefeat?.call();
+      }
     }
 
     setState(() {});

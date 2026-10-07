@@ -81,8 +81,17 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _resetEncounter([List<UnitEntity>? customEnemies, BattleModifier battleModifier = BattleModifier.none]) {
-    final allies = StarterBrigades.createPlayerSquad();
+  void _resetEncounter([
+    List<UnitEntity>? customEnemies,
+    BattleModifier battleModifier = BattleModifier.none,
+    bool preserveSquad = false,
+  ]) {
+    List<UnitEntity> allies;
+    if (preserveSquad) {
+      allies = _tickManager.allies.map((u) => u.copyWith(turnMeter: 0.0, activeEffects: const [])).toList();
+    } else {
+      allies = StarterBrigades.createPlayerSquad();
+    }
     final enemies = customEnemies ?? StarterBrigades.createTutorialEnemies();
 
     _tickManager = InitiativeTickManager(
@@ -237,7 +246,13 @@ class _AppShellState extends State<AppShell> {
         enemies = StarterBrigades.createTutorialEnemies();
       }
 
-      _resetEncounter(enemies);
+      // If all allies were fallen, revive squad before entering next battle
+      if (_tickManager.allies.every((u) => !u.isAlive)) {
+        final revived = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+        _tickManager.updateSquads(allies: revived);
+      }
+
+      _resetEncounter(enemies, BattleModifier.none, true);
       setState(() {
         _currentIndex = 1; // Switch to Combat Arena
       });
@@ -583,6 +598,205 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _onCombatDefeat() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF181820),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFB3261E), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.dangerous, color: Color(0xFFEF5350), size: 24),
+            SizedBox(width: 8),
+            Text(
+              'BRIGADE VANQUISHED',
+              style: TextStyle(
+                color: Color(0xFFEF5350),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'All bloodline vessels have fallen in battle. The shadows claim your expedition in ${CampaignMapScreen.chapterTitle(_currentChapter)}.',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111114),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFB3261E).withValues(alpha: 0.5)),
+              ),
+              child: const Text(
+                'Your vessels retreat to the Ashen Encampment to mend mortal wounds. Regroup, refine armaments, and begin a new descent.',
+                style: TextStyle(color: Color(0xFFE5A93C), fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('RETURN TO CAMP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+                _tickManager.updateSquads(allies: revivedAllies);
+                _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
+                _activeNode = null;
+                _currentIndex = 0; // Return to campaign map
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeployThrallDialog(UnitEntity reserveThrall) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF181820),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        side: BorderSide(color: Color(0xFFE5A93C), width: 1.5),
+      ),
+      builder: (ctx) {
+        final activeAllies = _tickManager.allies;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.swap_horiz, color: Color(0xFFE5A93C), size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'DEPLOY ${reserveThrall.name.toUpperCase()} TO BRIGADE',
+                      style: const TextStyle(
+                        color: Color(0xFFE5A93C),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Choose an active squad position to replace. The displaced vessel will return to your reserve inventory.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10.5),
+              ),
+              const SizedBox(height: 12),
+              ...activeAllies.map((activeUnit) {
+                final isVanguard = activeUnit.isVanguard;
+                final slotLabel = activeUnit.slot.name.toUpperCase();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111114),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isVanguard ? const Color(0xFFB3261E).withValues(alpha: 0.6) : const Color(0xFF1976D2).withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isVanguard ? const Color(0xFFB3261E).withValues(alpha: 0.3) : const Color(0xFF1976D2).withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isVanguard ? 'VAN ($slotLabel)' : 'ARC ($slotLabel)',
+                        style: TextStyle(
+                          color: isVanguard ? const Color(0xFFEF5350) : const Color(0xFF64B5F6),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      activeUnit.name,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    subtitle: Text(
+                      'G${activeUnit.generation} ${activeUnit.archetype.name.toUpperCase()} • HP: ${activeUnit.currentHp}/${activeUnit.maxHp} • ATK: ${activeUnit.attack}',
+                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                    ),
+                    trailing: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFB3261E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _deployThrallToSlot(reserveThrall, activeUnit);
+                      },
+                      child: const Text('REPLACE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+  void _deployThrallToSlot(UnitEntity incomingThrall, UnitEntity outgoingUnit) {
+    setState(() {
+      final deployedThrall = incomingThrall.copyWith(slot: outgoingUnit.slot);
+      _inventory.removeWhere((u) => u.id == incomingThrall.id);
+      _inventory.insert(0, outgoingUnit);
+
+      final newAllies = _tickManager.allies.map((u) {
+        if (u.id == outgoingUnit.id) return deployedThrall;
+        return u;
+      }).toList();
+
+      _tickManager.updateSquads(allies: newAllies);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Vessel Deployed: Bound ${incomingThrall.name} to ${outgoingUnit.slot.name.toUpperCase()} (Replaced ${outgoingUnit.name})!'),
+        backgroundColor: const Color(0xFF1B5E20),
+      ),
+    );
+  }
+
   UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
     Archetype? targetRole;
     if (scoutedAffinities != null && scoutedAffinities.isNotEmpty) {
@@ -597,7 +811,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _healSquad() {
-    final healed = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+    final healed = _tickManager.allies.map((u) {
+      if (!u.isAlive) {
+        return u.copyWith(currentHp: max(1, (u.maxHp * 0.40).round()));
+      }
+      final heal = (u.maxHp * 0.40).round();
+      return u.copyWith(currentHp: min(u.maxHp, u.currentHp + heal));
+    }).toList();
     _tickManager.consumeTurn(
       retainedOverflow: true,
       updatedAllies: healed,
@@ -766,6 +986,7 @@ class _AppShellState extends State<AppShell> {
                     onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onResetEncounter: () => setState(_resetEncounter),
                     onVictory: _onCombatVictory,
+                    onDefeat: _onCombatDefeat,
                   ),
                   // Tab 2: Crucible Altar
                   CrucibleScreen(
@@ -1104,7 +1325,20 @@ class _AppShellState extends State<AppShell> {
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                        if (!inActiveSquad)
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFB3261E),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => _showDeployThrallDialog(unit),
+                            child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
+                          )
+                        else
+                          const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
                       ],
                     ),
                   ),
