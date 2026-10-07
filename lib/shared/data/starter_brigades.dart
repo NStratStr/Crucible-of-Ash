@@ -801,5 +801,28 @@ class StarterBrigades {
         );
     }
   }
+
+  /// Generates the Lineage Crypt completion prize: Pureblood Shadowhound Sovereign (Gen 4 Pureblood Skirmisher)
+  static UnitEntity createPurebloodCryptReward() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return UnitEntity(
+      id: 'pureblood_crypt_$timestamp',
+      speciesId: 'feral_hound',
+      name: 'Pureblood Shadowhound Sovereign',
+      generation: 4,
+      archetype: Archetype.skirmisher,
+      slot: FormationSlot.front1,
+      level: 1,
+      maxLevel: 50,
+      currentHp: 1100,
+      maxHp: 1100,
+      attack: 310,
+      defense: 215,
+      speed: 135,
+      nativeTraitId: 'dive_bomb',
+      graftedTraitId: 'vicious_strike',
+      lineageAncestors: const ['Alpha_Hound_Prime', 'Beta_Hound_Prime', 'Cerberus_Spawn_Ascendant'],
+    );
+  }
 }
 

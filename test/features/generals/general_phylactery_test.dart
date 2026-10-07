@@ -85,5 +85,48 @@ void main() {
       // Rank 2: 140 * 1.20 = 168 damage
       expect(resRank2.summary, contains('168 poison damage'));
     });
+
+    test('Rank 3 Mastery potency (1.35) further amplifies damage', () {
+      final tickManager = InitiativeTickManager(
+        initialAllies: StarterBrigades.createPlayerSquad(),
+        initialEnemies: StarterBrigades.createTutorialEnemies(),
+      );
+
+      final rank3Service = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+        initialFocus: 1,
+        initialPhylacteryRanks: {GeneralType.malakor: 3},
+      );
+
+      expect(rank3Service.potencyMultiplier, equals(1.35));
+      final resRank3 = rank3Service.executeCorpseBurst();
+      // Rank 3: 140 * 1.35 = 189 damage
+      expect(resRank3.summary, contains('189 poison damage'));
+    });
+
+    test('Orders reflect unlock status accurately across Phylactery ranks', () {
+      final tickManager = InitiativeTickManager(
+        initialAllies: StarterBrigades.createPlayerSquad(),
+        initialEnemies: StarterBrigades.createTutorialEnemies(),
+      );
+
+      final service = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+      );
+
+      final orders = service.currentProfile.orders;
+      expect(service.isOrderUnlocked(orders[0]), isTrue);  // Rank 1 Siphon
+      expect(service.isOrderUnlocked(orders[1]), isFalse); // Rank 2 Ward
+      expect(service.isOrderUnlocked(orders[2]), isFalse); // Rank 3 Execute
+
+      service.upgradePhylactery(GeneralType.vladislav);
+      expect(service.isOrderUnlocked(orders[1]), isTrue);
+      expect(service.isOrderUnlocked(orders[2]), isFalse);
+
+      service.upgradePhylactery(GeneralType.vladislav);
+      expect(service.isOrderUnlocked(orders[2]), isTrue);
+    });
   });
 }

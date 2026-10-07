@@ -391,7 +391,7 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
 
             // Orders list
             const Text(
-              'BATTLEFIELD ORDERS (FOCUS):',
+              'BATTLEFIELD ORDERS & PHYLACTERY MASTERY:',
               style: TextStyle(
                 color: Color(0xFF8E8EA0),
                 fontSize: 9.5,
@@ -404,24 +404,50 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
               spacing: 6,
               runSpacing: 6,
               children: gen.orders.map((ord) {
+                final bool isUnlocked = rank >= ord.requiredPhylacteryRank;
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1C1C26),
+                    color: isUnlocked ? const Color(0xFF1C1C26) : const Color(0xFF14141A),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white10),
+                    border: Border.all(
+                      color: isUnlocked ? gen.themeColor.withValues(alpha: 0.5) : const Color(0xFF383844),
+                      width: isUnlocked ? 1.0 : 0.8,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(ord.icon, size: 12, color: gen.themeColor),
+                      Icon(
+                        isUnlocked ? ord.icon : Icons.lock,
+                        size: 11,
+                        color: isUnlocked ? gen.themeColor : Colors.white38,
+                      ),
                       const SizedBox(width: 5),
                       Text(
                         '${ord.name} (${ord.focusCost}F)',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isUnlocked ? Colors.white : Colors.white38,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isUnlocked
+                              ? const Color(0xFFE5A93C).withValues(alpha: 0.15)
+                              : Colors.white10,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          isUnlocked ? 'R${ord.requiredPhylacteryRank}' : 'LOCKED R${ord.requiredPhylacteryRank}',
+                          style: TextStyle(
+                            color: isUnlocked ? const Color(0xFFE5A93C) : Colors.white38,
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],

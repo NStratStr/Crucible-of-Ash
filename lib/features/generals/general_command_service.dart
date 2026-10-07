@@ -20,6 +20,7 @@ class GeneralOrderDefinition {
   final IconData icon;
   final bool requiresTargetEnemy;
   final bool requiresTargetAlly;
+  final int requiredPhylacteryRank;
 
   const GeneralOrderDefinition({
     required this.id,
@@ -29,6 +30,7 @@ class GeneralOrderDefinition {
     required this.icon,
     this.requiresTargetEnemy = false,
     this.requiresTargetAlly = false,
+    this.requiredPhylacteryRank = 1,
   });
 }
 
@@ -74,6 +76,7 @@ class GeneralProfile {
           description: 'Drain 15% HP from target enemy; heal frontline Vanguard allies.',
           icon: Icons.water_drop,
           requiresTargetEnemy: true,
+          requiredPhylacteryRank: 1,
         ),
         GeneralOrderDefinition(
           id: 'sanguine_ward',
@@ -81,6 +84,7 @@ class GeneralProfile {
           focusCost: 2,
           description: 'Sacrifice 15% team HP to create an Armor barrier equal to 200% of sacrificed vitality.',
           icon: Icons.shield,
+          requiredPhylacteryRank: 2,
         ),
         GeneralOrderDefinition(
           id: 'feast_of_ruin',
@@ -89,6 +93,7 @@ class GeneralProfile {
           description: 'Instantly execute enemy below 20% HP and surge squad with +50% Turn Meter.',
           icon: Icons.dangerous,
           requiresTargetEnemy: true,
+          requiredPhylacteryRank: 3,
         ),
       ],
     ),
@@ -109,6 +114,7 @@ class GeneralProfile {
           description: 'Fortify targeted ally with +40% Armor.',
           icon: Icons.security,
           requiresTargetAlly: true,
+          requiredPhylacteryRank: 1,
         ),
         GeneralOrderDefinition(
           id: 'retributive_stride',
@@ -116,6 +122,7 @@ class GeneralProfile {
           focusCost: 2,
           description: 'All Vanguard allies execute an immediate free counter-strike against enemies.',
           icon: Icons.flash_on,
+          requiredPhylacteryRank: 2,
         ),
         GeneralOrderDefinition(
           id: 'smite_the_wicked',
@@ -124,6 +131,7 @@ class GeneralProfile {
           description: 'High-impact divine strike scaling with 80% of total squad Armor.',
           icon: Icons.bolt,
           requiresTargetEnemy: true,
+          requiredPhylacteryRank: 3,
         ),
       ],
     ),
@@ -143,6 +151,7 @@ class GeneralProfile {
           focusCost: 1,
           description: 'Detonate necrotic miasma dealing 140 poison damage to all enemies and inflicting Blight.',
           icon: Icons.bubble_chart,
+          requiredPhylacteryRank: 1,
         ),
         GeneralOrderDefinition(
           id: 'virulent_cascade',
@@ -150,6 +159,7 @@ class GeneralProfile {
           focusCost: 2,
           description: 'Trigger 160 burst damage on all blighted foes and add a Blight stack.',
           icon: Icons.grain,
+          requiredPhylacteryRank: 2,
         ),
         GeneralOrderDefinition(
           id: 'rebind_flesh',
@@ -157,6 +167,7 @@ class GeneralProfile {
           focusCost: 3,
           description: 'Resurrect a fallen ally with 40% HP and 100% TM (or heal team if none fallen).',
           icon: Icons.healing,
+          requiredPhylacteryRank: 3,
         ),
       ],
     ),
@@ -177,6 +188,7 @@ class GeneralProfile {
           description: 'Immediately grant target ally 100% Turn Meter so they act next.',
           icon: Icons.fast_forward,
           requiresTargetAlly: true,
+          requiredPhylacteryRank: 1,
         ),
         GeneralOrderDefinition(
           id: 'unravel_hex',
@@ -184,6 +196,7 @@ class GeneralProfile {
           focusCost: 2,
           description: 'Cleanse all debuffs from squad and strip 30% Armor from all enemies.',
           icon: Icons.auto_fix_high,
+          requiredPhylacteryRank: 2,
         ),
         GeneralOrderDefinition(
           id: 'echoing_hourglass',
@@ -191,6 +204,7 @@ class GeneralProfile {
           focusCost: 3,
           description: 'Grant all allies +40% Turn Meter and reduce skill cooldowns by 1.',
           icon: Icons.update,
+          requiredPhylacteryRank: 3,
         ),
       ],
     ),
@@ -274,7 +288,22 @@ class GeneralCommandService extends ChangeNotifier {
 
   int getPhylacteryRank(GeneralType type) => _phylacteryRanks[type] ?? 1;
 
-  double get potencyMultiplier => activePhylacteryRank >= 2 ? 1.20 : 1.0;
+  double get potencyMultiplier {
+    final rank = activePhylacteryRank;
+    if (rank >= 3) return 1.35; // Rank 3 Mastery
+    if (rank >= 2) return 1.20; // Rank 2 Potency
+    return 1.0;
+  }
+
+  /// Checks if an order is unlocked under the current General's active Phylactery rank.
+  bool isOrderUnlocked(GeneralOrderDefinition order) {
+    return activePhylacteryRank >= order.requiredPhylacteryRank;
+  }
+
+  /// Checks if an order is unlocked for a specific general type.
+  bool isOrderUnlockedForGeneral(GeneralType type, GeneralOrderDefinition order) {
+    return getPhylacteryRank(type) >= order.requiredPhylacteryRank;
+  }
 
   bool upgradePhylactery(GeneralType type) {
     final current = getPhylacteryRank(type);
@@ -314,6 +343,18 @@ class GeneralCommandService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _validateOrderUnlocked(String orderId) {
+    final order = currentProfile.orders.firstWhere(
+      (o) => o.id == orderId,
+      orElse: () => throw ArgumentError('Unknown order $orderId for ${currentProfile.name}.'),
+    );
+    if (!isOrderUnlocked(order)) {
+      throw StateError(
+        'Order ${order.name} is sealed! Requires Phylactery Rank ${order.requiredPhylacteryRank}. Anoint ${currentProfile.name} in the Phylactery.',
+      );
+    }
+  }
+
   /// Validates and spends focus points. Throws an error if insufficient.
   void _spendFocus(int cost) {
     if (_currentFocus < cost) {
@@ -331,6 +372,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Siphon Vitality (Cost: 1 Focus)
   OrderResult executeSiphonVitality(String targetEnemyId) {
+    _validateOrderUnlocked('siphon_vitality');
     const int cost = 1;
     _spendFocus(cost);
 
@@ -376,6 +418,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Sanguine Ward (Cost: 2 Focus)
   OrderResult executeSanguineWard() {
+    _validateOrderUnlocked('sanguine_ward');
     const int cost = 2;
     _spendFocus(cost);
 
@@ -412,6 +455,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Feast of Ruin (Cost: 3 Focus)
   OrderResult executeFeastOfRuin(String targetEnemyId) {
+    _validateOrderUnlocked('feast_of_ruin');
     const int cost = 3;
     _spendFocus(cost);
 
@@ -459,6 +503,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Stand Resolute (Cost: 1 Focus)
   OrderResult executeStandResolute(String targetAllyId) {
+    _validateOrderUnlocked('stand_resolute');
     const int cost = 1;
     _spendFocus(cost);
 
@@ -489,6 +534,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Retributive Stride (Cost: 2 Focus)
   /// All surviving Vanguard allies strike the front enemy directly for 100% of their ATK.
   OrderResult executeRetributiveStride() {
+    _validateOrderUnlocked('retributive_stride');
     const int cost = 2;
     _spendFocus(cost);
 
@@ -526,6 +572,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Smite the Wicked (Cost: 3 Focus)
   /// High-impact divine strike scaling with 80% of total brigade armor.
   OrderResult executeSmiteTheWicked(String targetEnemyId) {
+    _validateOrderUnlocked('smite_the_wicked');
     const int cost = 3;
     _spendFocus(cost);
 
@@ -569,6 +616,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Corpse Burst (Cost: 1 Focus)
   /// Detonates necrotic miasma dealing 140 poison damage to all enemies and inflicting Blight.
   OrderResult executeCorpseBurst() {
+    _validateOrderUnlocked('corpse_burst');
     const int cost = 1;
     _spendFocus(cost);
 
@@ -600,6 +648,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Virulent Cascade (Cost: 2 Focus)
   /// Deals 160 instant damage to all blighted or bleeding foes, and adds a Blight stack.
   OrderResult executeVirulentCascade() {
+    _validateOrderUnlocked('virulent_cascade');
     const int cost = 2;
     _spendFocus(cost);
 
@@ -637,6 +686,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Rebind Flesh (Cost: 3 Focus)
   /// Resurrects a fallen ally with 40% HP and 100% TM. If none fallen, heals team for 35% HP.
   OrderResult executeRebindFlesh() {
+    _validateOrderUnlocked('rebind_flesh');
     const int cost = 3;
     _spendFocus(cost);
 
@@ -682,6 +732,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Quicken (Cost: 1 Focus)
   /// Immediately grant target ally 100% Turn Meter.
   OrderResult executeQuicken(String targetAllyId) {
+    _validateOrderUnlocked('quicken');
     const int cost = 1;
     _spendFocus(cost);
 
@@ -711,6 +762,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Unravel Hex (Cost: 2 Focus)
   /// Cleanses all debuffs on allies and strips 30% Armor from all enemies.
   OrderResult executeUnravelHex() {
+    _validateOrderUnlocked('unravel_hex');
     const int cost = 2;
     _spendFocus(cost);
 
@@ -744,6 +796,7 @@ class GeneralCommandService extends ChangeNotifier {
   /// Echoing Hourglass (Cost: 3 Focus)
   /// Grants all allies +40% Turn Meter and reduces skill cooldowns by 1.
   OrderResult executeEchoingHourglass() {
+    _validateOrderUnlocked('echoing_hourglass');
     const int cost = 3;
     _spendFocus(cost);
 

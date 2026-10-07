@@ -437,11 +437,23 @@ class _AppShellState extends State<AppShell> {
         _bloodlineSigils += sigilsReward;
       });
       _markNodeCompleted(_activeNode!.id);
+
+      UnitEntity? purebloodDrop;
+      if (_activeNode?.name.contains('Lineage Crypt') == true) {
+        purebloodDrop = StarterBrigades.createPurebloodCryptReward();
+        setState(() {
+          _inventory.insert(0, purebloodDrop!);
+        });
+      }
+
       final captured = _captureThrallAfterBattle(scoutedAffinities: _activeNode?.scoutedAffinities);
 
       String extraReward = '';
       if (sigilsReward > 0) {
         extraReward += ' • +$sigilsReward Sigil(s)';
+      }
+      if (purebloodDrop != null) {
+        extraReward += ' • PINNACLE LINEAGE: ${purebloodDrop.name} (PUREBLOOD GEN 4)!';
       }
       if (_activeNode!.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);

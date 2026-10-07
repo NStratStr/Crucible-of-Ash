@@ -132,7 +132,25 @@ void main() {
       expect(result.updatedAllies[1].currentHp, equals(600));
     });
 
-    test('Sanguine Ward sacrifices team HP to grant team armor barrier', () {
+    test('Locked orders throw StateError at Rank 1 until anointed in Phylactery', () {
+      commandService.grantFocus(2);
+      expect(commandService.isOrderUnlocked(commandService.currentProfile.orders[1]), isFalse);
+      expect(() => commandService.executeSanguineWard(), throwsStateError);
+
+      commandService.upgradePhylactery(GeneralType.vladislav);
+      expect(commandService.isOrderUnlocked(commandService.currentProfile.orders[1]), isTrue);
+      expect(commandService.activePhylacteryRank, equals(2));
+      expect(commandService.potencyMultiplier, equals(1.20));
+
+      expect(() => commandService.executeFeastOfRuin('enemy_boss'), throwsStateError);
+      commandService.upgradePhylactery(GeneralType.vladislav);
+      expect(commandService.activePhylacteryRank, equals(3));
+      expect(commandService.potencyMultiplier, equals(1.35));
+      expect(commandService.isOrderUnlocked(commandService.currentProfile.orders[2]), isTrue);
+    });
+
+    test('Sanguine Ward sacrifices team HP to grant team armor barrier at Rank 2', () {
+      commandService.upgradePhylactery(GeneralType.vladislav); // Rank 2 (+20% potency)
       commandService.grantFocus(2); // Focus = 3
 
       final OrderResult result = commandService.executeSanguineWard();
@@ -140,13 +158,12 @@ void main() {
       expect(commandService.currentFocus, equals(1));
       expect(result.updatedAllies[0].currentHp, equals(850));
       expect(result.updatedAllies[1].currentHp, equals(510));
-      expect(result.updatedAllies[0].defense, equals(100 + 240));
-      expect(result.updatedAllies[1].defense, equals(40 + 240));
+      // totalSacrificedHp = 240 * 2.0 * 1.20 = 576. 576 / 2 = 288
+      expect(result.updatedAllies[0].defense, equals(100 + 288));
+      expect(result.updatedAllies[1].defense, equals(40 + 288));
     });
 
     test('Feast of Ruin executes enemy below 20% HP and surges allied Turn Meter', () {
-      commandService.grantFocus(2); // Focus = 3
-
       final woundedBoss = enemyBoss.copyWith(currentHp: 300); // 15% HP
       tickManager = InitiativeTickManager(
         initialAllies: [vanguardHero, arcanumHero],
@@ -157,6 +174,7 @@ void main() {
         generalId: 'vladislav_01',
         generalName: 'Lord Vladislav',
         initialFocus: 3,
+        initialPhylacteryRanks: {GeneralType.vladislav: 3},
       );
 
       final OrderResult result = commandService.executeFeastOfRuin('enemy_boss');
@@ -181,19 +199,22 @@ void main() {
       expect(res.updatedAllies.first.defense, equals(140)); // 100 + 40
     });
 
-    test('Lady Valeria: Retributive Stride counters with vanguard attack', () {
+    test('Lady Valeria: Retributive Stride counters with vanguard attack at Rank 2', () {
       commandService.setActiveGeneral(GeneralType.valeria);
+      commandService.upgradePhylactery(GeneralType.valeria); // Rank 2
       commandService.grantFocus(2);
       final res = commandService.executeRetributiveStride();
       expect(res.updatedEnemies.first.currentHp, equals(2000 - 150)); // boss took 150 from ally_tank
     });
 
-    test('Lady Valeria: Smite the Wicked scales with total brigade armor', () {
+    test('Lady Valeria: Smite the Wicked scales with total brigade armor at Rank 3', () {
       commandService.setActiveGeneral(GeneralType.valeria);
+      commandService.upgradePhylactery(GeneralType.valeria); // Rank 2
+      commandService.upgradePhylactery(GeneralType.valeria); // Rank 3
       commandService.grantFocus(3);
-      // Total armor = 100 + 40 = 140. Smite deals 80% = 112 -> clamped min 150
+      // Total armor = 100 + 40 = 140. Smite deals 80% * 1.35 = 151
       final res = commandService.executeSmiteTheWicked('enemy_boss');
-      expect(res.updatedEnemies.first.currentHp, equals(2000 - 150));
+      expect(res.updatedEnemies.first.currentHp, equals(2000 - 151));
     });
 
     test('Malakor: Corpse Burst damages and blights all enemies', () {
@@ -203,8 +224,7 @@ void main() {
       expect(res.updatedEnemies.first.isBlighted, isTrue);
     });
 
-    test('Malakor: Rebind Flesh resurrects fallen ally with 40% HP and 100 TM', () {
-      commandService.setActiveGeneral(GeneralType.malakor);
+    test('Malakor: Rebind Flesh resurrects fallen ally with 40% HP and 100 TM at Rank 3', () {
       final deadTank = vanguardHero.copyWith(currentHp: 0);
       tickManager = InitiativeTickManager(
         initialAllies: [deadTank, arcanumHero],
@@ -214,6 +234,7 @@ void main() {
         tickManager: tickManager,
         generalType: GeneralType.malakor,
         initialFocus: 3,
+        initialPhylacteryRanks: {GeneralType.malakor: 3},
       );
 
       final res = commandService.executeRebindFlesh();
@@ -228,15 +249,18 @@ void main() {
       expect(res.updatedAllies[1].turnMeter, equals(100.0));
     });
 
-    test('Morrigan: Unravel Hex cleanses allies and shreds enemy armor', () {
+    test('Morrigan: Unravel Hex cleanses allies and shreds enemy armor at Rank 2', () {
       commandService.setActiveGeneral(GeneralType.morrigan);
+      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 2
       commandService.grantFocus(2);
       final res = commandService.executeUnravelHex();
       expect(res.updatedEnemies.first.defense, equals(56)); // 80 - 30% (24) = 56
     });
 
-    test('Morrigan: Echoing Hourglass grants +40% TM to team', () {
+    test('Morrigan: Echoing Hourglass grants +40% TM to team at Rank 3', () {
       commandService.setActiveGeneral(GeneralType.morrigan);
+      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 2
+      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 3
       commandService.grantFocus(3);
       final res = commandService.executeEchoingHourglass();
       expect(res.updatedAllies[0].turnMeter, equals(40.0));

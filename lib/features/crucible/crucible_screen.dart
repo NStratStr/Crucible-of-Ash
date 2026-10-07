@@ -112,10 +112,20 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   }
 
   void _updateDefaultGraft() {
-    if (_progenitorA != null) {
-      _selectedGraftTraitId = _progenitorA!.nativeTraitId;
-    } else if (_progenitorB != null) {
-      _selectedGraftTraitId = _progenitorB!.nativeTraitId;
+    final candidateTraits = <String>[
+      if (_progenitorA != null) ...[
+        _progenitorA!.nativeTraitId,
+        if (_progenitorA!.graftedTraitId != null) _progenitorA!.graftedTraitId!,
+      ],
+      if (_progenitorB != null) ...[
+        _progenitorB!.nativeTraitId,
+        if (_progenitorB!.graftedTraitId != null) _progenitorB!.graftedTraitId!,
+      ],
+    ];
+    if (candidateTraits.isNotEmpty) {
+      if (_selectedGraftTraitId == null || !candidateTraits.contains(_selectedGraftTraitId)) {
+        _selectedGraftTraitId = candidateTraits.first;
+      }
     } else {
       _selectedGraftTraitId = null;
     }
@@ -695,8 +705,14 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
   Widget _buildTraitGraftSelector() {
     final traits = <String>{
-      if (_progenitorA != null) _progenitorA!.nativeTraitId,
-      if (_progenitorB != null) _progenitorB!.nativeTraitId,
+      if (_progenitorA != null) ...[
+        _progenitorA!.nativeTraitId,
+        if (_progenitorA!.graftedTraitId != null) _progenitorA!.graftedTraitId!,
+      ],
+      if (_progenitorB != null) ...[
+        _progenitorB!.nativeTraitId,
+        if (_progenitorB!.graftedTraitId != null) _progenitorB!.graftedTraitId!,
+      ],
     }.toList();
 
     final selectedTrait = _selectedGraftTraitId != null ? TraitEntity.getTrait(_selectedGraftTraitId!) : null;

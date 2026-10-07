@@ -1494,6 +1494,7 @@ class _BattleScreenState extends State<BattleScreen> {
               Expanded(
                 child: Row(
                   children: profile.orders.map((order) {
+                    final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
                     return Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1502,7 +1503,18 @@ class _BattleScreenState extends State<BattleScreen> {
                           cost: order.focusCost,
                           availableFocus: focus,
                           borderColor: profile.themeColor,
+                          isUnlocked: isUnlocked,
+                          requiredRank: order.requiredPhylacteryRank,
                           onPressed: () => _dispatchOrder(order),
+                          onLockedTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.'),
+                                backgroundColor: const Color(0xFFB3261E),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     );
@@ -1521,8 +1533,39 @@ class _BattleScreenState extends State<BattleScreen> {
     required int cost,
     required int availableFocus,
     required Color borderColor,
+    required bool isUnlocked,
+    required int requiredRank,
     required VoidCallback onPressed,
+    required VoidCallback onLockedTap,
   }) {
+    if (!isUnlocked) {
+      return OutlinedButton(
+        onPressed: onLockedTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white38,
+          side: const BorderSide(color: Color(0xFF383844), width: 1.0),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock, size: 8, color: Colors.white38),
+                const SizedBox(width: 2),
+                Text(title, style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white38)),
+              ],
+            ),
+            Text(
+              'RANK $requiredRank',
+              style: const TextStyle(fontSize: 7.5, color: Color(0xFFE5A93C), fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
+    }
+
     final bool canCast = availableFocus >= cost;
 
     return OutlinedButton(
