@@ -898,6 +898,60 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _onFusionExecuted(UnitEntity child, List<String> sacrificedParentIds) {
+    setState(() {
+      final activeAllies = List<UnitEntity>.from(_tickManager.allies);
+      int replacedIndex = -1;
+
+      // Check if one of the sacrificed parents was in the active squad
+      for (int i = 0; i < activeAllies.length; i++) {
+        if (sacrificedParentIds.contains(activeAllies[i].id)) {
+          if (replacedIndex == -1) {
+            replacedIndex = i; // Place child in this active slot
+          }
+        }
+      }
+
+      if (replacedIndex != -1) {
+        final slot = activeAllies[replacedIndex].slot;
+        final placedChild = child.copyWith(slot: slot);
+        activeAllies[replacedIndex] = placedChild;
+
+        // If both parents were fielded in the active brigade, replace the second
+        for (int i = 0; i < activeAllies.length; i++) {
+          if (i != replacedIndex && sacrificedParentIds.contains(activeAllies[i].id)) {
+            final replacement = _inventory.firstWhere(
+              (u) => !sacrificedParentIds.contains(u.id) && !activeAllies.any((a) => a.id == u.id),
+              orElse: () => StarterBrigades.createPlayerSquad().first,
+            );
+            activeAllies[i] = replacement.copyWith(slot: activeAllies[i].slot);
+          }
+        }
+        _tickManager.updateSquads(allies: activeAllies);
+      } else {
+        _inventory.insert(0, child);
+      }
+
+      // Remove sacrificed parents from inventory
+      _inventory.removeWhere((u) => sacrificedParentIds.contains(u.id));
+    });
+
+    if (_ftueService.currentStage == FtueStage.crucibleFusion) {
+      _ftueService.advanceStage();
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          child.isPureblood
+              ? '👑 PUREBLOOD CONSECRATION: ${child.name} has ascended!'
+              : 'Transmutation complete: ${child.name} forged in the Crucible!',
+        ),
+        backgroundColor: child.isPureblood ? const Color(0xFFFF8F00) : const Color(0xFFB3261E),
+      ),
+    );
+  }
+
   void _onFusionComplete(UnitEntity child) {
     setState(() {
       _inventory.insert(0, child);
@@ -1057,6 +1111,11 @@ class _AppShellState extends State<AppShell> {
                   // Tab 2: Crucible Altar
                   CrucibleScreen(
                     availableInventory: allPlayerUnits,
+                    totalIchor: _totalIchor,
+                    bloodlineSigils: _bloodlineSigils,
+                    onIchorChanged: (val) => setState(() => _totalIchor = val),
+                    onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
+                    onFusionExecuted: _onFusionExecuted,
                     onFusionComplete: _onFusionComplete,
                   ),
                   // Tab 3: Relic Forge

@@ -9,11 +9,21 @@ import 'crucible_service.dart';
 class CrucibleScreen extends StatefulWidget {
   final List<UnitEntity> availableInventory;
   final ValueChanged<UnitEntity> onFusionComplete;
+  final int totalIchor;
+  final int bloodlineSigils;
+  final ValueChanged<int>? onIchorChanged;
+  final ValueChanged<int>? onSigilsChanged;
+  final void Function(UnitEntity child, List<String> sacrificedParentIds)? onFusionExecuted;
 
   const CrucibleScreen({
     super.key,
     required this.availableInventory,
     required this.onFusionComplete,
+    this.totalIchor = 9999,
+    this.bloodlineSigils = 99,
+    this.onIchorChanged,
+    this.onSigilsChanged,
+    this.onFusionExecuted,
   });
 
   @override
@@ -73,11 +83,40 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     super.dispose();
   }
 
+  String _selectedSpeciesFilter = 'ALL';
+  int? _selectedGenFilter;
+
+  int get _requiredIchorCost {
+    if (_progenitorA == null || _progenitorB == null) return 0;
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    switch (nextGen) {
+      case 2:
+        return 150;
+      case 3:
+        return 300;
+      case 4:
+        return 500;
+      default:
+        return 150;
+    }
+  }
+
+  int get _requiredSigilsCost {
+    if (_progenitorA == null || _progenitorB == null) return 0;
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    return nextGen >= 4 ? 1 : 0;
+  }
+
+  bool get _hasSufficientIchor => widget.totalIchor >= _requiredIchorCost;
+  bool get _hasSufficientSigils => widget.bloodlineSigils >= _requiredSigilsCost;
+  bool get _hasSufficientResources => _hasSufficientIchor && _hasSufficientSigils;
+
   bool get _canFuse =>
       _progenitorA != null &&
       _progenitorB != null &&
       _progenitorA!.speciesId == _progenitorB!.speciesId &&
       _selectedGraftTraitId != null &&
+      _hasSufficientResources &&
       !_isPerformingRitual;
 
   void _selectUnit(UnitEntity unit) {
@@ -134,6 +173,11 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   Future<void> _executeFusionRitual() async {
     if (!_canFuse) return;
 
+    final ichorCost = _requiredIchorCost;
+    final sigilCost = _requiredSigilsCost;
+    final parentAId = _progenitorA!.id;
+    final parentBId = _progenitorB!.id;
+
     setState(() => _isPerformingRitual = true);
     await _shakeController.forward(from: 0.0);
 
@@ -163,7 +207,19 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       selectedGraftTraitId: _selectedGraftTraitId!,
     );
 
-    widget.onFusionComplete(child);
+    // Deduct currencies
+    if (widget.onIchorChanged != null && ichorCost > 0) {
+      widget.onIchorChanged!(widget.totalIchor - ichorCost);
+    }
+    if (widget.onSigilsChanged != null && sigilCost > 0) {
+      widget.onSigilsChanged!(widget.bloodlineSigils - sigilCost);
+    }
+
+    if (widget.onFusionExecuted != null) {
+      widget.onFusionExecuted!(child, [parentAId, parentBId]);
+    } else {
+      widget.onFusionComplete(child);
+    }
 
     if (mounted) {
       setState(() {
@@ -313,31 +369,42 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Tri-Currency Status Bar
+              _buildCurrencyStatusBar(),
+
               // Altar Slots
               _buildProgenitorSelectionAltar(),
               const SizedBox(height: 16),
 
-              // Trait & Projected Potency (if both slotted)
+              // Trait, Cost, & Projected Potency (if both slotted)
               if (_progenitorA != null && _progenitorB != null) ...[
                 _buildTraitGraftSelector(),
                 const SizedBox(height: 14),
                 _buildInheritancePreviewCard(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                _buildResourceCostCard(),
+                const SizedBox(height: 14),
                 ElevatedButton.icon(
                   onPressed: _canFuse ? _executeFusionRitual : null,
                   icon: const Icon(Icons.fireplace, color: Colors.white),
                   label: Text(
                     _isPerformingRitual
                         ? 'TRANSMUTING SOULS...'
-                        : 'IGNITE CRUCIBLE OF BLOOD',
+                        : (!_hasSufficientResources
+                            ? 'INSUFFICIENT RESOURCES'
+                            : (_requiredSigilsCost > 0
+                                ? '👑 CONSECRATE PUREBLOOD SOVEREIGN'
+                                : 'IGNITE CRUCIBLE OF BLOOD')),
                     style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB3261E),
+                    backgroundColor: _requiredSigilsCost > 0
+                        ? const Color(0xFFC67C00)
+                        : const Color(0xFFB3261E),
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: const Color(0xFF2A2A38),
                     disabledForegroundColor: Colors.white24,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
                 ),
@@ -349,6 +416,177 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // TRI-CURRENCY & TRANSMUTATION COSTS
+  // ===========================================================================
+
+  Widget _buildCurrencyStatusBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF2B2B36)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 16),
+              const SizedBox(width: 6),
+              const Text(
+                'ICHOR: ',
+                style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${widget.totalIchor}',
+                style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          Container(width: 1, height: 18, color: const Color(0xFF2B2B36)),
+          Row(
+            children: [
+              const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 16),
+              const SizedBox(width: 6),
+              const Text(
+                'BLOODLINE SIGILS: ',
+                style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${widget.bloodlineSigils}',
+                style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResourceCostCard() {
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    final isPureblood = nextGen >= 4;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isPureblood
+            ? const Color(0xFF261808)
+            : const Color(0xFF1A1A24),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: !_hasSufficientResources
+              ? const Color(0xFFE53935)
+              : (isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C)),
+          width: 1.2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isPureblood ? Icons.auto_awesome : Icons.local_fire_department,
+                color: isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C),
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isPureblood
+                    ? 'PUREBLOOD CONSECRATION COST'
+                    : 'TRANSMUTATION RITUAL COST (GEN $nextGen)',
+                style: TextStyle(
+                  color: isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10.5,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              // Ichor Cost
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _hasSufficientIchor
+                      ? const Color(0xFFE5A93C).withValues(alpha: 0.15)
+                      : const Color(0xFFB3261E).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _hasSufficientIchor
+                        ? const Color(0xFFE5A93C)
+                        : const Color(0xFFE53935),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_requiredIchorCost Ichor',
+                      style: TextStyle(
+                        color: _hasSufficientIchor ? Colors.white : const Color(0xFFEF9A9A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_requiredSigilsCost > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _hasSufficientSigils
+                        ? const Color(0xFFFFD700).withValues(alpha: 0.15)
+                        : const Color(0xFFB3261E).withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _hasSufficientSigils
+                          ? const Color(0xFFFFD700)
+                          : const Color(0xFFE53935),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$_requiredSigilsCost Bloodline Sigil',
+                        style: TextStyle(
+                          color: _hasSufficientSigils ? const Color(0xFFFFD700) : const Color(0xFFEF9A9A),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (!_hasSufficientResources) ...[
+            const SizedBox(height: 6),
+            Text(
+              !_hasSufficientIchor
+                  ? '⚠ INSUFFICIENT ICHOR: Requires $_requiredIchorCost (have ${widget.totalIchor})'
+                  : '⚠ INSUFFICIENT BLOODLINE SIGILS: Requires 1 (have ${widget.bloodlineSigils})',
+              style: const TextStyle(color: Color(0xFFEF5350), fontSize: 9.5, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -509,7 +747,19 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   // ===========================================================================
 
   Widget _buildVisibleRosterSection() {
-    final list = widget.availableInventory;
+    final filteredList = widget.availableInventory.where((u) {
+      if (_selectedGenFilter != null && u.generation != _selectedGenFilter) {
+        return false;
+      }
+      if (_selectedSpeciesFilter == 'HOUND') {
+        return u.speciesId.contains('hound') || u.speciesId.contains('cerberus');
+      } else if (_selectedSpeciesFilter == 'GHOUL') {
+        return u.speciesId.contains('ghoul') || u.speciesId.contains('lich') || u.speciesId.contains('crypt');
+      } else if (_selectedSpeciesFilter == 'VANGUARD') {
+        return u.speciesId.contains('vanguard') || u.archetype == Archetype.juggernaut;
+      }
+      return true;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,9 +776,24 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                 letterSpacing: 1.2,
               ),
             ),
-            Text(
-              '${list.length} VESSELS',
-              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+            Row(
+              children: [
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.flash_on, size: 14, color: Color(0xFFE5A93C)),
+                  label: const Text('AUTO-PAIR', style: TextStyle(color: Color(0xFFE5A93C), fontSize: 10, fontWeight: FontWeight.bold)),
+                  onPressed: _autoSlotFirstCompatiblePair,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${filteredList.length} / ${widget.availableInventory.length} VESSELS',
+                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                ),
+              ],
             ),
           ],
         ),
@@ -537,14 +802,53 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           'Tap any vessel below to slot it into the Crucible Altar. Matching species can be fused.',
           style: TextStyle(color: Colors.white54, fontSize: 11),
         ),
+        const SizedBox(height: 8),
+
+        // Filter chips bar
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFilterChip('ALL', _selectedSpeciesFilter == 'ALL', () {
+                setState(() => _selectedSpeciesFilter = 'ALL');
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('HOUNDS', _selectedSpeciesFilter == 'HOUND', () {
+                setState(() => _selectedSpeciesFilter = 'HOUND');
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GHOULS', _selectedSpeciesFilter == 'GHOUL', () {
+                setState(() => _selectedSpeciesFilter = 'GHOUL');
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('VANGUARDS', _selectedSpeciesFilter == 'VANGUARD', () {
+                setState(() => _selectedSpeciesFilter = 'VANGUARD');
+              }),
+              const SizedBox(width: 10),
+              Container(width: 1, height: 16, color: const Color(0xFF2B2B36)),
+              const SizedBox(width: 10),
+              _buildFilterChip('GEN I', _selectedGenFilter == 1, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 1 ? null : 1);
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GEN II', _selectedGenFilter == 2, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 2 ? null : 2);
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GEN III', _selectedGenFilter == 3, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 3 ? null : 3);
+              }),
+            ],
+          ),
+        ),
         const SizedBox(height: 10),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: list.length,
+          itemCount: filteredList.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
-            final unit = list[index];
+            final unit = filteredList[index];
             final bool isSlottedA = _progenitorA?.id == unit.id;
             final bool isSlottedB = _progenitorB?.id == unit.id;
             final bool isSlotted = isSlottedA || isSlottedB;
@@ -860,6 +1164,31 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFB3261E).withValues(alpha: 0.3) : const Color(0xFF181820),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF8E8EA0),
+            fontSize: 9.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
