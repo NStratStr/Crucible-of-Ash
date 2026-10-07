@@ -35,8 +35,13 @@ class EndgameTrialDefinition {
 
 class EndgameGauntletDialog extends StatelessWidget {
   final List<UnitEntity>? activeSquad;
+  final Set<EndgameTrialType> clearedTrials;
 
-  const EndgameGauntletDialog({super.key, this.activeSquad});
+  const EndgameGauntletDialog({
+    super.key,
+    this.activeSquad,
+    this.clearedTrials = const {},
+  });
 
   static const List<EndgameTrialDefinition> trials = [
     EndgameTrialDefinition(
@@ -101,12 +106,19 @@ class EndgameGauntletDialog extends StatelessWidget {
     ),
   ];
 
-  static Future<EndgameTrialType?> show(BuildContext context, {List<UnitEntity>? activeSquad}) {
+  static Future<EndgameTrialType?> show(
+    BuildContext context, {
+    List<UnitEntity>? activeSquad,
+    Set<EndgameTrialType> clearedTrials = const {},
+  }) {
     return showModalBottomSheet<EndgameTrialType>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => EndgameGauntletDialog(activeSquad: activeSquad),
+      builder: (_) => EndgameGauntletDialog(
+        activeSquad: activeSquad,
+        clearedTrials: clearedTrials,
+      ),
     );
   }
 
@@ -317,9 +329,15 @@ class EndgameGauntletDialog extends StatelessWidget {
   }
 
   Widget _buildGauntletHeroBanner() {
+    final int masteredCount = clearedTrials.length;
+    final int totalCount = trials.length;
+    final bool isTorment1 = clearedTrials.contains(EndgameTrialType.abyssalDescent);
+    final bool isTorment2 = clearedTrials.contains(EndgameTrialType.abyssalDescentII);
+    final bool isTorment3 = clearedTrials.contains(EndgameTrialType.abyssalDescentIII);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      height: 100,
+      margin: const EdgeInsets.only(bottom: 12),
+      height: 96,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFB3261E), width: 1.5),
@@ -348,30 +366,64 @@ class EndgameGauntletDialog extends StatelessWidget {
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      Colors.black.withValues(alpha: 0.90),
-                      Colors.black.withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.92),
+                      Colors.black.withValues(alpha: 0.50),
                     ],
                   ),
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'THE MACRO TRIALS',
-                    style: TextStyle(
-                      color: Color(0xFFE5A93C),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'THE MACRO TRIALS',
+                        style: TextStyle(
+                          color: Color(0xFFE5A93C),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B1B22),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: masteredCount > 0 ? const Color(0xFF81C784) : const Color(0xFFE5A93C),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.emoji_events,
+                              size: 10,
+                              color: masteredCount > 0 ? const Color(0xFF81C784) : const Color(0xFFE5A93C),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'MASTERY: $masteredCount/$totalCount',
+                              style: TextStyle(
+                                color: masteredCount > 0 ? const Color(0xFF81C784) : const Color(0xFFE5A93C),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 2),
-                  Text(
+                  const Text(
                     'ENDGAME SIEGE & LINEAGE CRYPTS',
                     style: TextStyle(
                       color: Colors.white,
@@ -380,10 +432,14 @@ class EndgameGauntletDialog extends StatelessWidget {
                       letterSpacing: 0.8,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'High-stakes daily boss encounters with strict roster requirements and unique battle modifiers.',
-                    style: TextStyle(color: Colors.white70, fontSize: 9.5),
+                  Row(
+                    children: [
+                      _buildTormentBadge('TORMENT I', isTorment1, const Color(0xFF8E24AA)),
+                      const SizedBox(width: 6),
+                      _buildTormentBadge('TORMENT II', isTorment2, const Color(0xFF5E35B1)),
+                      const SizedBox(width: 6),
+                      _buildTormentBadge('TORMENT III', isTorment3, const Color(0xFFB71C1C)),
+                    ],
                   ),
                 ],
               ),
@@ -394,18 +450,55 @@ class EndgameGauntletDialog extends StatelessWidget {
     );
   }
 
+  Widget _buildTormentBadge(String label, bool isCleared, Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isCleared ? accentColor.withValues(alpha: 0.4) : Colors.black54,
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(
+          color: isCleared ? accentColor : Colors.white24,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isCleared ? Icons.military_tech : Icons.lock_outline,
+            size: 10,
+            color: isCleared ? const Color(0xFFFFD54F) : Colors.white38,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              color: isCleared ? Colors.white : Colors.white38,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTrialCard(BuildContext context, EndgameTrialDefinition trial) {
     final bool isLineageCrypt = trial.type == EndgameTrialType.lineageCrypt;
     final bool isDeathlessCrypt = trial.type == EndgameTrialType.deathlessCrypt;
     final int beastCount = _beastAndSkirmisherCount;
     final int undeadCount = _undeadAndOccultistCount;
     final bool lineageRestricted = (isLineageCrypt && beastCount < 2) || (isDeathlessCrypt && undeadCount < 2);
+    final bool isConquered = clearedTrials.contains(trial.type);
 
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF16161E),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: trial.themeColor.withValues(alpha: 0.7), width: 1.2),
+        border: Border.all(
+          color: isConquered ? const Color(0xFF81C784).withValues(alpha: 0.8) : trial.themeColor.withValues(alpha: 0.7),
+          width: isConquered ? 1.5 : 1.2,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -449,6 +542,32 @@ class EndgameGauntletDialog extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (isConquered)
+                  Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B5E20).withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF81C784), width: 1.0),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.emoji_events, size: 11, color: Color(0xFFFFD54F)),
+                        SizedBox(width: 3),
+                        Text(
+                          'CONQUERED',
+                          style: TextStyle(
+                            color: Color(0xFF81C784),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -579,15 +698,22 @@ class EndgameGauntletDialog extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                icon: Icon(lineageRestricted ? Icons.lock_outline : Icons.sports_kabaddi, size: 16),
+                icon: Icon(
+                  lineageRestricted
+                      ? Icons.lock_outline
+                      : (isConquered ? Icons.emoji_events : Icons.sports_kabaddi),
+                  size: 16,
+                ),
                 label: Text(
                   lineageRestricted
                       ? (isDeathlessCrypt ? 'SEPULCHRE SEALED' : 'LINEAGE SEALED')
-                      : 'ENGAGE TRIAL',
+                      : (isConquered ? 'REPLAY CONQUERED TRIAL' : 'ENGAGE TRIAL'),
                   style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: lineageRestricted ? const Color(0xFF424242) : trial.themeColor,
+                  backgroundColor: lineageRestricted
+                      ? const Color(0xFF424242)
+                      : (isConquered ? const Color(0xFF2E7D32) : trial.themeColor),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

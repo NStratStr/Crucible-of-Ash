@@ -3,6 +3,77 @@ import '../../core/combat_math.dart';
 import '../../shared/models/expedition_boon.dart';
 import 'campaign_node.dart';
 
+class ChapterTheme {
+  final int chapter;
+  final String title;
+  final String subtitle;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final Color backgroundColor;
+  final Color surfaceColor;
+  final Color pathColor;
+  final Color activePathColor;
+  final IconData chapterIcon;
+
+  const ChapterTheme({
+    required this.chapter,
+    required this.title,
+    required this.subtitle,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.backgroundColor,
+    required this.surfaceColor,
+    required this.pathColor,
+    required this.activePathColor,
+    required this.chapterIcon,
+  });
+
+  static ChapterTheme forChapter(int chapter) {
+    switch (chapter) {
+      case 2:
+        return const ChapterTheme(
+          chapter: 2,
+          title: 'CH. II: SUNKEN NECROPOLIS',
+          subtitle: 'The Submerged Tombs • Depths 0–5',
+          primaryColor: Color(0xFF00897B),
+          secondaryColor: Color(0xFF26A69A),
+          backgroundColor: Color(0xFF0A1312),
+          surfaceColor: Color(0xFF10211F),
+          pathColor: Color(0xFF1C3432),
+          activePathColor: Color(0xFF00BFA5),
+          chapterIcon: Icons.water,
+        );
+      case 3:
+        return const ChapterTheme(
+          chapter: 3,
+          title: 'CH. III: ABYSSAL RIFT',
+          subtitle: 'The Primordial Void • Depths 0–5',
+          primaryColor: Color(0xFF8E24AA),
+          secondaryColor: Color(0xFFBA68C8),
+          backgroundColor: Color(0xFF0F0B16),
+          surfaceColor: Color(0xFF1B1226),
+          pathColor: Color(0xFF2C193C),
+          activePathColor: Color(0xFFD500F9),
+          chapterIcon: Icons.dark_mode,
+        );
+      case 1:
+      default:
+        return const ChapterTheme(
+          chapter: 1,
+          title: 'CH. I: ASHEN PERIMETER',
+          subtitle: 'The Burning Outposts • Depths 0–4',
+          primaryColor: Color(0xFFB3261E),
+          secondaryColor: Color(0xFFE5A93C),
+          backgroundColor: Color(0xFF111114),
+          surfaceColor: Color(0xFF181820),
+          pathColor: Color(0xFF2B2B36),
+          activePathColor: Color(0xFFEF5350),
+          chapterIcon: Icons.local_fire_department,
+        );
+    }
+  }
+}
+
 class CampaignMapScreen extends StatelessWidget {
   final List<CampaignNode> nodes;
   final ValueChanged<CampaignNode> onSelectNode;
@@ -44,30 +115,48 @@ class CampaignMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ChapterTheme.forChapter(currentChapter);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF111114),
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF181820),
+        backgroundColor: theme.surfaceColor,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (currentChapter > 1 && onChapterChanged != null)
               IconButton(
-                icon: const Icon(Icons.arrow_left, size: 20, color: Color(0xFFE5A93C)),
+                icon: Icon(Icons.arrow_left, size: 20, color: theme.secondaryColor),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () => onChapterChanged!(currentChapter - 1),
               ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: Text(
-                chapterTitle(currentChapter),
-                style: const TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(theme.chapterIcon, size: 12, color: theme.secondaryColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        chapterTitle(currentChapter),
+                        style: const TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    theme.subtitle,
+                    style: TextStyle(letterSpacing: 0.8, color: theme.secondaryColor.withValues(alpha: 0.75), fontSize: 8),
+                  ),
+                ],
               ),
             ),
             if (currentChapter < maxUnlockedChapter && onChapterChanged != null)
               IconButton(
-                icon: const Icon(Icons.arrow_right, size: 20, color: Color(0xFFE5A93C)),
+                icon: Icon(Icons.arrow_right, size: 20, color: theme.secondaryColor),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () => onChapterChanged!(currentChapter + 1),
@@ -153,7 +242,11 @@ class CampaignMapScreen extends StatelessWidget {
               // Background Parchment Grid
               Positioned.fill(
                 child: CustomPaint(
-                  painter: _CampaignPathPainter(nodes: nodes, maxDepth: maxD),
+                  painter: _CampaignPathPainter(
+                    nodes: nodes,
+                    maxDepth: maxD,
+                    chapterTheme: theme,
+                  ),
                 ),
               ),
               // Node interactive badges
@@ -161,10 +254,13 @@ class CampaignMapScreen extends StatelessWidget {
                 // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: 0.1 to 0.9)
                 final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
                 final double y = node.verticalRatio * (mapHeight - 80) + 40;
+                final double badgeWidth = node.type == CampaignNodeType.boss ? 90.0 : 76.0;
+                final double leftPos = (x - badgeWidth / 2).clamp(4.0, (mapWidth - badgeWidth - 4.0).clamp(4.0, double.infinity));
 
                 return Positioned(
-                  left: x - 26,
-                  top: y - 26,
+                  left: leftPos,
+                  top: y - 28,
+                  width: badgeWidth,
                   child: _buildNodeBadge(context, node),
                 );
               }),
@@ -326,6 +422,9 @@ class CampaignMapScreen extends StatelessWidget {
             ),
             child: Text(
               node.name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: canTap ? Colors.white : Colors.white38,
                 fontSize: 8,
@@ -365,19 +464,42 @@ class CampaignMapScreen extends StatelessWidget {
     );
   }
 
+  static String _bossImageForChapter(int ch) {
+    switch (ch) {
+      case 2:
+        return 'assets/images/plague_occultist.jpg';
+      case 3:
+        return 'assets/images/ironclad_dreadnought.jpg';
+      case 1:
+      default:
+        return 'assets/images/flayed_butcher.jpg';
+    }
+  }
+
   void _showNodeEncounterDialog(BuildContext context, CampaignNode node) {
+    final double dialogWidth = (MediaQuery.of(context).size.width * 0.85).clamp(320.0, 480.0);
+    final theme = ChapterTheme.forChapter(currentChapter);
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF181820),
+          backgroundColor: theme.surfaceColor,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: Color(0xFFB3261E), width: 1.5),
+            side: BorderSide(
+              color: node.type == CampaignNodeType.boss ? const Color(0xFFE5A93C) : theme.primaryColor,
+              width: 1.5,
+            ),
           ),
           title: Row(
             children: [
-              Icon(_nodeIcon(node.type), color: const Color(0xFFB3261E), size: 22),
+              Icon(
+                _nodeIcon(node.type),
+                color: node.type == CampaignNodeType.boss ? const Color(0xFFE5A93C) : theme.primaryColor,
+                size: 22,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -392,114 +514,202 @@ class CampaignMapScreen extends StatelessWidget {
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                node.description,
-                style: const TextStyle(color: Color(0xFFB0B0C0), fontSize: 12),
-              ),
-              const SizedBox(height: 10),
-              // Scouted Enemy Formation details
-              if (node.isScouted && node.scoutedAffinities.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF101920),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF00ACC1), width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.visibility, color: Color(0xFF00E5FF), size: 14),
-                          SizedBox(width: 6),
-                          Text(
-                            'SCOUTED FORMATION AFFINITIES',
-                            style: TextStyle(
-                              color: Color(0xFF00E5FF),
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
-                            ),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Chapter Boss Presentation Card
+                  if (node.type == CampaignNodeType.boss) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      height: 120,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5A93C), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: node.scoutedAffinities.map((aff) {
-                          final color = _affinityColor(aff);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(3),
-                              border: Border.all(color: color, width: 0.8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Image.asset(
+                                _bossImageForChapter(currentChapter),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                              ),
                             ),
-                            child: Text(
-                              '${aff.name.toUpperCase()} (${_counterAdvice(aff)})',
-                              style: TextStyle(color: color, fontSize: 8.5, fontWeight: FontWeight.w600),
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.85),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF14141B),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF2B2B36)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+${node.rewardIchor} ICHOR',
-                      style: const TextStyle(
-                        color: Color(0xFFE5A93C),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+${node.rewardOre} ORE',
-                      style: const TextStyle(
-                        color: Color(0xFF80CBC4),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10.5,
-                      ),
-                    ),
-                    if (node.rewardSigils > 0) ...[
-                      const SizedBox(width: 10),
-                      const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '+${node.rewardSigils} SIGIL',
-                        style: const TextStyle(
-                          color: Color(0xFFFFD54F),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10.5,
+                            Positioned(
+                              bottom: 8,
+                              left: 10,
+                              right: 10,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFB3261E),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'WORLD TITAN',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Expanded(
+                                    child: Text(
+                                      'PUREBLOOD ASCENSION GATEWAY',
+                                      style: TextStyle(
+                                        color: Color(0xFFE5A93C),
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                  Text(
+                    node.description,
+                    style: const TextStyle(color: Color(0xFFB0B0C0), fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  // Scouted Enemy Formation details
+                  if (node.isScouted && node.scoutedAffinities.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF101920),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF00ACC1), width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.visibility, color: Color(0xFF00E5FF), size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'SCOUTED FORMATION AFFINITIES',
+                                style: TextStyle(
+                                  color: Color(0xFF00E5FF),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: node.scoutedAffinities.map((aff) {
+                              final color = _affinityColor(aff);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: color, width: 0.8),
+                                ),
+                                child: Text(
+                                  '${aff.name.toUpperCase()} (${_counterAdvice(aff)})',
+                                  style: TextStyle(color: color, fontSize: 8.5, fontWeight: FontWeight.w600),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14141B),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF2B2B36)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '+${node.rewardIchor} ICHOR',
+                          style: const TextStyle(
+                            color: Color(0xFFE5A93C),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '+${node.rewardOre} ORE',
+                          style: const TextStyle(
+                            color: Color(0xFF80CBC4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                        if (node.rewardSigils > 0) ...[
+                          const SizedBox(width: 10),
+                          const Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+${node.rewardSigils} SIGIL',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -508,7 +718,7 @@ class CampaignMapScreen extends StatelessWidget {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB3261E),
+                backgroundColor: node.type == CampaignNodeType.boss ? const Color(0xFFB3261E) : theme.primaryColor,
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
@@ -617,11 +827,27 @@ class CampaignMapScreen extends StatelessWidget {
 class _CampaignPathPainter extends CustomPainter {
   final List<CampaignNode> nodes;
   final double maxDepth;
+  final ChapterTheme chapterTheme;
 
-  _CampaignPathPainter({required this.nodes, this.maxDepth = 4.0});
+  _CampaignPathPainter({
+    required this.nodes,
+    this.maxDepth = 4.0,
+    required this.chapterTheme,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 1. Subtle ambient motes / particles matching the chapter's theme
+    final motePaint = Paint()..style = PaintingStyle.fill;
+    for (int i = 0; i < 16; i++) {
+      final double px = ((i * 137.5 + chapterTheme.chapter * 53) % size.width);
+      final double py = ((i * 89.3 + chapterTheme.chapter * 71) % size.height);
+      final double radius = (i % 3 == 0) ? 2.5 : 1.5;
+      final double alpha = ((i % 4) + 1) * 0.04;
+      motePaint.color = chapterTheme.secondaryColor.withValues(alpha: alpha);
+      canvas.drawCircle(Offset(px, py), radius, motePaint);
+    }
+
     final Map<String, Offset> nodePositions = {};
     final double safeMaxD = maxDepth > 0 ? maxDepth : 1.0;
 
@@ -632,12 +858,12 @@ class _CampaignPathPainter extends CustomPainter {
     }
 
     final Paint pathPaint = Paint()
-      ..color = const Color(0xFF2B2B36)
+      ..color = chapterTheme.pathColor
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
     final Paint activePathPaint = Paint()
-      ..color = const Color(0xFFB3261E).withValues(alpha: 0.6)
+      ..color = chapterTheme.activePathColor.withValues(alpha: 0.7)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
@@ -668,5 +894,8 @@ class _CampaignPathPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CampaignPathPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _CampaignPathPainter oldDelegate) =>
+      oldDelegate.chapterTheme.chapter != chapterTheme.chapter ||
+      oldDelegate.nodes != nodes ||
+      oldDelegate.maxDepth != maxDepth;
 }

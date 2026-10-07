@@ -26,6 +26,24 @@ class FloatingCombatText {
   });
 }
 
+class GeneralOrderBannerData {
+  final String generalName;
+  final String orderName;
+  final int focusCost;
+  final Color themeColor;
+  final IconData icon;
+  final String summary;
+
+  const GeneralOrderBannerData({
+    required this.generalName,
+    required this.orderName,
+    required this.focusCost,
+    required this.themeColor,
+    required this.icon,
+    required this.summary,
+  });
+}
+
 class BattleScreen extends StatefulWidget {
   final InitiativeTickManager tickManager;
   final CombatResolutionService combatService;
@@ -69,6 +87,18 @@ class _BattleScreenState extends State<BattleScreen> {
   String? _attackingUnitId;
   String? _damagedUnitId;
   String? _screenFlashType;
+  Color? _screenFlashColorOverride;
+  GeneralOrderBannerData? _activeOrderBanner;
+
+  void _addPop(String text, Color color, {bool isCrit = false}) {
+    if (!mounted) return;
+    final pop = FloatingCombatText(text: text, color: color, isCrit: isCrit);
+    setState(() => _floatingPops.add(pop));
+    final timer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _floatingPops.remove(pop));
+    });
+    _popTimers.add(timer);
+  }
 
   void _triggerAttackAnimation(String attackerId, String targetId, {String? vfx}) {
     if (!mounted) return;
@@ -76,6 +106,7 @@ class _BattleScreenState extends State<BattleScreen> {
       _attackingUnitId = attackerId;
       _damagedUnitId = targetId;
       _screenFlashType = vfx ?? 'slash';
+      _screenFlashColorOverride = null;
     });
 
     final timer = Timer(const Duration(milliseconds: 320), () {
@@ -84,6 +115,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _attackingUnitId = null;
           _damagedUnitId = null;
           _screenFlashType = null;
+          _screenFlashColorOverride = null;
         });
       }
     });
@@ -410,6 +442,10 @@ class _BattleScreenState extends State<BattleScreen> {
 
   void _dispatchOrder(GeneralOrderDefinition order) {
     _executeOrder(() {
+      final oldAllies = List<UnitEntity>.from(widget.tickManager.allies);
+      final oldEnemies = List<UnitEntity>.from(widget.tickManager.enemies);
+      final profile = widget.commandService.currentProfile;
+
       OrderResult res;
       switch (widget.commandService.activeGeneralType) {
         case GeneralType.vladislav:
@@ -468,7 +504,71 @@ class _BattleScreenState extends State<BattleScreen> {
           }
           break;
       }
-      setState(() => _combatLog = res.summary);
+
+      setState(() {
+        _combatLog = '[${profile.name.toUpperCase()}] ${order.name}: ${res.summary}';
+        _activeOrderBanner = GeneralOrderBannerData(
+          generalName: profile.name,
+          orderName: order.name,
+          focusCost: order.focusCost,
+          themeColor: profile.themeColor,
+          icon: order.icon,
+          summary: res.summary,
+        );
+        _screenFlashType = 'order';
+        _screenFlashColorOverride = profile.themeColor;
+      });
+
+      // Spawn floating pops based on delta between pre- and post-order stats
+      for (final newE in widget.tickManager.enemies) {
+        final oldE = oldEnemies.where((e) => e.id == newE.id).firstOrNull;
+        if (oldE != null) {
+          if (oldE.isAlive && !newE.isAlive) {
+            _addPop('EXECUTED', const Color(0xFFFF5252), isCrit: true);
+          } else if (oldE.currentHp > newE.currentHp) {
+            final diff = oldE.currentHp - newE.currentHp;
+            _addPop('-$diff', const Color(0xFFEF5350));
+          }
+        }
+      }
+
+      for (final newA in widget.tickManager.allies) {
+        final oldA = oldAllies.where((a) => a.id == newA.id).firstOrNull;
+        if (oldA != null) {
+          if (!oldA.isAlive && newA.isAlive) {
+            _addPop('RESURRECTED', const Color(0xFF81C784), isCrit: true);
+          } else if (newA.currentHp > oldA.currentHp) {
+            final diff = newA.currentHp - oldA.currentHp;
+            _addPop('+$diff HP', const Color(0xFF81C784));
+          }
+          if (newA.turnMeter > oldA.turnMeter && (newA.turnMeter - oldA.turnMeter) >= 25) {
+            _addPop('+TM SURGE', const Color(0xFF00E5FF));
+          }
+          if (newA.defense > oldA.defense) {
+            _addPop('+ARMOR', const Color(0xFF42A5F5));
+          }
+        }
+      }
+
+      final flashTimer = Timer(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          setState(() {
+            _screenFlashType = null;
+            _screenFlashColorOverride = null;
+          });
+        }
+      });
+      _popTimers.add(flashTimer);
+
+      final bannerTimer = Timer(const Duration(milliseconds: 1800), () {
+        if (mounted) {
+          setState(() {
+            _activeOrderBanner = null;
+          });
+        }
+      });
+      _popTimers.add(bannerTimer);
+
       if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
         widget.onVictory?.call();
       }
@@ -574,30 +674,45 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ),
             ),
-            // Full-screen Attack / Crit Strike VFX Overlay
+            // Commander Focus Order Cut-In Banner
+            if (_activeOrderBanner != null)
+              Positioned(
+                top: 75,
+                left: 16,
+                right: 16,
+                child: _buildGeneralOrderBanner(_activeOrderBanner!),
+              ),
+            // Full-screen Attack / Crit Strike / Order VFX Overlay
             if (_screenFlashType != null)
               Positioned.fill(
                 child: IgnorePointer(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     decoration: BoxDecoration(
-                      color: _screenFlashType == 'crit'
-                          ? const Color(0xFFFFD54F).withValues(alpha: 0.20)
-                          : const Color(0xFFB3261E).withValues(alpha: 0.16),
+                      color: (_screenFlashColorOverride ??
+                              (_screenFlashType == 'crit'
+                                  ? const Color(0xFFFFD54F)
+                                  : const Color(0xFFB3261E)))
+                          .withValues(alpha: 0.20),
                       border: Border.all(
-                        color: _screenFlashType == 'crit'
-                            ? const Color(0xFFFFD54F)
-                            : const Color(0xFFB3261E),
+                        color: _screenFlashColorOverride ??
+                            (_screenFlashType == 'crit'
+                                ? const Color(0xFFFFD54F)
+                                : const Color(0xFFB3261E)),
                         width: 2.5,
                       ),
                     ),
                     child: Center(
                       child: Icon(
-                        _screenFlashType == 'crit' ? Icons.flash_on : Icons.colorize,
+                        _screenFlashType == 'order'
+                            ? (_activeOrderBanner?.icon ?? Icons.flash_on)
+                            : (_screenFlashType == 'crit' ? Icons.flash_on : Icons.colorize),
                         size: 64,
-                        color: _screenFlashType == 'crit'
-                            ? const Color(0xFFFFD54F).withValues(alpha: 0.8)
-                            : const Color(0xFFEF5350).withValues(alpha: 0.7),
+                        color: (_screenFlashColorOverride ??
+                                (_screenFlashType == 'crit'
+                                    ? const Color(0xFFFFD54F)
+                                    : const Color(0xFFEF5350)))
+                            .withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -605,6 +720,83 @@ class _BattleScreenState extends State<BattleScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralOrderBanner(GeneralOrderBannerData banner) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141B).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: banner.themeColor, width: 2.0),
+        boxShadow: [
+          BoxShadow(
+            color: banner.themeColor.withValues(alpha: 0.4),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: banner.themeColor.withValues(alpha: 0.2),
+              border: Border.all(color: banner.themeColor, width: 1.5),
+            ),
+            child: Icon(banner.icon, color: banner.themeColor, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'COMMANDER ORDER: ${banner.orderName}',
+                      style: TextStyle(
+                        color: banner.themeColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5A93C), width: 1),
+                      ),
+                      child: Text(
+                        '${banner.focusCost} FOCUS',
+                        style: const TextStyle(
+                          color: Color(0xFFE5A93C),
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  banner.summary,
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

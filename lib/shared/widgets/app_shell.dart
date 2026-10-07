@@ -59,6 +59,8 @@ class _AppShellState extends State<AppShell> {
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
   CampaignNode? _activeNode;
+  final Set<EndgameTrialType> _clearedGauntletTrials = {};
+  EndgameTrialType? _activeGauntletTrial;
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
 
   @override
@@ -504,7 +506,23 @@ class _AppShellState extends State<AppShell> {
 
       final captured = _captureThrallAfterBattle(scoutedAffinities: _activeNode?.scoutedAffinities);
 
+      bool isFirstConquest = false;
+      if (_activeGauntletTrial != null) {
+        if (!_clearedGauntletTrials.contains(_activeGauntletTrial)) {
+          isFirstConquest = true;
+          _clearedGauntletTrials.add(_activeGauntletTrial!);
+          setState(() {
+            _bloodlineSigils += 1;
+            _totalIchor += 500;
+          });
+        }
+        _activeGauntletTrial = null;
+      }
+
       String extraReward = '';
+      if (isFirstConquest) {
+        extraReward += ' • FIRST CONQUEST BONUS (+1 Sigil, +500 Ichor)';
+      }
       if (sigilsReward > 0) {
         extraReward += ' • +$sigilsReward Sigil(s)';
       }
@@ -639,6 +657,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onCombatDefeat() {
+    _activeGauntletTrial = null;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -970,8 +989,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _handleOpenEndgameGauntlet() async {
-    final trial = await EndgameGauntletDialog.show(context, activeSquad: _tickManager.allies);
+    final trial = await EndgameGauntletDialog.show(
+      context,
+      activeSquad: _tickManager.allies,
+      clearedTrials: _clearedGauntletTrials,
+    );
     if (!mounted || trial == null) return;
+    _activeGauntletTrial = trial;
 
     List<UnitEntity> enemies;
     String trialName;
