@@ -171,5 +171,53 @@ void main() {
 
       expect(pureblood.generation, equals(4)); // Pureblood cap
     });
+
+    test('UnitEntity addXp levels up unit, compounds stats, and caps at maxLevel', () {
+      final unit = const UnitEntity(
+        id: 'novice_hound',
+        speciesId: 'feral_hound',
+        name: 'Novice Hound',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 1000,
+        maxHp: 1000,
+        attack: 100,
+        defense: 100,
+        speed: 100,
+        currentXp: 0,
+        nativeTraitId: 'rend',
+        lineageAncestors: const [],
+      );
+
+      expect(unit.isMaxLevel, isFalse);
+      expect(unit.xpToNextLevel, equals(100)); // Level 1 -> 100 XP
+      expect(unit.xpProgressRatio, equals(0.0));
+
+      // Add partial XP
+      final partial = unit.addXp(50);
+      expect(partial.level, equals(1));
+      expect(partial.currentXp, equals(50));
+      expect(partial.xpProgressRatio, closeTo(0.5, 0.01));
+
+      // Add enough to reach level 2 (requires 50 more)
+      final lvl2 = partial.addXp(50);
+      expect(lvl2.level, equals(2));
+      expect(lvl2.currentXp, equals(0));
+      expect(lvl2.xpToNextLevel, equals(200)); // Level 2 -> 200 XP
+      // Verify stat compounding (+10% HP, +8% ATK, +6% DEF, +2 SPD)
+      expect(lvl2.maxHp, equals(1100));
+      expect(lvl2.attack, equals(108));
+      expect(lvl2.defense, equals(106));
+      expect(lvl2.speed, equals(102));
+
+      // Level directly to max cap with massive XP
+      final maxed = lvl2.addXp(100000);
+      expect(maxed.level, equals(10));
+      expect(maxed.isMaxLevel, isTrue);
+      expect(maxed.xpProgressRatio, equals(1.0));
+    });
   });
 }

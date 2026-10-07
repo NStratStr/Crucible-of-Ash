@@ -237,6 +237,8 @@ class CampaignMapScreen extends StatelessWidget {
         return 'BIND WOUNDS';
       case CampaignNodeType.crypt:
         return 'PRY SARCOPHAGUS';
+      case CampaignNodeType.watchtower:
+        return 'SCALE OBSIDIAN SPIRE';
     }
   }
 
@@ -252,6 +254,8 @@ class CampaignMapScreen extends StatelessWidget {
         return Icons.healing;
       case CampaignNodeType.crypt:
         return Icons.vpn_key;
+      case CampaignNodeType.watchtower:
+        return Icons.visibility;
       case CampaignNodeType.boss:
         return Icons.shield;
     }

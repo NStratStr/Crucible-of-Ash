@@ -77,6 +77,30 @@ class RelicService extends ChangeNotifier {
     }
   }
 
+  /// Upgrades / Refines an existing relic (+1 to +5), increasing its base stats by 25% per tier.
+  RelicEntity upgradeRelic(String relicId) {
+    final int idx = _relics.indexWhere((r) => r.id == relicId);
+    if (idx == -1) {
+      throw ArgumentError('Relic $relicId not found.');
+    }
+    final current = _relics[idx];
+    if (!current.canUpgrade) {
+      throw StateError('Relic has reached maximum refinement tier (+5).');
+    }
+
+    final upgraded = current.copyWith(
+      upgradeLevel: current.upgradeLevel + 1,
+      bonusAttack: (current.bonusAttack * 1.25).round(),
+      bonusDefense: (current.bonusDefense * 1.25).round(),
+      bonusHp: (current.bonusHp * 1.25).round(),
+      bonusSpeed: current.bonusSpeed > 0 ? current.bonusSpeed + 2 : 0,
+    );
+
+    _relics[idx] = upgraded;
+    notifyListeners();
+    return upgraded;
+  }
+
   /// Computes all stat bonuses and active set effects for a given unit
   UnitRelicBonuses calculateBonuses(String unitId) {
     final equipped = getRelicsForUnit(unitId);

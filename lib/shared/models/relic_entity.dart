@@ -35,6 +35,7 @@ class RelicEntity {
   final double bonusCritRate;
   final String description;
   final String? equippedUnitId;
+  final int upgradeLevel; // 0 to 5
 
   const RelicEntity({
     required this.id,
@@ -49,7 +50,12 @@ class RelicEntity {
     this.bonusCritRate = 0.0,
     required this.description,
     this.equippedUnitId,
+    this.upgradeLevel = 0,
   });
+
+  String get displayName => upgradeLevel > 0 ? '$name +$upgradeLevel' : name;
+  bool get canUpgrade => upgradeLevel < 5;
+  int get upgradeCostIchor => (upgradeLevel + 1) * 75;
 
   RelicEntity copyWith({
     String? id,
@@ -65,6 +71,7 @@ class RelicEntity {
     String? description,
     String? equippedUnitId,
     bool clearEquipped = false,
+    int? upgradeLevel,
   }) {
     return RelicEntity(
       id: id ?? this.id,
@@ -79,6 +86,7 @@ class RelicEntity {
       bonusCritRate: bonusCritRate ?? this.bonusCritRate,
       description: description ?? this.description,
       equippedUnitId: clearEquipped ? null : (equippedUnitId ?? this.equippedUnitId),
+      upgradeLevel: upgradeLevel ?? this.upgradeLevel,
     );
   }
 

@@ -32,8 +32,8 @@ void main() {
     await tester.tap(find.text('Feral War-Hound Alpha').first);
     await tester.pumpAndSettle();
 
-    // Verify modal appeared with combat attributes and affinity matchup
+    // Verify modal appeared with level progression and affinity matchup
     expect(find.text('HEXAGONAL AFFINITY MATCHUP'), findsOneWidget);
-    expect(find.text('COMBAT ATTRIBUTES'), findsOneWidget);
+    expect(find.text('LEVEL PROGRESSION'), findsOneWidget);
   });
 }

@@ -6,6 +6,8 @@ import '../../features/campaign/campaign_map_generator.dart';
 import '../../features/campaign/campaign_map_screen.dart';
 import '../../features/campaign/campaign_node.dart';
 import '../../features/campaign/defiled_crypt_dialog.dart';
+import '../../features/campaign/rest_haven_dialog.dart';
+import '../../features/campaign/watchtower_dialog.dart';
 import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
@@ -114,15 +116,41 @@ class _AppShellState extends State<AppShell> {
     } else if (node.type == CampaignNodeType.crypt) {
       _handleDefiledCryptNode(node);
     } else if (node.type == CampaignNodeType.restHaven) {
-      _healSquad();
-      _markNodeCompleted(node.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Haven reached: Squad restored to full vitality!'),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
+      _handleRestHavenNode(node);
+    } else if (node.type == CampaignNodeType.watchtower) {
+      _handleWatchtowerNode(node);
     }
+  }
+
+  void _handleRestHavenNode(CampaignNode node) {
+    RestHavenDialog.show(
+      context: context,
+      node: node,
+      onHealSquad: _healSquad,
+      relicService: _relicService,
+      onGrantXp: () => _grantBrigadeXp(400),
+      onDismiss: () => _markNodeCompleted(node.id),
+    );
+  }
+
+  void _handleWatchtowerNode(CampaignNode node) {
+    WatchtowerDialog.show(
+      context: context,
+      node: node,
+      relicService: _relicService,
+      commandService: _commandService,
+      onGainIchor: (amount) => setState(() => _totalIchor += amount),
+      onDismiss: () => _markNodeCompleted(node.id),
+    );
+  }
+
+  void _grantBrigadeXp(int amount) {
+    final leveled = _tickManager.allies.map((u) => u.addXp(amount)).toList();
+    _tickManager.consumeTurn(
+      retainedOverflow: true,
+      updatedAllies: leveled,
+      autoResume: false,
+    );
   }
 
   Future<void> _handleBloodAltarNode(CampaignNode node) async {
@@ -255,6 +283,11 @@ class _AppShellState extends State<AppShell> {
   void _onCombatVictory() {
     if (_activeNode != null) {
       final reward = _activeNode!.rewardIchor;
+      final xpReward = _activeNode!.type == CampaignNodeType.boss
+          ? 1000
+          : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250);
+      _grantBrigadeXp(xpReward);
+
       setState(() {
         _totalIchor += reward;
       });
@@ -264,15 +297,15 @@ class _AppShellState extends State<AppShell> {
       String extraReward = '';
       if (_activeNode!.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
-        extraReward = ' • Dropped ${drop.name}!';
+        extraReward = ' • Dropped ${drop.displayName}!';
       } else if (_activeNode!.type == CampaignNodeType.boss) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
-        extraReward = ' • LEGENDARY DROP: ${drop.name}!';
+        extraReward = ' • LEGENDARY DROP: ${drop.displayName}!';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('EXPEDITION VICTORY! +$reward Ichor, Captured Thrall bound$extraReward'),
+          content: Text('EXPEDITION VICTORY! +$reward Ichor, +$xpReward XP, Captured Thrall bound$extraReward'),
           backgroundColor: const Color(0xFF1B5E20),
           duration: const Duration(seconds: 4),
         ),
@@ -288,13 +321,13 @@ class _AppShellState extends State<AppShell> {
       generation: 1,
       archetype: Archetype.juggernaut,
       slot: FormationSlot.front1,
-      level: 10,
+      level: 1,
       maxLevel: 10,
-      currentHp: 750,
-      maxHp: 750,
-      attack: 140,
-      defense: 110,
-      speed: 105,
+      currentHp: 650,
+      maxHp: 650,
+      attack: 110,
+      defense: 95,
+      speed: 100,
       nativeTraitId: 'rend_flesh',
       lineageAncestors: const [],
     );

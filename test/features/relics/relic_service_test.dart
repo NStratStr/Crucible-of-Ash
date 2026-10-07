@@ -99,5 +99,28 @@ void main() {
       expect(forged.id, isNotEmpty);
       expect(forged.name, isNotEmpty);
     });
+
+    test('Refining and upgrading a relic scales stats by +25% per tier and caps at +5', () {
+      final initialRelic = relicService.allRelics.firstWhere((r) => r.id == 'test_blade');
+      expect(initialRelic.upgradeLevel, equals(0));
+      expect(initialRelic.bonusAttack, equals(50));
+
+      // Upgrade to +1
+      final upgraded1 = relicService.upgradeRelic('test_blade');
+      expect(upgraded1.upgradeLevel, equals(1));
+      expect(upgraded1.displayName, equals('Vampire Blade +1'));
+      expect(upgraded1.bonusAttack, equals((50 * 1.25).round())); // 63
+
+      // Upgrade to +5
+      relicService.upgradeRelic('test_blade'); // +2
+      relicService.upgradeRelic('test_blade'); // +3
+      relicService.upgradeRelic('test_blade'); // +4
+      final upgraded5 = relicService.upgradeRelic('test_blade'); // +5
+      expect(upgraded5.upgradeLevel, equals(5));
+      expect(upgraded5.canUpgrade, isFalse);
+
+      // Attempting to upgrade beyond +5 throws StateError
+      expect(() => relicService.upgradeRelic('test_blade'), throwsStateError);
+    });
   });
 }

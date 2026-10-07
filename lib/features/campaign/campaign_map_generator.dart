@@ -68,7 +68,7 @@ class CampaignMapGenerator {
         type: CampaignNodeType.elite,
         name: 'Abyssal Juggernaut',
         description: 'Heavily armored titan wielding an iron slab.',
-        nextNodeIds: ['node_3_a'],
+        nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 350,
       ),
       const CampaignNode(
@@ -78,20 +78,30 @@ class CampaignMapGenerator {
         type: CampaignNodeType.skirmish,
         name: 'Ravenwood Thicket',
         description: 'Flock of winged skirmishers swooping low.',
-        nextNodeIds: ['node_3_a'],
+        nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 180,
       ),
 
-      // Depth 3: Sanctuary Threshold
+      // Depth 3: Sanctuary or Scouting Spire
       const CampaignNode(
         id: 'node_3_a',
         depth: 3,
-        verticalRatio: 0.50,
+        verticalRatio: 0.35,
         type: CampaignNodeType.restHaven,
         name: 'Smoldering Haven',
-        description: 'Rest threshold to bind wounds before the colossus.',
+        description: 'Rest threshold to bind wounds or refine armaments.',
         nextNodeIds: ['node_4_boss'],
         rewardIchor: 100,
+      ),
+      const CampaignNode(
+        id: 'node_3_b',
+        depth: 3,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.watchtower,
+        name: 'Obsidian Spire',
+        description: 'Scout upcoming Titan weak points or harvest supplies.',
+        nextNodeIds: ['node_4_boss'],
+        rewardIchor: 150,
       ),
 
       // Depth 4: Chapter Gatekeeper Boss

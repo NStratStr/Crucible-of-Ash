@@ -4,8 +4,9 @@ enum CampaignNodeType {
   skirmish,    // Standard brigade fight
   elite,       // Dangerous elite monster
   altar,       // Sacrifice HP for stat buff
-  restHaven,   // Heal squad HP
+  restHaven,   // Heal squad HP or upgrade relic
   crypt,       // Narrative mystery event
+  watchtower,  // Scout upcoming tiers and reveal enemy affinities
   boss,        // Chapter World Titan
 }
 

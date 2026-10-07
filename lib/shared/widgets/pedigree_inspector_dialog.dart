@@ -213,7 +213,94 @@ class PedigreeInspectorDialog extends StatelessWidget {
                     showStats: false,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+
+                // Section 0.5: Generational Progression & XP Bar
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF181820),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: unit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF2B2B36),
+                      width: unit.isMaxLevel ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                unit.isMaxLevel ? Icons.stars : Icons.military_tech,
+                                color: unit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF64B5F6),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'LEVEL PROGRESSION',
+                                style: TextStyle(
+                                  color: unit.isMaxLevel ? const Color(0xFFE5A93C) : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            unit.isMaxLevel ? 'MAX LEVEL' : 'Lv. ${unit.level}/${unit.maxLevel}',
+                            style: TextStyle(
+                              color: unit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF64B5F6),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: unit.xpProgressRatio,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFF2B2B36),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            unit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF1976D2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            unit.isMaxLevel
+                                ? 'Full 10% Parental Stat Transfer Unlocked!'
+                                : '${unit.currentXp} / ${unit.xpToNextLevel} XP',
+                            style: TextStyle(
+                              color: unit.isMaxLevel ? const Color(0xFF81C784) : const Color(0xFF8E8EA0),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            unit.isMaxLevel ? '10% INHERITANCE' : '5% (PREMATURE)',
+                            style: TextStyle(
+                              color: unit.isMaxLevel ? const Color(0xFFE5A93C) : Colors.white38,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
 
                 // Section 1: Affinity Wheel Matchup
                 _buildSectionHeader('HEXAGONAL AFFINITY MATCHUP', Icons.sync_alt),

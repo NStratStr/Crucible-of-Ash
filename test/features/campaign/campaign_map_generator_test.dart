@@ -28,5 +28,19 @@ void main() {
       expect(bossNode.depth, equals(4));
       expect(bossNode.nextNodeIds.isEmpty, isTrue);
     });
+
+    test('Campaign includes both Rest Haven and Watchtower scouting nodes at Depth 3', () {
+      final nodes = CampaignMapGenerator.generateCuratedCampaign();
+      final depth3Nodes = nodes.where((n) => n.depth == 3).toList();
+
+      expect(depth3Nodes.length, equals(2));
+      expect(depth3Nodes.any((n) => n.type == CampaignNodeType.restHaven), isTrue);
+      expect(depth3Nodes.any((n) => n.type == CampaignNodeType.watchtower), isTrue);
+
+      // Both branch into boss
+      for (final n in depth3Nodes) {
+        expect(n.nextNodeIds, contains('node_4_boss'));
+      }
+    });
   });
 }

@@ -39,6 +39,7 @@ class UnitEntity {
   final String? graftedTraitId;
   final List<String> lineageAncestors;
   final String? customAvatarAsset;
+  final int currentXp;
 
   const UnitEntity({
     required this.id,
@@ -64,7 +65,50 @@ class UnitEntity {
     this.graftedTraitId,
     required this.lineageAncestors,
     this.customAvatarAsset,
+    this.currentXp = 0,
   });
+
+  bool get isMaxLevel => level >= maxLevel;
+  int get xpToNextLevel => level * 100;
+  double get xpProgressRatio => isMaxLevel ? 1.0 : (currentXp / xpToNextLevel).clamp(0.0, 1.0);
+
+  /// Grants XP to the unit, computing any level-up threshold crossings and compounding stat gains.
+  UnitEntity addXp(int xpGained) {
+    if (isMaxLevel) return this;
+
+    int newXp = currentXp + xpGained;
+    int newLevel = level;
+    int newMaxHp = maxHp;
+    int newHp = currentHp;
+    int newAtk = attack;
+    int newDef = defense;
+    int newSpd = speed;
+
+    while (newLevel < maxLevel && newXp >= (newLevel * 100)) {
+      newXp -= (newLevel * 100);
+      newLevel += 1;
+      final hpGain = (newMaxHp * 0.10).round().clamp(15, 200);
+      newMaxHp += hpGain;
+      newHp += hpGain;
+      newAtk += (newAtk * 0.08).round().clamp(5, 50);
+      newDef += (newDef * 0.06).round().clamp(4, 40);
+      newSpd += 2;
+    }
+
+    if (newLevel >= maxLevel) {
+      newXp = 0;
+    }
+
+    return copyWith(
+      level: newLevel,
+      currentXp: newXp,
+      maxHp: newMaxHp,
+      currentHp: newHp,
+      attack: newAtk,
+      defense: newDef,
+      speed: newSpd,
+    );
+  }
 
   String get effectiveAvatarAsset {
     if (customAvatarAsset != null) return customAvatarAsset!;
@@ -276,6 +320,7 @@ class UnitEntity {
     String? graftedTraitId,
     FormationSlot? slot,
     String? customAvatarAsset,
+    int? currentXp,
   }) {
     return UnitEntity(
       id: id,
@@ -301,6 +346,7 @@ class UnitEntity {
       graftedTraitId: graftedTraitId ?? this.graftedTraitId,
       lineageAncestors: lineageAncestors,
       customAvatarAsset: customAvatarAsset ?? this.customAvatarAsset,
+      currentXp: currentXp ?? this.currentXp,
     );
   }
 }
