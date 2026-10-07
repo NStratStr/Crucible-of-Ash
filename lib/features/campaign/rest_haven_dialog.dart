@@ -71,161 +71,174 @@ class RestHavenDialog extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final dialogWidth = (screenWidth * 0.85).clamp(320.0, 480.0);
 
-    return AlertDialog(
+    return Dialog(
       backgroundColor: const Color(0xFF131318),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFF43A047), width: 2),
       ),
-      title: const Row(
-        children: [
-          Icon(Icons.healing, color: Color(0xFF81C784), size: 24),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'SANCTIFIED REST HAVEN',
-              style: TextStyle(
-                color: Color(0xFF81C784),
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: dialogWidth,
-        child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogWidth),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  height: 120,
-                  width: dialogWidth,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        'assets/images/bone_campfire.jpg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF1A241C),
-                          child: const Center(
-                            child: Icon(Icons.fireplace, color: Color(0xFF81C784), size: 48),
-                          ),
-                        ),
+              const Row(
+                children: [
+                  Icon(Icons.healing, color: Color(0xFF81C784), size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'SANCTIFIED REST HAVEN',
+                      style: TextStyle(
+                        color: Color(0xFF81C784),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 14,
                       ),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFF43A047).withValues(alpha: 0.6), width: 1.2),
-                          borderRadius: BorderRadius.circular(8),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          height: 120,
+                          width: dialogWidth,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.asset(
+                                'assets/images/bone_campfire.jpg',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: const Color(0xFF1A241C),
+                                  child: const Center(
+                                    child: Icon(Icons.fireplace, color: Color(0xFF81C784), size: 48),
+                                  ),
+                                ),
+                              ),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFF43A047).withValues(alpha: 0.6), width: 1.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.75),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Positioned(
+                                bottom: 8,
+                                left: 10,
+                                child: Text(
+                                  'CONSECRATED BONE PYRE',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5A93C),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
-                      const Positioned(
-                        bottom: 8,
-                        left: 10,
-                        child: Text(
-                          'CONSECRATED BONE PYRE',
-                          style: TextStyle(
-                            color: Color(0xFFE5A93C),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
-                          ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A241C),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.5)),
                         ),
+                        child: const Text(
+                          'The brigade halts within a hollowed sanctuary. Cold mist recedes before an altar of consecrated embers. '
+                          'Choose how your weary warriors prepare for the trials ahead.',
+                          style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'HAVEN RITES:',
+                        style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Choice 1: Communion of Blood (Heal Squad)
+                      _buildChoiceButton(
+                        icon: Icons.favorite,
+                        color: const Color(0xFF81C784),
+                        title: 'Communion of Blood',
+                        subtitle: 'Bind mortal wounds: Restore 40% HP to all active brigade vessels.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          onHealSquad();
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vessel wounds bound: +40% HP restored to Brigade!'),
+                              backgroundColor: Color(0xFF1B5E20),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 2: Anvil of Refinement (Upgrade Relic)
+                      _buildChoiceButton(
+                        icon: Icons.hardware,
+                        color: const Color(0xFFE5A93C),
+                        title: 'Anvil of Refinement',
+                        subtitle: 'Hone equipped weaponry: Upgrade 1 equipped relic by +1 refinement tier (+25% stats).',
+                        onTap: () => _upgradeFirstEquippedRelic(context),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 3: Infuse Lineage (Grant XP)
+                      _buildChoiceButton(
+                        icon: Icons.auto_awesome,
+                        color: const Color(0xFF64B5F6),
+                        title: 'Meditative Crucible',
+                        subtitle: 'Focus martial discipline: Award +400 XP to all active brigade vessels.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          onGrantXp();
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Martial focus awakened: +400 XP granted to Brigade!'),
+                              backgroundColor: Color(0xFF0D47A1),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
               ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A241C),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.5)),
-              ),
-              child: const Text(
-                'The brigade halts within a hollowed sanctuary. Cold mist recedes before an altar of consecrated embers. '
-                'Choose how your weary warriors prepare for the trials ahead.',
-                style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'HAVEN RITES:',
-              style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-
-            // Choice 1: Communion of Blood (Heal Squad)
-            _buildChoiceButton(
-              icon: Icons.favorite,
-              color: const Color(0xFF81C784),
-              title: 'Communion of Blood',
-              subtitle: 'Bind mortal wounds: Restore 40% HP to all active brigade vessels.',
-              onTap: () {
-                Navigator.pop(context);
-                onHealSquad();
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vessel wounds bound: +40% HP restored to Brigade!'),
-                    backgroundColor: Color(0xFF1B5E20),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 2: Anvil of Refinement (Upgrade Relic)
-            _buildChoiceButton(
-              icon: Icons.hardware,
-              color: const Color(0xFFE5A93C),
-              title: 'Anvil of Refinement',
-              subtitle: 'Hone equipped weaponry: Upgrade 1 equipped relic by +1 refinement tier (+25% stats).',
-              onTap: () => _upgradeFirstEquippedRelic(context),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 3: Infuse Lineage (Grant XP)
-            _buildChoiceButton(
-              icon: Icons.auto_awesome,
-              color: const Color(0xFF64B5F6),
-              title: 'Meditative Crucible',
-              subtitle: 'Focus martial discipline: Award +400 XP to all active brigade vessels.',
-              onTap: () {
-                Navigator.pop(context);
-                onGrantXp();
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Martial focus awakened: +400 XP granted to Brigade!'),
-                    backgroundColor: Color(0xFF0D47A1),
-                  ),
-                );
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
 }
 
   Widget _buildChoiceButton({

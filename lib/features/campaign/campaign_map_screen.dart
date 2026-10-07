@@ -483,7 +483,7 @@ class CampaignMapScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
+        return Dialog(
           backgroundColor: theme.surfaceColor,
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           shape: RoundedRectangleBorder(
@@ -493,34 +493,42 @@ class CampaignMapScreen extends StatelessWidget {
               width: 1.5,
             ),
           ),
-          title: Row(
-            children: [
-              Icon(
-                _nodeIcon(node.type),
-                color: node.type == CampaignNodeType.boss ? const Color(0xFFE5A93C) : theme.primaryColor,
-                size: 22,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  node.name.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: dialogWidth,
-            child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: dialogWidth),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _nodeIcon(node.type),
+                        color: node.type == CampaignNodeType.boss ? const Color(0xFFE5A93C) : theme.primaryColor,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          node.name.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                   // Chapter Boss Presentation Card
                   if (node.type == CampaignNodeType.boss) ...[
                     Container(
@@ -707,30 +715,39 @@ class CampaignMapScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('RETREAT', style: TextStyle(color: Colors.white54)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: node.type == CampaignNodeType.boss ? const Color(0xFFB3261E) : theme.primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onSelectNode(node);
+                        },
+                        child: Text(
+                          _actionLabel(node.type),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('RETREAT', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: node.type == CampaignNodeType.boss ? const Color(0xFFB3261E) : theme.primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                onSelectNode(node);
-              },
-              child: Text(
-                _actionLabel(node.type),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
         );
       },
     );

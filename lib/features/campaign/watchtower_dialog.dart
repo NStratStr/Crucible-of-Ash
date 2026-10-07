@@ -54,163 +54,176 @@ class WatchtowerDialog extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final dialogWidth = (screenWidth * 0.85).clamp(320.0, 480.0);
 
-    return AlertDialog(
+    return Dialog(
       backgroundColor: const Color(0xFF131318),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFF00ACC1), width: 2),
       ),
-      title: const Row(
-        children: [
-          Icon(Icons.visibility, color: Color(0xFF00E5FF), size: 24),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'OBSIDIAN WATCHTOWER',
-              style: TextStyle(
-                color: Color(0xFF00E5FF),
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: dialogWidth,
-        child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogWidth),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF142426),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF00838F).withValues(alpha: 0.5)),
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.visibility, color: Color(0xFF00E5FF), size: 24),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'OBSIDIAN WATCHTOWER',
+                      style: TextStyle(
+                        color: Color(0xFF00E5FF),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text(
-                'Perched upon a spire of volcanic glass, your scouts peer through the creeping gloom. '
-                'The formations of the advancing horde are laid bare. Direct your vantage point.',
-                style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
+              const SizedBox(height: 14),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF142426),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF00838F).withValues(alpha: 0.5)),
+                        ),
+                        child: const Text(
+                          'Perched upon a spire of volcanic glass, your scouts peer through the creeping gloom. '
+                          'The formations of the advancing horde are laid bare. Direct your vantage point.',
+                          style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'SCOUTING OBJECTIVES:',
+                        style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Choice 1: Deploy Reconnaissance (Reveal Affinities)
+                      _buildChoiceButton(
+                        icon: Icons.travel_explore,
+                        color: const Color(0xFF00E5FF),
+                        title: 'Deploy Forward Reconnaissance',
+                        subtitle: 'Clear Fog of War across upcoming tiers to unmask enemy brigade affinities and roles.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          onScoutForwardNodes?.call();
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Scouts deployed: Upcoming enemy brigade affinities unmasked!'),
+                              backgroundColor: Color(0xFF006064),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 2: Excavate Cursed Ore Vein (+60 Cursed Ore)
+                      _buildChoiceButton(
+                        icon: Icons.diamond_outlined,
+                        color: const Color(0xFF26A69A),
+                        title: 'Excavate Cursed Ore Vein',
+                        subtitle: 'Mine volcanic metallic ore: Harvest +60 Cursed Ore for Relic Forging.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          onGainOre?.call(60);
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Volcanic vein mined: Harvested +60 Cursed Ore!'),
+                              backgroundColor: Color(0xFF004D40),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 3: Chart Enemy Blindspots (+250 Ichor)
+                      _buildChoiceButton(
+                        icon: Icons.radar,
+                        color: const Color(0xFF4FC3F7),
+                        title: 'Chart Enemy Blindspots',
+                        subtitle: 'Extract tactical routes: Harvest +250 Ichor from mapped supply veins.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          onGainIchor(250);
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Tactical routes mapped: Harvested +250 Ichor!'),
+                              backgroundColor: Color(0xFF006064),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 4: Signal the Commander (Gain +1 Focus)
+                      _buildChoiceButton(
+                        icon: Icons.shield_moon,
+                        color: const Color(0xFFE5A93C),
+                        title: 'War Horn of Command',
+                        subtitle: 'Sound the signal: Banks +1 Command Focus for the General before the next battle.',
+                        onTap: () {
+                          Navigator.pop(context);
+                          commandService.registerCombatDamage(500); // Guarantees +1 Focus
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('War horn sounded: General gained +1 Command Focus!'),
+                              backgroundColor: Color(0xFF4527A0),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Choice 5: Plunder Spire Armory (Forge Rare Relic)
+                      _buildChoiceButton(
+                        icon: Icons.inventory_2,
+                        color: const Color(0xFFAB47BC),
+                        title: 'Plunder Spire Armory',
+                        subtitle: 'Unseal the garrison lockbox: Claim a Rare Armament Relic.',
+                        onTap: () {
+                          final drop = relicService.forgeRandomRelic(rarity: RelicRarity.rare);
+                          Navigator.pop(context);
+                          onDismiss();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Armory unsealed: Recovered ${drop.displayName}!'),
+                              backgroundColor: const Color(0xFF4A148C),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'SCOUTING OBJECTIVES:',
-              style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-
-            // Choice 1: Deploy Reconnaissance (Reveal Affinities)
-            _buildChoiceButton(
-              icon: Icons.travel_explore,
-              color: const Color(0xFF00E5FF),
-              title: 'Deploy Forward Reconnaissance',
-              subtitle: 'Clear Fog of War across upcoming tiers to unmask enemy brigade affinities and roles.',
-              onTap: () {
-                Navigator.pop(context);
-                onScoutForwardNodes?.call();
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Scouts deployed: Upcoming enemy brigade affinities unmasked!'),
-                    backgroundColor: Color(0xFF006064),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 2: Excavate Cursed Ore Vein (+60 Cursed Ore)
-            _buildChoiceButton(
-              icon: Icons.diamond_outlined,
-              color: const Color(0xFF26A69A),
-              title: 'Excavate Cursed Ore Vein',
-              subtitle: 'Mine volcanic metallic ore: Harvest +60 Cursed Ore for Relic Forging.',
-              onTap: () {
-                Navigator.pop(context);
-                onGainOre?.call(60);
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Volcanic vein mined: Harvested +60 Cursed Ore!'),
-                    backgroundColor: Color(0xFF004D40),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 3: Chart Enemy Blindspots (+250 Ichor)
-            _buildChoiceButton(
-              icon: Icons.radar,
-              color: const Color(0xFF4FC3F7),
-              title: 'Chart Enemy Blindspots',
-              subtitle: 'Extract tactical routes: Harvest +250 Ichor from mapped supply veins.',
-              onTap: () {
-                Navigator.pop(context);
-                onGainIchor(250);
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Tactical routes mapped: Harvested +250 Ichor!'),
-                    backgroundColor: Color(0xFF006064),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 4: Signal the Commander (Gain +1 Focus)
-            _buildChoiceButton(
-              icon: Icons.shield_moon,
-              color: const Color(0xFFE5A93C),
-              title: 'War Horn of Command',
-              subtitle: 'Sound the signal: Banks +1 Command Focus for the General before the next battle.',
-              onTap: () {
-                Navigator.pop(context);
-                commandService.registerCombatDamage(500); // Guarantees +1 Focus
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('War horn sounded: General gained +1 Command Focus!'),
-                    backgroundColor: Color(0xFF4527A0),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Choice 5: Plunder Spire Armory (Forge Rare Relic)
-            _buildChoiceButton(
-              icon: Icons.inventory_2,
-              color: const Color(0xFFAB47BC),
-              title: 'Plunder Spire Armory',
-              subtitle: 'Unseal the garrison lockbox: Claim a Rare Armament Relic.',
-              onTap: () {
-                final drop = relicService.forgeRandomRelic(rarity: RelicRarity.rare);
-                Navigator.pop(context);
-                onDismiss();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Armory unsealed: Recovered ${drop.displayName}!'),
-                    backgroundColor: const Color(0xFF4A148C),
-                  ),
-                );
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
 }
 
   Widget _buildChoiceButton({
