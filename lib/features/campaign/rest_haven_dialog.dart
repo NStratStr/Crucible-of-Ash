@@ -68,6 +68,9 @@ class RestHavenDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final dialogWidth = (screenWidth * 0.85).clamp(320.0, 480.0);
+
     return AlertDialog(
       backgroundColor: const Color(0xFF131318),
       shape: RoundedRectangleBorder(
@@ -91,54 +94,62 @@ class RestHavenDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Stack(
-                children: [
-                  Image.asset(
-                    'assets/images/bone_campfire.jpg',
-                    height: 120,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF43A047).withValues(alpha: 0.6), width: 1.2),
-                        borderRadius: BorderRadius.circular(8),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.75),
-                          ],
+      content: SizedBox(
+        width: dialogWidth,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  height: 120,
+                  width: dialogWidth,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        'assets/images/bone_campfire.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF1A241C),
+                          child: const Center(
+                            child: Icon(Icons.fireplace, color: Color(0xFF81C784), size: 48),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const Positioned(
-                    bottom: 8,
-                    left: 10,
-                    child: Text(
-                      'CONSECRATED BONE PYRE',
-                      style: TextStyle(
-                        color: Color(0xFFE5A93C),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF43A047).withValues(alpha: 0.6), width: 1.2),
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.75),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                      const Positioned(
+                        bottom: 8,
+                        left: 10,
+                        child: Text(
+                          'CONSECRATED BONE PYRE',
+                          style: TextStyle(
+                            color: Color(0xFFE5A93C),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -213,8 +224,9 @@ class RestHavenDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildChoiceButton({
     required IconData icon,

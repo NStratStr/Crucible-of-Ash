@@ -51,6 +51,9 @@ class WatchtowerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final dialogWidth = (screenWidth * 0.85).clamp(320.0, 480.0);
+
     return AlertDialog(
       backgroundColor: const Color(0xFF131318),
       shape: RoundedRectangleBorder(
@@ -74,10 +77,12 @@ class WatchtowerDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      content: SizedBox(
+        width: dialogWidth,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
@@ -204,8 +209,9 @@ class WatchtowerDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildChoiceButton({
     required IconData icon,

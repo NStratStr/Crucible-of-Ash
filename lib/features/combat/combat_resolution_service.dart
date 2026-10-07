@@ -191,13 +191,19 @@ class CombatResolutionService {
 
     // Decrement durations on active effects
     final bool wasStunned = currentUnit.isStunned;
+    // Rebind Flesh thralls collapse once their final Decaying turn elapses
+    final bool decayExpired = currentUnit.activeEffects
+        .any((e) => e.type == StatusEffectType.decaying && e.durationTurns <= 1);
     final updatedEffects = currentUnit.activeEffects
         .map((e) => StatusEffect(type: e.type, durationTurns: e.durationTurns - 1, value: e.value))
         .where((e) => e.durationTurns > 0)
         .toList();
 
     // Calculate final HP
-    final int netHp = (currentUnit.currentHp + healAmount - dotDamage).clamp(0, currentUnit.maxHp);
+    final int netHp = decayExpired
+        ? 0
+        : (currentUnit.currentHp + healAmount - dotDamage).clamp(0, currentUnit.maxHp);
+    if (decayExpired) triggeredTraits.add('decay_collapse');
     final updatedUnit = currentUnit.copyWith(
       currentHp: netHp,
       activeEffects: updatedEffects,
@@ -240,7 +246,9 @@ class CombatResolutionService {
         dotDamage: dotDamage,
         healAmount: healAmount,
         isDefeated: true,
-        message: '${currentUnit.name} succumbed to internal rot and wounds!',
+        message: decayExpired
+            ? '${currentUnit.name}\'s rebound flesh crumbles back into the grave!'
+            : '${currentUnit.name} succumbed to internal rot and wounds!',
         triggeredTraits: triggeredTraits,
       );
     }
@@ -298,6 +306,11 @@ class CombatResolutionService {
     final bool attackerIsAlly = tickManager.allies.any((u) => u.id == attacker.id);
     final List<UnitEntity> opposingSquad = attackerIsAlly ? tickManager.enemies : tickManager.allies;
     final List<UnitEntity> friendlySquad = attackerIsAlly ? tickManager.allies : tickManager.enemies;
+
+    // Remember the ally's last (non-Limit-Burst) action for Echoing Hourglass replays
+    if (attackerIsAlly && !skill.isLimitBurst) {
+      commandService?.recordUnitAction(attacker.id, skill, targetUnitId);
+    }
 
     // Healing / Friendly skill
     if (skill.targetType == SkillTargetType.singleAlly || skill.damageCoefficient == 0.0) {

@@ -1743,6 +1743,8 @@ class _BattleScreenState extends State<BattleScreen> {
         return const Color(0xFF1E88E5);
       case StatusEffectType.speedUp:
         return const Color(0xFF00ACC1);
+      case StatusEffectType.decaying:
+        return const Color(0xFF8D6E63);
     }
   }
 
@@ -1758,6 +1760,8 @@ class _BattleScreenState extends State<BattleScreen> {
         return 'ARM';
       case StatusEffectType.speedUp:
         return 'SPD';
+      case StatusEffectType.decaying:
+        return 'ROT';
     }
   }
 }

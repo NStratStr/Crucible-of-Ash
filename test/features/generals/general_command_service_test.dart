@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
-import 'package:ashen_crucible/shared/models/unit_entity.dart';
+import 'package:ashen_crucible/features/combat/combat_resolution_service.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/features/generals/general_command_service.dart';
+import 'package:ashen_crucible/shared/models/skill_entity.dart';
+import 'package:ashen_crucible/shared/models/unit_entity.dart';
 
 UnitEntity createTestUnit({
   required String id,
@@ -249,22 +251,150 @@ void main() {
       expect(res.updatedAllies[1].turnMeter, equals(100.0));
     });
 
-    test('Morrigan: Unravel Hex cleanses allies and shreds enemy armor at Rank 2', () {
-      commandService.setActiveGeneral(GeneralType.morrigan);
-      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 2
-      commandService.grantFocus(2);
+    test('Morrigan: Unravel Hex purges enemy buffs (Armor Up, Haste) and shreds 30% Armor', () {
+      final buffedBoss = enemyBoss.copyWith(
+        defense: 100,
+        activeEffects: const [
+          StatusEffect(type: StatusEffectType.defenseUp, durationTurns: 2),
+          StatusEffect(type: StatusEffectType.speedUp, durationTurns: 2),
+        ],
+      );
+      tickManager = InitiativeTickManager(
+        initialAllies: [vanguardHero, arcanumHero],
+        initialEnemies: [buffedBoss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.morrigan,
+        initialFocus: 2,
+        initialPhylacteryRanks: {GeneralType.morrigan: 2},
+      );
+
       final res = commandService.executeUnravelHex();
-      expect(res.updatedEnemies.first.defense, equals(56)); // 80 - 30% (24) = 56
+      expect(res.updatedEnemies.first.defense, equals(70)); // 100 - 30% = 70
+      expect(res.updatedEnemies.first.activeEffects.isEmpty, isTrue);
+      expect(res.summary, contains('Stripped 2 enemy buff(s)'));
     });
 
-    test('Morrigan: Echoing Hourglass grants +40% TM to team at Rank 3', () {
-      commandService.setActiveGeneral(GeneralType.morrigan);
-      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 2
-      commandService.upgradePhylactery(GeneralType.morrigan); // Rank 3
-      commandService.grantFocus(3);
+    test('Morrigan: Echoing Hourglass replays backline Arcanum ally last action for free', () {
+      final boss = enemyBoss.copyWith(currentHp: 2000, defense: 0);
+      tickManager = InitiativeTickManager(
+        initialAllies: [vanguardHero, arcanumHero],
+        initialEnemies: [boss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.morrigan,
+        initialFocus: 3,
+        initialPhylacteryRanks: {GeneralType.morrigan: 3},
+      );
+
+      // Record Arcanum ally's last action (Shadow Bolt with 1.5x coefficient)
+      commandService.recordUnitAction(
+        arcanumHero.id,
+        const SkillEntity(
+          id: 'mystic_bolt',
+          name: 'Mystic Bolt',
+          description: 'Arcane blast',
+          damageCoefficient: 1.5,
+        ),
+        'enemy_boss',
+      );
+
       final res = commandService.executeEchoingHourglass();
-      expect(res.updatedAllies[0].turnMeter, equals(40.0));
-      expect(res.updatedAllies[1].turnMeter, equals(40.0));
+      expect(res.summary, contains('Mystic Bolt'));
+      // Arcanum Hero ATK = 150 * 1.5 = 225 damage dealt
+      expect(res.updatedEnemies.first.currentHp, lessThan(2000));
+    });
+
+    test('Malakor: Corpse Burst detonates intact corpse for 140 + 20% corpse HP and marks it consumed', () {
+      final deadTank = vanguardHero.copyWith(currentHp: 0, maxHp: 1000);
+      tickManager = InitiativeTickManager(
+        initialAllies: [deadTank, arcanumHero],
+        initialEnemies: [enemyBoss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+        initialFocus: 1,
+      );
+
+      // 140 + 20% of 1000 = 140 + 200 = 340 damage
+      final res = commandService.executeCorpseBurst();
+      expect(res.summary, contains('detonated Vanguard Wall\'s remains'));
+      expect(res.updatedEnemies.first.currentHp, equals(2000 - 340));
+      expect(commandService.consumedCorpseIds.contains(deadTank.id), isTrue);
+
+      // Second detonation cannot use the already consumed corpse -> vents raw miasma (140)
+      commandService.grantFocus(1);
+      final res2 = commandService.executeCorpseBurst();
+      expect(res2.summary, contains('vented raw miasma'));
+      expect(res2.updatedEnemies.first.currentHp, equals(2000 - 340 - 140));
+    });
+
+    test('Malakor: Virulent Cascade triggers 50% of remaining DoT on blighted enemies', () {
+      // Enemy afflicted with 2 turns of Blight at 60 dmg/turn = 120 total remaining DoT
+      final afflictedBoss = enemyBoss.copyWith(
+        currentHp: 1500,
+        activeEffects: const [
+          StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 60),
+        ],
+      );
+      tickManager = InitiativeTickManager(
+        initialAllies: [vanguardHero, arcanumHero],
+        initialEnemies: [afflictedBoss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+        initialFocus: 2,
+        initialPhylacteryRanks: {GeneralType.malakor: 2},
+      );
+
+      // 50% of 120 = 60 * 1.20 (Rank 2 potency) = 72 damage
+      final res = commandService.executeVirulentCascade();
+      expect(res.updatedEnemies.first.currentHp, equals(1500 - 72));
+      expect(res.summary, contains('ruptured 1 afflicted enemies'));
+    });
+
+    test('Malakor: Rebind Flesh thrall collapses when Decaying status expires after 2 turns', () {
+      final deadTank = vanguardHero.copyWith(currentHp: 0);
+      tickManager = InitiativeTickManager(
+        initialAllies: [deadTank, arcanumHero],
+        initialEnemies: [enemyBoss],
+      );
+      commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+        initialFocus: 3,
+        initialPhylacteryRanks: {GeneralType.malakor: 3},
+      );
+
+      final combatService = CombatResolutionService(
+        tickManager: tickManager,
+        commandService: commandService,
+      );
+
+      final res = commandService.executeRebindFlesh();
+      final reboundThrall = res.updatedAllies.first;
+      expect(reboundThrall.isAlive, isTrue);
+      expect(reboundThrall.activeEffects.any((e) => e.type == StatusEffectType.decaying), isTrue);
+
+      // Turn 1 start: Decaying ticks down from 3 to 2, thrall still lives
+      final turn1 = combatService.processTurnStart(unitId: reboundThrall.id, autoResumeIfTurnSkipped: false);
+      expect(turn1.isDefeated, isFalse);
+      expect(turn1.unit.isAlive, isTrue);
+
+      // Turn 2 start: Decaying ticks down from 2 to 1, thrall still lives
+      final turn2 = combatService.processTurnStart(unitId: reboundThrall.id, autoResumeIfTurnSkipped: false);
+      expect(turn2.isDefeated, isFalse);
+      expect(turn2.unit.isAlive, isTrue);
+
+      // Turn 3 start: Decaying expires (<= 1) -> rebound flesh crumbles to 0 HP
+      final turn3 = combatService.processTurnStart(unitId: reboundThrall.id, autoResumeIfTurnSkipped: false);
+      expect(turn3.isDefeated, isTrue);
+      expect(turn3.unit.currentHp, equals(0));
+      expect(turn3.message, contains('crumbles back into the grave'));
     });
   });
 }

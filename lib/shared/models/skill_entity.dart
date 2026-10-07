@@ -14,6 +14,7 @@ enum StatusEffectType {
   stun,        // Skips next turn
   defenseUp,   // +30% Armor
   speedUp,     // +20% Speed
+  decaying,    // Rebound thrall: collapses back to death when duration expires
 }
 
 @immutable
@@ -40,6 +41,8 @@ class StatusEffect {
         return 'Armor Up';
       case StatusEffectType.speedUp:
         return 'Haste';
+      case StatusEffectType.decaying:
+        return 'Decaying';
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../combat/initiative_tick_manager.dart';
@@ -239,6 +240,14 @@ class OrderResult {
   });
 }
 
+@immutable
+class RecordedAction {
+  final SkillEntity skill;
+  final String targetUnitId;
+
+  const RecordedAction({required this.skill, required this.targetUnitId});
+}
+
 class GeneralCommandService extends ChangeNotifier {
   static const int maxFocusCap = 3;
   static const double focusChargeThreshold = 500.0; // Damage dealt/taken per 1 Focus point
@@ -287,6 +296,29 @@ class GeneralCommandService extends ChangeNotifier {
   int get activePhylacteryRank => getPhylacteryRank(_activeGeneralType);
 
   int getPhylacteryRank(GeneralType type) => _phylacteryRanks[type] ?? 1;
+
+  /// Last action performed by each ally (unitId -> skill + target), replayed by Echoing Hourglass.
+  final Map<String, RecordedAction> _lastActions = {};
+
+  /// Corpses already detonated by Corpse Burst; they cannot be detonated or rebound again.
+  final Set<String> _consumedCorpseIds = {};
+
+  Map<String, RecordedAction> get lastActions => Map.unmodifiable(_lastActions);
+  Set<String> get consumedCorpseIds => Set.unmodifiable(_consumedCorpseIds);
+
+  /// Called by the combat engine whenever an ally resolves a skill.
+  void recordUnitAction(String unitId, SkillEntity skill, String targetUnitId) {
+    _lastActions[unitId] = RecordedAction(skill: skill, targetUnitId: targetUnitId);
+  }
+
+  /// Clears per-battle memory (last actions, consumed corpses) when a new encounter begins.
+  void resetBattleMemory() {
+    _lastActions.clear();
+    _consumedCorpseIds.clear();
+  }
+
+  /// Fallen units that remain intact (not yet detonated).
+  bool _isIntactCorpse(UnitEntity u) => !u.isAlive && !_consumedCorpseIds.contains(u.id);
 
   double get potencyMultiplier {
     final rank = activePhylacteryRank;
@@ -614,15 +646,24 @@ class GeneralCommandService extends ChangeNotifier {
   // ===========================================================================
 
   /// Corpse Burst (Cost: 1 Focus)
-  /// Detonates necrotic miasma dealing 140 poison damage to all enemies and inflicting Blight.
+  /// Spec 6.1: Detonates a fallen unit for AoE poison damage. The largest intact corpse on
+  /// the field (ally or enemy) explodes for 140 + 20% of its max HP, then is consumed.
+  /// With no corpse available, Malakor vents raw miasma for the base 140 damage.
   OrderResult executeCorpseBurst() {
     _validateOrderUnlocked('corpse_burst');
     const int cost = 1;
     _spendFocus(cost);
 
-    final int burstDamage = max(1, (140 * potencyMultiplier).round());
     final List<UnitEntity> allies = List.of(tickManager.allies);
     List<UnitEntity> enemies = List.of(tickManager.enemies);
+
+    final corpses = [...allies, ...enemies].where(_isIntactCorpse).toList()
+      ..sort((a, b) => b.maxHp.compareTo(a.maxHp));
+    final UnitEntity? corpse = corpses.isNotEmpty ? corpses.first : null;
+
+    final int corpseBonus = corpse != null ? (corpse.maxHp * 0.20).round() : 0;
+    final int burstDamage = max(1, ((140 + corpseBonus) * potencyMultiplier).round());
+    if (corpse != null) _consumedCorpseIds.add(corpse.id);
 
     enemies = enemies.map((enemy) {
       if (!enemy.isAlive) return enemy;
@@ -639,35 +680,50 @@ class GeneralCommandService extends ChangeNotifier {
       orderName: 'Corpse Burst',
       focusSpent: cost,
       remainingFocus: _currentFocus,
-      summary: 'Corpse Burst detonated! Dealt $burstDamage poison damage and blighted all enemies.',
+      summary: corpse != null
+          ? 'Corpse Burst detonated ${corpse.name}\'s remains! Dealt $burstDamage poison damage and blighted all enemies.'
+          : 'Corpse Burst vented raw miasma! Dealt $burstDamage poison damage and blighted all enemies.',
       updatedAllies: allies,
       updatedEnemies: enemies,
     );
   }
 
+  /// Remaining DoT a unit will suffer from its Bleed/Blight effects across their full durations.
+  static int remainingDotDamage(UnitEntity unit) {
+    int total = 0;
+    for (final e in unit.activeEffects) {
+      if (e.type == StatusEffectType.bleed) {
+        final perTurn = e.value > 0 ? e.value : max(1, (unit.maxHp * 0.05).round());
+        total += perTurn * e.durationTurns;
+      } else if (e.type == StatusEffectType.blight) {
+        final perTurn = e.value > 0 ? e.value : max(1, (unit.maxHp * 0.06).round());
+        total += perTurn * e.durationTurns;
+      }
+    }
+    return total;
+  }
+
   /// Virulent Cascade (Cost: 2 Focus)
-  /// Deals 160 instant damage to all blighted or bleeding foes, and adds a Blight stack.
+  /// Spec 6.1: Instantly triggers 50% of the remaining DoT on every afflicted enemy.
+  /// The underlying Bleed/Blight effects keep ticking afterwards.
   OrderResult executeVirulentCascade() {
     _validateOrderUnlocked('virulent_cascade');
     const int cost = 2;
     _spendFocus(cost);
 
-    final int cascadeDamage = max(1, (160 * potencyMultiplier).round());
     final List<UnitEntity> allies = List.of(tickManager.allies);
     List<UnitEntity> enemies = List.of(tickManager.enemies);
 
     int targetsAfflicted = 0;
+    int totalBurst = 0;
     enemies = enemies.map((enemy) {
       if (!enemy.isAlive) return enemy;
-      final bool isAfflicted = enemy.isBlighted || enemy.isBleeding;
-      if (isAfflicted) {
-        targetsAfflicted++;
-        final int newHp = max(0, enemy.currentHp - cascadeDamage);
-        final updatedEffects = List<StatusEffect>.from(enemy.activeEffects)
-          ..add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 50));
-        return enemy.copyWith(currentHp: newHp, activeEffects: updatedEffects);
-      }
-      return enemy;
+      final int remaining = remainingDotDamage(enemy);
+      if (remaining <= 0) return enemy;
+      targetsAfflicted++;
+      final int burst = max(1, (remaining * 0.50 * potencyMultiplier).round());
+      totalBurst += burst;
+      return enemy.copyWith(currentHp: max(0, enemy.currentHp - burst));
     }).toList();
 
     _applyStateToTickManager(allies, enemies);
@@ -677,14 +733,20 @@ class GeneralCommandService extends ChangeNotifier {
       orderName: 'Virulent Cascade',
       focusSpent: cost,
       remainingFocus: _currentFocus,
-      summary: 'Virulent Cascade tore through $targetsAfflicted afflicted enemies for $cascadeDamage burst damage!',
+      summary: targetsAfflicted > 0
+          ? 'Virulent Cascade ruptured $targetsAfflicted afflicted enemies, unleashing $totalBurst festering damage!'
+          : 'Virulent Cascade found no festering wounds to rupture.',
       updatedAllies: allies,
       updatedEnemies: enemies,
     );
   }
 
+  /// Turns of action a Rebind Flesh thrall gets before collapsing (Decaying ticks at turn start).
+  static const int reboundThrallTurns = 2;
+
   /// Rebind Flesh (Cost: 3 Focus)
-  /// Resurrects a fallen ally with 40% HP and 100% TM. If none fallen, heals team for 35% HP.
+  /// Spec 6.1: Resurrects a fallen ally as a decaying thrall for 2 turns (40% HP, 100% TM).
+  /// The thrall collapses when its Decaying status expires. If none fallen, heals team for 35% HP.
   OrderResult executeRebindFlesh() {
     _validateOrderUnlocked('rebind_flesh');
     const int cost = 3;
@@ -693,7 +755,7 @@ class GeneralCommandService extends ChangeNotifier {
     List<UnitEntity> allies = List.of(tickManager.allies);
     final List<UnitEntity> enemies = List.of(tickManager.enemies);
 
-    final deadIdx = allies.indexWhere((u) => !u.isAlive);
+    final deadIdx = allies.indexWhere(_isIntactCorpse);
     String summary;
 
     if (deadIdx != -1) {
@@ -702,10 +764,15 @@ class GeneralCommandService extends ChangeNotifier {
       allies[deadIdx] = deadUnit.copyWith(
         currentHp: restoredHp,
         turnMeter: 100.0,
+        activeEffects: const [
+          // +1 because the effect is decremented at the start of each of the thrall's turns
+          StatusEffect(type: StatusEffectType.decaying, durationTurns: reboundThrallTurns + 1),
+        ],
       );
-      summary = 'Rebound flesh! Resurrected ${deadUnit.name} with $restoredHp HP and 100% Turn Meter.';
+      summary = 'Rebound flesh! ${deadUnit.name} rises as a decaying thrall with $restoredHp HP for $reboundThrallTurns turns.';
     } else {
       allies = allies.map((u) {
+        if (!u.isAlive) return u;
         final heal = (u.maxHp * 0.35).round();
         return u.copyWith(currentHp: min(u.maxHp, u.currentHp + heal));
       }).toList();
@@ -760,24 +827,28 @@ class GeneralCommandService extends ChangeNotifier {
   }
 
   /// Unravel Hex (Cost: 2 Focus)
-  /// Cleanses all debuffs on allies and strips 30% Armor from all enemies.
+  /// Spec 6.1: Strips all enemy buffs (Armor Up, Haste) and reduces enemy Armor by 30%.
   OrderResult executeUnravelHex() {
     _validateOrderUnlocked('unravel_hex');
     const int cost = 2;
     _spendFocus(cost);
 
-    List<UnitEntity> allies = List.of(tickManager.allies);
+    final List<UnitEntity> allies = List.of(tickManager.allies);
     List<UnitEntity> enemies = List.of(tickManager.enemies);
 
-    allies = allies.map((u) {
-      if (!u.isAlive) return u;
-      return u.copyWith(activeEffects: const []);
-    }).toList();
-
+    int buffsStripped = 0;
     enemies = enemies.map((e) {
       if (!e.isAlive) return e;
+      final remainingEffects = e.activeEffects.where((eff) {
+        final isBuff = eff.type == StatusEffectType.defenseUp || eff.type == StatusEffectType.speedUp;
+        if (isBuff) buffsStripped++;
+        return !isBuff;
+      }).toList();
       final int armorShred = (e.defense * 0.30).round();
-      return e.copyWith(defense: max(10, e.defense - armorShred));
+      return e.copyWith(
+        defense: max(10, e.defense - armorShred),
+        activeEffects: remainingEffects,
+      );
     }).toList();
 
     _applyStateToTickManager(allies, enemies);
@@ -787,35 +858,90 @@ class GeneralCommandService extends ChangeNotifier {
       orderName: 'Unravel Hex',
       focusSpent: cost,
       remainingFocus: _currentFocus,
-      summary: 'All ally debuffs purged and 30% Armor stripped from all enemies!',
+      summary: 'Hex unravelled! Stripped $buffsStripped enemy buff(s) and 30% Armor from all enemies!',
       updatedAllies: allies,
       updatedEnemies: enemies,
     );
   }
 
   /// Echoing Hourglass (Cost: 3 Focus)
-  /// Grants all allies +40% Turn Meter and reduces skill cooldowns by 1.
+  /// Spec 6.1: Every living backline Arcanum ally repeats their last action for free.
+  /// Offensive echoes strike the original target (or the first living foe if it fell);
+  /// support echoes re-heal their original ally. If no Arcanum ally has acted yet,
+  /// the sands instead grant all allies +40% Turn Meter and -1 skill cooldowns.
   OrderResult executeEchoingHourglass() {
     _validateOrderUnlocked('echoing_hourglass');
     const int cost = 3;
     _spendFocus(cost);
 
     List<UnitEntity> allies = List.of(tickManager.allies);
-    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    List<UnitEntity> enemies = List.of(tickManager.enemies);
 
-    allies = allies.map((u) {
-      if (!u.isAlive) return u;
-      final updatedSkills = u.resolvedSkills.map((s) {
-        if (s.currentCooldown > 0) {
-          return s.copyWith(currentCooldown: s.currentCooldown - 1);
-        }
-        return s;
+    final echoers = allies
+        .where((u) => u.isAlive && !u.isVanguard && _lastActions.containsKey(u.id))
+        .toList();
+
+    if (echoers.isEmpty) {
+      allies = allies.map((u) {
+        if (!u.isAlive) return u;
+        final updatedSkills = u.resolvedSkills.map((s) {
+          if (s.currentCooldown > 0) {
+            return s.copyWith(currentCooldown: s.currentCooldown - 1);
+          }
+          return s;
+        }).toList();
+        return u.copyWith(
+          turnMeter: u.turnMeter + 40.0,
+          skills: updatedSkills,
+        );
       }).toList();
-      return u.copyWith(
-        turnMeter: u.turnMeter + 40.0,
-        skills: updatedSkills,
+
+      _applyStateToTickManager(allies, enemies);
+
+      return OrderResult(
+        orderId: 'echoing_hourglass',
+        orderName: 'Echoing Hourglass',
+        focusSpent: cost,
+        remainingFocus: _currentFocus,
+        summary: 'No Arcanum echoes to recall — time rewound! Squad gained +40% Turn Meter and reduced skill cooldowns.',
+        updatedAllies: allies,
+        updatedEnemies: enemies,
       );
-    }).toList();
+    }
+
+    final List<String> echoLog = [];
+    for (final echoer in echoers) {
+      final action = _lastActions[echoer.id]!;
+      final skill = action.skill;
+      final bool isSupport = skill.targetType == SkillTargetType.singleAlly || skill.damageCoefficient == 0.0;
+
+      if (isSupport) {
+        int idx = allies.indexWhere((u) => u.id == action.targetUnitId && u.isAlive);
+        if (idx == -1) idx = allies.indexWhere((u) => u.id == echoer.id);
+        final target = allies[idx];
+        final heal = max(50, (target.maxHp * 0.25).round());
+        final effects = List<StatusEffect>.from(target.activeEffects);
+        if (skill.appliedStatus != null) effects.add(skill.appliedStatus!);
+        allies[idx] = target.copyWith(
+          currentHp: min(target.maxHp, target.currentHp + heal),
+          activeEffects: effects,
+        );
+        echoLog.add('${echoer.name} echoed ${skill.name} (+$heal HP to ${target.name})');
+      } else {
+        int idx = enemies.indexWhere((u) => u.id == action.targetUnitId && u.isAlive);
+        if (idx == -1) idx = enemies.indexWhere((u) => u.isAlive);
+        if (idx == -1) break; // No foes left standing
+        final target = enemies[idx];
+        final mitigation = CombatMath.calculateMitigation(target.defense);
+        final affinity = CombatMath.getAffinityMultiplier(echoer.archetype, target.archetype);
+        final damage = max(1, (echoer.attack * skill.damageCoefficient * mitigation * affinity).round());
+        final newHp = max(0, target.currentHp - damage);
+        final effects = List<StatusEffect>.from(target.activeEffects);
+        if (skill.appliedStatus != null && newHp > 0) effects.add(skill.appliedStatus!);
+        enemies[idx] = target.copyWith(currentHp: newHp, activeEffects: effects);
+        echoLog.add('${echoer.name} echoed ${skill.name} ($damage DMG to ${target.name})');
+      }
+    }
 
     _applyStateToTickManager(allies, enemies);
 
@@ -824,18 +950,13 @@ class GeneralCommandService extends ChangeNotifier {
       orderName: 'Echoing Hourglass',
       focusSpent: cost,
       remainingFocus: _currentFocus,
-      summary: 'Time rewound! Squad gained +40% Turn Meter and reduced skill cooldowns.',
+      summary: 'The hourglass turns! ${echoLog.join(' • ')}',
       updatedAllies: allies,
       updatedEnemies: enemies,
     );
   }
 
   void _applyStateToTickManager(List<UnitEntity> allies, List<UnitEntity> enemies) {
-    tickManager.consumeTurn(
-      retainedOverflow: true,
-      updatedAllies: allies,
-      updatedEnemies: enemies,
-      autoResume: false,
-    );
+    tickManager.updateSquads(allies: allies, enemies: enemies);
   }
 }

@@ -25,9 +25,11 @@ class DefiledCryptDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFF6A1B9A), width: 1.5),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: Column(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -82,8 +84,9 @@ class DefiledCryptDialog extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildChoiceButton({
     required BuildContext context,
