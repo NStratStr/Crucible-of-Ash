@@ -2,8 +2,28 @@ import '../../core/combat_math.dart';
 import 'campaign_node.dart';
 
 class CampaignMapGenerator {
-  /// Generates a curated, connected campaign trail across 6 depth tiers.
-  static List<CampaignNode> generateCuratedCampaign() {
+  /// Generates a curated, connected campaign trail across chapters.
+  static List<CampaignNode> generateCuratedCampaign([int chapter = 1]) {
+    return generateCampaignForChapter(chapter);
+  }
+
+  /// Generates the DAG expedition map for the specified chapter.
+  static List<CampaignNode> generateCampaignForChapter(int chapter) {
+    switch (chapter) {
+      case 2:
+        return _generateChapter2();
+      case 3:
+        return _generateChapter3();
+      case 1:
+      default:
+        return _generateChapter1();
+    }
+  }
+
+  // ===========================================================================
+  // CHAPTER 1: THE ASHEN PERIMETER (Depth 0 to 4)
+  // ===========================================================================
+  static List<CampaignNode> _generateChapter1() {
     return [
       // Depth 0: Incursion
       const CampaignNode(
@@ -134,6 +154,383 @@ class CampaignMapGenerator {
         rewardOre: 120,
         rewardSigils: 2,
         scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
+      ),
+    ];
+  }
+
+  // ===========================================================================
+  // CHAPTER 2: THE SUNKEN NECROPOLIS (Depth 0 to 5)
+  // ===========================================================================
+  static List<CampaignNode> _generateChapter2() {
+    return [
+      // Depth 0: Sunken Perimeter
+      const CampaignNode(
+        id: 'ch2_0_a',
+        depth: 0,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.skirmish,
+        name: 'Gate of Sunken Bones',
+        description: 'Barrow guards patrol the submerged causeway.',
+        nextNodeIds: ['ch2_1_a', 'ch2_1_b'],
+        isReachable: true,
+        rewardIchor: 140,
+        rewardOre: 30,
+        scoutedAffinities: [Archetype.occultist, Archetype.skirmisher],
+      ),
+      const CampaignNode(
+        id: 'ch2_0_b',
+        depth: 0,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.skirmish,
+        name: 'Poison Mire',
+        description: 'Venomous prowlers stalking the brackish wetlands.',
+        nextNodeIds: ['ch2_1_b', 'ch2_1_c'],
+        isReachable: true,
+        rewardIchor: 140,
+        rewardOre: 35,
+        scoutedAffinities: [Archetype.assassin, Archetype.support],
+      ),
+
+      // Depth 1: Ancient Altars
+      const CampaignNode(
+        id: 'ch2_1_a',
+        depth: 1,
+        verticalRatio: 0.20,
+        type: CampaignNodeType.altar,
+        name: 'Blood Sigil Monolith',
+        description: 'Pulsing monolith radiating sanguine energies.',
+        nextNodeIds: ['ch2_2_a'],
+        rewardIchor: 250,
+        rewardOre: 25,
+      ),
+      const CampaignNode(
+        id: 'ch2_1_b',
+        depth: 1,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.skirmish,
+        name: 'Catacomb Ambush',
+        description: 'Reanimated duelists guarding flooded crypt passages.',
+        nextNodeIds: ['ch2_2_a', 'ch2_2_b'],
+        rewardIchor: 180,
+        rewardOre: 40,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.assassin],
+      ),
+      const CampaignNode(
+        id: 'ch2_1_c',
+        depth: 1,
+        verticalRatio: 0.80,
+        type: CampaignNodeType.crypt,
+        name: 'Defiled Vault',
+        description: 'Sealed reliquary holding preserved progenitor remains.',
+        nextNodeIds: ['ch2_2_b'],
+        rewardIchor: 300,
+        rewardOre: 50,
+        rewardSigils: 1,
+      ),
+
+      // Depth 2: Elite Clash
+      const CampaignNode(
+        id: 'ch2_2_a',
+        depth: 2,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.elite,
+        name: 'Ironclad Dreadnought',
+        description: 'Unstoppable armored juggernaut forged in cursed iron.',
+        nextNodeIds: ['ch2_3_a', 'ch2_3_b'],
+        rewardIchor: 450,
+        rewardOre: 80,
+        rewardSigils: 1,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.marksman],
+      ),
+      const CampaignNode(
+        id: 'ch2_2_b',
+        depth: 2,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.skirmish,
+        name: 'Ghoul Warrens',
+        description: 'Ravenous ghouls swarming from crumbling tombs.',
+        nextNodeIds: ['ch2_3_b', 'ch2_3_c'],
+        rewardIchor: 220,
+        rewardOre: 45,
+        scoutedAffinities: [Archetype.skirmisher, Archetype.occultist],
+      ),
+
+      // Depth 3: Repose & Omen
+      const CampaignNode(
+        id: 'ch2_3_a',
+        depth: 3,
+        verticalRatio: 0.25,
+        type: CampaignNodeType.restHaven,
+        name: 'Sanctuary of Embers',
+        description: 'A secluded fire sanctum shielded from necrotic blight.',
+        nextNodeIds: ['ch2_4_a'],
+        rewardIchor: 150,
+        rewardOre: 30,
+      ),
+      const CampaignNode(
+        id: 'ch2_3_b',
+        depth: 3,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.watchtower,
+        name: "Seer's Sconce",
+        description: 'Unveils the upcoming witch coven and chapter apex.',
+        nextNodeIds: ['ch2_4_a', 'ch2_4_b'],
+        rewardIchor: 200,
+        rewardOre: 60,
+      ),
+      const CampaignNode(
+        id: 'ch2_3_c',
+        depth: 3,
+        verticalRatio: 0.75,
+        type: CampaignNodeType.crypt,
+        name: 'Forgotten Mausoleum',
+        description: 'A massive sarcophagus vibrating with dark focus.',
+        nextNodeIds: ['ch2_4_b'],
+        rewardIchor: 350,
+        rewardOre: 50,
+        rewardSigils: 1,
+      ),
+
+      // Depth 4: Pre-Boss Gauntlet
+      const CampaignNode(
+        id: 'ch2_4_a',
+        depth: 4,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.elite,
+        name: 'Abyssal Witch Coven',
+        description: 'Master sorceresses channeling corrosive rot miasma.',
+        nextNodeIds: ['ch2_5_boss'],
+        rewardIchor: 550,
+        rewardOre: 90,
+        rewardSigils: 1,
+        scoutedAffinities: [Archetype.occultist, Archetype.support],
+      ),
+      const CampaignNode(
+        id: 'ch2_4_b',
+        depth: 4,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.skirmish,
+        name: 'Plague Cistern',
+        description: 'Elite archers guarding the inner necrotic reservoir.',
+        nextNodeIds: ['ch2_5_boss'],
+        rewardIchor: 260,
+        rewardOre: 50,
+        scoutedAffinities: [Archetype.marksman, Archetype.assassin],
+      ),
+
+      // Depth 5: Chapter 2 Boss
+      const CampaignNode(
+        id: 'ch2_5_boss',
+        depth: 5,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.boss,
+        name: 'The Sunken Lich King',
+        description: 'Master of the drowned catacombs with dark soul-siphoning incantations.',
+        nextNodeIds: [],
+        rewardIchor: 1200,
+        rewardOre: 180,
+        rewardSigils: 3,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
+      ),
+    ];
+  }
+
+  // ===========================================================================
+  // CHAPTER 3: THE ABYSSAL RIFT (Depth 0 to 6)
+  // ===========================================================================
+  static List<CampaignNode> _generateChapter3() {
+    return [
+      // Depth 0: The Brimstone Threshold
+      const CampaignNode(
+        id: 'ch3_0_a',
+        depth: 0,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.skirmish,
+        name: 'Brimstone Causeway',
+        description: 'Molten earth fractured by colossal footsteps.',
+        nextNodeIds: ['ch3_1_a', 'ch3_1_b'],
+        isReachable: true,
+        rewardIchor: 180,
+        rewardOre: 40,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.support],
+      ),
+      const CampaignNode(
+        id: 'ch3_0_b',
+        depth: 0,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.skirmish,
+        name: 'Void Rift Chasm',
+        description: 'Stalkers slipping through planar tears.',
+        nextNodeIds: ['ch3_1_b', 'ch3_1_c'],
+        isReachable: true,
+        rewardIchor: 180,
+        rewardOre: 45,
+        scoutedAffinities: [Archetype.occultist, Archetype.marksman],
+      ),
+
+      // Depth 1: Blood Altars & Crypts
+      const CampaignNode(
+        id: 'ch3_1_a',
+        depth: 1,
+        verticalRatio: 0.20,
+        type: CampaignNodeType.altar,
+        name: 'Altar of Soul Tithe',
+        description: 'A monument demanding vital essence for dark boons.',
+        nextNodeIds: ['ch3_2_a'],
+        rewardIchor: 300,
+        rewardOre: 35,
+      ),
+      const CampaignNode(
+        id: 'ch3_1_b',
+        depth: 1,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.skirmish,
+        name: 'Wraith Marsh',
+        description: 'Incorporeal specters haunting the dark mist.',
+        nextNodeIds: ['ch3_2_a', 'ch3_2_b'],
+        rewardIchor: 220,
+        rewardOre: 50,
+        scoutedAffinities: [Archetype.assassin, Archetype.skirmisher],
+      ),
+      const CampaignNode(
+        id: 'ch3_1_c',
+        depth: 1,
+        verticalRatio: 0.80,
+        type: CampaignNodeType.crypt,
+        name: 'Tomb of the Ancient Pureblood',
+        description: 'Chamber enclosing a pristine generational seed.',
+        nextNodeIds: ['ch3_2_b'],
+        rewardIchor: 400,
+        rewardOre: 60,
+        rewardSigils: 2,
+      ),
+
+      // Depth 2: High Threat Clashes
+      const CampaignNode(
+        id: 'ch3_2_a',
+        depth: 2,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.elite,
+        name: 'Harbinger of Ruin',
+        description: 'Fierce winged beast with devastating aerial dives.',
+        nextNodeIds: ['ch3_3_a', 'ch3_3_b'],
+        rewardIchor: 600,
+        rewardOre: 100,
+        rewardSigils: 2,
+        scoutedAffinities: [Archetype.skirmisher, Archetype.marksman],
+      ),
+      const CampaignNode(
+        id: 'ch3_2_b',
+        depth: 2,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.skirmish,
+        name: 'Void Stalker Den',
+        description: 'Pack of shadow beasts hungry for pureblood flesh.',
+        nextNodeIds: ['ch3_3_b', 'ch3_3_c'],
+        rewardIchor: 260,
+        rewardOre: 60,
+        scoutedAffinities: [Archetype.assassin, Archetype.occultist],
+      ),
+
+      // Depth 3: Rest & Revelation
+      const CampaignNode(
+        id: 'ch3_3_a',
+        depth: 3,
+        verticalRatio: 0.25,
+        type: CampaignNodeType.restHaven,
+        name: 'Hallowed Bone Pyre',
+        description: 'Sanctuary of burning bone ash to forge or mend vessels.',
+        nextNodeIds: ['ch3_4_a'],
+        rewardIchor: 200,
+        rewardOre: 40,
+      ),
+      const CampaignNode(
+        id: 'ch3_3_b',
+        depth: 3,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.watchtower,
+        name: 'Astral Spire',
+        description: 'Peers into the core of the Chapter 3 World Titan.',
+        nextNodeIds: ['ch3_4_a', 'ch3_4_b'],
+        rewardIchor: 250,
+        rewardOre: 80,
+      ),
+      const CampaignNode(
+        id: 'ch3_3_c',
+        depth: 3,
+        verticalRatio: 0.75,
+        type: CampaignNodeType.crypt,
+        name: 'Crypt of Forgotten Kings',
+        description: 'Royal tomb guarded by eternal deathless champions.',
+        nextNodeIds: ['ch3_4_b'],
+        rewardIchor: 450,
+        rewardOre: 70,
+        rewardSigils: 2,
+      ),
+
+      // Depth 4: Eclipse Citadel
+      const CampaignNode(
+        id: 'ch3_4_a',
+        depth: 4,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.elite,
+        name: 'Archon of the Eclipse',
+        description: 'Master of void and necrotic sorcery.',
+        nextNodeIds: ['ch3_5_a', 'ch3_5_b'],
+        rewardIchor: 700,
+        rewardOre: 120,
+        rewardSigils: 2,
+        scoutedAffinities: [Archetype.occultist, Archetype.support],
+      ),
+      const CampaignNode(
+        id: 'ch3_4_b',
+        depth: 4,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.altar,
+        name: 'Chamber of Sacrifice',
+        description: 'The final altar demanding the ultimate blood covenant.',
+        nextNodeIds: ['ch3_5_b'],
+        rewardIchor: 350,
+        rewardOre: 50,
+      ),
+
+      // Depth 5: Final Haven & Threshold
+      const CampaignNode(
+        id: 'ch3_5_a',
+        depth: 5,
+        verticalRatio: 0.35,
+        type: CampaignNodeType.restHaven,
+        name: 'The Last Haven',
+        description: 'Final respite before the World Titan Sovereign.',
+        nextNodeIds: ['ch3_6_boss'],
+        rewardIchor: 200,
+        rewardOre: 40,
+      ),
+      const CampaignNode(
+        id: 'ch3_5_b',
+        depth: 5,
+        verticalRatio: 0.65,
+        type: CampaignNodeType.watchtower,
+        name: 'Titan Watchpoint',
+        description: 'Scout the Titan Sovereign and harvest battle provisions.',
+        nextNodeIds: ['ch3_6_boss'],
+        rewardIchor: 300,
+        rewardOre: 90,
+      ),
+
+      // Depth 6: Pinnacle Boss
+      const CampaignNode(
+        id: 'ch3_6_boss',
+        depth: 6,
+        verticalRatio: 0.50,
+        type: CampaignNodeType.boss,
+        name: 'The Ashen World Titan Sovereign',
+        description: 'The Primordial World Titan awakened at maximum cataclysmic fury.',
+        nextNodeIds: [],
+        rewardIchor: 2000,
+        rewardOre: 250,
+        rewardSigils: 4,
+        scoutedAffinities: [Archetype.juggernaut, Archetype.skirmisher, Archetype.occultist],
       ),
     ];
   }

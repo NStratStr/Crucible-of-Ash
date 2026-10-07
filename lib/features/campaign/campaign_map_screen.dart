@@ -9,6 +9,9 @@ class CampaignMapScreen extends StatelessWidget {
   final int cursedOre;
   final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
+  final int currentChapter;
+  final int maxUnlockedChapter;
+  final ValueChanged<int>? onChapterChanged;
 
   const CampaignMapScreen({
     super.key,
@@ -18,7 +21,23 @@ class CampaignMapScreen extends StatelessWidget {
     this.cursedOre = 0,
     this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
+    this.currentChapter = 1,
+    this.maxUnlockedChapter = 1,
+    this.onChapterChanged,
   });
+
+  static String chapterTitle(int ch) {
+    switch (ch) {
+      case 1:
+        return 'CH. I: ASHEN PERIMETER';
+      case 2:
+        return 'CH. II: SUNKEN NECROPOLIS';
+      case 3:
+        return 'CH. III: ABYSSAL RIFT';
+      default:
+        return 'TIER $ch: DEEP DESCENT';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +45,31 @@ class CampaignMapScreen extends StatelessWidget {
       backgroundColor: const Color(0xFF111114),
       appBar: AppBar(
         backgroundColor: const Color(0xFF181820),
-        title: const Text(
-          'ASHEN EXPEDITION TRAIL',
-          style: TextStyle(letterSpacing: 2.0, fontWeight: FontWeight.bold, fontSize: 13),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (currentChapter > 1 && onChapterChanged != null)
+              IconButton(
+                icon: const Icon(Icons.arrow_left, size: 20, color: Color(0xFFE5A93C)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => onChapterChanged!(currentChapter - 1),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: Text(
+                chapterTitle(currentChapter),
+                style: const TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ),
+            if (currentChapter < maxUnlockedChapter && onChapterChanged != null)
+              IconButton(
+                icon: const Icon(Icons.arrow_right, size: 20, color: Color(0xFFE5A93C)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => onChapterChanged!(currentChapter + 1),
+              ),
+          ],
         ),
         centerTitle: true,
         actions: [
@@ -98,19 +139,20 @@ class CampaignMapScreen extends StatelessWidget {
         builder: (context, constraints) {
           final double mapWidth = constraints.maxWidth;
           final double mapHeight = constraints.maxHeight;
+          final double maxD = nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
 
           return Stack(
             children: [
               // Background Parchment Grid
               Positioned.fill(
                 child: CustomPaint(
-                  painter: _CampaignPathPainter(nodes: nodes),
+                  painter: _CampaignPathPainter(nodes: nodes, maxDepth: maxD),
                 ),
               ),
               // Node interactive badges
               ...nodes.map((node) {
-                // Calculate position: depth (X axis: 0 to 4), verticalRatio (Y axis: 0.1 to 0.9)
-                final double x = (node.depth / 4.0) * (mapWidth - 80) + 40;
+                // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: 0.1 to 0.9)
+                final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
                 final double y = node.verticalRatio * (mapHeight - 80) + 40;
 
                 return Positioned(
@@ -512,15 +554,17 @@ class CampaignMapScreen extends StatelessWidget {
 
 class _CampaignPathPainter extends CustomPainter {
   final List<CampaignNode> nodes;
+  final double maxDepth;
 
-  _CampaignPathPainter({required this.nodes});
+  _CampaignPathPainter({required this.nodes, this.maxDepth = 4.0});
 
   @override
   void paint(Canvas canvas, Size size) {
     final Map<String, Offset> nodePositions = {};
+    final double safeMaxD = maxDepth > 0 ? maxDepth : 1.0;
 
     for (final node in nodes) {
-      final double x = (node.depth / 4.0) * (size.width - 80) + 40;
+      final double x = (node.depth / safeMaxD) * (size.width - 80) + 40;
       final double y = node.verticalRatio * (size.height - 80) + 40;
       nodePositions[node.id] = Offset(x, y);
     }

@@ -46,6 +46,8 @@ class _AppShellState extends State<AppShell> {
     GeneralType.malakor: 1,
     GeneralType.morrigan: 1,
   };
+  int _currentChapter = 1;
+  int _maxUnlockedChapter = 1;
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
@@ -64,7 +66,7 @@ class _AppShellState extends State<AppShell> {
     _ftueService = FtueService();
     _resetEncounter();
     _inventory = StarterBrigades.createReserveInventory();
-    _campaignNodes = CampaignMapGenerator.generateCuratedCampaign();
+    _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
 
     // Equip starter weapon to lead frontliner
     if (_tickManager.allies.isNotEmpty && _relicService.unequippedRelics.isNotEmpty) {
@@ -228,7 +230,7 @@ class _AppShellState extends State<AppShell> {
         node.type == CampaignNodeType.boss) {
       List<UnitEntity> enemies;
       if (node.type == CampaignNodeType.boss) {
-        enemies = StarterBrigades.createBossEnemies();
+        enemies = StarterBrigades.createChapterBossEnemies(_currentChapter);
       } else if (node.type == CampaignNodeType.elite) {
         enemies = StarterBrigades.createEliteEnemies();
       } else {
@@ -471,6 +473,20 @@ class _AppShellState extends State<AppShell> {
         _ftueService.advanceStage();
       }
 
+      if (_activeNode!.type == CampaignNodeType.boss && _currentChapter < 3) {
+        final nextCh = _currentChapter + 1;
+        if (_maxUnlockedChapter < nextCh) {
+          setState(() {
+            _maxUnlockedChapter = nextCh;
+          });
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showChapterAscensionDialog(nextCh);
+          }
+        });
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('EXPEDITION VICTORY! +$reward Ichor, +$oreReward Ore, +$xpReward XP • Bound ${captured.name} (${captured.archetype.name.toUpperCase()})$extraReward'),
@@ -479,6 +495,92 @@ class _AppShellState extends State<AppShell> {
         ),
       );
     }
+  }
+
+  void _showChapterAscensionDialog(int nextChapter) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF181820),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE5A93C), width: 1.5),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 24),
+            const SizedBox(width: 8),
+            Text(
+              'CHAPTER $_currentChapter CONQUERED!',
+              style: const TextStyle(
+                color: Color(0xFFE5A93C),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The primordial guardian of ${CampaignMapScreen.chapterTitle(_currentChapter)} has fallen! The seal dissolves into ashen dust.',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111114),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFB3261E).withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.arrow_circle_right_outlined, color: Color(0xFFB3261E), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'UNLOCKED: ${CampaignMapScreen.chapterTitle(nextChapter)}',
+                      style: const TextStyle(
+                        color: Color(0xFFEF5350),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('REMAIN HERE', style: TextStyle(color: Colors.white60, fontSize: 11)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.explore, size: 16),
+            label: Text('ASCEND TO CHAPTER $nextChapter', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              setState(() {
+                _currentChapter = nextChapter;
+                _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(nextChapter);
+                _currentIndex = 0; // Return to Campaign Map
+              });
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
@@ -646,6 +748,12 @@ class _AppShellState extends State<AppShell> {
                     cursedOre: _cursedOre,
                     bloodlineSigils: _bloodlineSigils,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
+                    currentChapter: _currentChapter,
+                    maxUnlockedChapter: _maxUnlockedChapter,
+                    onChapterChanged: (ch) => setState(() {
+                      _currentChapter = ch;
+                      _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
+                    }),
                   ),
                   // Tab 1: Tactical Arena
                   BattleScreen(

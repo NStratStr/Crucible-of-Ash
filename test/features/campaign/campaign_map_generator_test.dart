@@ -42,5 +42,51 @@ void main() {
         expect(n.nextNodeIds, contains('node_4_boss'));
       }
     });
+
+    test('Chapter 2 (Sunken Necropolis) generates depths 0 to 5 terminating in Sunken Lich King', () {
+      final nodes = CampaignMapGenerator.generateCampaignForChapter(2);
+
+      expect(nodes.isNotEmpty, isTrue);
+
+      final startingNodes = nodes.where((n) => n.depth == 0).toList();
+      expect(startingNodes.every((n) => n.isReachable), isTrue);
+
+      // Verify all forward node links exist
+      final allNodeIds = nodes.map((n) => n.id).toSet();
+      for (final node in nodes) {
+        for (final nextId in node.nextNodeIds) {
+          expect(allNodeIds.contains(nextId), isTrue,
+              reason: 'Node ${node.id} links to unknown node $nextId in Ch 2');
+        }
+      }
+
+      final bossNode = nodes.firstWhere((n) => n.type == CampaignNodeType.boss);
+      expect(bossNode.depth, equals(5));
+      expect(bossNode.name, contains('Sunken Lich King'));
+      expect(bossNode.nextNodeIds.isEmpty, isTrue);
+    });
+
+    test('Chapter 3 (Abyssal Rift) generates depths 0 to 6 terminating in World Titan Sovereign', () {
+      final nodes = CampaignMapGenerator.generateCampaignForChapter(3);
+
+      expect(nodes.isNotEmpty, isTrue);
+
+      final startingNodes = nodes.where((n) => n.depth == 0).toList();
+      expect(startingNodes.every((n) => n.isReachable), isTrue);
+
+      // Verify all forward node links exist
+      final allNodeIds = nodes.map((n) => n.id).toSet();
+      for (final node in nodes) {
+        for (final nextId in node.nextNodeIds) {
+          expect(allNodeIds.contains(nextId), isTrue,
+              reason: 'Node ${node.id} links to unknown node $nextId in Ch 3');
+        }
+      }
+
+      final bossNode = nodes.firstWhere((n) => n.type == CampaignNodeType.boss);
+      expect(bossNode.depth, equals(6));
+      expect(bossNode.name, contains('Titan Sovereign'));
+      expect(bossNode.rewardSigils, equals(4));
+    });
   });
 }

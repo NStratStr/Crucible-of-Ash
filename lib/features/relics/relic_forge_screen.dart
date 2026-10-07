@@ -28,6 +28,7 @@ class RelicForgeScreen extends StatefulWidget {
 class _RelicForgeScreenState extends State<RelicForgeScreen> {
   String? _selectedUnitId;
   RelicSlot? _slotFilter;
+  RelicSetType? _setTypeFilter;
 
   @override
   void initState() {
@@ -92,8 +93,9 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     final equippedRelics = widget.relicService.getRelicsForUnit(selectedUnit.id);
     final bonuses = widget.relicService.calculateBonuses(selectedUnit.id);
     final unequipped = widget.relicService.unequippedRelics.where((r) {
-      if (_slotFilter == null) return true;
-      return r.slot == _slotFilter;
+      if (_slotFilter != null && r.slot != _slotFilter) return false;
+      if (_setTypeFilter != null && r.setType != _setTypeFilter) return false;
+      return true;
     }).toList();
 
     return Scaffold(
@@ -295,6 +297,22 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             ),
           ),
 
+          const SizedBox(height: 4),
+
+          // Set Synergy Filter Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                _buildSetFilterChip('ALL SETS', null, const Color(0xFFB3261E)),
+                _buildSetFilterChip('BLOOD (2)', RelicSetType.bloodleech, const Color(0xFFEF5350)),
+                _buildSetFilterChip('IRON (2)', RelicSetType.ironclad, const Color(0xFF90A4AE)),
+                _buildSetFilterChip('TEMP (2)', RelicSetType.tempest, const Color(0xFF29B6F6)),
+                _buildSetFilterChip('EXEC (4)', RelicSetType.executioner, const Color(0xFFAB47BC)),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 6),
 
           // Unequipped Relics List
@@ -302,7 +320,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             child: unequipped.isEmpty
                 ? Center(
                     child: Text(
-                      'No unequipped ${_slotFilter?.name.toUpperCase() ?? ""} relics in inventory.\nForge more using Ichor above!',
+                      'No unequipped ${_slotFilter != null ? _slotFilter!.name.toUpperCase() : ""} ${_setTypeFilter != null ? RelicEntity.setName(_setTypeFilter!) : ""} relics in inventory.\nForge more using Ichor above!',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white38, fontSize: 11),
                     ),
@@ -462,6 +480,38 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.white60,
                 fontSize: 8.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSetFilterChip(String label, RelicSetType? setType, Color accentColor) {
+    final bool isSelected = _setTypeFilter == setType;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _setTypeFilter = setType),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? accentColor.withValues(alpha: 0.25) : const Color(0xFF1E1E26),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: isSelected ? accentColor : Colors.transparent,
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? accentColor : Colors.white60,
+                fontSize: 8.0,
                 fontWeight: FontWeight.bold,
               ),
             ),

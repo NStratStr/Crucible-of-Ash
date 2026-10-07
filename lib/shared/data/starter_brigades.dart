@@ -357,6 +357,120 @@ class StarterBrigades {
     ];
   }
 
+  /// Chapter-specific Gatekeeper Boss
+  static List<UnitEntity> createChapterBossEnemies(int chapter) {
+    if (chapter == 2) {
+      return [
+        const UnitEntity(
+          id: 'boss_lich_king',
+          speciesId: 'sunken_lich',
+          name: 'The Sunken Lich King',
+          generation: 3,
+          archetype: Archetype.occultist,
+          slot: FormationSlot.front1,
+          level: 28,
+          maxLevel: 45,
+          currentHp: 3200,
+          maxHp: 3200,
+          attack: 230,
+          defense: 150,
+          speed: 105,
+          nativeTraitId: 'plague_hex',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'boss_lich_guard',
+          speciesId: 'iron_vanguard',
+          name: 'Necrotic Dreadnaught',
+          generation: 2,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front2,
+          level: 24,
+          maxLevel: 35,
+          currentHp: 1500,
+          maxHp: 1500,
+          attack: 170,
+          defense: 160,
+          speed: 95,
+          nativeTraitId: 'iron_bastion',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'boss_lich_chanter',
+          speciesId: 'death_priest',
+          name: 'Crypt Siphonist',
+          generation: 2,
+          archetype: Archetype.support,
+          slot: FormationSlot.back1,
+          level: 24,
+          maxLevel: 35,
+          currentHp: 1200,
+          maxHp: 1200,
+          attack: 140,
+          defense: 100,
+          speed: 110,
+          nativeTraitId: 'sanguine_mend',
+          lineageAncestors: [],
+        ),
+      ];
+    } else if (chapter >= 3) {
+      return [
+        const UnitEntity(
+          id: 'boss_world_titan_sov',
+          speciesId: 'titan_sovereign',
+          name: 'The Ashen World Titan Sovereign',
+          generation: 4,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front1,
+          level: 35,
+          maxLevel: 50,
+          currentHp: 4800,
+          maxHp: 4800,
+          attack: 290,
+          defense: 230,
+          speed: 110,
+          nativeTraitId: 'blood_sovereign',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'boss_titan_archon',
+          speciesId: 'archon_eclipse',
+          name: 'Archon of the Eclipse',
+          generation: 3,
+          archetype: Archetype.occultist,
+          slot: FormationSlot.front2,
+          level: 30,
+          maxLevel: 45,
+          currentHp: 1800,
+          maxHp: 1800,
+          attack: 240,
+          defense: 130,
+          speed: 115,
+          nativeTraitId: 'plague_hex',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'boss_titan_stalker',
+          speciesId: 'void_stalker',
+          name: 'Void Stalker',
+          generation: 3,
+          archetype: Archetype.assassin,
+          slot: FormationSlot.back1,
+          level: 30,
+          maxLevel: 45,
+          currentHp: 1600,
+          maxHp: 1600,
+          attack: 250,
+          defense: 110,
+          speed: 130,
+          nativeTraitId: 'death_mark',
+          lineageAncestors: [],
+        ),
+      ];
+    }
+    return createBossEnemies();
+  }
+
   /// Endgame Gauntlet: The World Titan Siege
   static List<UnitEntity> createWorldTitanEnemies() {
     return [
