@@ -227,35 +227,98 @@ class CombatResolutionService {
     }
 
     final UnitEntity target = opposingSquad[targetIndex];
+    final List<UnitEntity> friendlySquad = attackerIsAlly ? tickManager.allies : tickManager.enemies;
 
     final attackerRelics = relicService?.calculateBonuses(attacker.id) ?? const UnitRelicBonuses();
     final targetRelics = relicService?.calculateBonuses(target.id) ?? const UnitRelicBonuses();
 
+    final Set<String> attackerTraits = {
+      attacker.nativeTraitId,
+      if (attacker.graftedTraitId != null) attacker.graftedTraitId!,
+    };
+    final Set<String> targetTraits = {
+      target.nativeTraitId,
+      if (target.graftedTraitId != null) target.graftedTraitId!,
+    };
+
     // 1. Evaluate Hex Affinity and Glancing Blow status
     final double affinityMod = CombatMath.getAffinityMultiplier(attacker.archetype, target.archetype);
-    final bool isGlancing = CombatMath.isGlancingBlow(attacker.archetype, target.archetype, _rng);
+    bool isGlancing = CombatMath.isGlancingBlow(attacker.archetype, target.archetype, _rng);
+    // Trait: Keen Eye prevents glancing blows
+    if (attackerTraits.contains('keen_eye')) {
+      isGlancing = false;
+    }
 
     // 2. Evaluate Critical Strike
-    final double effectiveCritRate = (attacker.critRate + attackerRelics.bonusCritRate).clamp(0.0, 1.0);
-    final double effectiveCritDmg = attacker.critDamage + attackerRelics.bonusCritDamage;
+    double effectiveCritRate = (attacker.critRate + attackerRelics.bonusCritRate).clamp(0.0, 1.0);
+    if (attackerTraits.contains('keen_eye')) {
+      effectiveCritRate = (effectiveCritRate + 0.20).clamp(0.0, 1.0);
+    }
+
+    double effectiveCritDmg = attacker.critDamage + attackerRelics.bonusCritDamage;
+    if (attackerTraits.contains('vicious_strike')) {
+      effectiveCritDmg += 0.35;
+    }
+
     final bool isCritical = !isGlancing && (_rng.nextDouble() < effectiveCritRate);
     final double critMod = isCritical ? effectiveCritDmg : 1.0;
 
     // 3. Compute Defense Mitigation
     int baseDefense = target.defense + targetRelics.bonusDefense;
+    // Trait: Iron Bastion (+30% Armor)
+    if (targetTraits.contains('iron_bastion')) {
+      baseDefense = (baseDefense * 1.30).round();
+    }
+    // Trait: Shield Bastion (+25% Armor while HP > 50%)
+    if (targetTraits.contains('shield_bash') && target.currentHp > (target.maxHp * 0.5)) {
+      baseDefense = (baseDefense * 1.25).round();
+    }
+
     // Valeria's Iron Aegis: Frontline Vanguard allies gain +25% Armor
     if (!attackerIsAlly && commandService?.activeGeneralType == GeneralType.valeria && target.isVanguard) {
       baseDefense = (baseDefense * 1.25).round();
     }
-    final int effectiveDefense = skill.ignoresArmor ? (baseDefense * 0.5).round() : baseDefense;
+
+    // Trait: Piercing Arrow (ignores 50% defense)
+    final bool bypassArmor = skill.ignoresArmor || attackerTraits.contains('piercing_arrow');
+    final int effectiveDefense = bypassArmor ? (baseDefense * 0.5).round() : baseDefense;
     final double mitigation = CombatMath.calculateMitigation(effectiveDefense);
 
     // 4. Compute Base and Final Damage
-    final int effectiveAttack = attacker.attack + attackerRelics.bonusAttack;
-    final double baseDamage = effectiveAttack * skill.damageCoefficient * mitigation;
-    final double variance = 0.95 + (_rng.nextDouble() * 0.10);
+    int effectiveAttack = attacker.attack + attackerRelics.bonusAttack;
+    // Trait: Pack Instinct / Pack Hunter (+10% Attack per living ally)
+    if (attackerTraits.contains('pack_instinct') || attackerTraits.contains('pack_hunter')) {
+      final int livingAllies = friendlySquad.where((u) => u.isAlive).length;
+      effectiveAttack = (effectiveAttack * (1.0 + (0.10 * livingAllies))).round();
+    }
 
+    double baseDamage = effectiveAttack * skill.damageCoefficient * mitigation;
+    // Trait: Savage Claws (+15% damage)
+    if (attackerTraits.contains('claw_slash')) {
+      baseDamage *= 1.15;
+    }
+
+    final double variance = 0.95 + (_rng.nextDouble() * 0.10);
     double totalDamage = baseDamage * affinityMod * critMod * variance;
+
+    // Trait: Aerial Predator (+30% damage vs backline Arcanum)
+    if (attackerTraits.contains('dive_bomb') && !target.isVanguard) {
+      totalDamage *= 1.30;
+    }
+
+    // Trait: Shadow Bolt (+35% damage vs targets below 50% HP)
+    if (attackerTraits.contains('shadow_bolt') && target.currentHp < (target.maxHp * 0.5)) {
+      totalDamage *= 1.35;
+    }
+
+    // Trait: Death Mark (+40% damage vs Bleeding or Blighted foes)
+    if (attackerTraits.contains('death_mark')) {
+      final bool hasDoT = target.isBleeding || target.activeEffects.any((e) => e.type == StatusEffectType.blight);
+      if (hasDoT) {
+        totalDamage *= 1.40;
+      }
+    }
+
     if (isGlancing) {
       totalDamage *= 0.70;
     }
@@ -269,13 +332,41 @@ class CombatResolutionService {
       targetEffects.add(skill.appliedStatus!);
     }
 
+    // Trait: Rend Flesh / Rend (Applies Bleed on hit)
+    if ((attackerTraits.contains('rend_flesh') || attackerTraits.contains('rend')) && !isGlancing && newTargetHp > 0) {
+      targetEffects.add(const StatusEffect(type: StatusEffectType.bleed, durationTurns: 2, value: 50));
+    }
+
+    // Trait: Virulent Hex (Applies Blight on hit)
+    if (attackerTraits.contains('plague_hex') && !isGlancing && newTargetHp > 0) {
+      targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 3, value: 40));
+    }
+
+    double targetTurnMeter = target.turnMeter;
+    // Trait: Terrifying Shriek / Screech (reduces target TM by 15%)
+    if (attackerTraits.contains('screech') && newTargetHp > 0) {
+      targetTurnMeter = max(0.0, targetTurnMeter - 15.0);
+    }
+
     final UnitEntity updatedTarget = target.copyWith(
       currentHp: newTargetHp,
+      turnMeter: targetTurnMeter,
       activeEffects: targetEffects,
     );
 
+    // Trait: Blight Miasma (inflicts Blight on attacker when hit)
+    List<StatusEffect> attackerEffects = List.of(attacker.activeEffects);
+    if (targetTraits.contains('blight_curse') && attacker.isAlive) {
+      attackerEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 35));
+    }
+
     // 6. Resolve Lifesteal
     double effectiveLifestealRatio = skill.lifestealRatio + attackerRelics.bonusLifesteal;
+    // Trait: Blood Sovereign (+12% Lifesteal)
+    if (attackerTraits.contains('blood_sovereign')) {
+      effectiveLifestealRatio += 0.12;
+    }
+
     // Vladislav's Crimson Tithe: +8% Lifesteal against wounded or bleeding targets
     if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.vladislav) {
       if (target.isBleeding || target.currentHp < target.maxHp) {
@@ -299,7 +390,12 @@ class CombatResolutionService {
     // Morrigan's Temporal Threads: Crits grant +5% Turn Meter
     double bonusTmFromCrit = 0.0;
     if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.morrigan && isCritical) {
-      bonusTmFromCrit = 5.0;
+      bonusTmFromCrit += 5.0;
+    }
+
+    // Trait: Rabid Frenzy (+25% TM on crit)
+    if (attackerTraits.contains('rabid_bite') && isCritical) {
+      bonusTmFromCrit += 25.0;
     }
 
     // 7. Update Cooldowns and Ultimate Charge
@@ -321,6 +417,7 @@ class CombatResolutionService {
       turnMeter: attacker.turnMeter + bonusTmFromCrit,
       ultimateCharge: newUltimate,
       skills: updatedSkills,
+      activeEffects: attackerEffects,
     );
 
     // 8. Reconstruct Squad State

@@ -3,6 +3,7 @@ import '../../core/combat_math.dart';
 import '../../features/relics/relic_service.dart';
 import '../models/relic_entity.dart';
 import '../models/skill_entity.dart';
+import '../models/trait_entity.dart';
 import '../models/unit_entity.dart';
 import 'gothic_card_frame_widget.dart';
 
@@ -639,41 +640,105 @@ class PedigreeInspectorDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.fingerprint, size: 14, color: Color(0xFFE5A93C)),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'NATIVE TRAIT: ',
-                            style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                      // Native Trait
+                      () {
+                        final nativeTrait = TraitEntity.getTrait(unit.nativeTraitId);
+                        return Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: nativeTrait.themeColor.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: nativeTrait.themeColor.withValues(alpha: 0.5)),
                           ),
-                          Text(
-                            unit.nativeTraitId.replaceAll('_', ' ').toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(nativeTrait.icon, size: 14, color: nativeTrait.themeColor),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'NATIVE: ${nativeTrait.name.toUpperCase()}',
+                                    style: TextStyle(
+                                      color: nativeTrait.themeColor,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                nativeTrait.description,
+                                style: const TextStyle(color: Colors.white70, fontSize: 10),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.tune, size: 14, color: Color(0xFF81C784)),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'GRAFTED TRAIT: ',
-                            style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            unit.graftedTraitId != null
-                                ? unit.graftedTraitId!.replaceAll('_', ' ').toUpperCase()
-                                : 'NONE (SOCKET AVAILABLE IN CRUCIBLE)',
-                            style: TextStyle(
-                              color: unit.graftedTraitId != null ? const Color(0xFF81C784) : Colors.white30,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                        );
+                      }(),
+                      const SizedBox(height: 8),
+
+                      // Grafted Trait Socket
+                      () {
+                        if (unit.graftedTraitId != null) {
+                          final graftedTrait = TraitEntity.getTrait(unit.graftedTraitId!);
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF81C784).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF81C784).withValues(alpha: 0.6)),
                             ),
-                          ),
-                        ],
-                      ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(graftedTrait.icon, size: 14, color: const Color(0xFF81C784)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'GRAFTED: ${graftedTrait.name.toUpperCase()}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF81C784),
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  graftedTrait.description,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF131318),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white24, style: BorderStyle.solid),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.add_circle_outline, size: 14, color: Colors.white38),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'GRAFT SOCKET EMPTY • Fuse in Crucible to bind a progenitor\'s trait',
+                                    style: TextStyle(color: Colors.white38, fontSize: 9.5, fontStyle: FontStyle.italic),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      }(),
                       const SizedBox(height: 10),
                       const Divider(color: Color(0xFF2B2B36), height: 1),
                       const SizedBox(height: 8),

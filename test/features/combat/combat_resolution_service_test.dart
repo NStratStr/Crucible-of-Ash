@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
 import 'package:ashen_crucible/shared/models/unit_entity.dart';
+import 'package:ashen_crucible/shared/models/skill_entity.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/features/combat/combat_resolution_service.dart';
 
@@ -152,6 +153,83 @@ void main() {
       expect(result.targetDefeated, isTrue);
       expect(result.target.currentHp, equals(0));
       expect(tickManager.phase, equals(CombatPhase.battleEnded));
+    });
+
+    test('Attacker with rend_flesh trait applies Bleed status effect to target on hit', () {
+      final rendHero = juggernautHero.copyWith(
+        turnMeter: 100.0,
+        nativeTraitId: 'rend_flesh',
+      );
+      final foe = assassinFoe.copyWith(currentHp: 1000, turnMeter: 0.0);
+
+      tickManager = InitiativeTickManager(
+        initialAllies: [rendHero],
+        initialEnemies: [foe],
+      );
+      tickManager.advanceTick();
+
+      combatService = CombatResolutionService(tickManager: tickManager);
+
+      final result = combatService.executeBasicAttack(
+        targetUnitId: 'enemy_assassin',
+        autoResumeTickEngine: false,
+      );
+
+      expect(result.target.activeEffects.any((e) => e.type == StatusEffectType.bleed), isTrue);
+    });
+
+    test('Defender with blight_curse trait applies Blight back to the attacker when damaged', () {
+      final hero = juggernautHero.copyWith(turnMeter: 100.0);
+      final cursedFoe = assassinFoe.copyWith(
+        currentHp: 1000,
+        turnMeter: 0.0,
+        nativeTraitId: 'blight_curse',
+      );
+
+      tickManager = InitiativeTickManager(
+        initialAllies: [hero],
+        initialEnemies: [cursedFoe],
+      );
+      tickManager.advanceTick();
+
+      combatService = CombatResolutionService(tickManager: tickManager);
+
+      final result = combatService.executeBasicAttack(
+        targetUnitId: 'enemy_assassin',
+        autoResumeTickEngine: false,
+      );
+
+      expect(result.attacker.activeEffects.any((e) => e.type == StatusEffectType.blight), isTrue);
+    });
+
+    test('Attacker with keen_eye trait never suffers Glancing Blow against predator role', () {
+      // Occultist is predator of Juggernaut (disadvantage 0.75x)
+      final occultistFoe = buildUnit(
+        id: 'foe_occ',
+        name: 'Dark Occultist',
+        archetype: Archetype.occultist,
+        speed: 80,
+      );
+      final keenHero = juggernautHero.copyWith(
+        turnMeter: 100.0,
+        nativeTraitId: 'keen_eye',
+      );
+
+      // Run multiple attacks to ensure zero glancing blows occur
+      for (int i = 0; i < 5; i++) {
+        tickManager = InitiativeTickManager(
+          initialAllies: [keenHero],
+          initialEnemies: [occultistFoe],
+        );
+        tickManager.advanceTick();
+        combatService = CombatResolutionService(tickManager: tickManager);
+
+        final result = combatService.executeBasicAttack(
+          targetUnitId: 'foe_occ',
+          autoResumeTickEngine: false,
+        );
+        expect(result.isGlancing, isFalse);
+      }
     });
   });
 }

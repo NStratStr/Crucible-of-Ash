@@ -5,12 +5,14 @@ class CampaignMapScreen extends StatelessWidget {
   final List<CampaignNode> nodes;
   final ValueChanged<CampaignNode> onSelectNode;
   final int totalIchor;
+  final VoidCallback? onOpenEndgameGauntlet;
 
   const CampaignMapScreen({
     super.key,
     required this.nodes,
     required this.onSelectNode,
     this.totalIchor = 0,
+    this.onOpenEndgameGauntlet,
   });
 
   @override
@@ -25,6 +27,12 @@ class CampaignMapScreen extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
+          if (onOpenEndgameGauntlet != null)
+            IconButton(
+              icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 20),
+              tooltip: 'Endgame Gauntlet',
+              onPressed: onOpenEndgameGauntlet,
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 14.0),
             child: Row(
@@ -70,6 +78,23 @@ class CampaignMapScreen extends StatelessWidget {
                   child: _buildNodeBadge(context, node),
                 );
               }),
+              // Endgame Gauntlet Banner Button
+              if (onOpenEndgameGauntlet != null)
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.workspace_premium, size: 16),
+                    label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E1E28),
+                      foregroundColor: const Color(0xFFE5A93C),
+                      side: const BorderSide(color: Color(0xFFE5A93C), width: 1.2),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: onOpenEndgameGauntlet,
+                  ),
+                ),
             ],
           );
         },

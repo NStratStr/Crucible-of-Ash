@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../shared/models/trait_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/gothic_card_frame_widget.dart';
 import 'crucible_service.dart';
@@ -645,6 +646,8 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       if (_progenitorB != null) _progenitorB!.nativeTraitId,
     }.toList();
 
+    final selectedTrait = _selectedGraftTraitId != null ? TraitEntity.getTrait(_selectedGraftTraitId!) : null;
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -656,7 +659,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'SELECT TRAIT TO GRAFT TO CHILD',
+            'SELECT TRAIT TO GRAFT TO DESCENDANT',
             style: TextStyle(
               color: Colors.white,
               fontSize: 10,
@@ -667,10 +670,13 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
+            runSpacing: 6,
             children: traits.map((trait) {
+              final traitEntity = TraitEntity.getTrait(trait);
               final isSelected = _selectedGraftTraitId == trait;
               return ChoiceChip(
-                label: Text(trait.replaceAll('_', ' ').toUpperCase(),
+                avatar: Icon(traitEntity.icon, size: 14, color: isSelected ? Colors.white : traitEntity.themeColor),
+                label: Text(traitEntity.name.toUpperCase(),
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
                 selected: isSelected,
                 selectedColor: const Color(0xFFB3261E),
@@ -684,6 +690,29 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               );
             }).toList(),
           ),
+          if (selectedTrait != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: selectedTrait.themeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: selectedTrait.themeColor.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Icon(selectedTrait.icon, size: 16, color: selectedTrait.themeColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      selectedTrait.description,
+                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -6,6 +6,7 @@ import '../../features/campaign/campaign_map_generator.dart';
 import '../../features/campaign/campaign_map_screen.dart';
 import '../../features/campaign/campaign_node.dart';
 import '../../features/campaign/defiled_crypt_dialog.dart';
+import '../../features/campaign/endgame_gauntlet_dialog.dart';
 import '../../features/campaign/rest_haven_dialog.dart';
 import '../../features/campaign/watchtower_dialog.dart';
 import '../../features/combat/battle_screen.dart';
@@ -391,6 +392,58 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  Future<void> _handleOpenEndgameGauntlet() async {
+    final trial = await EndgameGauntletDialog.show(context);
+    if (!mounted || trial == null) return;
+
+    List<UnitEntity> enemies;
+    String trialName;
+    int rewardIchor;
+    switch (trial) {
+      case EndgameTrialType.worldTitan:
+        enemies = StarterBrigades.createWorldTitanEnemies();
+        trialName = 'The Ashen World Titan';
+        rewardIchor = 2000;
+        break;
+      case EndgameTrialType.lineageCrypt:
+        enemies = StarterBrigades.createLineageCryptEnemies();
+        trialName = 'Lineage Crypt: Den of Fangs';
+        rewardIchor = 800;
+        break;
+      case EndgameTrialType.abyssalDescent:
+        enemies = StarterBrigades.createAbyssalDescentEnemies();
+        trialName = 'Abyssal Descent: Torment I';
+        rewardIchor = 1200;
+        break;
+    }
+
+    final gauntletNode = CampaignNode(
+      id: 'gauntlet_${DateTime.now().millisecondsSinceEpoch}',
+      depth: 4,
+      verticalRatio: 0.5,
+      type: CampaignNodeType.boss,
+      name: trialName,
+      description: 'High-stakes Endgame Gauntlet trial.',
+      nextNodeIds: const [],
+      rewardIchor: rewardIchor,
+      isCurrent: true,
+      isReachable: true,
+    );
+
+    setState(() {
+      _activeNode = gauntletNode;
+      _resetEncounter(enemies);
+      _currentIndex = 1; // Switch to Battle Arena
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Engaged $trialName! The Gauntlet awakens.'),
+        backgroundColor: const Color(0xFFB3261E),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allPlayerUnits = [
@@ -407,6 +460,7 @@ class _AppShellState extends State<AppShell> {
             nodes: _campaignNodes,
             onSelectNode: _onSelectCampaignNode,
             totalIchor: _totalIchor,
+            onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
           ),
           // Tab 1: Tactical Arena
           BattleScreen(

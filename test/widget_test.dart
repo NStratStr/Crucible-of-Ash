@@ -63,5 +63,26 @@ void main() {
     // Verify Commander switched to Lady Valeria
     expect(find.text('LADY VALERIA'), findsOneWidget);
   });
+
+  testWidgets('Opening Endgame Gauntlet renders trials and allows engaging World Titan', (WidgetTester tester) async {
+    await tester.pumpWidget(const AshenCrucibleApp());
+    await tester.pump();
+
+    // On Campaign Map, tap ENDGAME GAUNTLET button
+    expect(find.text('ENDGAME GAUNTLET'), findsOneWidget);
+    await tester.tap(find.text('ENDGAME GAUNTLET'));
+    await tester.pumpAndSettle();
+
+    // Verify modal appeared with trials
+    expect(find.text('THE ENDGAME GAUNTLET'), findsOneWidget);
+    expect(find.text('THE ASHEN WORLD TITAN'), findsOneWidget);
+
+    // Tap ENGAGE TRIAL for World Titan
+    await tester.tap(find.text('ENGAGE TRIAL').first);
+    await tester.pumpAndSettle();
+
+    // Verify engaged into Battle Arena
+    expect(find.text('The Ashen World Titan'), findsOneWidget);
+  });
 }
 
