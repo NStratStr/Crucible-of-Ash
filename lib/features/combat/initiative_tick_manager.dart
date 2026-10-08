@@ -39,6 +39,7 @@ class InitiativeTickManager extends ChangeNotifier {
 
   Timer? _loopTimer;
   final Duration tickInterval;
+  double _speedMultiplier = 1.0;
 
   InitiativeTickManager({
     required List<UnitEntity> initialAllies,
@@ -53,6 +54,12 @@ class InitiativeTickManager extends ChangeNotifier {
   UnitEntity? get activeUnit => _activeUnit;
   List<UnitEntity> get allies => _allies;
   List<UnitEntity> get enemies => _enemies;
+  double get speedMultiplier => _speedMultiplier;
+
+  Duration get effectiveTickInterval => Duration(
+        milliseconds:
+            (tickInterval.inMilliseconds / _speedMultiplier).round().clamp(20, 1000),
+      );
 
   List<UnitEntity> get allUnits => [..._allies, ..._enemies];
 
@@ -63,6 +70,17 @@ class InitiativeTickManager extends ChangeNotifier {
         activeUnit: _activeUnit,
         phase: _phase,
       );
+
+  /// Sets the real-time simulation speed multiplier (e.g. 1.0x, 2.0x).
+  void setSpeedMultiplier(double multiplier) {
+    if (multiplier <= 0 || _speedMultiplier == multiplier) return;
+    _speedMultiplier = multiplier;
+    if (_phase == CombatPhase.ticking && _loopTimer != null) {
+      _loopTimer?.cancel();
+      _loopTimer = Timer.periodic(effectiveTickInterval, (_) => advanceTick());
+    }
+    notifyListeners();
+  }
 
   /// Starts the automatic real-time tick engine.
   void start() {
@@ -77,7 +95,7 @@ class InitiativeTickManager extends ChangeNotifier {
     notifyListeners();
 
     _loopTimer?.cancel();
-    _loopTimer = Timer.periodic(tickInterval, (_) => advanceTick());
+    _loopTimer = Timer.periodic(effectiveTickInterval, (_) => advanceTick());
   }
 
   /// Pauses the automatic timer.

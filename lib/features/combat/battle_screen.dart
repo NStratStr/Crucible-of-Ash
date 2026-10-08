@@ -7,6 +7,7 @@ import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
 import '../../shared/widgets/living_atmosphere_background.dart';
+import '../../shared/widgets/hexagonal_affinity_wheel_widget.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
@@ -300,7 +301,8 @@ class _BattleScreenState extends State<BattleScreen> {
     _isProcessingAiTurn = true;
 
     try {
-      await Future.delayed(const Duration(milliseconds: 550));
+      final int aiDelay = (550 / widget.tickManager.speedMultiplier).round();
+      await Future.delayed(Duration(milliseconds: aiDelay));
       if (!mounted) return;
 
       final activeBefore = widget.tickManager.activeUnit;
@@ -591,6 +593,58 @@ class _BattleScreenState extends State<BattleScreen> {
     setState(() {
       _combatLog = 'Commander sworn: ${profile.name} (${profile.title}) took command!';
     });
+  }
+
+  void _showHexWheelDialog([Archetype? activeArchetype]) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF16161F),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.hexagon_outlined, color: Color(0xFFD4AF37), size: 18),
+              SizedBox(width: 8),
+              Text(
+                'HEXAGONAL AFFINITY WHEEL',
+                style: TextStyle(
+                  color: Color(0xFFD4AF37),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Clockwise target = Advantage (+30% DMG, -15% Incoming)\n'
+                'Counter-clockwise target = Disadvantage (-25% DMG, +25% Glancing Blow)',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+              ),
+              const SizedBox(height: 16),
+              HexagonalAffinityWheelWidget(
+                activeArchetype: activeArchetype,
+                size: 220,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('DISMISS', style: TextStyle(color: Color(0xFFD4AF37))),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -884,10 +938,73 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 const SizedBox(width: 8),
 
-                // Right: Auto Mode & Tick Indicator
+                // Right: Speed Toggle, Wheel Info, Auto Mode & Tick Indicator
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Speed Multiplier Toggle
+                    GestureDetector(
+                      onTap: () {
+                        final current = widget.tickManager.speedMultiplier;
+                        final next = current == 1.0 ? 2.0 : 1.0;
+                        widget.tickManager.setSpeedMultiplier(next);
+                        setState(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: widget.tickManager.speedMultiplier > 1.0
+                              ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
+                              : const Color(0xFF2B2B36),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: widget.tickManager.speedMultiplier > 1.0
+                                ? const Color(0xFFE5A93C)
+                                : const Color(0xFF424250),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '${widget.tickManager.speedMultiplier.toInt()}X',
+                          style: TextStyle(
+                            fontSize: 9.0,
+                            fontWeight: FontWeight.bold,
+                            color: widget.tickManager.speedMultiplier > 1.0
+                                ? const Color(0xFFE5A93C)
+                                : Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Affinity Wheel Modal Trigger
+                    GestureDetector(
+                      onTap: () => _showHexWheelDialog(activeUnit?.archetype),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2B2B36),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF424250), width: 1),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.hexagon_outlined, size: 11, color: Color(0xFFD4AF37)),
+                            SizedBox(width: 2),
+                            Text(
+                              'WHEEL',
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFD4AF37),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -898,7 +1015,7 @@ class _BattleScreenState extends State<BattleScreen> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         decoration: BoxDecoration(
                           color: _autoBattle ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
                           borderRadius: BorderRadius.circular(4),
@@ -912,21 +1029,21 @@ class _BattleScreenState extends State<BattleScreen> {
                           children: [
                             Icon(
                               _autoBattle ? Icons.play_arrow : Icons.pause,
-                              size: 13,
+                              size: 12,
                               color: Colors.white,
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 2),
                             Text(
                               _autoBattle ? 'AUTO' : 'MANUAL',
-                              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1F1F2A),
                         borderRadius: BorderRadius.circular(4),
@@ -938,7 +1055,7 @@ class _BattleScreenState extends State<BattleScreen> {
                           color: Color(0xFF9E9EB0),
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
-                          fontSize: 9.5,
+                          fontSize: 9.0,
                         ),
                       ),
                     ),
@@ -1401,6 +1518,12 @@ class _BattleScreenState extends State<BattleScreen> {
     final double tmRatio = (unit.turnMeter / 100.0).clamp(0.0, 1.0);
     final bool ultReady = unit.ultimateCharge >= 100.0 && alive;
 
+    final activeUnit = widget.tickManager.activeUnit;
+    double? affinityMult;
+    if (isEnemy && alive && _isPlayerTurnNow && activeUnit != null) {
+      affinityMult = CombatMath.getAffinityMultiplier(activeUnit.archetype, unit.archetype);
+    }
+
     final bool isAttacking = _attackingUnitId == unit.id;
     final bool isDamaged = _damagedUnitId == unit.id;
     final double lungeY = isAttacking ? (isEnemy ? 12.0 : -12.0) : 0.0;
@@ -1612,18 +1735,33 @@ class _BattleScreenState extends State<BattleScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFB3261E),
+                                            color: affinityMult != null && affinityMult > 1.0
+                                                ? const Color(0xFF2E7D32)
+                                                : (affinityMult != null && affinityMult < 1.0
+                                                    ? const Color(0xFFC62828)
+                                                    : const Color(0xFFB3261E)),
                                             borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: const Color(0xFFFF5252), width: 1),
+                                            border: Border.all(
+                                              color: affinityMult != null && affinityMult > 1.0
+                                                  ? const Color(0xFF81C784)
+                                                  : (affinityMult != null && affinityMult < 1.0
+                                                      ? const Color(0xFFFF8A80)
+                                                      : const Color(0xFFFF5252)),
+                                              width: 1,
+                                            ),
                                           ),
-                                          child: const Row(
+                                          child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.gps_fixed, size: 8, color: Colors.white),
-                                              SizedBox(width: 2),
+                                              const Icon(Icons.gps_fixed, size: 8, color: Colors.white),
+                                              const SizedBox(width: 2),
                                               Text(
-                                                'TARGET',
-                                                style: TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
+                                                affinityMult != null && affinityMult > 1.0
+                                                    ? 'TARGET (▲+30%)'
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? 'TARGET (▼WEAK)'
+                                                        : 'TARGET'),
+                                                style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           ),
@@ -1667,14 +1805,33 @@ class _BattleScreenState extends State<BattleScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.75),
+                                            color: affinityMult != null && affinityMult > 1.0
+                                                ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
+                                                : (affinityMult != null && affinityMult < 1.0
+                                                    ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
+                                                    : Colors.black.withValues(alpha: 0.75)),
                                             borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
+                                            border: Border.all(
+                                              color: affinityMult != null && affinityMult > 1.0
+                                                  ? const Color(0xFF81C784)
+                                                  : (affinityMult != null && affinityMult < 1.0
+                                                      ? const Color(0xFFFF8A80)
+                                                      : const Color(0xFFE5A93C)),
+                                              width: 0.8,
+                                            ),
                                           ),
                                           child: Text(
-                                            'G${unit.generation}',
-                                            style: const TextStyle(
-                                              color: Color(0xFFE5A93C),
+                                            affinityMult != null && affinityMult > 1.0
+                                                ? '▲ ADV'
+                                                : (affinityMult != null && affinityMult < 1.0
+                                                    ? '▼ WEAK'
+                                                    : 'G${unit.generation}'),
+                                            style: TextStyle(
+                                              color: affinityMult != null && affinityMult > 1.0
+                                                  ? const Color(0xFFA5D6A7)
+                                                  : (affinityMult != null && affinityMult < 1.0
+                                                      ? const Color(0xFFFFCDD2)
+                                                      : const Color(0xFFE5A93C)),
                                               fontSize: 7.5,
                                               fontFamily: 'monospace',
                                               fontWeight: FontWeight.bold,
@@ -1858,6 +2015,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final focus = widget.commandService.currentFocus;
     final profile = widget.commandService.currentProfile;
     final skills = activeUnit?.resolvedSkills ?? [];
+    final double? targetedAffinity = (selectedEnemy != null && activeUnit != null)
+        ? CombatMath.getAffinityMultiplier(activeUnit.archetype, selectedEnemy.archetype)
+        : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1927,7 +2087,11 @@ class _BattleScreenState extends State<BattleScreen> {
                                     : '${(activeUnit?.ultimateCharge ?? 0).toInt()}% GAUGE')
                                 : (skill.currentCooldown > 0
                                     ? '${skill.currentCooldown} CD'
-                                    : '${skill.damageCoefficient}x DMG'),
+                                    : (targetedAffinity != null && targetedAffinity > 1.0
+                                        ? '${skill.damageCoefficient}x DMG (▲ 1.3x)'
+                                        : (targetedAffinity != null && targetedAffinity < 1.0
+                                            ? '${skill.damageCoefficient}x DMG (▼ 0.75x)'
+                                            : '${skill.damageCoefficient}x DMG'))),
                             style: TextStyle(
                               fontSize: 8,
                               color: isUlt && ultReady ? Colors.black87 : Colors.white70,
