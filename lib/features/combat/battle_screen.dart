@@ -2018,18 +2018,43 @@ class _BattleScreenState extends State<BattleScreen> {
                                   Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        unit.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          shadows: [
-                                            Shadow(color: Colors.black, blurRadius: 4),
-                                          ],
-                                        ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              unit.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                shadows: [
+                                                  Shadow(color: Colors.black, blurRadius: 4),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                                              borderRadius: BorderRadius.circular(2),
+                                              border: Border.all(color: const Color(0xFFE5A93C), width: 0.6),
+                                            ),
+                                            child: Text(
+                                              'Lv.${unit.level}',
+                                              style: const TextStyle(
+                                                color: Color(0xFFE5A93C),
+                                                fontSize: 7.5,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                       const SizedBox(height: 2),
                                       Padding(

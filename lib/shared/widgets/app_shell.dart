@@ -63,13 +63,14 @@ class _AppShellState extends State<AppShell> {
   final Set<EndgameTrialType> _clearedGauntletTrials = {};
   EndgameTrialType? _activeGauntletTrial;
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _relicService = RelicService();
     _ftueService = FtueService();
-    _resetEncounter();
+    _resetEncounter(null, BattleModifier.none, false);
     _inventory = StarterBrigades.createReserveInventory();
     _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
 
@@ -164,14 +165,19 @@ class _AppShellState extends State<AppShell> {
   void _resetEncounter([
     List<UnitEntity>? customEnemies,
     BattleModifier battleModifier = BattleModifier.none,
-    bool preserveSquad = false,
+    bool preserveSquad = true,
   ]) {
     List<UnitEntity> allies;
-    if (preserveSquad) {
-      allies = _tickManager.allies.map((u) => u.copyWith(turnMeter: 0.0, activeEffects: const [])).toList();
+    if (preserveSquad && _isInitialized && _tickManager.allies.isNotEmpty) {
+      allies = _tickManager.allies.map((u) => u.copyWith(
+        currentHp: u.currentHp <= 0 ? (u.maxHp * 0.5).round() : u.currentHp,
+        turnMeter: 0.0,
+        activeEffects: const [],
+      )).toList();
     } else {
       allies = StarterBrigades.createPlayerSquad();
     }
+    _isInitialized = true;
     final enemies = customEnemies ?? StarterBrigades.createTutorialEnemies();
 
     _tickManager = InitiativeTickManager(
@@ -393,11 +399,21 @@ class _AppShellState extends State<AppShell> {
       }
       return updated;
     }).toList();
-    _tickManager.consumeTurn(
-      retainedOverflow: true,
-      updatedAllies: leveled,
-      autoResume: false,
-    );
+    _tickManager.updateSquads(allies: leveled);
+
+    // Award 50% training XP to reserve thralls in inventory so they progress towards max level
+    final reserveXp = (amount * 0.5).round();
+    if (reserveXp > 0 && _inventory.isNotEmpty) {
+      _inventory = _inventory.map((u) {
+        final oldLevel = u.level;
+        final updated = u.addXp(reserveXp);
+        if (updated.level > oldLevel) {
+          levelUps.add('${updated.name} [Reserve] (Lv. $oldLevel➔${updated.level})');
+        }
+        return updated;
+      }).toList();
+    }
+
     return levelUps;
   }
 
@@ -414,11 +430,7 @@ class _AppShellState extends State<AppShell> {
         return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
       }).toList();
 
-      _tickManager.consumeTurn(
-        retainedOverflow: true,
-        updatedAllies: sacrificedAllies,
-        autoResume: false,
-      );
+      _tickManager.updateSquads(allies: sacrificedAllies);
 
       setState(() {
         _totalIchor += 350;
@@ -439,11 +451,7 @@ class _AppShellState extends State<AppShell> {
         return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
       }).toList();
 
-      _tickManager.consumeTurn(
-        retainedOverflow: true,
-        updatedAllies: sacrificedAllies,
-        autoResume: false,
-      );
+      _tickManager.updateSquads(allies: sacrificedAllies);
 
       final epicRelic = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
       _markNodeCompleted(node.id);
@@ -461,11 +469,7 @@ class _AppShellState extends State<AppShell> {
         return u.copyWith(currentHp: max(1, u.currentHp - sacrifice));
       }).toList();
 
-      _tickManager.consumeTurn(
-        retainedOverflow: true,
-        updatedAllies: sacrificedAllies,
-        autoResume: false,
-      );
+      _tickManager.updateSquads(allies: sacrificedAllies);
 
       setState(() {
         _activeExpeditionBoons.add(ExpeditionBoon.sanguineCovenant);
@@ -522,11 +526,7 @@ class _AppShellState extends State<AppShell> {
           return u.copyWith(currentHp: max(1, u.currentHp - hpLoss));
         }).toList();
 
-        _tickManager.consumeTurn(
-          retainedOverflow: true,
-          updatedAllies: afflictedAllies,
-          autoResume: false,
-        );
+        _tickManager.updateSquads(allies: afflictedAllies);
 
         setState(() {
           _totalIchor += 350;
@@ -551,11 +551,7 @@ class _AppShellState extends State<AppShell> {
         return u.copyWith(currentHp: min(u.maxHp, u.currentHp + heal));
       }).toList();
 
-      _tickManager.consumeTurn(
-        retainedOverflow: true,
-        updatedAllies: healed,
-        autoResume: false,
-      );
+      _tickManager.updateSquads(allies: healed);
       _markNodeCompleted(node.id);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -590,21 +586,24 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onCombatVictory() {
-    if (_activeNode != null) {
-      final reward = _activeNode!.rewardIchor;
-      final oreReward = _activeNode!.rewardOre;
-      final sigilsReward = _activeNode!.rewardSigils;
-      final xpReward = _activeNode!.type == CampaignNodeType.boss
-          ? 1000
-          : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250);
-      final levelUps = _grantBrigadeXp(xpReward);
+    final reward = _activeNode?.rewardIchor ?? 150;
+    final oreReward = _activeNode?.rewardOre ?? 15;
+    final sigilsReward = _activeNode?.rewardSigils ?? 0;
+    final xpReward = _activeNode == null
+        ? 350
+        : (_activeNode!.type == CampaignNodeType.boss
+            ? 1000
+            : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250));
+    final levelUps = _grantBrigadeXp(xpReward);
 
-      setState(() {
-        _totalIchor += reward;
-        _cursedOre += oreReward;
-        _bloodlineSigils += sigilsReward;
-      });
+    setState(() {
+      _totalIchor += reward;
+      _cursedOre += oreReward;
+      _bloodlineSigils += sigilsReward;
+    });
+    if (_activeNode != null) {
       _markNodeCompleted(_activeNode!.id);
+    }
 
       UnitEntity? purebloodDrop;
       if (_activeNode?.name.contains('Tomb of the Deathless') == true) {
@@ -647,10 +646,10 @@ class _AppShellState extends State<AppShell> {
       if (purebloodDrop != null) {
         extraReward += ' • PINNACLE LINEAGE: ${purebloodDrop.name} (PUREBLOOD GEN 4)!';
       }
-      if (_activeNode!.type == CampaignNodeType.elite) {
+      if (_activeNode?.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
         extraReward += ' • Dropped ${drop.displayName}!';
-      } else if (_activeNode!.type == CampaignNodeType.boss) {
+      } else if (_activeNode?.type == CampaignNodeType.boss) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
         extraReward += ' • LEGENDARY DROP: ${drop.displayName}!';
       }
@@ -663,7 +662,7 @@ class _AppShellState extends State<AppShell> {
         _ftueService.advanceStage();
       }
 
-      if (_activeNode!.type == CampaignNodeType.boss && _currentChapter < 3) {
+      if (_activeNode?.type == CampaignNodeType.boss && _currentChapter < 3) {
         final nextCh = _currentChapter + 1;
         if (_maxUnlockedChapter < nextCh) {
           setState(() {
@@ -685,7 +684,6 @@ class _AppShellState extends State<AppShell> {
         ),
       );
       _saveCurrentState();
-    }
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
@@ -1057,11 +1055,7 @@ class _AppShellState extends State<AppShell> {
       final heal = (u.maxHp * 0.40).round();
       return u.copyWith(currentHp: min(u.maxHp, u.currentHp + heal));
     }).toList();
-    _tickManager.consumeTurn(
-      retainedOverflow: true,
-      updatedAllies: healed,
-      autoResume: false,
-    );
+    _tickManager.updateSquads(allies: healed);
   }
 
   void _unlockCryptThrall() {
