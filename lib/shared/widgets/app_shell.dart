@@ -1591,23 +1591,76 @@ class _AppShellState extends State<AppShell> {
                               width: 52,
                               height: 52,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12),
+                                  bottom: Radius.circular(4),
+                                ),
                                 border: Border.all(
                                   color: inActiveSquad
                                       ? const Color(0xFFB3261E)
-                                      : const Color(0xFFE5A93C).withValues(alpha: 0.5),
-                                  width: 1.5,
+                                      : (unit.isPureblood
+                                          ? const Color(0xFFFF5252)
+                                          : _getArchetypeColor(unit.archetype).withValues(alpha: 0.7)),
+                                  width: unit.isPureblood || inActiveSquad ? 1.6 : 1.2,
+                                ),
+                                boxShadow: [
+                                  if (unit.isPureblood)
+                                    BoxShadow(
+                                      color: const Color(0xFFFF1744).withValues(alpha: 0.45),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  const BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                                gradient: RadialGradient(
+                                  center: const Alignment(0, -0.3),
+                                  radius: 0.85,
+                                  colors: [
+                                    _getArchetypeColor(unit.archetype).withValues(alpha: 0.35),
+                                    const Color(0xFF13131A),
+                                    const Color(0xFF09090D),
+                                  ],
                                 ),
                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(6.5),
-                                child: Image.asset(
-                                  unit.effectiveAvatarAsset,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: const Color(0xFF2B2B36),
-                                    child: const Icon(Icons.shield, color: Colors.white24, size: 24),
-                                  ),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(11),
+                                  bottom: Radius.circular(3),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Image.asset(
+                                        unit.effectiveAvatarAsset,
+                                        fit: BoxFit.cover,
+                                        alignment: Alignment.topCenter,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: const Color(0xFF2B2B36),
+                                          child: const Icon(Icons.shield, color: Colors.white24, size: 24),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned.fill(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            stops: const [0.0, 0.65, 1.0],
+                                            colors: [
+                                              Colors.black.withValues(alpha: 0.1),
+                                              Colors.transparent,
+                                              Colors.black.withValues(alpha: 0.75),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -2035,5 +2088,22 @@ class _AppShellState extends State<AppShell> {
         ],
       ),
     );
+  }
+
+  Color _getArchetypeColor(Archetype type) {
+    switch (type) {
+      case Archetype.juggernaut:
+        return const Color(0xFFC62828);
+      case Archetype.assassin:
+        return const Color(0xFF6A1B9A);
+      case Archetype.marksman:
+        return const Color(0xFF2E7D32);
+      case Archetype.skirmisher:
+        return const Color(0xFFE65100);
+      case Archetype.support:
+        return const Color(0xFF00838F);
+      case Archetype.occultist:
+        return const Color(0xFF4527A0);
+    }
   }
 }

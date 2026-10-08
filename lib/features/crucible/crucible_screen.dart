@@ -725,12 +725,55 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFE5A93C), width: 1),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(10),
+                      bottom: Radius.circular(4),
+                    ),
+                    border: Border.all(
+                      color: unit.isPureblood ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      if (unit.isPureblood)
+                        BoxShadow(
+                          color: const Color(0xFFFF1744).withValues(alpha: 0.45),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                    ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: Image.asset(unit.effectiveAvatarAsset, fit: BoxFit.cover),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(9),
+                      bottom: Radius.circular(3),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Image.asset(
+                            unit.effectiveAvatarAsset,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: const [0.0, 0.7, 1.0],
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.7),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Text(
@@ -941,7 +984,10 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
+                              bottom: Radius.circular(3),
+                            ),
                             border: Border.all(
                               color: isSlotted
                                   ? const Color(0xFFB3261E)
@@ -952,8 +998,15 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                             ),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(5),
-                            child: Image.asset(unit.effectiveAvatarAsset, fit: BoxFit.cover),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(7),
+                              bottom: Radius.circular(2),
+                            ),
+                            child: Image.asset(
+                              unit.effectiveAvatarAsset,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                            ),
                           ),
                         ),
                         Container(

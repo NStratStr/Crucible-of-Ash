@@ -1775,32 +1775,139 @@ class _BattleScreenState extends State<BattleScreen> {
             borderRadius: BorderRadius.circular(5),
             child: Stack(
               children: [
-                // LAYER 1: Portrait Image
+                // LAYER 0: Dark Gothic Stone Base
                 Positioned.fill(
-                  child: Image.asset(
-                    unit.effectiveAvatarAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF161622), Color(0xFF09090D)],
+                      ),
+                    ),
                   ),
                 ),
 
-                // LAYER 1.5: Tint
-                Positioned.fill(
+                // LAYER 1: Arched Character Cutout Chamber (Elevated Cutout Silhouette)
+                Positioned(
+                  top: 18,
+                  bottom: 40,
+                  left: 3,
+                  right: 3,
                   child: Container(
-                    color: alive
-                        ? (isCriticalHp
-                            ? const Color(0xFFB3261E).withValues(alpha: 0.25)
-                            : Colors.black.withValues(alpha: 0.22))
-                        : Colors.black.withValues(alpha: 0.82),
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                        bottom: Radius.circular(3),
+                      ),
+                      border: Border.all(
+                        color: isActive
+                            ? const Color(0xFFFFD54F)
+                            : (isSelectedTarget
+                                ? const Color(0xFFFF5252)
+                                : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.65 : 0.25)),
+                        width: isActive || isSelectedTarget ? 1.4 : 1.0,
+                      ),
+                      boxShadow: [
+                        if (isActive)
+                          BoxShadow(
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          )
+                        else if (isSelectedTarget)
+                          BoxShadow(
+                            color: const Color(0xFFFF1744).withValues(alpha: 0.45),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          )
+                        else
+                          const BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 5,
+                            offset: Offset(0, 2),
+                          ),
+                      ],
+                      gradient: RadialGradient(
+                        center: const Alignment(0, -0.3),
+                        radius: 0.85,
+                        colors: [
+                          _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.38 : 0.08),
+                          const Color(0xFF13131A),
+                          const Color(0xFF09090D),
+                        ],
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(11),
+                        bottom: Radius.circular(2),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Character Artwork (Desaturated if fallen)
+                          Positioned.fill(
+                            child: ColorFiltered(
+                              colorFilter: alive
+                                  ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
+                                  : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
+                              child: Image.asset(
+                                unit.effectiveAvatarAsset,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.topCenter,
+                                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                              ),
+                            ),
+                          ),
+
+                          // Inner Silhouette Vignette & Depth Shadow
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  stops: const [0.0, 0.65, 1.0],
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.12),
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.82),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Critical HP Warning Vignette
+                          if (isCriticalHp)
+                            Positioned.fill(
+                              child: Container(
+                                color: const Color(0xFFB3261E).withValues(alpha: 0.25),
+                              ),
+                            ),
+
+                          // Death Darkening
+                          if (!alive)
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black.withValues(alpha: 0.65),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
 
                 // LAYER 2: Carved Iron Gothic Frame Overlay
                 Positioned.fill(
-                  child: Image.asset(
-                    'assets/images/card_frame.png',
-                    fit: BoxFit.fill,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  child: IgnorePointer(
+                    child: Image.asset(
+                      'assets/images/card_frame.png',
+                      fit: BoxFit.fill,
+                      opacity: const AlwaysStoppedAnimation(0.75),
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
                   ),
                 ),
 

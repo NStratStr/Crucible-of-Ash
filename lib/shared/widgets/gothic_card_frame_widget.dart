@@ -58,6 +58,11 @@ class GothicCardFrameWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeColor = _getArchetypeColor(unit.archetype);
 
+    final double topPad = (height * 0.13).clamp(26.0, 36.0);
+    final double bottomPad = showStats
+        ? (height * 0.31).clamp(62.0, 78.0)
+        : (height * 0.20).clamp(40.0, 50.0);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -85,34 +90,127 @@ class GothicCardFrameWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(9),
           child: Stack(
             children: [
-              // 1. Character Portrait Artwork
+              // 1. Dark Atmospheric Gothic Stone Backing
               Positioned.fill(
-                child: Image.asset(
-                  unit.effectiveAvatarAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: const Color(0xFF1B1B22),
-                      child: Icon(
-                        _getArchetypeIcon(unit.archetype),
-                        color: themeColor.withValues(alpha: 0.5),
-                        size: 48,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF161622),
+                        const Color(0xFF0A0A10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // 2. Dedicated Character Cutout Arch Chamber (Elevated Cutout Figure)
+              Positioned(
+                top: topPad,
+                bottom: bottomPad,
+                left: 8,
+                right: 8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(22),
+                      bottom: Radius.circular(6),
+                    ),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFFE5A93C)
+                          : (unit.isPureblood
+                              ? const Color(0xFFFF5252)
+                              : themeColor.withValues(alpha: 0.65)),
+                      width: unit.isPureblood ? 1.8 : 1.3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                    );
-                  },
+                      if (unit.isPureblood)
+                        BoxShadow(
+                          color: const Color(0xFFFF1744).withValues(alpha: 0.45),
+                          blurRadius: 12,
+                          spreadRadius: 1.5,
+                        ),
+                    ],
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.25),
+                      radius: 0.85,
+                      colors: [
+                        themeColor.withValues(alpha: 0.38),
+                        const Color(0xFF14141E),
+                        const Color(0xFF0A0A0E),
+                      ],
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                      bottom: Radius.circular(5),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Character Portrait Artwork with Top-Center Alignment
+                        Positioned.fill(
+                          child: Image.asset(
+                            unit.effectiveAvatarAsset,
+                            fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFF1B1B22),
+                                child: Icon(
+                                  _getArchetypeIcon(unit.archetype),
+                                  color: themeColor.withValues(alpha: 0.5),
+                                  size: 48,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Character Cutout Vignette & Inner Rim Shadow
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: const [0.0, 0.65, 1.0],
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.15),
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.82),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
-              // 2. Carved Iron Gothic Frame Overlay (with transparent window)
+              // 3. Carved Iron Gothic Frame Overlay
               Positioned.fill(
-                child: Image.asset(
-                  'assets/images/card_frame.png',
-                  fit: BoxFit.fill,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                child: IgnorePointer(
+                  child: Image.asset(
+                    'assets/images/card_frame.png',
+                    fit: BoxFit.fill,
+                    opacity: const AlwaysStoppedAnimation(0.85),
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
                 ),
               ),
 
-              // 3. Subtle bottom shadow for name readability
+              // 4. Subtle bottom shadow for name readability
               Positioned(
                 left: 0,
                 right: 0,
@@ -125,14 +223,14 @@ class GothicCardFrameWidget extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.92),
+                        Colors.black.withValues(alpha: 0.94),
                       ],
                     ),
                   ),
                 ),
               ),
 
-              // 3. Top Badges: Archetype (Left) & Generation (Right)
+              // 5. Top Badges: Archetype (Left) & Generation (Right)
               Positioned(
                 top: 6,
                 left: 6,
