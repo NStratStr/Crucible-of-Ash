@@ -41,6 +41,13 @@ class RelicService extends ChangeNotifier {
 
   List<RelicEntity> get allRelics => List.unmodifiable(_relics);
 
+  /// Overwrites the full relic collection (used for restoring saved state).
+  void setAllRelics(List<RelicEntity> newRelics) {
+    _relics.clear();
+    _relics.addAll(newRelics);
+    notifyListeners();
+  }
+
   List<RelicEntity> get unequippedRelics =>
       _relics.where((r) => r.equippedUnitId == null).toList();
 

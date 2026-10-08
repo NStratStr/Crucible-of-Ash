@@ -15,6 +15,7 @@ import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
+import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
 import '../../features/relics/relic_service.dart';
 import '../../features/ftue/awakening_dialog.dart';
@@ -83,6 +84,81 @@ class _AppShellState extends State<AppShell> {
     _ftueService.addListener(() {
       if (mounted) setState(() {});
     });
+
+    _loadPersistedState();
+  }
+
+  Future<void> _loadPersistedState() async {
+    try {
+      final saved = await GameStatePersistenceService.load();
+      if (saved != null && mounted) {
+        setState(() {
+          _totalIchor = saved.totalIchor;
+          _cursedOre = saved.cursedOre;
+          _bloodlineSigils = saved.bloodlineSigils;
+          _activeGeneralType = saved.activeGeneralType;
+          _phylacteryRanks = Map.from(saved.phylacteryRanks);
+          _currentChapter = saved.currentChapter;
+          _maxUnlockedChapter = saved.maxUnlockedChapter;
+          _clearedGauntletTrials.clear();
+          _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
+
+          if (saved.allies.isNotEmpty) {
+            _tickManager.dispose();
+            _commandService.dispose();
+            _tickManager = InitiativeTickManager(
+              initialAllies: saved.allies,
+              initialEnemies: StarterBrigades.createTutorialEnemies(),
+              tickInterval: const Duration(milliseconds: 140),
+            );
+            _commandService = GeneralCommandService(
+              tickManager: _tickManager,
+              generalType: _activeGeneralType,
+              initialFocus: (_phylacteryRanks[_activeGeneralType] ?? 1) >= 3 ? 2 : 1,
+              initialPhylacteryRanks: _phylacteryRanks,
+            );
+            _combatService = CombatResolutionService(
+              tickManager: _tickManager,
+              commandService: _commandService,
+              relicService: _relicService,
+            );
+            _tickManager.start();
+          }
+
+          if (saved.reserveInventory.isNotEmpty) {
+            _inventory = saved.reserveInventory;
+          }
+
+          if (saved.relics.isNotEmpty) {
+            _relicService.setAllRelics(saved.relics);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error restoring saved state: $e');
+    }
+  }
+
+  Future<void> _saveCurrentState() async {
+    try {
+      final data = GameSaveData(
+        totalIchor: _totalIchor,
+        cursedOre: _cursedOre,
+        bloodlineSigils: _bloodlineSigils,
+        activeGeneralType: _activeGeneralType,
+        phylacteryRanks: _phylacteryRanks,
+        currentChapter: _currentChapter,
+        maxUnlockedChapter: _maxUnlockedChapter,
+        allies: _tickManager.allies,
+        reserveInventory: _inventory,
+        relics: _relicService.allRelics,
+        clearedGauntletTrials: _clearedGauntletTrials,
+        lastSavedTimestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+      await GameStatePersistenceService.save(data);
+    } catch (e) {
+      debugPrint('Error saving state: $e');
+    }
   }
 
   void _resetEncounter([
@@ -566,6 +642,7 @@ class _AppShellState extends State<AppShell> {
           duration: const Duration(seconds: 4),
         ),
       );
+      _saveCurrentState();
     }
   }
 
@@ -855,6 +932,7 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: const Color(0xFF1B5E20),
       ),
     );
+    _saveCurrentState();
   }
 
   UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
@@ -969,6 +1047,7 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: child.isPureblood ? const Color(0xFFFF8F00) : const Color(0xFFB3261E),
       ),
     );
+    _saveCurrentState();
   }
 
   void _onFusionComplete(UnitEntity child) {
@@ -986,6 +1065,7 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: const Color(0xFFB3261E),
       ),
     );
+    _saveCurrentState();
   }
 
   Future<void> _handleOpenEndgameGauntlet() async {
@@ -1238,6 +1318,24 @@ class _AppShellState extends State<AppShell> {
           style: TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 13),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Save Lineage Progress',
+            icon: const Icon(Icons.save_outlined, size: 20, color: Color(0xFF81C784)),
+            onPressed: () async {
+              await _saveCurrentState();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Progression saved: Brigade roster, lineage, and currencies secured!'),
+                    backgroundColor: Color(0xFF1B5E20),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

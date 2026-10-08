@@ -367,4 +367,132 @@ class UnitEntity {
       currentXp: currentXp ?? this.currentXp,
     );
   }
+
+  /// Checks if unit or any of its progenitors belongs to the specified bloodline lineage tag.
+  bool hasLineage(String tag) {
+    final lower = tag.toLowerCase();
+    if (speciesId.toLowerCase().contains(lower)) return true;
+    for (final ancestor in lineageAncestors) {
+      if (ancestor.toLowerCase().contains(lower)) return true;
+    }
+    return false;
+  }
+
+  /// Whether unit carries verified Beastline ancestry (Feral Hounds, Bats, Wolves, Skirmishers).
+  bool get hasBeastLineage {
+    return archetype == Archetype.skirmisher ||
+        speciesId.contains('hound') ||
+        speciesId.contains('cerberus') ||
+        speciesId.contains('beast') ||
+        speciesId.contains('bat') ||
+        speciesId.contains('wolf') ||
+        speciesId.contains('fang') ||
+        lineageAncestors.any((a) {
+          final l = a.toLowerCase();
+          return l.contains('hound') ||
+              l.contains('cerberus') ||
+              l.contains('beast') ||
+              l.contains('wolf') ||
+              l.contains('fang') ||
+              l.contains('bloodline_beast');
+        });
+  }
+
+  /// Whether unit carries verified Deathless / Undead ancestry (Grave Disciples, Ghouls, Liches, Skeletons, Occultists).
+  bool get hasUndeadLineage {
+    return archetype == Archetype.occultist ||
+        speciesId.contains('grave') ||
+        speciesId.contains('disciple') ||
+        speciesId.contains('undead') ||
+        speciesId.contains('lich') ||
+        speciesId.contains('ghoul') ||
+        speciesId.contains('skeleton') ||
+        speciesId.contains('vampire') ||
+        speciesId.contains('deathless') ||
+        lineageAncestors.any((a) {
+          final l = a.toLowerCase();
+          return l.contains('grave') ||
+              l.contains('disciple') ||
+              l.contains('undead') ||
+              l.contains('lich') ||
+              l.contains('ghoul') ||
+              l.contains('skeleton') ||
+              l.contains('vampire') ||
+              l.contains('deathless') ||
+              l.contains('bloodline_undead');
+        });
+  }
+
+  /// List of verified human-readable lineage tags for UI display.
+  List<String> get verifiedLineageTags {
+    final tags = <String>[];
+    if (hasBeastLineage) tags.add('Beastline');
+    if (hasUndeadLineage) tags.add('Deathless');
+    if (speciesId.contains('footman') || lineageAncestors.any((a) => a.contains('footman'))) {
+      tags.add('Ironclad');
+    }
+    if (speciesId.contains('archer') || lineageAncestors.any((a) => a.contains('archer'))) {
+      tags.add('Ashen Legion');
+    }
+    return tags;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'speciesId': speciesId,
+      'name': name,
+      'generation': generation,
+      'archetype': archetype.name,
+      'slot': slot.name,
+      'level': level,
+      'maxLevel': maxLevel,
+      'currentHp': currentHp,
+      'maxHp': maxHp,
+      'attack': attack,
+      'defense': defense,
+      'speed': speed,
+      'critRate': critRate,
+      'critDamage': critDamage,
+      'nativeTraitId': nativeTraitId,
+      'graftedTraitId': graftedTraitId,
+      'lineageAncestors': lineageAncestors,
+      'customAvatarAsset': customAvatarAsset,
+      'currentXp': currentXp,
+    };
+  }
+
+  factory UnitEntity.fromJson(Map<String, dynamic> json) {
+    return UnitEntity(
+      id: json['id'] as String,
+      speciesId: json['speciesId'] as String,
+      name: json['name'] as String,
+      generation: (json['generation'] as num).toInt(),
+      archetype: Archetype.values.firstWhere(
+        (a) => a.name == json['archetype'],
+        orElse: () => Archetype.juggernaut,
+      ),
+      slot: FormationSlot.values.firstWhere(
+        (s) => s.name == json['slot'],
+        orElse: () => FormationSlot.front1,
+      ),
+      level: (json['level'] as num).toInt(),
+      maxLevel: (json['maxLevel'] as num).toInt(),
+      currentHp: (json['currentHp'] as num).toInt(),
+      maxHp: (json['maxHp'] as num).toInt(),
+      attack: (json['attack'] as num).toInt(),
+      defense: (json['defense'] as num).toInt(),
+      speed: (json['speed'] as num).toInt(),
+      critRate: (json['critRate'] as num?)?.toDouble() ?? 0.15,
+      critDamage: (json['critDamage'] as num?)?.toDouble() ?? 1.50,
+      nativeTraitId: json['nativeTraitId'] as String? ?? 'none',
+      graftedTraitId: json['graftedTraitId'] as String?,
+      lineageAncestors: (json['lineageAncestors'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      customAvatarAsset: json['customAvatarAsset'] as String?,
+      currentXp: (json['currentXp'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

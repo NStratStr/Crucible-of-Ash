@@ -797,6 +797,55 @@ class PedigreeInspectorDialog extends StatelessWidget {
                       ],
                       const Divider(color: Color(0xFF2B2B36), height: 1),
                       const SizedBox(height: 8),
+                      if (unit.verifiedLineageTags.isNotEmpty) ...[
+                        const Text(
+                          'VERIFIED LINEAGE BLOODLINES',
+                          style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: unit.verifiedLineageTags.map((tag) {
+                            final Color badgeColor = tag == 'Beastline'
+                                ? const Color(0xFFFB8C00)
+                                : (tag == 'Deathless'
+                                    ? const Color(0xFF7E57C2)
+                                    : const Color(0xFFE5A93C));
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: badgeColor.withValues(alpha: 0.6), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    tag == 'Beastline'
+                                        ? Icons.pets
+                                        : (tag == 'Deathless' ? Icons.brightness_3 : Icons.shield),
+                                    size: 10,
+                                    color: badgeColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    tag.toUpperCase(),
+                                    style: TextStyle(
+                                      color: badgeColor,
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       const Text(
                         'BLOODLINE PROGENITORS',
                         style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 9, fontWeight: FontWeight.bold),

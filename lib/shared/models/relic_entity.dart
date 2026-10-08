@@ -156,4 +156,49 @@ class RelicEntity {
         return 'Shadowstalker Set';
     }
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'slot': slot.name,
+      'rarity': rarity.name,
+      'setType': setType.name,
+      'bonusAttack': bonusAttack,
+      'bonusDefense': bonusDefense,
+      'bonusHp': bonusHp,
+      'bonusSpeed': bonusSpeed,
+      'bonusCritRate': bonusCritRate,
+      'description': description,
+      'equippedUnitId': equippedUnitId,
+      'upgradeLevel': upgradeLevel,
+    };
+  }
+
+  factory RelicEntity.fromJson(Map<String, dynamic> json) {
+    return RelicEntity(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      slot: RelicSlot.values.firstWhere(
+        (s) => s.name == json['slot'],
+        orElse: () => RelicSlot.weapon,
+      ),
+      rarity: RelicRarity.values.firstWhere(
+        (r) => r.name == json['rarity'],
+        orElse: () => RelicRarity.common,
+      ),
+      setType: RelicSetType.values.firstWhere(
+        (st) => st.name == json['setType'],
+        orElse: () => RelicSetType.ironclad,
+      ),
+      bonusAttack: (json['bonusAttack'] as num?)?.toInt() ?? 0,
+      bonusDefense: (json['bonusDefense'] as num?)?.toInt() ?? 0,
+      bonusHp: (json['bonusHp'] as num?)?.toInt() ?? 0,
+      bonusSpeed: (json['bonusSpeed'] as num?)?.toInt() ?? 0,
+      bonusCritRate: (json['bonusCritRate'] as num?)?.toDouble() ?? 0.0,
+      description: json['description'] as String? ?? '',
+      equippedUnitId: json['equippedUnitId'] as String?,
+      upgradeLevel: (json['upgradeLevel'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

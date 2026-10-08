@@ -124,30 +124,12 @@ class EndgameGauntletDialog extends StatelessWidget {
 
   int get _beastAndSkirmisherCount {
     if (activeSquad == null) return 2;
-    return activeSquad!.where((u) {
-      final isSkirm = u.archetype == Archetype.skirmisher;
-      final isBeast = u.speciesId.contains('hound') ||
-          u.speciesId.contains('cerberus') ||
-          u.speciesId.contains('beast') ||
-          u.speciesId.contains('bat') ||
-          u.speciesId.contains('wolf');
-      return isSkirm || isBeast;
-    }).length;
+    return activeSquad!.where((u) => u.hasBeastLineage).length;
   }
 
   int get _undeadAndOccultistCount {
     if (activeSquad == null) return 2;
-    return activeSquad!.where((u) {
-      final isOccultist = u.archetype == Archetype.occultist;
-      final isUndead = u.speciesId.contains('ghoul') ||
-          u.speciesId.contains('lich') ||
-          u.speciesId.contains('skeleton') ||
-          u.speciesId.contains('undead') ||
-          u.speciesId.contains('vampire') ||
-          u.speciesId.contains('necro') ||
-          u.speciesId.contains('grave');
-      return isOccultist || isUndead;
-    }).length;
+    return activeSquad!.where((u) => u.hasUndeadLineage).length;
   }
 
   void _onEngageTrial(BuildContext context, EndgameTrialDefinition trial) {

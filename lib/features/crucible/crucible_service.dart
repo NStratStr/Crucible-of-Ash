@@ -47,12 +47,14 @@ class CrucibleService {
       finalSpd = (finalSpd * 1.15).round();
     }
 
-    final List<String> combinedPedigree = [
+    final List<String> combinedPedigree = {
       ...parentA.lineageAncestors,
+      parentA.speciesId,
       parentA.id,
       ...parentB.lineageAncestors,
+      parentB.speciesId,
       parentB.id,
-    ];
+    }.toList();
 
     final int maxLvl = nextGeneration >= 4 ? 50 : 30 + (nextGeneration * 5);
 
