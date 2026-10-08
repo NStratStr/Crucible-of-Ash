@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/features/campaign/campaign_node.dart';
+import 'package:ashen_crucible/features/campaign/defiled_crypt_dialog.dart';
 import 'package:ashen_crucible/features/campaign/rest_haven_dialog.dart';
 import 'package:ashen_crucible/features/campaign/watchtower_dialog.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
@@ -113,6 +114,45 @@ void main() {
       expect(find.text('Chart Enemy Blindspots'), findsOneWidget);
       expect(find.text('War Horn of Command'), findsOneWidget);
       expect(find.text('Plunder Spire Armory'), findsOneWidget);
+    });
+
+    testWidgets('DefiledCryptDialog renders choices and returns selected choice', (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      DefiledCryptChoice? chosenResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () async {
+                    chosenResult = await DefiledCryptDialog.show(context);
+                  },
+                  child: const Text('OPEN CRYPT'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('OPEN CRYPT'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('THE DEFILED SARCOPHAGUS'), findsOneWidget);
+      expect(find.text('DESECRATE THE TOMB (HIGH RISK)'), findsOneWidget);
+      expect(find.textContaining('60% chance: Ancient Relic'), findsOneWidget);
+      expect(find.text('REBIND THE RESTLESS CORPSE'), findsOneWidget);
+      expect(find.text('PERFORM PURIFICATION RITES'), findsOneWidget);
+
+      await tester.tap(find.text('DESECRATE THE TOMB (HIGH RISK)'));
+      await tester.pumpAndSettle();
+
+      expect(chosenResult, DefiledCryptChoice.desecrateTomb);
     });
   });
 }

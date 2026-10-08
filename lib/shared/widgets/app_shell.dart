@@ -501,20 +501,49 @@ class _AppShellState extends State<AppShell> {
     if (!mounted || choice == null) return;
 
     if (choice == DefiledCryptChoice.desecrateTomb) {
-      final relic = _relicService.forgeRandomRelic(rarity: RelicRarity.rare);
-      setState(() {
-        _totalIchor += 250;
-      });
-      _markNodeCompleted(node.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Tomb desecrated! Plundered ${relic.name} & +250 Ichor.'),
-          backgroundColor: const Color(0xFFFFB300),
-        ),
-      );
+      final isSuccess = Random().nextDouble() < 0.60;
+      if (isSuccess) {
+        final relic = _relicService.forgeRandomRelic(rarity: RelicRarity.rare);
+        setState(() {
+          _totalIchor += 250;
+        });
+        _markNodeCompleted(node.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tomb desecrated! Plundered ${relic.displayName} & +250 Ichor.'),
+            backgroundColor: const Color(0xFFFFB300),
+          ),
+        );
+      } else {
+        // 40% Necrotic Miasma Trap trigger: Afflict brigade (-15% current HP)
+        final afflictedAllies = _tickManager.allies.map((u) {
+          if (!u.isAlive) return u;
+          final hpLoss = (u.currentHp * 0.15).round();
+          return u.copyWith(currentHp: max(1, u.currentHp - hpLoss));
+        }).toList();
+
+        _tickManager.consumeTurn(
+          retainedOverflow: true,
+          updatedAllies: afflictedAllies,
+          autoResume: false,
+        );
+
+        setState(() {
+          _totalIchor += 350;
+        });
+        _markNodeCompleted(node.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('TRAP TRIGGERED! Necrotic Miasma afflicted brigade (-15% HP), but extracted +350 Ichor!'),
+            backgroundColor: Color(0xFFB3261E),
+          ),
+        );
+      }
+      _saveCurrentState();
     } else if (choice == DefiledCryptChoice.rebindThrall) {
       _unlockCryptThrall();
       _markNodeCompleted(node.id);
+      _saveCurrentState();
     } else if (choice == DefiledCryptChoice.purifyTomb) {
       final healed = _tickManager.allies.map((u) {
         if (!u.isAlive) return u;
@@ -534,6 +563,7 @@ class _AppShellState extends State<AppShell> {
           backgroundColor: Color(0xFF2E7D32),
         ),
       );
+      _saveCurrentState();
     }
   }
 

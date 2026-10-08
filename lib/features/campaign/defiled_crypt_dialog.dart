@@ -58,7 +58,7 @@ class DefiledCryptDialog extends StatelessWidget {
             _buildChoiceButton(
               context: context,
               title: 'DESECRATE THE TOMB (HIGH RISK)',
-              subtitle: 'Plunder ancient treasures. Gain +250 Ichor and an Ancient Relic.',
+              subtitle: 'Plunder ancient treasures. 60% chance: Ancient Relic + 250 Ichor. 40% risk: Necrotic Miasma Trap (-15% Squad HP) & +350 compensatory Ichor.',
               icon: Icons.auto_awesome,
               color: const Color(0xFFFFB300),
               onTap: () => Navigator.pop(context, DefiledCryptChoice.desecrateTomb),

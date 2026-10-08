@@ -46,6 +46,18 @@ class GeneralOrderBannerData {
   });
 }
 
+class LimitBurstBannerData {
+  final UnitEntity caster;
+  final SkillEntity skill;
+  final String targetName;
+
+  const LimitBurstBannerData({
+    required this.caster,
+    required this.skill,
+    required this.targetName,
+  });
+}
+
 class BattleScreen extends StatefulWidget {
   final InitiativeTickManager tickManager;
   final CombatResolutionService combatService;
@@ -91,6 +103,7 @@ class _BattleScreenState extends State<BattleScreen> {
   String? _screenFlashType;
   Color? _screenFlashColorOverride;
   GeneralOrderBannerData? _activeOrderBanner;
+  LimitBurstBannerData? _activeLimitBurstBanner;
 
   void _addPop(String text, Color color, {bool isCrit = false}) {
     if (!mounted) return;
@@ -408,6 +421,25 @@ class _BattleScreenState extends State<BattleScreen> {
         isGlancing: result.isGlancing,
         heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
       );
+
+      if (skill.isLimitBurst) {
+        setState(() {
+          _activeLimitBurstBanner = LimitBurstBannerData(
+            caster: result.attacker,
+            skill: skill,
+            targetName: result.target.name,
+          );
+        });
+
+        final bannerTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            setState(() {
+              _activeLimitBurstBanner = null;
+            });
+          }
+        });
+        _popTimers.add(bannerTimer);
+      }
 
       setState(() {
         final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
@@ -742,6 +774,14 @@ class _BattleScreenState extends State<BattleScreen> {
                 right: 16,
                 child: _buildGeneralOrderBanner(_activeOrderBanner!),
               ),
+            // Brave Exvius Tactical Limit Burst Banner
+            if (_activeLimitBurstBanner != null)
+              Positioned(
+                top: 75,
+                left: 16,
+                right: 16,
+                child: _buildLimitBurstBanner(_activeLimitBurstBanner!),
+              ),
             // Full-screen Attack / Crit Strike / Order VFX Overlay
             if (_screenFlashType != null)
               Positioned.fill(
@@ -852,6 +892,110 @@ class _BattleScreenState extends State<BattleScreen> {
                   banner.summary,
                   style: const TextStyle(color: Colors.white, fontSize: 11),
                   maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLimitBurstBanner(LimitBurstBannerData banner) {
+    final caster = banner.caster;
+    final skill = banner.skill;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141B).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFD54F), width: 2.0),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
+            blurRadius: 18,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: const Color(0xFFB3261E).withValues(alpha: 0.3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFFD54F).withValues(alpha: 0.2),
+              border: Border.all(color: const Color(0xFFFFD54F), width: 1.5),
+            ),
+            child: const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'LIMIT BURST AWAKENING',
+                      style: TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5A93C), width: 1),
+                      ),
+                      child: Text(
+                        'GEN ${caster.generation} • LV. ${caster.level}',
+                        style: const TextStyle(
+                          color: Color(0xFFE5A93C),
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      '${caster.name.toUpperCase()} : ${skill.name.toUpperCase()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '(${skill.damageCoefficient}x DMG)',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Cataclysmic strike unleashed upon ${banner.targetName}!',
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

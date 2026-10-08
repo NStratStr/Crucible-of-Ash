@@ -157,6 +157,11 @@ void main() {
 
       // Trigger Limit Burst
       await tester.tap(find.text('LIMIT BURST'));
+      await tester.pump();
+      
+      // Verify Limit Burst Awakening banner cut-in is active
+      expect(find.text('LIMIT BURST AWAKENING'), findsOneWidget);
+
       await tester.pump(const Duration(milliseconds: 350));
       tickManager.pause();
       await tester.pump(const Duration(milliseconds: 100));
@@ -164,6 +169,10 @@ void main() {
       // Verify hero ultimate charge reset to 0%
       final updatedHero = tickManager.allies.firstWhere((u) => u.id == 'ally_hero');
       expect(updatedHero.ultimateCharge, 0.0);
+
+      // Verify banner dismisses after timeout
+      await tester.pump(const Duration(milliseconds: 1200));
+      expect(find.text('LIMIT BURST AWAKENING'), findsNothing);
     });
   });
 }
