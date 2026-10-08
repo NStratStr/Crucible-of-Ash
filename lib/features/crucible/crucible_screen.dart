@@ -15,6 +15,7 @@ class CrucibleScreen extends StatefulWidget {
   final ValueChanged<int>? onIchorChanged;
   final ValueChanged<int>? onSigilsChanged;
   final void Function(UnitEntity child, List<String> sacrificedParentIds)? onFusionExecuted;
+  final void Function(UnitEntity updatedUnit, int ichorCost)? onUnitLeveled;
 
   const CrucibleScreen({
     super.key,
@@ -25,6 +26,7 @@ class CrucibleScreen extends StatefulWidget {
     this.onIchorChanged,
     this.onSigilsChanged,
     this.onFusionExecuted,
+    this.onUnitLeveled,
   });
 
   @override
@@ -669,7 +671,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     required VoidCallback onClear,
   }) {
     return Container(
-      height: 156,
+      height: 172,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: const Color(0xFF181820),
@@ -748,9 +750,55 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (unit.level < unit.maxLevel && widget.onUnitLeveled != null)
+                  InkWell(
+                    onTap: () => _handleProgenitorInfuse(unit),
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB3261E).withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE57373), width: 0.8),
+                      ),
+                      child: Text(
+                        'INFUSE (Lv.${unit.level + 1})',
+                        style: const TextStyle(
+                          color: Color(0xFFFF8A80),
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
     );
+  }
+
+  void _handleProgenitorInfuse(UnitEntity unit) {
+    final cost = unit.xpNeededForNextLevel;
+    if (widget.totalIchor < cost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Insufficient Ichor! Requires $cost Ichor to infuse ${unit.name}.'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
+    final leveled = unit.levelUp(levels: 1);
+    setState(() {
+      if (_progenitorA?.id == unit.id) {
+        _progenitorA = leveled;
+      }
+      if (_progenitorB?.id == unit.id) {
+        _progenitorB = leveled;
+      }
+    });
+
+    widget.onUnitLeveled?.call(leveled, cost);
   }
 
   // ===========================================================================

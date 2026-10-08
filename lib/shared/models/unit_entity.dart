@@ -70,6 +70,28 @@ class UnitEntity {
 
   bool get isMaxLevel => level >= maxLevel;
   int get xpToNextLevel => level * 100;
+  int get xpNeededForNextLevel => isMaxLevel ? 0 : (xpToNextLevel - currentXp);
+
+  int get xpNeededForMaxLevel {
+    if (isMaxLevel) return 0;
+    int needed = xpNeededForNextLevel;
+    for (int lvl = level + 1; lvl < maxLevel; lvl++) {
+      needed += lvl * 100;
+    }
+    return needed;
+  }
+
+  /// Levels up the unit by [levels] count (defaults to 1), compounding stats.
+  UnitEntity levelUp({int levels = 1}) {
+    if (isMaxLevel) return this;
+    UnitEntity current = this;
+    for (int i = 0; i < levels; i++) {
+      if (current.isMaxLevel) break;
+      current = current.addXp(current.xpNeededForNextLevel);
+    }
+    return current;
+  }
+
   double get xpProgressRatio => isMaxLevel ? 1.0 : (currentXp / xpToNextLevel).clamp(0.0, 1.0);
 
   /// Grants XP to the unit, computing any level-up threshold crossings and compounding stat gains.

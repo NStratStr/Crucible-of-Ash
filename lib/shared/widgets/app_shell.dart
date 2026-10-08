@@ -383,13 +383,22 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _grantBrigadeXp(int amount) {
-    final leveled = _tickManager.allies.map((u) => u.addXp(amount)).toList();
+  List<String> _grantBrigadeXp(int amount) {
+    final List<String> levelUps = [];
+    final leveled = _tickManager.allies.map((u) {
+      final oldLevel = u.level;
+      final updated = u.addXp(amount);
+      if (updated.level > oldLevel) {
+        levelUps.add('${updated.name} (Lv. $oldLevel➔${updated.level})');
+      }
+      return updated;
+    }).toList();
     _tickManager.consumeTurn(
       retainedOverflow: true,
       updatedAllies: leveled,
       autoResume: false,
     );
+    return levelUps;
   }
 
   Future<void> _handleBloodAltarNode(CampaignNode node) async {
@@ -558,7 +567,7 @@ class _AppShellState extends State<AppShell> {
       final xpReward = _activeNode!.type == CampaignNodeType.boss
           ? 1000
           : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250);
-      _grantBrigadeXp(xpReward);
+      final levelUps = _grantBrigadeXp(xpReward);
 
       setState(() {
         _totalIchor += reward;
@@ -596,6 +605,9 @@ class _AppShellState extends State<AppShell> {
       }
 
       String extraReward = '';
+      if (levelUps.isNotEmpty) {
+        extraReward += ' • LEVEL UP: ${levelUps.join(", ")}';
+      }
       if (isFirstConquest) {
         extraReward += ' • FIRST CONQUEST BONUS (+1 Sigil, +500 Ichor)';
       }
@@ -935,6 +947,65 @@ class _AppShellState extends State<AppShell> {
     _saveCurrentState();
   }
 
+  void _levelUpUnit({
+    required String unitId,
+    required int xpAmount,
+    required int ichorCost,
+  }) {
+    if (_totalIchor < ichorCost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Insufficient Ichor! Requires $ichorCost Ichor, but you have $_totalIchor.'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
+    UnitEntity? updatedUnit;
+
+    // 1. Check active squad
+    final allyIndex = _tickManager.allies.indexWhere((u) => u.id == unitId);
+    if (allyIndex != -1) {
+      final ally = _tickManager.allies[allyIndex];
+      final leveled = ally.addXp(xpAmount);
+      updatedUnit = leveled;
+
+      final newAllies = List<UnitEntity>.from(_tickManager.allies);
+      newAllies[allyIndex] = leveled;
+      _tickManager.updateSquads(allies: newAllies);
+    } else {
+      // 2. Check reserve inventory
+      final invIndex = _inventory.indexWhere((u) => u.id == unitId);
+      if (invIndex != -1) {
+        final unit = _inventory[invIndex];
+        final leveled = unit.addXp(xpAmount);
+        updatedUnit = leveled;
+
+        _inventory[invIndex] = leveled;
+      }
+    }
+
+    if (updatedUnit != null) {
+      setState(() {
+        _totalIchor -= ichorCost;
+      });
+      _saveCurrentState();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updatedUnit.isMaxLevel
+                ? '👑 ${updatedUnit.name} reached MAX LEVEL ${updatedUnit.maxLevel}! 10% Inheritance Unlocked!'
+                : '✦ ${updatedUnit.name} infused with $xpAmount XP (Lv. ${updatedUnit.level}/${updatedUnit.maxLevel})!',
+          ),
+          backgroundColor: updatedUnit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF2E7D32),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
     Archetype? targetRole;
     if (scoutedAffinities != null && scoutedAffinities.isNotEmpty) {
@@ -1221,6 +1292,11 @@ class _AppShellState extends State<AppShell> {
                     onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onFusionExecuted: _onFusionExecuted,
                     onFusionComplete: _onFusionComplete,
+                    onUnitLeveled: (updatedUnit, cost) => _levelUpUnit(
+                      unitId: updatedUnit.id,
+                      xpAmount: cost,
+                      ichorCost: cost,
+                    ),
                   ),
                   // Tab 3: Relic Forge
                   RelicForgeScreen(
@@ -1407,9 +1483,30 @@ class _AppShellState extends State<AppShell> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'THRALLS & PROGENITORS (${allUnits.length})',
-                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          'THRALLS & PROGENITORS (${allUnits.length})',
+                          style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFB3261E).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFE57373), width: 0.8),
+                          ),
+                          child: Text(
+                            '$_totalIchor ICHOR',
+                            style: const TextStyle(
+                              color: Color(0xFFFF8A80),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     const Text(
@@ -1443,6 +1540,12 @@ class _AppShellState extends State<AppShell> {
                     context,
                     unit,
                     relicService: _relicService,
+                    totalIchor: _totalIchor,
+                    onLevelUp: (updatedUnit, cost) => _levelUpUnit(
+                      unitId: updatedUnit.id,
+                      xpAmount: cost,
+                      ichorCost: cost,
+                    ),
                   ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
@@ -1572,20 +1675,49 @@ class _AppShellState extends State<AppShell> {
                             ],
                           ),
                         ),
-                        if (!inActiveSquad)
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFB3261E),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () => _showDeployThrallDialog(unit),
-                            child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
-                          )
-                        else
-                          const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!unit.isMaxLevel) ...[
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFE5A93C),
+                                  side: const BorderSide(color: Color(0xFFE5A93C), width: 0.8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => PedigreeInspectorDialog.show(
+                                  context,
+                                  unit,
+                                  relicService: _relicService,
+                                  totalIchor: _totalIchor,
+                                  onLevelUp: (updatedUnit, cost) => _levelUpUnit(
+                                    unitId: updatedUnit.id,
+                                    xpAmount: cost,
+                                    ichorCost: cost,
+                                  ),
+                                ),
+                                child: const Text('INFUSE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (!inActiveSquad)
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFB3261E),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => _showDeployThrallDialog(unit),
+                                child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
+                              )
+                            else
+                              const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                          ],
+                        ),
                       ],
                     ),
                   ),

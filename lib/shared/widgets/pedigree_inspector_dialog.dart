@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../features/relics/relic_service.dart';
@@ -8,16 +9,20 @@ import '../models/unit_entity.dart';
 import 'gothic_card_frame_widget.dart';
 import 'hexagonal_affinity_wheel_widget.dart';
 
-class PedigreeInspectorDialog extends StatelessWidget {
+class PedigreeInspectorDialog extends StatefulWidget {
   final UnitEntity unit;
   final bool isEnemy;
   final RelicService? relicService;
+  final int totalIchor;
+  final void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp;
 
   const PedigreeInspectorDialog({
     super.key,
     required this.unit,
     this.isEnemy = false,
     this.relicService,
+    this.totalIchor = 0,
+    this.onLevelUp,
   });
 
   static Future<void> show(
@@ -25,6 +30,8 @@ class PedigreeInspectorDialog extends StatelessWidget {
     UnitEntity unit, {
     bool isEnemy = false,
     RelicService? relicService,
+    int totalIchor = 0,
+    void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -34,6 +41,115 @@ class PedigreeInspectorDialog extends StatelessWidget {
         unit: unit,
         isEnemy: isEnemy,
         relicService: relicService,
+        totalIchor: totalIchor,
+        onLevelUp: onLevelUp,
+      ),
+    );
+  }
+
+  @override
+  State<PedigreeInspectorDialog> createState() => _PedigreeInspectorDialogState();
+}
+
+class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
+  late UnitEntity _currentUnit;
+  late int _currentIchor;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUnit = widget.unit;
+    _currentIchor = widget.totalIchor;
+  }
+
+  void _handleLevelUp({int levels = 1}) {
+    final cost = _currentUnit.xpNeededForNextLevel;
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.levelUp(levels: levels);
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
+  void _handleMaxLevel() {
+    final cost = _currentUnit.xpNeededForMaxLevel;
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.addXp(cost);
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
+  void _handleInfuseXp(int xp) {
+    final cost = xp;
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.addXp(xp);
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
+  Widget _buildInfusionButton({
+    required String label,
+    required int cost,
+    required VoidCallback? onPressed,
+    bool isHighlight = false,
+  }) {
+    final bool canAfford = onPressed != null;
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isHighlight
+            ? (canAfford ? const Color(0xFF7B1FA2) : const Color(0xFF2B2B36))
+            : (canAfford ? const Color(0xFFB3261E) : const Color(0xFF2B2B36)),
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: const Color(0xFF1E1E24),
+        disabledForegroundColor: Colors.white30,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: BorderSide(
+            color: canAfford
+                ? (isHighlight ? const Color(0xFFBA68C8) : const Color(0xFFE57373))
+                : Colors.transparent,
+            width: 0.8,
+          ),
+        ),
+      ),
+      onPressed: onPressed,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.water_drop,
+                size: 9,
+                color: canAfford ? const Color(0xFFEF5350) : Colors.white30,
+              ),
+              const SizedBox(width: 2),
+              Text(
+                '$cost Ichor',
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: canAfford ? Colors.white70 : Colors.white30,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -89,6 +205,9 @@ class PedigreeInspectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final unit = _currentUnit;
+    final isEnemy = widget.isEnemy;
+    final relicService = widget.relicService;
     final themeColor = _getArchetypeColor(unit.archetype);
     final prey = CombatMath.getPreyArchetype(unit.archetype);
     final predator = CombatMath.getPredatorArchetype(unit.archetype);
@@ -204,6 +323,7 @@ class PedigreeInspectorDialog extends StatelessWidget {
           // Scrollable Content
           Expanded(
             child: ListView(
+              cacheExtent: 1500,
               padding: const EdgeInsets.all(16),
               children: [
                 // Section 0: Grand Portrait Card
@@ -299,6 +419,70 @@ class PedigreeInspectorDialog extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (!isEnemy && widget.onLevelUp != null && !unit.isMaxLevel) ...[
+                        const SizedBox(height: 8),
+                        const Divider(color: Color(0xFF2B2B36), height: 1),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 13),
+                                SizedBox(width: 4),
+                                Text(
+                                  'BLOODLINE INFUSION',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5A93C),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              'Available: $_currentIchor Ichor',
+                              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildInfusionButton(
+                                label: '+1 LEVEL',
+                                cost: unit.xpNeededForNextLevel,
+                                onPressed: _currentIchor >= unit.xpNeededForNextLevel
+                                    ? () => _handleLevelUp(levels: 1)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _buildInfusionButton(
+                                label: 'MAX LEVEL',
+                                cost: unit.xpNeededForMaxLevel,
+                                isHighlight: true,
+                                onPressed: _currentIchor >= unit.xpNeededForMaxLevel
+                                    ? () => _handleMaxLevel()
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _buildInfusionButton(
+                                label: '+100 XP',
+                                cost: min(100, unit.xpNeededForNextLevel),
+                                onPressed: _currentIchor >= min(100, unit.xpNeededForNextLevel)
+                                    ? () => _handleInfuseXp(min(100, unit.xpNeededForNextLevel))
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
