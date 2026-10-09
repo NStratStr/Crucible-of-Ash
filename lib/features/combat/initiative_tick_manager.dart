@@ -51,6 +51,10 @@ class InitiativeTickManager extends ChangeNotifier {
   final Duration tickInterval;
   double _speedMultiplier = 1.0;
 
+  // GDD v2.6 Sec 13.2: Multi-Phase Boss Tracking (66% and 33% HP Thresholds)
+  final Set<double> _bossPhaseThresholdsCrossed = {};
+  String? _lastPhaseShiftMessage;
+
   InitiativeTickManager({
     required List<UnitEntity> initialAllies,
     required List<UnitEntity> initialEnemies,
@@ -91,6 +95,43 @@ class InitiativeTickManager extends ChangeNotifier {
   void resetReckoningClock() {
     _tickCount = 0;
     notifyListeners();
+  }
+
+  String? get lastPhaseShiftMessage => _lastPhaseShiftMessage;
+  void clearLastPhaseShiftMessage() {
+    _lastPhaseShiftMessage = null;
+  }
+
+  /// GDD v2.6 Sec 13.2: Crossing major boss phase thresholds (66% HP, 33% HP)
+  /// resets the Reckoning timer to Tick 0, clears Reckoning penalties, and triggers a phase shift.
+  bool checkBossPhaseThresholds() {
+    final bossList = _enemies.where((u) => u.isBoss && u.isAlive);
+    if (bossList.isEmpty) return false;
+
+    final boss = bossList.first;
+    final double hpRatio = boss.maxHp > 0 ? (boss.currentHp / boss.maxHp) : 1.0;
+
+    bool shifted = false;
+
+    // Check 66% HP threshold (Phase 2)
+    if (hpRatio <= 0.66 && !_bossPhaseThresholdsCrossed.contains(0.66)) {
+      _bossPhaseThresholdsCrossed.add(0.66);
+      _tickCount = 0; // Reset Reckoning timer to Tick 0
+      _lastPhaseShiftMessage = 'PHASE SHIFT: ${boss.name} Enters Phase II! Reckoning Clock Reset.';
+      shifted = true;
+    }
+    // Check 33% HP threshold (Phase 3)
+    else if (hpRatio <= 0.33 && !_bossPhaseThresholdsCrossed.contains(0.33)) {
+      _bossPhaseThresholdsCrossed.add(0.33);
+      _tickCount = 0; // Reset Reckoning timer to Tick 0
+      _lastPhaseShiftMessage = 'CRITICAL PHASE: ${boss.name} Blood Frenzy! Reckoning Clock Reset.';
+      shifted = true;
+    }
+
+    if (shifted) {
+      notifyListeners();
+    }
+    return shifted;
   }
 
   bool _isBulletTime = false;

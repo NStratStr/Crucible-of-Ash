@@ -746,6 +746,9 @@ class CombatResolutionService {
       autoResume: autoResumeTickEngine,
     );
 
+    // GDD v2.6 Sec 13.2: Multi-Phase Boss Timer Resets upon crossing 66% or 33% HP
+    tickManager.checkBossPhaseThresholds();
+
     return ActionResult(
       attacker: updatedAttacker,
       target: updatedTarget,

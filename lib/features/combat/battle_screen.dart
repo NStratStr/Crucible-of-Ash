@@ -296,6 +296,15 @@ class _BattleScreenState extends State<BattleScreen> {
       _lastProcessedTurnStartUnitId = null;
     }
 
+    // GDD v2.6 Sec 13.2: Check for Boss Phase Shifts (66% and 33% HP)
+    final phaseShiftMsg = widget.tickManager.lastPhaseShiftMessage;
+    if (phaseShiftMsg != null) {
+      widget.tickManager.clearLastPhaseShiftMessage();
+      _combatLog = phaseShiftMsg;
+      _addPop('⚡ PHASE SHIFT! ⚡', const Color(0xFFFFD54F), isCrit: true);
+      _triggerScreenShake();
+    }
+
     if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
       _handleAiTurn();
     } else if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
@@ -2578,41 +2587,49 @@ class _BattleScreenState extends State<BattleScreen> {
                                   fit: BoxFit.scaleDown,
                                   alignment: Alignment.center,
                                   child: SizedBox(
-                                    width: max(constraints.maxWidth, 380.0),
+                                    width: max(constraints.maxWidth, 430.0),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         // Bottom-Left of Pedestal: Archetype Shield Badge (or ☠ BOSS badge for bosses)
                                         if (isBossUnit)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(color: const Color(0xFFFF5252), width: 1.4),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: const Color(0xFFFF1744).withValues(alpha: 0.5),
-                                                  blurRadius: 6,
-                                                ),
-                                              ],
-                                            ),
-                                            child: const Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.dangerous, size: 9, color: Color(0xFFFFD54F)),
-                                                SizedBox(width: 3),
-                                                Text(
-                                                  '☠ BOSS',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFFFD54F),
-                                                    fontSize: 8.0,
-                                                    fontWeight: FontWeight.bold,
+                                          Builder(builder: (ctx) {
+                                            final String phaseText = hpRatio > 0.66
+                                                ? '☠ BOSS'
+                                                : (hpRatio > 0.33 ? '⚡ BOSS (P2)' : '🔥 BOSS (P3)');
+                                            final Color phaseColor = hpRatio > 0.66
+                                                ? const Color(0xFFFFD54F)
+                                                : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(color: phaseColor, width: 1.4),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: phaseColor.withValues(alpha: 0.5),
+                                                    blurRadius: 6,
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          )
+                                                ],
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.dangerous, size: 9, color: phaseColor),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    phaseText,
+                                                    style: TextStyle(
+                                                      color: phaseColor,
+                                                      fontSize: 8.0,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          })
                                         else
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
