@@ -27,17 +27,27 @@ class EnemyAiService {
     return tickManager.enemies.any((u) => u.id == active.id && u.isAlive);
   }
 
-  /// Selects a target ally prioritizing frontline Vanguard, then Arcanum
-  UnitEntity? selectTargetAlly() {
+  /// GDD v2.6 Section 3.3: Dynamic Targeting Hierarchy
+  /// 1. Hard Constraints: Vanguard protection (melee targets must strike Vanguard before Arcanum)
+  /// 2. Primary Priority Flag: Lowest EHP (Effective Health Points)
+  /// 3. Tie-Breaker Metric: Slot proximity / lowest raw HP
+  /// 4. Fallback: Nearest valid living ally
+  UnitEntity? selectTargetAlly({UnitEntity? actingUnit}) {
     final aliveVanguard = tickManager.allies.where((u) => u.isVanguard && u.isAlive).toList();
-    if (aliveVanguard.isNotEmpty) {
-      return aliveVanguard[_rng.nextInt(aliveVanguard.length)];
-    }
-    final aliveAllies = tickManager.allies.where((u) => u.isAlive).toList();
-    if (aliveAllies.isNotEmpty) {
-      return aliveAllies[_rng.nextInt(aliveAllies.length)];
-    }
-    return null;
+    final List<UnitEntity> candidatePool = aliveVanguard.isNotEmpty
+        ? aliveVanguard
+        : tickManager.allies.where((u) => u.isAlive).toList();
+
+    if (candidatePool.isEmpty) return null;
+
+    // Sort by Lowest EHP (GDD Sec 3.1 & 3.3)
+    candidatePool.sort((a, b) {
+      final ehpCompare = a.ehp.compareTo(b.ehp);
+      if (ehpCompare != 0) return ehpCompare;
+      return a.currentHp.compareTo(b.currentHp);
+    });
+
+    return candidatePool.first;
   }
 
   /// Selects a friendly enemy target (for healing / buffs)
@@ -49,6 +59,19 @@ class EnemyAiService {
     }
     final alive = tickManager.enemies.where((u) => u.isAlive).toList();
     return alive.isNotEmpty ? alive.first : null;
+  }
+
+  /// Predicts the impending action intent of the enemy unit for telegraphing (GDD Sec 13.5)
+  SkillEntity? predictNextSkill(UnitEntity enemy) {
+    final readySkills = enemy.resolvedSkills.where((s) => s.isReady).toList();
+    if (readySkills.isEmpty) return null;
+    return readySkills.firstWhere(
+      (s) => s.isLimitBurst && enemy.ultimateCharge >= 100.0,
+      orElse: () => readySkills.firstWhere(
+        (s) => s.cooldownTurns > 0,
+        orElse: () => readySkills.first,
+      ),
+    );
   }
 
   /// Executes the active enemy unit's turn and registers combat damage

@@ -2498,6 +2498,51 @@ class _BattleScreenState extends State<BattleScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
+                                // GDD v2.6 Sec 13.5: Enemy Boss/Elite Action Intent Telegraphing
+                                if (isEnemy && alive && unit.turnMeter >= 40.0) ...[
+                                  Builder(builder: (ctx) {
+                                    final intentSkill = _aiService.predictNextSkill(unit);
+                                    if (intentSkill == null) return const SizedBox.shrink();
+                                    final bool isLimitBurst = intentSkill.isLimitBurst;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 2.0),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: isLimitBurst
+                                              ? const Color(0xFFD50000).withValues(alpha: 0.90)
+                                              : const Color(0xFF263238).withValues(alpha: 0.85),
+                                          borderRadius: BorderRadius.circular(3),
+                                          border: Border.all(
+                                            color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                            width: isLimitBurst ? 1.2 : 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
+                                              size: 8.5,
+                                              color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              'INTENT: ${intentSkill.name.toUpperCase()}',
+                                              style: TextStyle(
+                                                color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
+                                                fontSize: 7.0,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+
                                 // Status Effect Badges (if active, above the pedestal)
                                 if (unit.activeEffects.isNotEmpty && alive)
                                   Padding(

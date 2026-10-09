@@ -243,6 +243,7 @@ class CampaignMapScreen extends StatelessWidget {
       body: Column(
         children: [
           if (activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
+          if (onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -360,6 +361,85 @@ class CampaignMapScreen extends StatelessWidget {
                   ],
                 ),
               )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMvpSkirmishBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFB71C1C).withValues(alpha: 0.85),
+            const Color(0xFF1E1E28).withValues(alpha: 0.95),
+          ],
+        ),
+        border: const Border(bottom: BorderSide(color: Color(0xFFFF5252), width: 1.2)),
+        boxShadow: const [
+          BoxShadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEF5350).withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFFF5252), width: 1.0),
+            ),
+            child: const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 16),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'MVP TRIAL: 3-WAVE ASHEN SKIRMISH',
+                  style: TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 10.0,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'Ash Legion vs Crypt Stalkers • Boss Gorgoroth the Flayed • Vladislav Grimoire',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 8.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            key: const ValueKey('launch_mvp_skirmish_button'),
+            onPressed: onLaunchMvpSkirmish,
+            icon: const Icon(Icons.sports_kabaddi, size: 14, color: Colors.black),
+            label: const Text(
+              'ENGAGE',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+                color: Colors.black,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD54F),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             ),
           ),
         ],
