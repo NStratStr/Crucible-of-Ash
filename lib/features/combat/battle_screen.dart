@@ -1937,8 +1937,8 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // LAYER 1: Arched Character Cutout Chamber (Elevated Cutout Silhouette)
                 Positioned(
-                  top: 18,
-                  bottom: 40,
+                  top: 2,
+                  bottom: 58,
                   left: 3,
                   right: 3,
                   child: Container(
@@ -2005,7 +2005,7 @@ class _BattleScreenState extends State<BattleScreen> {
                               child: Image.asset(
                                 unit.effectiveAvatarAsset,
                                 fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
-                                alignment: unit.isFigurineCutout ? Alignment.center : Alignment.topCenter,
+                                alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
                                 errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
                               ),
                             ),
@@ -2121,7 +2121,7 @@ class _BattleScreenState extends State<BattleScreen> {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  height: 48,
+                  height: 64,
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -2129,20 +2129,20 @@ class _BattleScreenState extends State<BattleScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: 0.95),
+                          Colors.black.withValues(alpha: 0.92),
                         ],
                       ),
                     ),
                   ),
                 ),
 
-                // LAYER 3: Interactive UI Information with responsive scale-down
+                // LAYER 3: Interactive UI Information anchored to Pedestal & Ground
                 Positioned.fill(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return FittedBox(
                         fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
+                        alignment: Alignment.bottomCenter,
                         child: SizedBox(
                           width: constraints.maxWidth,
                           child: Opacity(
@@ -2150,241 +2150,108 @@ class _BattleScreenState extends State<BattleScreen> {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  // Top Row: Archetype badge & Target / Active badge
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      if (unit.isBoss)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
-                                              SizedBox(width: 2),
-                                              Text(
-                                                '☠ BOSS',
-                                                style: TextStyle(
-                                                  color: Color(0xFFFFD54F),
-                                                  fontSize: 7.5,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.8),
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                _archetypeShortCode(unit.archetype),
-                                                style: TextStyle(
-                                                  color: _archetypeColor(unit.archetype),
-                                                  fontSize: 8.0,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      if (isSelectedTarget)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: affinityMult != null && affinityMult > 1.0
-                                                ? const Color(0xFF2E7D32)
-                                                : (affinityMult != null && affinityMult < 1.0
-                                                    ? const Color(0xFFC62828)
-                                                    : const Color(0xFFB3261E)),
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(
-                                              color: affinityMult != null && affinityMult > 1.0
-                                                  ? const Color(0xFF81C784)
-                                                  : (affinityMult != null && affinityMult < 1.0
-                                                      ? const Color(0xFFFF8A80)
-                                                      : const Color(0xFFFF5252)),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.gps_fixed, size: 8, color: Colors.white),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                affinityMult != null && affinityMult > 1.0
-                                                    ? 'TARGET (▲+30%)'
-                                                    : (affinityMult != null && affinityMult < 1.0
-                                                        ? 'TARGET (▼WEAK)'
-                                                        : 'TARGET'),
-                                                style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      else if (isActive)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFE5A93C),
-                                            borderRadius: BorderRadius.circular(3),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.flash_on, size: 8, color: Colors.black),
-                                              SizedBox(width: 2),
-                                              Text(
-                                                'ACTING',
-                                                style: TextStyle(color: Colors.black, fontSize: 7.5, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      else if (ultReady)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFFD54F),
-                                            borderRadius: BorderRadius.circular(3),
-                                          ),
-                                          child: const Text(
-                                            'ULT',
-                                            style: TextStyle(
-                                              color: Colors.black,
-                                              fontSize: 7.5,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        )
-                                      else
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: unit.isBoss
-                                                ? const Color(0xFFB71C1C).withValues(alpha: 0.9)
-                                                : (affinityMult != null && affinityMult > 1.0
-                                                    ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
-                                                    : (affinityMult != null && affinityMult < 1.0
-                                                        ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
-                                                        : Colors.black.withValues(alpha: 0.75))),
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(
-                                              color: unit.isBoss
-                                                  ? const Color(0xFFFF5252)
-                                                  : (affinityMult != null && affinityMult > 1.0
-                                                      ? const Color(0xFF81C784)
-                                                      : (affinityMult != null && affinityMult < 1.0
-                                                          ? const Color(0xFFFF8A80)
-                                                          : const Color(0xFFE5A93C))),
-                                              width: unit.isBoss ? 1.2 : 0.8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            unit.isBoss
-                                                ? '☠ BOSS'
-                                                : (affinityMult != null && affinityMult > 1.0
-                                                    ? '▲ ADV'
-                                                    : (affinityMult != null && affinityMult < 1.0
-                                                        ? '▼ WEAK'
-                                                        : 'G${unit.generation}')),
-                                            style: TextStyle(
-                                              color: unit.isBoss
-                                                  ? const Color(0xFFFFD54F)
-                                                  : (affinityMult != null && affinityMult > 1.0
-                                                      ? const Color(0xFFA5D6A7)
-                                                      : (affinityMult != null && affinityMult < 1.0
-                                                          ? const Color(0xFFFFCDD2)
-                                                          : const Color(0xFFE5A93C))),
-                                              fontSize: 7.5,
-                                              fontFamily: 'monospace',
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-
-                                  // Center: Status Effect Badges (if active)
+                                  // Status Effect Badges (if active, above the pedestal)
                                   if (unit.activeEffects.isNotEmpty && alive)
-                                    Wrap(
-                                      spacing: 2,
-                                      runSpacing: 1,
-                                      alignment: WrapAlignment.center,
-                                      children: unit.activeEffects.take(4).map((eff) {
-                                        final Color color = _statusColor(eff.type);
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: color.withValues(alpha: 0.35),
-                                            borderRadius: BorderRadius.circular(2),
-                                            border: Border.all(color: color, width: 0.7),
-                                          ),
-                                          child: Text(
-                                            _statusAbbr(eff.type),
-                                            style: TextStyle(
-                                              color: color,
-                                              fontSize: 7.0,
-                                              fontWeight: FontWeight.bold,
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 2.0),
+                                      child: Wrap(
+                                        spacing: 2,
+                                        runSpacing: 1,
+                                        alignment: WrapAlignment.center,
+                                        children: unit.activeEffects.take(4).map((eff) {
+                                          final Color color = _statusColor(eff.type);
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: color.withValues(alpha: 0.35),
+                                              borderRadius: BorderRadius.circular(2),
+                                              border: Border.all(color: color, width: 0.7),
                                             ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    )
-                                  else
-                                    const SizedBox.shrink(),
-
-                                  // Bottom: Unit Name, HP & TM
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Flexible(
                                             child: Text(
-                                              unit.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 9.5,
+                                              _statusAbbr(eff.type),
+                                              style: TextStyle(
+                                                color: color,
+                                                fontSize: 7.0,
                                                 fontWeight: FontWeight.bold,
-                                                shadows: [
-                                                  Shadow(color: Colors.black, blurRadius: 4),
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+
+                                  // PEDESTAL HUD ROW: Shield (Left) - Level (Center) - Rarity/Target/Boss (Right)
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: max(constraints.maxWidth, 225.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          // Bottom-Left of Pedestal: Archetype Shield Badge (or ☠ BOSS badge for bosses)
+                                          if (unit.isBoss)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
+                                                  SizedBox(width: 2),
+                                                  Text(
+                                                    '☠ BOSS',
+                                                    style: TextStyle(
+                                                      color: Color(0xFFFFD54F),
+                                                      fontSize: 7.5,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withValues(alpha: 0.85),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
+                                                  const SizedBox(width: 2),
+                                                  Text(
+                                                    _archetypeShortCode(unit.archetype),
+                                                    style: TextStyle(
+                                                      color: _archetypeColor(unit.archetype),
+                                                      fontSize: 8.0,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 3),
+
+                                          // Middle of Pedestal: Level Badge
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
                                             decoration: BoxDecoration(
                                               color: unit.isBoss
-                                                  ? const Color(0xFFB71C1C).withValues(alpha: 0.45)
-                                                  : const Color(0xFFE5A93C).withValues(alpha: 0.25),
-                                              borderRadius: BorderRadius.circular(2),
+                                                  ? const Color(0xFFB71C1C).withValues(alpha: 0.6)
+                                                  : Colors.black.withValues(alpha: 0.85),
+                                              borderRadius: BorderRadius.circular(3),
                                               border: Border.all(
                                                 color: unit.isBoss ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
-                                                width: unit.isBoss ? 1.0 : 0.6,
+                                                width: unit.isBoss ? 1.0 : 0.8,
                                               ),
                                             ),
                                             child: Text(
@@ -2396,64 +2263,221 @@ class _BattleScreenState extends State<BattleScreen> {
                                               ),
                                             ),
                                           ),
+
+                                          // Bottom-Right of Pedestal: Target / Boss / Status / Gen Badge
+                                          if (isSelectedTarget)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: affinityMult != null && affinityMult > 1.0
+                                                    ? const Color(0xFF2E7D32)
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? const Color(0xFFC62828)
+                                                        : const Color(0xFFB3261E)),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(
+                                                  color: affinityMult != null && affinityMult > 1.0
+                                                      ? const Color(0xFF81C784)
+                                                      : (affinityMult != null && affinityMult < 1.0
+                                                          ? const Color(0xFFFF8A80)
+                                                          : const Color(0xFFFF5252)),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.gps_fixed, size: 8, color: Colors.white),
+                                                  const SizedBox(width: 2),
+                                                  Text(
+                                                    affinityMult != null && affinityMult > 1.0
+                                                        ? 'TARGET (▲+30%)'
+                                                        : (affinityMult != null && affinityMult < 1.0
+                                                            ? 'TARGET (▼WEAK)'
+                                                            : 'TARGET'),
+                                                    style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else if (unit.isBoss)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
+                                                  SizedBox(width: 2),
+                                                  Text(
+                                                    '☠ BOSS',
+                                                    style: TextStyle(
+                                                      color: Color(0xFFFFD54F),
+                                                      fontSize: 7.5,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else if (isActive)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE5A93C),
+                                                borderRadius: BorderRadius.circular(3),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.flash_on, size: 8, color: Colors.black),
+                                                  SizedBox(width: 2),
+                                                  Text(
+                                                    'ACTING',
+                                                    style: TextStyle(color: Colors.black, fontSize: 7.5, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else if (ultReady)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFD54F),
+                                                borderRadius: BorderRadius.circular(3),
+                                              ),
+                                              child: const Text(
+                                                'ULT',
+                                                style: TextStyle(
+                                                  color: Colors.black,
+                                                  fontSize: 7.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: affinityMult != null && affinityMult > 1.0
+                                                    ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
+                                                        : Colors.black.withValues(alpha: 0.85)),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(
+                                                  color: affinityMult != null && affinityMult > 1.0
+                                                      ? const Color(0xFF81C784)
+                                                      : (affinityMult != null && affinityMult < 1.0
+                                                          ? const Color(0xFFFF8A80)
+                                                          : const Color(0xFFE5A93C)),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                affinityMult != null && affinityMult > 1.0
+                                                    ? '▲ ADV'
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? '▼ WEAK'
+                                                        : (unit.isPureblood ? 'PUREBLOOD' : 'G${unit.generation}')),
+                                                style: TextStyle(
+                                                  color: affinityMult != null && affinityMult > 1.0
+                                                    ? const Color(0xFFA5D6A7)
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? const Color(0xFFFFCDD2)
+                                                        : const Color(0xFFE5A93C)),
+                                                  fontSize: 7.5,
+                                                  fontFamily: 'monospace',
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
                                         ],
                                       ),
-                                      const SizedBox(height: 2),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              '${unit.currentHp}/${unit.maxHp} HP',
-                                              style: TextStyle(
-                                                color: hpRatio > 0.35
-                                                    ? Colors.white
-                                                    : const Color(0xFFEF5350),
-                                                fontSize: 7.5,
-                                                fontFamily: 'monospace',
-                                                fontWeight: FontWeight.bold,
-                                                shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
-                                              ),
-                                            ),
-                                            Text(
-                                              '${unit.turnMeter.toInt()}% TM',
-                                              style: const TextStyle(
-                                                color: Color(0xFF00E5FF),
-                                                fontSize: 7.5,
-                                                fontFamily: 'monospace',
-                                                fontWeight: FontWeight.bold,
-                                                shadows: [Shadow(color: Colors.black, blurRadius: 3)],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 2),
+
+                                  // Under Pedestal: Unit Name
+                                  Center(
+                                    child: Text(
+                                      unit.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [
+                                          Shadow(color: Colors.black, blurRadius: 4),
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(1.5),
-                                        child: LinearProgressIndicator(
-                                          value: hpRatio,
-                                          minHeight: 4.5,
-                                          backgroundColor: const Color(0xFF2A2A38),
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            hpRatio > 0.4
-                                                ? const Color(0xFF2E7D32)
-                                                : const Color(0xFFC62828),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 2),
+
+                                  // Under Pedestal: HP & Action Stats
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${unit.currentHp}/${unit.maxHp} HP',
+                                          style: TextStyle(
+                                            color: hpRatio > 0.35 ? Colors.white : const Color(0xFFEF5350),
+                                            fontSize: 7.5,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.bold,
+                                            shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(1.5),
-                                        child: LinearProgressIndicator(
-                                          value: tmRatio,
-                                          minHeight: 3.0,
-                                          backgroundColor: const Color(0xFF2A2A38),
-                                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00B0FF)),
+                                        Text(
+                                          '${unit.turnMeter.toInt()}% TM',
+                                          style: const TextStyle(
+                                            color: Color(0xFF00E5FF),
+                                            fontSize: 7.5,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.bold,
+                                            shadows: [Shadow(color: Colors.black, blurRadius: 3)],
+                                          ),
                                         ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 2),
+
+                                  // Under Pedestal: Health Bar (Green / Red)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(1.5),
+                                    child: LinearProgressIndicator(
+                                      value: hpRatio,
+                                      minHeight: 4.5,
+                                      backgroundColor: const Color(0xFF2A2A38),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        hpRatio > 0.4 ? const Color(0xFF4CAF50) : const Color(0xFFC62828),
                                       ),
-                                    ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 1.5),
+
+                                  // Under Pedestal: Action Bar (Cyan)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(1.5),
+                                    child: LinearProgressIndicator(
+                                      value: tmRatio,
+                                      minHeight: 3.0,
+                                      backgroundColor: const Color(0xFF2A2A38),
+                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00BCD4)),
+                                    ),
                                   ),
                                 ],
                               ),
