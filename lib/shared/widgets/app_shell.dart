@@ -60,6 +60,7 @@ class _AppShellState extends State<AppShell> {
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
   CampaignNode? _activeNode;
+  List<List<UnitEntity>>? _activeEnemyWaves;
   final Set<EndgameTrialType> _clearedGauntletTrials = {};
   EndgameTrialType? _activeGauntletTrial;
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
@@ -167,7 +168,9 @@ class _AppShellState extends State<AppShell> {
     List<UnitEntity>? customEnemies,
     BattleModifier battleModifier = BattleModifier.none,
     bool preserveSquad = true,
+    List<List<UnitEntity>>? enemyWaves,
   ]) {
+    _activeEnemyWaves = enemyWaves;
     List<UnitEntity> allies;
     if (preserveSquad && _isInitialized && _tickManager.allies.isNotEmpty) {
       allies = _tickManager.allies.map((u) => u.copyWith(
@@ -193,8 +196,13 @@ class _AppShellState extends State<AppShell> {
       tickManager: _tickManager,
       generalType: _activeGeneralType,
       initialFocus: startingFocus,
+      maxFocus: _activeGeneralType == GeneralType.vladislav ? GeneralCommandService.grimoireMaxFocusCap : GeneralCommandService.defaultMaxFocusCap,
       initialPhylacteryRanks: _phylacteryRanks,
     );
+
+    if (_activeGeneralType == GeneralType.vladislav) {
+      _commandService.initializeGrimoire();
+    }
 
     _combatService = CombatResolutionService(
       tickManager: _tickManager,
@@ -205,6 +213,39 @@ class _AppShellState extends State<AppShell> {
     );
 
     _tickManager.start();
+  }
+
+  void _launchMvpThreeWaveSkirmish() {
+    final waves = StarterBrigades.createMvpThreeWaveSkirmish();
+    final allies = StarterBrigades.createAshLegionPlayerSquad();
+
+    _tickManager = InitiativeTickManager(
+      initialAllies: allies,
+      initialEnemies: waves.first,
+      tickInterval: const Duration(milliseconds: 140),
+    );
+
+    _commandService = GeneralCommandService(
+      tickManager: _tickManager,
+      generalType: GeneralType.vladislav,
+      initialFocus: 6,
+      maxFocus: GeneralCommandService.grimoireMaxFocusCap,
+      initialPhylacteryRanks: _phylacteryRanks,
+    );
+    _commandService.initializeGrimoire();
+
+    _combatService = CombatResolutionService(
+      tickManager: _tickManager,
+      commandService: _commandService,
+      relicService: _relicService,
+    );
+
+    _activeEnemyWaves = waves;
+    _tickManager.start();
+
+    setState(() {
+      _currentIndex = 1; // Switch to Tactical Arena
+    });
   }
 
   @override
@@ -1308,6 +1349,7 @@ class _AppShellState extends State<AppShell> {
                     bloodlineSigils: _bloodlineSigils,
                     activeBoons: _activeExpeditionBoons,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
+                    onLaunchMvpSkirmish: _launchMvpThreeWaveSkirmish,
                     currentChapter: _currentChapter,
                     maxUnlockedChapter: _maxUnlockedChapter,
                     onChapterChanged: (ch) => setState(() {
@@ -1323,6 +1365,7 @@ class _AppShellState extends State<AppShell> {
                     commandService: _commandService,
                     relicService: _relicService,
                     bloodlineSigils: _bloodlineSigils,
+                    enemyWaves: _activeEnemyWaves,
                     onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onResetEncounter: () => setState(_resetEncounter),
                     onVictory: _onCombatVictory,

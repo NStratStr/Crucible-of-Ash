@@ -2,6 +2,202 @@ import '../../core/combat_math.dart';
 import '../models/unit_entity.dart';
 
 class StarterBrigades {
+  /// GDD v2.6 Section 14.1: The Ash Legion Player Squad (5 Launch Miniatures)
+  static List<UnitEntity> createAshLegionPlayerSquad() {
+    return [
+      const UnitEntity(
+        id: 'ash_footman_01',
+        speciesId: 'iron_footman',
+        name: 'Iron Footman',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 900,
+        maxHp: 900,
+        attack: 115,
+        defense: 140,
+        speed: 90,
+        resist: 60,
+        nativeTraitId: 'shield_bash',
+        lineageAncestors: ['ironclad_veteran'],
+      ),
+      const UnitEntity(
+        id: 'ash_duelist_01',
+        speciesId: 'grave_duelist',
+        name: 'Grave Duelist',
+        generation: 1,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 720,
+        maxHp: 720,
+        attack: 155,
+        defense: 75,
+        speed: 125,
+        resist: 45,
+        critRate: 0.25,
+        critDamage: 1.65,
+        nativeTraitId: 'vicious_strike',
+        lineageAncestors: ['ashen_inquisitor'],
+      ),
+      const UnitEntity(
+        id: 'ash_medicus_01',
+        speciesId: 'field_medicus',
+        name: 'Field Medicus',
+        generation: 1,
+        archetype: Archetype.support,
+        slot: FormationSlot.front3,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 780,
+        maxHp: 780,
+        attack: 120,
+        defense: 95,
+        speed: 100,
+        resist: 70,
+        nativeTraitId: 'healing_touch',
+        lineageAncestors: ['sunlight_banneret'],
+      ),
+      const UnitEntity(
+        id: 'ash_arbalest_01',
+        speciesId: 'iron_arbalest',
+        name: 'Iron Arbalest',
+        generation: 1,
+        archetype: Archetype.marksman,
+        slot: FormationSlot.back1,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 620,
+        maxHp: 620,
+        attack: 175,
+        defense: 65,
+        speed: 110,
+        resist: 50,
+        critRate: 0.20,
+        critDamage: 1.60,
+        nativeTraitId: 'piercing_bolt',
+        lineageAncestors: ['siege_arbalest'],
+      ),
+      const UnitEntity(
+        id: 'ash_cleric_01',
+        speciesId: 'sun_scorched_cleric',
+        name: 'Sun-Scorched Cleric',
+        generation: 1,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back2,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 650,
+        maxHp: 650,
+        attack: 165,
+        defense: 70,
+        speed: 95,
+        resist: 80,
+        nativeTraitId: 'solar_flare',
+        lineageAncestors: ['solar_hierophant'],
+      ),
+    ];
+  }
+
+  /// GDD v2.6 Section 14.1: The Crypt Stalkers Enemy Squad (5 Launch Miniatures)
+  static List<UnitEntity> createCryptStalkersEnemySquad() {
+    return [
+      const UnitEntity(
+        id: 'crypt_husk_01',
+        speciesId: 'rotting_husk',
+        name: 'Rotting Husk',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 8,
+        maxLevel: 20,
+        currentHp: 850,
+        maxHp: 850,
+        attack: 100,
+        defense: 125,
+        speed: 80,
+        resist: 50,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: ['grave_titan'],
+      ),
+      const UnitEntity(
+        id: 'crypt_ghoul_01',
+        speciesId: 'grave_ghoul',
+        name: 'Grave Ghoul',
+        generation: 1,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 8,
+        maxLevel: 20,
+        currentHp: 580,
+        maxHp: 580,
+        attack: 135,
+        defense: 60,
+        speed: 120,
+        resist: 40,
+        nativeTraitId: 'rend_flesh',
+        lineageAncestors: ['strigoi_lord'],
+      ),
+      const UnitEntity(
+        id: 'crypt_alchemist_01',
+        speciesId: 'blood_alchemist',
+        name: 'Blood Alchemist',
+        generation: 1,
+        archetype: Archetype.support,
+        slot: FormationSlot.front3,
+        level: 8,
+        maxLevel: 20,
+        currentHp: 640,
+        maxHp: 640,
+        attack: 110,
+        defense: 80,
+        speed: 95,
+        resist: 60,
+        nativeTraitId: 'toxic_infusion',
+        lineageAncestors: ['sanguine_priestess'],
+      ),
+      const UnitEntity(
+        id: 'crypt_archer_01',
+        speciesId: 'bone_archer',
+        name: 'Bone Archer',
+        generation: 1,
+        archetype: Archetype.marksman,
+        slot: FormationSlot.back1,
+        level: 8,
+        maxLevel: 20,
+        currentHp: 520,
+        maxHp: 520,
+        attack: 150,
+        defense: 55,
+        speed: 105,
+        resist: 45,
+        nativeTraitId: 'piercing_arrow',
+        lineageAncestors: ['wraith_sniper'],
+      ),
+      const UnitEntity(
+        id: 'crypt_necromancer_01',
+        speciesId: 'blight_necromancer',
+        name: 'Blight Necromancer',
+        generation: 1,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back2,
+        level: 8,
+        maxLevel: 20,
+        currentHp: 550,
+        maxHp: 550,
+        attack: 145,
+        defense: 65,
+        speed: 90,
+        resist: 75,
+        nativeTraitId: 'blight_curse',
+        lineageAncestors: ['lich_dominus'],
+      ),
+    ];
+  }
+
   /// Starter Allied Squad (Vanguard: Front 1, 2, 3; Arcanum: Back 1, 2)
   static List<UnitEntity> createPlayerSquad() {
     return [
@@ -1395,6 +1591,45 @@ class StarterBrigades {
         lineageAncestors: [],
       ),
     ];
+  }
+
+  /// GDD v2.6 Sec 14.1: Single 3-wave skirmish map proving initiative ticks, card drags, bullet-time, and stagger interrupts.
+  static List<List<UnitEntity>> createMvpThreeWaveSkirmish() {
+    final baseCrypt = createCryptStalkersEnemySquad();
+
+    // Wave 1: 3 Vanguard thralls
+    final List<UnitEntity> wave1 = [
+      baseCrypt[0].copyWith(id: 'cs_w1_1', name: 'Rotting Husk (Vanguard)', slot: FormationSlot.front1),
+      baseCrypt[1].copyWith(id: 'cs_w1_2', name: 'Grave Ghoul (Skirmisher)', slot: FormationSlot.front2),
+      baseCrypt[2].copyWith(id: 'cs_w1_3', name: 'Blood Alchemist (Acolyte)', slot: FormationSlot.back1),
+    ];
+
+    // Wave 2: 4 Reinforced Crypt Stalkers
+    final List<UnitEntity> wave2 = [
+      baseCrypt[0].copyWith(id: 'cs_w2_1', name: 'Rotting Husk (Veteran)', slot: FormationSlot.front1, currentHp: 650, maxHp: 650),
+      baseCrypt[1].copyWith(id: 'cs_w2_2', name: 'Grave Ghoul (Frenzied)', slot: FormationSlot.front2, attack: 130),
+      baseCrypt[3].copyWith(id: 'cs_w2_3', name: 'Bone Archer (Marksman)', slot: FormationSlot.back1),
+      baseCrypt[4].copyWith(id: 'cs_w2_4', name: 'Blight Necromancer (Occultist)', slot: FormationSlot.back2),
+    ];
+
+    // Wave 3: Full 5-unit Sovereign Boss Wave
+    final List<UnitEntity> wave3 = [
+      baseCrypt[0].copyWith(id: 'cs_w3_1', name: 'Rotting Husk Guard', slot: FormationSlot.front1, defense: 140),
+      baseCrypt[1].copyWith(id: 'cs_w3_2', name: 'Grave Ghoul Elite', slot: FormationSlot.front2, attack: 145),
+      baseCrypt[2].copyWith(id: 'cs_w3_3', name: 'Blood Alchemist Prime', slot: FormationSlot.back1),
+      baseCrypt[3].copyWith(id: 'cs_w3_4', name: 'Bone Archer Sniper', slot: FormationSlot.back2, attack: 160),
+      baseCrypt[4].copyWith(
+        id: 'boss_gorgoroth_flayed',
+        name: 'Gorgoroth the Flayed',
+        slot: FormationSlot.front3,
+        currentHp: 2200,
+        maxHp: 2200,
+        attack: 180,
+        defense: 120,
+      ),
+    ];
+
+    return [wave1, wave2, wave3];
   }
 }
 

@@ -66,5 +66,25 @@ void main() {
       expect(CombatMath.getPreyArchetype(Archetype.occultist), equals(Archetype.juggernaut));
       expect(CombatMath.getPredatorArchetype(Archetype.occultist), equals(Archetype.support));
     });
+
+    test('GDD v2.6 Section 3.1: PRR, ERR, and EHP formulas evaluate accurately', () {
+      // PRR = Armor / (Armor + 100 + 10 * AttackerLevel)
+      // Level 10 attacker, 100 armor: 100 / (100 + 100 + 100) = 100 / 300 = 0.3333
+      expect(CombatMath.calculatePrr(100, attackerLevel: 10), closeTo(0.3333, 0.001));
+
+      // 0 Armor -> 0.0 PRR
+      expect(CombatMath.calculatePrr(0, attackerLevel: 1), equals(0.0));
+
+      // ERR = Resist / (Resist + 120)
+      // 120 Resist: 120 / (120 + 120) = 0.50
+      expect(CombatMath.calculateErr(120), closeTo(0.50, 0.001));
+
+      // 0 Resist -> 0.0 ERR
+      expect(CombatMath.calculateErr(0), equals(0.0));
+
+      // EHP = HP * (1 + Armor / 100) * (1 + Resist / 100)
+      // 1000 HP, 100 Armor, 50 Resist -> 1000 * 2.0 * 1.5 = 3000 EHP
+      expect(CombatMath.calculateEhp(1000, armor: 100, resist: 50), closeTo(3000.0, 0.001));
+    });
   });
 }

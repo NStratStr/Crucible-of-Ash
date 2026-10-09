@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../../shared/models/unit_entity.dart';
 
@@ -8,6 +9,15 @@ enum CombatPhase {
   awaitingAction,
   resolvingAction,
   battleEnded,
+}
+
+/// GDD v2.6 Section 13.1: The Ashen Reckoning Enrage Phases
+enum AshenReckoningPhase {
+  normal,          // 0:00 - 1:14 (< 2,250 ticks)
+  warning,         // 1:15 - 1:29 (2,250 - 2,699 ticks): Warning Chime
+  reckoning,       // 1:30 - 1:44 (2,700 - 3,149 ticks): Phase 1: 2.0x Damage, -50% Heals
+  terminalCollapse,// 1:45 - 1:59 (3,150 - 3,599 ticks): Phase 2: Escalating Damage, No Revives
+  adjudication,    // 2:00+ (3,600+ ticks): Hard Adjudication — Highest Total HP Wins
 }
 
 @immutable
@@ -55,6 +65,33 @@ class InitiativeTickManager extends ChangeNotifier {
   List<UnitEntity> get allies => _allies;
   List<UnitEntity> get enemies => _enemies;
   double get speedMultiplier => _speedMultiplier;
+
+  // GDD v2.6 Sec 13.1: The Ashen Reckoning enrage clock tracking
+  AshenReckoningPhase get reckoningPhase {
+    if (_tickCount >= 3600) return AshenReckoningPhase.adjudication;
+    if (_tickCount >= 3150) return AshenReckoningPhase.terminalCollapse;
+    if (_tickCount >= 2700) return AshenReckoningPhase.reckoning;
+    if (_tickCount >= 2250) return AshenReckoningPhase.warning;
+    return AshenReckoningPhase.normal;
+  }
+
+  /// Damage multiplier based on Ashen Reckoning phase (2.0x in Phase 1 & 2)
+  double get reckoningDamageMultiplier =>
+      reckoningPhase.index >= AshenReckoningPhase.reckoning.index ? 2.0 : 1.0;
+
+  /// Healing multiplier based on Ashen Reckoning phase (-50% in Phase 1 & 2)
+  double get reckoningHealingMultiplier =>
+      reckoningPhase.index >= AshenReckoningPhase.reckoning.index ? 0.5 : 1.0;
+
+  /// Whether revives are prohibited by Terminal Collapse
+  bool get areRevivesDisabled =>
+      reckoningPhase.index >= AshenReckoningPhase.terminalCollapse.index;
+
+  /// GDD v2.6 Section 13.2: Multi-phase boss timer reset to Tick 0.
+  void resetReckoningClock() {
+    _tickCount = 0;
+    notifyListeners();
+  }
 
   Duration get effectiveTickInterval => Duration(
         milliseconds:
@@ -121,6 +158,19 @@ class InitiativeTickManager extends ChangeNotifier {
     }
 
     _tickCount++;
+
+    // GDD v2.6 Sec 13.1: Hard Adjudication at 3,600 ticks (2:00 mark)
+    if (_tickCount >= 3600) {
+      _adjudicateMatch();
+      return;
+    }
+
+    // Terminal Collapse: Apply escalating environmental true damage pulse every second (30 ticks)
+    if (reckoningPhase == AshenReckoningPhase.terminalCollapse && _tickCount % 30 == 0) {
+      final int pulse = ((_tickCount - 3150) ~/ 30 * 15) + 25;
+      _allies = _allies.map((u) => u.isAlive ? u.copyWith(currentHp: max(1, u.currentHp - pulse)) : u).toList(growable: false);
+      _enemies = _enemies.map((u) => u.isAlive ? u.copyWith(currentHp: max(1, u.currentHp - pulse)) : u).toList(growable: false);
+    }
 
     // Increment TM for all surviving combatants: delta = (Speed / 100) * tickScale
     _allies = _allies.map((unit) {
@@ -262,6 +312,29 @@ class InitiativeTickManager extends ChangeNotifier {
       }
     }
     notifyListeners();
+  }
+
+  /// GDD v2.6 Sec 13.2 & 14.1: Advances to next combat wave, resets reckoning timer.
+  void advanceWave(List<UnitEntity> nextWaveEnemies) {
+    _enemies = List.unmodifiable(nextWaveEnemies);
+    resetReckoningClock();
+    _phase = CombatPhase.ticking;
+    _activeUnit = null;
+    start();
+    notifyListeners();
+  }
+
+  /// GDD v2.6 Sec 13.1: Hard Adjudication at 2:00 mark (highest total remaining squad HP wins)
+  void _adjudicateMatch() {
+    final int totalAllyHp = _allies.fold(0, (acc, u) => acc + max(0, u.currentHp));
+    final int totalEnemyHp = _enemies.fold(0, (acc, u) => acc + max(0, u.currentHp));
+
+    if (totalAllyHp >= totalEnemyHp) {
+      _enemies = _enemies.map((e) => e.copyWith(currentHp: 0)).toList(growable: false);
+    } else {
+      _allies = _allies.map((a) => a.copyWith(currentHp: 0)).toList(growable: false);
+    }
+    _finishBattle();
   }
 
   bool _isBattleOver() {

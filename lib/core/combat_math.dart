@@ -42,14 +42,39 @@ class CombatMath {
     return false;
   }
 
-  /// Asymptotic defense mitigation curve.
+  /// Physical Damage Reduction (Diminishing Returns) from GDD v2.6 Sec 3.1:
+  /// PRR = Armor / (Armor + 100 + (10 * AttackerLevel))
+  static double calculatePrr(int armor, {int attackerLevel = 1}) {
+    final double safeArmor = max(0, armor).toDouble();
+    final double denom = safeArmor + 100.0 + (10.0 * max(1, attackerLevel));
+    return safeArmor / denom;
+  }
+
+  /// Elemental Resistance Reduction from GDD v2.6 Sec 3.1:
+  /// ERR = Resist / (Resist + 120)
+  static double calculateErr(int resist) {
+    final double safeResist = max(0, resist).toDouble();
+    return safeResist / (safeResist + 120.0);
+  }
+
+  /// Effective Health Calculation (EHP) from GDD v2.6 Sec 3.1:
+  /// EHP = HP * (1 + Armor / 100) * (1 + Resist / 100)
+  static double calculateEhp(int hp, {int armor = 0, int resist = 0}) {
+    final double safeHp = max(0, hp).toDouble();
+    final double safeArmor = max(0, armor).toDouble();
+    final double safeResist = max(0, resist).toDouble();
+    return safeHp * (1.0 + safeArmor / 100.0) * (1.0 + safeResist / 100.0);
+  }
+
+  /// Defense mitigation curve.
   /// Mitigation Multiplier = 1000 / (1000 + 3.5 * Defense)
   static double calculateMitigation(int defense) {
     final double safeDef = max(0, defense).toDouble();
     return 1000.0 / (1000.0 + (3.5 * safeDef));
   }
 
-  /// Complete damage resolution pipeline.
+  /// Complete damage resolution pipeline from GDD v2.6 Sec 3.1:
+  /// Damage = (BaseATK * SkillCoeff) * (1 - PRR) * (1 + CRIT_MULT) - FlatAbsorb
   static int calculateDamage({
     required int attack,
     required int defense,
@@ -58,10 +83,15 @@ class CombatMath {
     required Archetype defenderRole,
     required double critRate,
     required double critDamage,
+    int attackerLevel = 1,
+    int flatAbsorb = 0,
+    bool useHyperbolicPrr = false,
     Random? rng,
   }) {
     final Random activeRng = rng ?? _rng;
-    final double mitigation = calculateMitigation(defense);
+    final double mitigation = useHyperbolicPrr
+        ? (1.0 - calculatePrr(defense, attackerLevel: attackerLevel))
+        : calculateMitigation(defense);
     final double baseDamage = attack * skillCoefficient * mitigation;
 
     final double affinityMod = getAffinityMultiplier(attackerRole, defenderRole);
@@ -75,7 +105,7 @@ class CombatMath {
     // Variance: 0.95 to 1.05
     final double variance = 0.95 + (activeRng.nextDouble() * 0.10);
 
-    double totalDamage = baseDamage * affinityMod * critMod * variance;
+    double totalDamage = (baseDamage * affinityMod * critMod * variance) - flatAbsorb;
     if (glancing) {
       totalDamage *= 0.70; // 30% reduction on glancing blow
     }

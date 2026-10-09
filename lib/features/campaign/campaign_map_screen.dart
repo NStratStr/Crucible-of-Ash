@@ -86,6 +86,7 @@ class CampaignMapScreen extends StatelessWidget {
   final int cursedOre;
   final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
+  final VoidCallback? onLaunchMvpSkirmish;
   final int currentChapter;
   final int maxUnlockedChapter;
   final ValueChanged<int>? onChapterChanged;
@@ -99,6 +100,7 @@ class CampaignMapScreen extends StatelessWidget {
     this.cursedOre = 0,
     this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
+    this.onLaunchMvpSkirmish,
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
     this.onChapterChanged,
@@ -170,6 +172,12 @@ class CampaignMapScreen extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
+          if (onLaunchMvpSkirmish != null)
+            IconButton(
+              icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 20),
+              tooltip: 'MVP 3-Wave Skirmish (GDD Sec 14.1)',
+              onPressed: onLaunchMvpSkirmish,
+            ),
           if (onOpenEndgameGauntlet != null)
             IconButton(
               icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 20),

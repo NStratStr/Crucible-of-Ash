@@ -9,12 +9,17 @@ enum SkillTargetType {
 }
 
 enum StatusEffectType {
-  bleed,       // Physical DoT (synergizes with Vladislav aura)
-  blight,      // Occult Poison DoT
-  stun,        // Skips next turn
-  defenseUp,   // +30% Armor
-  speedUp,     // +20% Speed
-  decaying,    // Rebound thrall: collapses back to death when duration expires
+  bleed,        // Physical DoT (GDD v2.6 Sec 4)
+  blight,       // Occult Poison DoT
+  burn,         // Fire DoT (suppresses 100% healing)
+  freeze,       // Hard CC (Physical hit shatters for bonus damage)
+  stun,         // Hard CC (Pauses AP accumulation)
+  vulnerable,   // Debuff (+25% incoming damage)
+  defenseUp,    // +30% Armor buff
+  speedUp,      // +35% BaseSPD Haste buff
+  shield,       // Absorbs incoming damage
+  invulnerable, // Invulnerability grace window (e.g. 6 ticks upon revive)
+  decaying,     // Rebound thrall: collapses back to death when duration expires
 }
 
 @immutable
@@ -29,18 +34,39 @@ class StatusEffect {
     this.value = 0,
   });
 
+  bool get isDebuff =>
+      type == StatusEffectType.bleed ||
+      type == StatusEffectType.blight ||
+      type == StatusEffectType.burn ||
+      type == StatusEffectType.freeze ||
+      type == StatusEffectType.stun ||
+      type == StatusEffectType.vulnerable ||
+      type == StatusEffectType.decaying;
+
+  bool get isBuff => !isDebuff;
+
   String get displayName {
     switch (type) {
       case StatusEffectType.bleed:
         return 'Bleed';
       case StatusEffectType.blight:
         return 'Blight';
+      case StatusEffectType.burn:
+        return 'Burn';
+      case StatusEffectType.freeze:
+        return 'Freeze';
       case StatusEffectType.stun:
         return 'Stun';
+      case StatusEffectType.vulnerable:
+        return 'Vulnerable';
       case StatusEffectType.defenseUp:
         return 'Armor Up';
       case StatusEffectType.speedUp:
         return 'Haste';
+      case StatusEffectType.shield:
+        return 'Shield';
+      case StatusEffectType.invulnerable:
+        return 'Grace';
       case StatusEffectType.decaying:
         return 'Decaying';
     }

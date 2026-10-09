@@ -59,6 +59,66 @@ class GeneralProfile {
     required this.orders,
   });
 
+  static const GeneralOrderDefinition rendFleshOrder = GeneralOrderDefinition(
+    id: 'rend_flesh',
+    name: 'REND FLESH',
+    focusCost: 1,
+    description: 'Strike target enemy with physical damage and inflict 2 stacks of Bleed.',
+    icon: Icons.colorize,
+    requiresTargetEnemy: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition ironBulwarkOrder = GeneralOrderDefinition(
+    id: 'iron_bulwark',
+    name: 'IRON BULWARK',
+    focusCost: 2,
+    description: 'Fortify target ally with an Aegis Shield and +25 Armor.',
+    icon: Icons.shield,
+    requiresTargetAlly: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition exsanguinatingStrikeOrder = GeneralOrderDefinition(
+    id: 'exsanguinating_strike',
+    name: 'EXSANGUINATE',
+    focusCost: 3,
+    description: 'Heavy strike dealing 2.5x damage against Bleeding targets or executing below 25% HP.',
+    icon: Icons.dangerous,
+    requiresTargetEnemy: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition sanguineRevivalOrder = GeneralOrderDefinition(
+    id: 'sanguine_revival',
+    name: 'REVIVAL',
+    focusCost: 4,
+    description: 'Infuse Vitae into a fallen ally: revives with grace window and Aegis Shield overflow.',
+    icon: Icons.healing,
+    requiresTargetAlly: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition disruptingCleaveOrder = GeneralOrderDefinition(
+    id: 'disrupting_cleave',
+    name: 'DISRUPT',
+    focusCost: 2,
+    description: 'Cleave enemy formation and reduce target AP / Turn Meter by 25%.',
+    icon: Icons.flash_on,
+    requiresTargetEnemy: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition bloodBoilOrder = GeneralOrderDefinition(
+    id: 'blood_boil',
+    name: 'BLOOD BOIL',
+    focusCost: 2,
+    description: 'Grant target ally Haste (+35% Speed) at the cost of 5% current HP recoil.',
+    icon: Icons.whatshot,
+    requiresTargetAlly: true,
+    requiredPhylacteryRank: 1,
+  );
+
   static const List<GeneralProfile> allGenerals = [
     GeneralProfile(
       type: GeneralType.vladislav,
@@ -96,6 +156,12 @@ class GeneralProfile {
           requiresTargetEnemy: true,
           requiredPhylacteryRank: 3,
         ),
+        rendFleshOrder,
+        ironBulwarkOrder,
+        exsanguinatingStrikeOrder,
+        sanguineRevivalOrder,
+        disruptingCleaveOrder,
+        bloodBoilOrder,
       ],
     ),
     GeneralProfile(
@@ -250,13 +316,24 @@ class RecordedAction {
 
 class GeneralCommandService extends ChangeNotifier {
   static const int maxFocusCap = 3;
+  static const int defaultMaxFocusCap = 3;
+  static const int grimoireMaxFocusCap = 6;
+  static const int maxHandSize = 3;
   static const double focusChargeThreshold = 500.0; // Damage dealt/taken per 1 Focus point
 
   final InitiativeTickManager tickManager;
   GeneralType _activeGeneralType;
 
+  int _maxFocusCap;
   int _currentFocus;
   double _accumulatedDamageProgress = 0.0;
+
+  // Grimoire State (GDD v2.6 Sec 5 & 14.1)
+  final List<GeneralOrderDefinition> _grimoireDeck = [];
+  final List<GeneralOrderDefinition> _hand = [];
+  final List<GeneralOrderDefinition> _discardPile = [];
+  int _burnCooldownTicks = 0;
+  bool _isBulletTimeActive = false;
 
   final Map<GeneralType, int> _phylacteryRanks = {
     GeneralType.vladislav: 1,
@@ -271,9 +348,11 @@ class GeneralCommandService extends ChangeNotifier {
     String? generalName,
     GeneralType generalType = GeneralType.vladislav,
     int initialFocus = 1,
+    int? maxFocus,
     Map<GeneralType, int>? initialPhylacteryRanks,
   })  : _activeGeneralType = generalType,
-        _currentFocus = initialFocus.clamp(0, maxFocusCap) {
+        _maxFocusCap = maxFocus ?? defaultMaxFocusCap,
+        _currentFocus = initialFocus.clamp(0, maxFocus ?? defaultMaxFocusCap) {
     if (initialPhylacteryRanks != null) {
       _phylacteryRanks.addAll(initialPhylacteryRanks);
     }
@@ -285,15 +364,31 @@ class GeneralCommandService extends ChangeNotifier {
   String get generalId => currentProfile.id;
   String get generalName => currentProfile.name;
   int get currentFocus => _currentFocus;
-  int get maxFocus => maxFocusCap;
-  bool get isFocusMaxed => _currentFocus >= maxFocusCap;
+  int get maxFocus => _maxFocusCap;
+  int get currentMaxFocus => _maxFocusCap;
+  set maxFocusCapValue(int val) {
+    _maxFocusCap = val;
+    if (_currentFocus > _maxFocusCap) _currentFocus = _maxFocusCap;
+    notifyListeners();
+  }
+  bool get isFocusMaxed => _currentFocus >= _maxFocusCap;
   double get focusProgressRatio =>
       (_accumulatedDamageProgress / focusChargeThreshold).clamp(0.0, 1.0);
   double get focusChargeProgress => focusProgressRatio;
 
+  // Grimoire Getters (GDD v2.6 Sec 5)
+  List<GeneralOrderDefinition> get hand => List.unmodifiable(_hand);
+  List<GeneralOrderDefinition> get grimoireDeck => List.unmodifiable(_grimoireDeck);
+  List<GeneralOrderDefinition> get discardPile => List.unmodifiable(_discardPile);
+  int get burnCooldownTicks => _burnCooldownTicks;
+  bool get isBulletTimeActive => _isBulletTimeActive;
+  double get simulationSpeedMultiplier => _isBulletTimeActive ? 0.30 : 1.0;
+
   Map<GeneralType, int> get allPhylacteryRanks => Map.unmodifiable(_phylacteryRanks);
 
   int get activePhylacteryRank => getPhylacteryRank(_activeGeneralType);
+
+  int get getActivePhylacteryRank => getPhylacteryRank(_activeGeneralType);
 
   int getPhylacteryRank(GeneralType type) => _phylacteryRanks[type] ?? 1;
 
@@ -353,16 +448,16 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Accumulates damage dealt or taken across the squad and converts it to Focus points.
   void registerCombatDamage(int damage) {
-    if (_currentFocus >= maxFocusCap || damage <= 0) return;
+    if (_currentFocus >= _maxFocusCap || damage <= 0) return;
 
     _accumulatedDamageProgress += damage;
 
-    while (_accumulatedDamageProgress >= focusChargeThreshold && _currentFocus < maxFocusCap) {
+    while (_accumulatedDamageProgress >= focusChargeThreshold && _currentFocus < _maxFocusCap) {
       _accumulatedDamageProgress -= focusChargeThreshold;
       _currentFocus++;
     }
 
-    if (_currentFocus == maxFocusCap) {
+    if (_currentFocus == _maxFocusCap) {
       _accumulatedDamageProgress = 0.0;
     }
 
@@ -371,7 +466,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Manually grants flat Focus (e.g. from Altar rewards or Relic triggers).
   void grantFocus(int points) {
-    _currentFocus = (_currentFocus + points).clamp(0, maxFocusCap);
+    _currentFocus = (_currentFocus + points).clamp(0, _maxFocusCap);
     notifyListeners();
   }
 
@@ -399,7 +494,403 @@ class GeneralCommandService extends ChangeNotifier {
   }
 
   // ===========================================================================
-  // 1. LORD VLADISLAV (VAMPIRE) ORDERS
+  // GRIMOIRE DECK & HAND LIFECYCLE (GDD v2.6 SEC 5 & 14.1)
+  // ===========================================================================
+
+  void _onCardPlayed(String cardId) {
+    final int handIdx = _hand.indexWhere((c) => c.id == cardId);
+    if (handIdx != -1) {
+      final card = _hand.removeAt(handIdx);
+      _discardPile.add(card);
+      drawCard();
+      notifyListeners();
+    }
+  }
+
+  /// Initializes the 10-card Grimoire deck and draws the initial 3-card hand.
+  void initializeGrimoire({List<GeneralOrderDefinition>? customDeck}) {
+    _hand.clear();
+    _discardPile.clear();
+    _burnCooldownTicks = 0;
+    _isBulletTimeActive = false;
+    _maxFocusCap = grimoireMaxFocusCap;
+
+    _grimoireDeck.clear();
+    if (customDeck != null && customDeck.isNotEmpty) {
+      _grimoireDeck.addAll(customDeck);
+    } else {
+      // Standard 10-card Grimoire for Lord Vladislav (MVP GDD v2.6 Sec 14.1)
+      _grimoireDeck.addAll([
+        GeneralProfile.rendFleshOrder,
+        GeneralProfile.rendFleshOrder,
+        GeneralProfile.ironBulwarkOrder,
+        GeneralProfile.ironBulwarkOrder,
+        GeneralProfile.exsanguinatingStrikeOrder,
+        GeneralProfile.exsanguinatingStrikeOrder,
+        GeneralProfile.sanguineRevivalOrder,
+        GeneralProfile.disruptingCleaveOrder,
+        GeneralProfile.disruptingCleaveOrder,
+        GeneralProfile.bloodBoilOrder,
+      ]);
+    }
+
+    // Draw up to maxHandSize (3) cards
+    while (_hand.length < maxHandSize && _grimoireDeck.isNotEmpty) {
+      _hand.add(_grimoireDeck.removeAt(0));
+    }
+    notifyListeners();
+  }
+
+  /// Draws a card from the deck into hand. Reshuffles discard pile if deck is empty.
+  GeneralOrderDefinition? drawCard() {
+    if (_hand.length >= maxHandSize) return null;
+    if (_grimoireDeck.isEmpty) {
+      if (_discardPile.isEmpty) return null;
+      // Deck Reshuffle: recycles discard pile with zero penalty
+      _grimoireDeck.addAll(_discardPile);
+      _discardPile.clear();
+    }
+    if (_grimoireDeck.isEmpty) return null;
+    final card = _grimoireDeck.removeAt(0);
+    _hand.add(card);
+    notifyListeners();
+    return card;
+  }
+
+  /// Discards a card from hand to the Burn Pit (costs 0 Focus),
+  /// triggering a 6-tick safety cooldown before drawing a replacement.
+  void burnCard(String cardId) {
+    final int handIdx = _hand.indexWhere((c) => c.id == cardId);
+    if (handIdx == -1) return;
+    final card = _hand.removeAt(handIdx);
+    _discardPile.add(card);
+    _burnCooldownTicks = 6;
+    notifyListeners();
+  }
+
+  /// Called each simulation tick to process burn cooldowns.
+  void onSimulationTick() {
+    if (_burnCooldownTicks > 0) {
+      _burnCooldownTicks--;
+      if (_burnCooldownTicks == 0) {
+        drawCard();
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Toggles Bullet-Time (slows simulation to 30% speed).
+  void setBulletTime(bool active) {
+    if (_isBulletTimeActive == active) return;
+    _isBulletTimeActive = active;
+    notifyListeners();
+  }
+
+  // ===========================================================================
+  // 1A. LORD VLADISLAV 6-CARD GRIMOIRE ORDERS (MVP SPEC GDD v2.6 SEC 14.1)
+  // ===========================================================================
+
+  /// Rend Flesh (Cost: 1 Focus)
+  /// Strike + Bleed DoT.
+  OrderResult executeRendFlesh(String targetEnemyId) {
+    _validateOrderUnlocked('rend_flesh');
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    final int enemyIdx = enemies.indexWhere((u) => u.id == targetEnemyId && u.isAlive);
+    if (enemyIdx == -1) {
+      throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
+    }
+
+    const int cost = 1;
+    _spendFocus(cost);
+
+    final UnitEntity target = enemies[enemyIdx];
+    final double prr = CombatMath.calculatePrr(target.armor);
+    final int rawDmg = (160 * potencyMultiplier).round();
+    final int netDmg = max(1, (rawDmg * (1.0 - prr)).round());
+    final int newHp = max(0, target.currentHp - netDmg);
+
+    final List<StatusEffect> updatedEffects = List.of(target.activeEffects);
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.bleed,
+      durationTurns: 3,
+      value: 40,
+    ));
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.bleed,
+      durationTurns: 3,
+      value: 40,
+    ));
+
+    enemies[enemyIdx] = target.copyWith(
+      currentHp: newHp,
+      activeEffects: updatedEffects,
+    );
+
+    _applyStateToTickManager(tickManager.allies, enemies);
+    _onCardPlayed('rend_flesh');
+
+    return OrderResult(
+      orderId: 'rend_flesh',
+      orderName: 'Rend Flesh',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Inflicted $netDmg damage and 2 Bleed stacks on ${target.name}.',
+      updatedAllies: tickManager.allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Iron Bulwark (Cost: 2 Focus)
+  /// Aegis Shield + Armor boost.
+  OrderResult executeIronBulwark(String targetAllyId) {
+    _validateOrderUnlocked('iron_bulwark');
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final int allyIdx = allies.indexWhere((u) => u.id == targetAllyId && u.isAlive);
+    if (allyIdx == -1) {
+      throw ArgumentError('Target ally $targetAllyId not found or already defeated.');
+    }
+
+    const int cost = 2;
+    _spendFocus(cost);
+
+    final UnitEntity target = allies[allyIdx];
+    final int shieldValue = (250 * potencyMultiplier).round();
+    final List<StatusEffect> updatedEffects = List.of(target.activeEffects);
+    updatedEffects.add(StatusEffect(
+      type: StatusEffectType.shield,
+      durationTurns: 3,
+      value: shieldValue,
+    ));
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.defenseUp,
+      durationTurns: 3,
+      value: 25,
+    ));
+
+    allies[allyIdx] = target.copyWith(
+      activeEffects: updatedEffects,
+      defense: target.defense + 25,
+    );
+
+    _applyStateToTickManager(allies, tickManager.enemies);
+    _onCardPlayed('iron_bulwark');
+
+    return OrderResult(
+      orderId: 'iron_bulwark',
+      orderName: 'Iron Bulwark',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Fortified ${target.name} with $shieldValue Aegis Shield and +25 Armor.',
+      updatedAllies: allies,
+      updatedEnemies: tickManager.enemies,
+    );
+  }
+
+  /// Exsanguinating Strike (Cost: 3 Focus)
+  /// Execute bonus vs. Bleeding targets or targets below 25% HP.
+  OrderResult executeExsanguinatingStrike(String targetEnemyId) {
+    _validateOrderUnlocked('exsanguinating_strike');
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    final int enemyIdx = enemies.indexWhere((u) => u.id == targetEnemyId && u.isAlive);
+    if (enemyIdx == -1) {
+      throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
+    }
+
+    const int cost = 3;
+    _spendFocus(cost);
+
+    final UnitEntity target = enemies[enemyIdx];
+    final bool isBleeding = target.activeEffects.any((e) => e.type == StatusEffectType.bleed);
+    final bool isLowHp = (target.currentHp / target.maxHp) <= 0.25;
+
+    int damageDealt;
+    String summary;
+
+    if (isLowHp) {
+      damageDealt = target.currentHp;
+      enemies[enemyIdx] = target.copyWith(currentHp: 0);
+      summary = 'Executed ${target.name} under 25% HP threshold!';
+    } else if (isBleeding) {
+      final double prr = CombatMath.calculatePrr(target.armor);
+      final int rawDmg = (200 * 2.5 * potencyMultiplier).round();
+      damageDealt = max(1, (rawDmg * (1.0 - prr)).round());
+      final int newHp = max(0, target.currentHp - damageDealt);
+      enemies[enemyIdx] = target.copyWith(currentHp: newHp);
+      summary = 'Exsanguinated ${target.name} for $damageDealt amplified damage (2.5x vs Bleed)!';
+    } else {
+      final double prr = CombatMath.calculatePrr(target.armor);
+      final int rawDmg = (200 * potencyMultiplier).round();
+      damageDealt = max(1, (rawDmg * (1.0 - prr)).round());
+      final int newHp = max(0, target.currentHp - damageDealt);
+      enemies[enemyIdx] = target.copyWith(currentHp: newHp);
+      summary = 'Struck ${target.name} for $damageDealt physical damage.';
+    }
+
+    _applyStateToTickManager(tickManager.allies, enemies);
+    _onCardPlayed('exsanguinating_strike');
+
+    return OrderResult(
+      orderId: 'exsanguinating_strike',
+      orderName: 'Exsanguinating Strike',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: summary,
+      updatedAllies: tickManager.allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Sanguine Revival (Cost: 4 Focus)
+  /// Infused Vitae revive targeting a fallen Inert Vessel.
+  OrderResult executeSanguineRevival(String targetAllyId) {
+    _validateOrderUnlocked('sanguine_revival');
+    if (tickManager.areRevivesDisabled) {
+      throw StateError('Revives are strictly disabled during Terminal Collapse!');
+    }
+
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final int allyIdx = allies.indexWhere((u) => u.id == targetAllyId && !u.isAlive);
+    if (allyIdx == -1) {
+      throw ArgumentError('Target ally $targetAllyId is not a fallen Inert Vessel.');
+    }
+
+    const int cost = 4;
+    _spendFocus(cost);
+
+    final UnitEntity target = allies[allyIdx];
+    final int newReviveCount = target.reviveCount + 1;
+    final int effectiveCap = (target.maxHp * pow(0.80, newReviveCount)).round();
+
+    final int rawHeal = ((350 * potencyMultiplier) * tickManager.reckoningHealingMultiplier).round();
+    final int finalHp = min(effectiveCap, max(1, rawHeal));
+    final int overflow = max(0, rawHeal - effectiveCap);
+    final int aegisShield = (overflow * 0.50).round();
+
+    final List<StatusEffect> updatedEffects = target.activeEffects
+        .where((e) => !e.isDebuff)
+        .toList();
+
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.invulnerable,
+      durationTurns: 1,
+      value: 6,
+    ));
+
+    if (aegisShield > 0) {
+      updatedEffects.add(StatusEffect(
+        type: StatusEffectType.shield,
+        durationTurns: 2,
+        value: aegisShield,
+      ));
+    }
+
+    allies[allyIdx] = target.copyWith(
+      currentHp: finalHp,
+      reviveCount: newReviveCount,
+      turnMeter: 0.0,
+      activeEffects: updatedEffects,
+    );
+
+    _applyStateToTickManager(allies, tickManager.enemies);
+    _onCardPlayed('sanguine_revival');
+
+    return OrderResult(
+      orderId: 'sanguine_revival',
+      orderName: 'Sanguine Revival',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Revived ${target.name} with $finalHp HP, 6-tick Grace, and $aegisShield Aegis Shield.',
+      updatedAllies: allies,
+      updatedEnemies: tickManager.enemies,
+    );
+  }
+
+  /// Disrupting Cleave (Cost: 2 Focus)
+  /// Staggers enemy AP gauge by 25%.
+  OrderResult executeDisruptingCleave(String targetEnemyId) {
+    _validateOrderUnlocked('disrupting_cleave');
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    final int enemyIdx = enemies.indexWhere((u) => u.id == targetEnemyId && u.isAlive);
+    if (enemyIdx == -1) {
+      throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
+    }
+
+    const int cost = 2;
+    _spendFocus(cost);
+
+    final UnitEntity target = enemies[enemyIdx];
+    final double prr = CombatMath.calculatePrr(target.armor);
+    final int rawDmg = (140 * potencyMultiplier).round();
+    final int netDmg = max(1, (rawDmg * (1.0 - prr)).round());
+    final int newHp = max(0, target.currentHp - netDmg);
+
+    final double newTurnMeter = max(0.0, target.turnMeter - 25.0);
+
+    enemies[enemyIdx] = target.copyWith(
+      currentHp: newHp,
+      turnMeter: newTurnMeter,
+    );
+
+    _applyStateToTickManager(tickManager.allies, enemies);
+    _onCardPlayed('disrupting_cleave');
+
+    return OrderResult(
+      orderId: 'disrupting_cleave',
+      orderName: 'Disrupting Cleave',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Dealt $netDmg damage and disrupted ${target.name}\'s AP gauge by 25%.',
+      updatedAllies: tickManager.allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Blood Boil (Cost: 2 Focus)
+  /// Haste buff +35% SPD with minor recoil (5% HP).
+  OrderResult executeBloodBoil(String targetAllyId) {
+    _validateOrderUnlocked('blood_boil');
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final int allyIdx = allies.indexWhere((u) => u.id == targetAllyId && u.isAlive);
+    if (allyIdx == -1) {
+      throw ArgumentError('Target ally $targetAllyId not found or already defeated.');
+    }
+
+    const int cost = 2;
+    _spendFocus(cost);
+
+    final UnitEntity target = allies[allyIdx];
+    final int recoil = max(1, (target.currentHp * 0.05).round());
+    final int newHp = max(1, target.currentHp - recoil);
+
+    final List<StatusEffect> updatedEffects = List.of(target.activeEffects);
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.speedUp,
+      durationTurns: 3,
+      value: 35,
+    ));
+
+    allies[allyIdx] = target.copyWith(
+      currentHp: newHp,
+      speed: (target.speed * 1.35).round(),
+      activeEffects: updatedEffects,
+    );
+
+    _applyStateToTickManager(allies, tickManager.enemies);
+    _onCardPlayed('blood_boil');
+
+    return OrderResult(
+      orderId: 'blood_boil',
+      orderName: 'Blood Boil',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Granted +35% Haste to ${target.name} at cost of $recoil recoil HP.',
+      updatedAllies: allies,
+      updatedEnemies: tickManager.enemies,
+    );
+  }
+
+  // ===========================================================================
+  // 1B. LORD VLADISLAV LEGACY ORDERS
   // ===========================================================================
 
   /// Siphon Vitality (Cost: 1 Focus)

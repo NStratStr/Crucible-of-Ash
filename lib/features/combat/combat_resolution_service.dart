@@ -345,7 +345,8 @@ class CombatResolutionService {
     final int targetIndex = friendlySquad.indexWhere((u) => u.id == targetUnitId && u.isAlive);
     final UnitEntity target = targetIndex != -1 ? friendlySquad[targetIndex] : attacker;
 
-    final int healValue = max(50, (target.maxHp * 0.25).round());
+    int healValue = max(50, (target.maxHp * 0.25).round());
+    healValue = (healValue * tickManager.reckoningHealingMultiplier).round();
     final int newHp = min(target.maxHp, target.currentHp + healValue);
     List<StatusEffect> effects = List.of(target.activeEffects);
     if (skill.appliedStatus != null) {
@@ -545,15 +546,47 @@ class CombatResolutionService {
       totalDamage *= 1.20;
     }
 
+    // GDD v2.6 Sec 4: Vulnerable status (+25% incoming damage)
+    if (target.activeEffects.any((e) => e.type == StatusEffectType.vulnerable)) {
+      totalDamage *= 1.25;
+    }
+
+    // GDD v2.6 Sec 13.1: The Ashen Reckoning Phase 1/2 Damage Amplification (2.0x)
+    totalDamage *= tickManager.reckoningDamageMultiplier;
+
     if (isGlancing) {
       totalDamage *= 0.70;
     }
 
-    final int finalDamage = max(1, totalDamage.round());
+    // GDD v2.6 Sec 3.4: Awakening Grace Window (Immune to damage while invulnerable)
+    final bool isInvulnerable = target.activeEffects.any((e) => e.type == StatusEffectType.invulnerable);
+    int finalDamage = isInvulnerable ? 0 : max(1, totalDamage.round());
+
+    // GDD v2.6 Sec 4: Shield absorption
+    List<StatusEffect> targetEffects = List.of(target.activeEffects);
+    final int shieldIndex = targetEffects.indexWhere((e) => e.type == StatusEffectType.shield);
+    if (shieldIndex != -1 && finalDamage > 0) {
+      final shield = targetEffects[shieldIndex];
+      if (shield.value >= finalDamage) {
+        final remainingShield = shield.value - finalDamage;
+        finalDamage = 0;
+        if (remainingShield > 0) {
+          targetEffects[shieldIndex] = StatusEffect(
+            type: StatusEffectType.shield,
+            durationTurns: shield.durationTurns,
+            value: remainingShield,
+          );
+        } else {
+          targetEffects.removeAt(shieldIndex);
+        }
+      } else {
+        finalDamage -= shield.value;
+        targetEffects.removeAt(shieldIndex);
+      }
+    }
 
     // 5. Apply Damage to Defender & Status Effects
     final int newTargetHp = max(0, target.currentHp - finalDamage);
-    List<StatusEffect> targetEffects = List.of(target.activeEffects);
     if (skill.appliedStatus != null && !isGlancing && newTargetHp > 0) {
       targetEffects.add(skill.appliedStatus!);
     }
@@ -724,6 +757,99 @@ class CombatResolutionService {
       lifestealRecovered: lifestealRecovered,
       skillName: skill.name,
       appliedStatusName: skill.appliedStatus?.displayName,
+    );
+  }
+
+  /// GDD v2.6 Section 3.4: Infused Vitae Revive on downed "Inert Vessel"
+  /// Formula: Revived_HP = (Caster_ATK * SkillCoeff) * (1 + Caster_Gen * 0.15)
+  /// Capped at target effectiveMaxHp; overflow converts into an Aegis Shield Ring (50% excess).
+  /// Revived unit gains 6-tick invulnerability grace window, cleansed debuffs, and AP reset to 0.
+  /// Target suffers stacking Soul Fracture penalty (-20% Max HP).
+  ActionResult? executeInfusedVitaeRevive({
+    required String targetUnitId,
+    double skillCoefficient = 1.2,
+    bool autoResumeTickEngine = true,
+  }) {
+    if (tickManager.areRevivesDisabled) {
+      return null; // Terminal Collapse forbids revives!
+    }
+
+    final UnitEntity? caster = tickManager.activeUnit;
+    if (caster == null) return null;
+
+    final bool casterIsAlly = tickManager.allies.any((u) => u.id == caster.id);
+    final List<UnitEntity> friendlySquad = casterIsAlly ? tickManager.allies : tickManager.enemies;
+
+    // Find the downed "Inert Vessel" (currentHp == 0)
+    final int targetIndex = friendlySquad.indexWhere((u) => u.id == targetUnitId && !u.isAlive);
+    if (targetIndex == -1) return null;
+
+    final UnitEntity target = friendlySquad[targetIndex];
+
+    // GDD v2.6 Sec 3.4: Soul Fracture penalty (+1 revive count -> -20% Max HP)
+    final int newReviveCount = target.reviveCount + 1;
+    final int effectiveCap = (target.maxHp * pow(0.80, newReviveCount)).round();
+
+    // Infused Vitae formula: (Caster_ATK * SkillCoeff) * (1 + Caster_Gen * 0.15)
+    final double rawHeal = (caster.attack * skillCoefficient) * (1.0 + (caster.generation * 0.15));
+    int calculatedHeal = rawHeal.round();
+    calculatedHeal = (calculatedHeal * tickManager.reckoningHealingMultiplier).round();
+
+    final int finalHp = min(effectiveCap, max(1, calculatedHeal));
+    final int overflow = max(0, calculatedHeal - effectiveCap);
+    final int aegisShield = (overflow * 0.50).round();
+
+    // Cleanse debuffs and apply 6-tick invulnerability grace window & aegis shield
+    final List<StatusEffect> updatedEffects = target.activeEffects
+        .where((e) => !e.isDebuff)
+        .toList();
+
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.invulnerable,
+      durationTurns: 1,
+      value: 6,
+    ));
+
+    if (aegisShield > 0) {
+      updatedEffects.add(StatusEffect(
+        type: StatusEffectType.shield,
+        durationTurns: 2,
+        value: aegisShield,
+      ));
+    }
+
+    final UnitEntity revivedUnit = target.copyWith(
+      currentHp: finalHp,
+      reviveCount: newReviveCount,
+      turnMeter: 0.0,
+      activeEffects: updatedEffects,
+    );
+
+    final List<UnitEntity> updatedFriendly = friendlySquad.map((u) {
+      return u.id == target.id ? revivedUnit : u;
+    }).toList();
+
+    final updatedAllies = casterIsAlly ? updatedFriendly : tickManager.allies;
+    final updatedEnemies = casterIsAlly ? tickManager.enemies : updatedFriendly;
+
+    tickManager.consumeTurn(
+      retainedOverflow: false,
+      updatedAllies: updatedAllies,
+      updatedEnemies: updatedEnemies,
+      autoResume: autoResumeTickEngine,
+    );
+
+    return ActionResult(
+      attacker: caster,
+      target: revivedUnit,
+      damageDealt: 0,
+      isCritical: false,
+      isGlancing: false,
+      affinityMultiplier: 1.0,
+      targetDefeated: false,
+      lifestealRecovered: 0,
+      skillName: 'Infused Vitae Revival',
+      healAmount: finalHp,
     );
   }
 }

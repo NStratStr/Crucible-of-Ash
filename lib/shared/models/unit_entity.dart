@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../../core/combat_math.dart';
 import 'skill_entity.dart';
@@ -18,13 +19,18 @@ class UnitEntity {
   final int maxLevel;
   final int currentHp;
 
-  // Attributes
+  // Attributes & Defense (GDD v2.6 Sec 3.1)
   final int maxHp;
   final int attack;
   final int defense;
   final int speed;
+  final int resist;
+  final int flatAbsorb;
   final double critRate;
   final double critDamage;
+
+  // Revive & Soul Fracture (GDD v2.6 Sec 3.4)
+  final int reviveCount;
 
   // Turn Meter & Ultimate (0.0 to 100.0)
   final double turnMeter;
@@ -55,6 +61,9 @@ class UnitEntity {
     required this.attack,
     required this.defense,
     required this.speed,
+    this.resist = 50,
+    this.flatAbsorb = 0,
+    this.reviveCount = 0,
     this.critRate = 0.15,
     this.critDamage = 1.50,
     this.turnMeter = 0.0,
@@ -67,6 +76,15 @@ class UnitEntity {
     this.customAvatarAsset,
     this.currentXp = 0,
   });
+
+  /// GDD v2.6: Armor is an alias for physical defense rating.
+  int get armor => defense;
+
+  /// GDD v2.6 Sec 3.4: Stacking -20% Max HP penalty for each revive in battle.
+  int get effectiveMaxHp => (maxHp * pow(0.80, reviveCount)).round();
+
+  /// GDD v2.6 Sec 3.1: Effective Health (EHP) calculation.
+  double get ehp => CombatMath.calculateEhp(currentHp, armor: defense, resist: resist);
 
   bool get isMaxLevel => level >= maxLevel;
   int get xpToNextLevel => level * 100;
@@ -163,39 +181,48 @@ class UnitEntity {
       return 'assets/images/feral_warhound.png';
     }
 
-    // Occultist / Lich line
+    // Occultist / Support / Lich / Cleric / Medicus / Alchemist line
     if (archetype == Archetype.occultist ||
+        archetype == Archetype.support ||
         speciesId.contains('occultist') ||
         speciesId.contains('lich') ||
         speciesId.contains('apothecary') ||
         speciesId.contains('plague') ||
         speciesId.contains('warlock') ||
         speciesId.contains('witch') ||
+        speciesId.contains('cleric') ||
+        speciesId.contains('medicus') ||
+        speciesId.contains('alchemist') ||
         name.contains('Disciple') ||
         name.contains('Weave') ||
-        name.contains('Lich')) {
+        name.contains('Lich') ||
+        name.contains('Cleric') ||
+        name.contains('Medicus') ||
+        name.contains('Alchemist')) {
       if (isFinalEvolution || name.contains('Void') || name.contains('Lich') || speciesId.contains('lich')) {
         return 'assets/images/lich_pureblood.png';
       }
       return 'assets/images/occultist_base.png';
     }
 
-    // Marksman / Ballista line
+    // Marksman / Ballista / Arbalest line
     if (archetype == Archetype.marksman ||
         speciesId.contains('archer') ||
         speciesId.contains('marksman') ||
         speciesId.contains('sniper') ||
         speciesId.contains('ballista') ||
+        speciesId.contains('arbalest') ||
         name.contains('Archer') ||
         name.contains('Sniper') ||
-        name.contains('Ballista')) {
+        name.contains('Ballista') ||
+        name.contains('Arbalest')) {
       if (isFinalEvolution || speciesId.contains('ballista') || name.contains('Ballista')) {
         return 'assets/images/ballista_pureblood.png';
       }
       return 'assets/images/marksman_base.png';
     }
 
-    // Assassin / Skirmisher / Vampire / Ghoul line
+    // Assassin / Skirmisher / Vampire / Ghoul / Duelist line
     if (archetype == Archetype.assassin ||
         archetype == Archetype.skirmisher ||
         speciesId.contains('stalker') ||
@@ -203,18 +230,20 @@ class UnitEntity {
         speciesId.contains('reaper') ||
         speciesId.contains('vampire') ||
         speciesId.contains('ghoul') ||
+        speciesId.contains('duelist') ||
         name.contains('Shadow') ||
         name.contains('Blade') ||
         name.contains('Skirmisher') ||
         name.contains('Vampire') ||
-        name.contains('Ghoul')) {
+        name.contains('Ghoul') ||
+        name.contains('Duelist')) {
       if (isFinalEvolution || name.contains('Eclipse') || name.contains('Vampire') || speciesId.contains('vampire')) {
         return 'assets/images/vampire_pureblood.png';
       }
       return 'assets/images/ghoul_base.png';
     }
 
-    // Juggernaut / Knight / Footman / Paladin / Dreadnought line
+    // Juggernaut / Knight / Footman / Husk / Paladin / Dreadnought line
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||
         speciesId.contains('golem') ||
@@ -222,9 +251,11 @@ class UnitEntity {
         speciesId.contains('dreadnought') ||
         speciesId.contains('paladin') ||
         speciesId.contains('guardian') ||
+        speciesId.contains('husk') ||
         name.contains('Footman') ||
         name.contains('Dreadnought') ||
-        name.contains('Paladin')) {
+        name.contains('Paladin') ||
+        name.contains('Husk')) {
       if (isFinalEvolution || speciesId.contains('dreadnought') || name.contains('Dreadnought')) {
         return 'assets/images/dreadnought_pureblood.png';
       }
@@ -238,13 +269,31 @@ class UnitEntity {
 
   String get factionName {
     if (isBoss) return 'Primordial Titans';
-    if (speciesId.contains('hound') || speciesId.contains('wolf') || speciesId.contains('beast') || speciesId.contains('cerberus')) {
-      return 'Feral Beasts';
+    if (speciesId.contains('hound') ||
+        speciesId.contains('wolf') ||
+        speciesId.contains('beast') ||
+        speciesId.contains('cerberus') ||
+        speciesId.contains('boar')) {
+      return 'Corrupted Beasts';
     }
-    if (speciesId.contains('ghoul') || speciesId.contains('plague') || speciesId.contains('deathless') || archetype == Archetype.occultist) {
-      return 'Deathless Undead';
+    if (speciesId.contains('ghoul') ||
+        speciesId.contains('plague') ||
+        speciesId.contains('deathless') ||
+        speciesId.contains('crypt') ||
+        speciesId.contains('husk') ||
+        speciesId.contains('necro') ||
+        name.contains('Crypt') ||
+        name.contains('Husk') ||
+        archetype == Archetype.occultist) {
+      return 'Crypt Stalkers';
     }
-    return 'Iron Vanguard';
+    if (speciesId.contains('void') ||
+        speciesId.contains('cult') ||
+        speciesId.contains('rift') ||
+        name.contains('Void')) {
+      return 'Occult Void Cult';
+    }
+    return 'Ash Legion';
   }
 
   bool get isFigurineCutout => effectiveAvatarAsset.endsWith('.png');
@@ -433,12 +482,18 @@ class UnitEntity {
   }
 
   UnitEntity copyWith({
+    String? id,
+    String? name,
+    int? generation,
     int? currentHp,
     int? level,
     int? maxHp,
     int? attack,
     int? defense,
     int? speed,
+    int? resist,
+    int? flatAbsorb,
+    int? reviveCount,
     double? turnMeter,
     double? ultimateCharge,
     List<StatusEffect>? activeEffects,
@@ -450,10 +505,10 @@ class UnitEntity {
     int? currentXp,
   }) {
     return UnitEntity(
-      id: id,
+      id: id ?? this.id,
       speciesId: speciesId,
-      name: name,
-      generation: generation,
+      name: name ?? this.name,
+      generation: generation ?? this.generation,
       archetype: archetype,
       slot: slot ?? this.slot,
       level: level ?? this.level,
@@ -463,6 +518,9 @@ class UnitEntity {
       attack: attack ?? this.attack,
       defense: defense ?? this.defense,
       speed: speed ?? this.speed,
+      resist: resist ?? this.resist,
+      flatAbsorb: flatAbsorb ?? this.flatAbsorb,
+      reviveCount: reviveCount ?? this.reviveCount,
       critRate: critRate,
       critDamage: critDamage,
       turnMeter: turnMeter ?? this.turnMeter,
@@ -561,6 +619,9 @@ class UnitEntity {
       'attack': attack,
       'defense': defense,
       'speed': speed,
+      'resist': resist,
+      'flatAbsorb': flatAbsorb,
+      'reviveCount': reviveCount,
       'critRate': critRate,
       'critDamage': critDamage,
       'nativeTraitId': nativeTraitId,
@@ -592,6 +653,9 @@ class UnitEntity {
       attack: (json['attack'] as num).toInt(),
       defense: (json['defense'] as num).toInt(),
       speed: (json['speed'] as num).toInt(),
+      resist: (json['resist'] as num?)?.toInt() ?? 50,
+      flatAbsorb: (json['flatAbsorb'] as num?)?.toInt() ?? 0,
+      reviveCount: (json['reviveCount'] as num?)?.toInt() ?? 0,
       critRate: (json['critRate'] as num?)?.toDouble() ?? 0.15,
       critDamage: (json['critDamage'] as num?)?.toDouble() ?? 1.50,
       nativeTraitId: json['nativeTraitId'] as String? ?? 'none',

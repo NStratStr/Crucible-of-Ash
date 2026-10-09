@@ -79,6 +79,7 @@ class BattleScreen extends StatefulWidget {
   final VoidCallback? onResetEncounter;
   final VoidCallback? onVictory;
   final VoidCallback? onDefeat;
+  final List<List<UnitEntity>>? enemyWaves;
 
   const BattleScreen({
     super.key,
@@ -91,6 +92,7 @@ class BattleScreen extends StatefulWidget {
     this.onResetEncounter,
     this.onVictory,
     this.onDefeat,
+    this.enemyWaves,
   });
 
   @override
@@ -98,6 +100,7 @@ class BattleScreen extends StatefulWidget {
 }
 
 class _BattleScreenState extends State<BattleScreen> {
+  int _currentWaveIndex = 0;
   String? _selectedEnemyId;
   String _combatLog = 'Prepare for engagement. The Crucible awaits.';
   late EnemyAiService _aiService;
@@ -282,6 +285,15 @@ class _BattleScreenState extends State<BattleScreen> {
 
     if (widget.tickManager.phase == CombatPhase.battleEnded && !_hasDispatchedEndOutcome) {
       if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+        if (widget.enemyWaves != null && _currentWaveIndex < widget.enemyWaves!.length - 1) {
+          _currentWaveIndex++;
+          final nextWave = widget.enemyWaves![_currentWaveIndex];
+          widget.tickManager.advanceWave(nextWave);
+          _addPop('WAVE ${_currentWaveIndex + 1} ENGAGED!', const Color(0xFFFFD54F), isCrit: true);
+          _combatLog = '[REINFORCEMENTS] Wave ${_currentWaveIndex + 1} of ${widget.enemyWaves!.length} enters the arena!';
+          setState(() {});
+          return;
+        }
         _hasDispatchedEndOutcome = true;
         widget.onVictory?.call();
       } else if (widget.tickManager.allies.every((u) => !u.isAlive)) {
@@ -520,7 +532,28 @@ class _BattleScreenState extends State<BattleScreen> {
       OrderResult res;
       switch (widget.commandService.activeGeneralType) {
         case GeneralType.vladislav:
-          if (order.id == 'siphon_vitality') {
+          if (order.id == 'rend_flesh') {
+            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            res = widget.commandService.executeRendFlesh(enemyId);
+          } else if (order.id == 'iron_bulwark') {
+            final ally = widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to fortify.'));
+            res = widget.commandService.executeIronBulwark(ally.id);
+          } else if (order.id == 'exsanguinating_strike') {
+            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            res = widget.commandService.executeExsanguinatingStrike(enemyId);
+          } else if (order.id == 'sanguine_revival') {
+            final fallenAlly = widget.tickManager.allies.firstWhere(
+              (a) => !a.isAlive,
+              orElse: () => throw StateError('No fallen ally to revive.'),
+            );
+            res = widget.commandService.executeSanguineRevival(fallenAlly.id);
+          } else if (order.id == 'disrupting_cleave') {
+            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            res = widget.commandService.executeDisruptingCleave(enemyId);
+          } else if (order.id == 'blood_boil') {
+            final ally = widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to buff.'));
+            res = widget.commandService.executeBloodBoil(ally.id);
+          } else if (order.id == 'siphon_vitality') {
             if (_selectedEnemyId == null) {
               throw StateError('Select an enemy to siphon.');
             }
@@ -3098,35 +3131,68 @@ class _BattleScreenState extends State<BattleScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Row(
-                  children: profile.orders.map((order) {
-                    final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
-                    return Expanded(
-                      child: Padding(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: (widget.commandService.hand.isNotEmpty
+                            ? widget.commandService.hand
+                            : profile.orders)
+                        .map((order) {
+                      final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
+                      return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: _buildOrderButton(
-                          title: order.name,
-                          cost: order.focusCost,
-                          availableFocus: focus,
-                          borderColor: profile.themeColor,
-                          isUnlocked: isUnlocked,
-                          requiredRank: order.requiredPhylacteryRank,
-                          onPressed: () => _dispatchOrder(order),
-                          onLockedTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.'),
-                                backgroundColor: const Color(0xFFB3261E),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                        child: SizedBox(
+                          width: 84,
+                          child: _buildOrderButton(
+                            title: order.name,
+                            cost: order.focusCost,
+                            availableFocus: focus,
+                            borderColor: profile.themeColor,
+                            isUnlocked: isUnlocked,
+                            requiredRank: order.requiredPhylacteryRank,
+                            onPressed: () => _dispatchOrder(order),
+                            onLockedTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.',
+                                  ),
+                                  backgroundColor: const Color(0xFFB3261E),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
+              if (widget.commandService.hand.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Burn Card (0 Focus)',
+                  child: InkWell(
+                    onTap: () {
+                      final burned = widget.commandService.hand.first;
+                      widget.commandService.burnCard(burned.id);
+                      _addPop('BURNED', const Color(0xFFFF7043));
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E1A1A),
+                        border: Border.all(color: const Color(0xFFFF7043), width: 1.0),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.local_fire_department, size: 16, color: Color(0xFFFF7043)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -3266,6 +3332,16 @@ class _BattleScreenState extends State<BattleScreen> {
         return const Color(0xFF00ACC1);
       case StatusEffectType.decaying:
         return const Color(0xFF8D6E63);
+      case StatusEffectType.burn:
+        return const Color(0xFFFF7043);
+      case StatusEffectType.freeze:
+        return const Color(0xFF29B6F6);
+      case StatusEffectType.vulnerable:
+        return const Color(0xFFAB47BC);
+      case StatusEffectType.shield:
+        return const Color(0xFFFFD54F);
+      case StatusEffectType.invulnerable:
+        return const Color(0xFF80CBC4);
     }
   }
 
@@ -3283,12 +3359,30 @@ class _BattleScreenState extends State<BattleScreen> {
         return 'SPD';
       case StatusEffectType.decaying:
         return 'ROT';
+      case StatusEffectType.burn:
+        return 'BRN';
+      case StatusEffectType.freeze:
+        return 'FRZ';
+      case StatusEffectType.vulnerable:
+        return 'VUL';
+      case StatusEffectType.shield:
+        return 'SHD';
+      case StatusEffectType.invulnerable:
+        return 'GRC';
     }
   }
 
   Color _factionGlowColor(UnitEntity unit) {
     if (unit.isBoss) return const Color(0xFFFF1744);
     switch (unit.factionName) {
+      case 'Ash Legion':
+        return const Color(0xFFFF9800);
+      case 'Crypt Stalkers':
+        return const Color(0xFF00E5FF);
+      case 'Crimson Court':
+        return const Color(0xFFD50000);
+      case 'Weaver Brood':
+        return const Color(0xFFAB47BC);
       case 'Feral Beasts':
         return const Color(0xFF66BB6A);
       case 'Deathless Undead':
