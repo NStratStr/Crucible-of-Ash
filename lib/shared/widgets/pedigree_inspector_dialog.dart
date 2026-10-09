@@ -207,6 +207,7 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
   Widget build(BuildContext context) {
     final unit = _currentUnit;
     final isEnemy = widget.isEnemy;
+    final bool isBoss = isEnemy && (unit.isBoss || unit.level >= 20 || unit.name.toLowerCase().contains('titan'));
     final relicService = widget.relicService;
     final themeColor = _getArchetypeColor(unit.archetype);
     final prey = CombatMath.getPreyArchetype(unit.archetype);
@@ -222,7 +223,12 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
       decoration: BoxDecoration(
         color: const Color(0xFF131318),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: const Color(0xFFB3261E), width: 1.5),
+        border: Border.all(
+          color: isBoss
+              ? const Color(0xFFFF1744)
+              : (isEnemy ? const Color(0xFFB3261E) : const Color(0xFF2E7D32)),
+          width: isBoss ? 2.0 : 1.5,
+        ),
       ),
       child: Column(
         children: [
@@ -245,11 +251,11 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: themeColor.withValues(alpha: 0.2),
+                    color: (isBoss ? const Color(0xFFB71C1C) : themeColor).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: themeColor, width: 1.5),
+                    border: Border.all(color: isBoss ? const Color(0xFFFF5252) : themeColor, width: 1.5),
                   ),
-                  child: Icon(_getArchetypeIcon(unit.archetype), color: themeColor, size: 28),
+                  child: Icon(isBoss ? Icons.dangerous : _getArchetypeIcon(unit.archetype), color: isBoss ? const Color(0xFFFF5252) : themeColor, size: 28),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -270,33 +276,67 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isEnemy
-                                  ? const Color(0xFFB3261E).withValues(alpha: 0.25)
-                                  : const Color(0xFF2E7D32).withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: isEnemy ? const Color(0xFFB3261E) : const Color(0xFF2E7D32),
+                          if (isBoss)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFB71C1C).withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF1744).withValues(alpha: 0.4),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.dangerous, size: 10, color: Color(0xFFFFD54F)),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    '☠ PRIMORDIAL BOSS',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isEnemy
+                                    ? const Color(0xFFB3261E).withValues(alpha: 0.25)
+                                    : const Color(0xFF2E7D32).withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: isEnemy ? const Color(0xFFB3261E) : const Color(0xFF2E7D32),
+                                ),
+                              ),
+                              child: Text(
+                                isEnemy ? 'ENEMY' : 'ALLY',
+                                style: TextStyle(
+                                  color: isEnemy ? const Color(0xFFEF5350) : const Color(0xFF81C784),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              isEnemy ? 'ENEMY' : 'ALLY',
-                              style: TextStyle(
-                                color: isEnemy ? const Color(0xFFEF5350) : const Color(0xFF81C784),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        _getGenerationTitle(unit.generation),
-                        style: const TextStyle(
-                          color: Color(0xFFE5A93C),
+                        isBoss
+                            ? 'TITANIC LEVEL ${unit.level} • APEX WORLD BEHEMOTH'
+                            : _getGenerationTitle(unit.generation),
+                        style: TextStyle(
+                          color: isBoss ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.1,
@@ -369,7 +409,96 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                 ),
                 const SizedBox(height: 14),
 
-                // Section 0.5: Generational Progression & XP Bar
+                // Section 0.5: Generational Progression / Boss Combat Vitals
+                if (isBoss)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E0B0B),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFFF5252),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF1744).withValues(alpha: 0.3),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.dangerous,
+                                  color: Color(0xFFFF5252),
+                                  size: 16,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'TITANIC COMBAT HEALTH',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFD54F),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${unit.currentHp} / ${unit.maxHp} HP',
+                              style: const TextStyle(
+                                color: Color(0xFFFF8A80),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: (unit.currentHp / unit.maxHp).clamp(0.0, 1.0),
+                            minHeight: 8,
+                            backgroundColor: const Color(0xFF2B2B36),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFC62828)),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Phase 1: Primordial Awakened (${((unit.currentHp / unit.maxHp) * 100).toInt()}%)',
+                              style: const TextStyle(
+                                color: Color(0xFFFF8A80),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Text(
+                              'COLOSSUS DREAD ENGINE',
+                              style: TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -598,6 +727,45 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                 ],
               ),
             ),
+
+                if (isBoss) ...[
+                  const SizedBox(height: 14),
+                  _buildSectionHeader('PRIMORDIAL BOSS DREAD MECHANICS', Icons.warning_amber_rounded),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E0E12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.65), width: 1.2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildBossMechanicRow(
+                          icon: Icons.shield,
+                          title: 'COLOSSAL FORTITUDE',
+                          desc: 'Immune to Stun, Sleep, and Turn Meter pushback.',
+                          accentColor: const Color(0xFFFF8A80),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildBossMechanicRow(
+                          icon: Icons.flash_on,
+                          title: 'TECTONIC CLEAVE',
+                          desc: 'Strikes multiple units simultaneously with devastating area damage.',
+                          accentColor: const Color(0xFFFFD54F),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildBossMechanicRow(
+                          icon: Icons.bloodtype,
+                          title: 'BLOOD TITHE SURGE',
+                          desc: 'Taking critical damage accelerates Boss Ultimate Limit Gauge by 15%.',
+                          accentColor: const Color(0xFFFF5252),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 16),
 
@@ -1232,6 +1400,53 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
           Text(value, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
         ],
       ),
+    );
+  }
+
+  Widget _buildBossMechanicRow({
+    required IconData icon,
+    required String title,
+    required String desc,
+    required Color accentColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(icon, size: 14, color: accentColor),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: const TextStyle(
+                  color: Color(0xFFC5C5D2),
+                  fontSize: 9.5,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

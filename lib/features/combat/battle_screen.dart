@@ -708,99 +708,137 @@ class _BattleScreenState extends State<BattleScreen> {
 
   Widget _buildGrandBossBar(UnitEntity boss) {
     final double hpRatio = (boss.currentHp / boss.maxHp).clamp(0.0, 1.0);
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2E0909), Color(0xFF140505), Color(0xFF2E0909)],
-        ),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF1744).withValues(alpha: 0.5),
-            blurRadius: 10,
-            spreadRadius: 1,
+    return GestureDetector(
+      onTap: () {
+        PedigreeInspectorDialog.show(
+          context,
+          boss,
+          isEnemy: true,
+          relicService: widget.relicService,
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2E0909), Color(0xFF140505), Color(0xFF2E0909)],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.dangerous, color: Color(0xFFFF5252), size: 14),
-                  const SizedBox(width: 5),
-                  Text(
-                    'PRIMORDIAL BOSS: ${boss.name.toUpperCase()}',
-                    style: const TextStyle(
-                      color: Color(0xFFFFD54F),
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF1744).withValues(alpha: 0.5),
+              blurRadius: 10,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.dangerous, color: Color(0xFFFF5252), size: 14),
+                    const SizedBox(width: 5),
+                    Text(
+                      'PRIMORDIAL BOSS: ${boss.name.toUpperCase()}',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB3261E),
-                  borderRadius: BorderRadius.circular(3),
-                  border: Border.all(color: const Color(0xFFFF8A80), width: 0.8),
+                  ],
                 ),
-                child: Text(
-                  'Lv.${boss.level} TITAN',
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB3261E),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFFFF8A80), width: 0.8),
+                      ),
+                      child: Text(
+                        'Lv.${boss.level} TITAN',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E28),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.assignment, size: 8, color: Color(0xFFFFD54F)),
+                          SizedBox(width: 2),
+                          Text(
+                            'SHEET',
+                            style: TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: hpRatio,
+                minHeight: 7.0,
+                backgroundColor: const Color(0xFF2A2A38),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${boss.currentHp} / ${boss.maxHp} HP',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8.0,
+                    color: Colors.white70,
+                    fontSize: 7.5,
+                    fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: hpRatio,
-              minHeight: 7.0,
-              backgroundColor: const Color(0xFF2A2A38),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
-              ),
+                Text(
+                  '${(hpRatio * 100).toInt()}%',
+                  style: const TextStyle(
+                    color: Color(0xFFFF8A80),
+                    fontSize: 7.5,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${boss.currentHp} / ${boss.maxHp} HP',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 7.5,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                '${(hpRatio * 100).toInt()}%',
-                style: const TextStyle(
-                  color: Color(0xFFFF8A80),
-                  fontSize: 7.5,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -2038,7 +2076,18 @@ class _BattleScreenState extends State<BattleScreen> {
     return GestureDetector(
       onTap: () {
         if (isEnemy && alive) {
-          onTap?.call();
+          if (isSelectedTarget) {
+            // Already selected as target! Tapping again opens the character sheet / inspector!
+            PedigreeInspectorDialog.show(
+              context,
+              unit,
+              isEnemy: isEnemy,
+              relicService: widget.relicService,
+            );
+          } else {
+            // First tap selects target to hit
+            onTap?.call();
+          }
         } else {
           PedigreeInspectorDialog.show(
             context,
@@ -2047,6 +2096,14 @@ class _BattleScreenState extends State<BattleScreen> {
             relicService: widget.relicService,
           );
         }
+      },
+      onDoubleTap: () {
+        PedigreeInspectorDialog.show(
+          context,
+          unit,
+          isEnemy: isEnemy,
+          relicService: widget.relicService,
+        );
       },
       onLongPress: () {
         PedigreeInspectorDialog.show(
@@ -2361,7 +2418,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                   fit: BoxFit.scaleDown,
                                   alignment: Alignment.center,
                                   child: SizedBox(
-                                    width: max(constraints.maxWidth, 320.0),
+                                    width: max(constraints.maxWidth, 380.0),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
@@ -2605,6 +2662,47 @@ class _BattleScreenState extends State<BattleScreen> {
                                                 fontSize: 7.5,
                                                 fontFamily: 'monospace',
                                                 fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          GestureDetector(
+                                            onTap: () {
+                                              PedigreeInspectorDialog.show(
+                                                context,
+                                                unit,
+                                                isEnemy: isEnemy,
+                                                relicService: widget.relicService,
+                                              );
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1E1E28),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(
+                                                  color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.assignment,
+                                                    size: 7.0,
+                                                    color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
+                                                  ),
+                                                  const SizedBox(width: 2),
+                                                  Text(
+                                                    'SHEET',
+                                                    style: TextStyle(
+                                                      color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
+                                                      fontSize: 7.0,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ),
