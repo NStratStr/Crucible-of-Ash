@@ -218,6 +218,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   @override
   void dispose() {
+    _shakeTimer?.cancel();
     _autoBattleTimer?.cancel();
     for (final t in _popTimers) {
       t.cancel();
@@ -1723,55 +1724,63 @@ class _BattleScreenState extends State<BattleScreen> {
 
     return Expanded(
       flex: 12,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Left Minions / Henchmen
-          ...leftMinions.map((unit) => _buildMinionSlot(
-                unit: unit,
-                activeUnitId: activeUnitId,
-                selectedTargetId: selectedTargetId,
-                onSelectTarget: onSelectTarget,
-              )),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left Minions / Henchmen
+                ...leftMinions.map((unit) => _buildMinionSlot(
+                      unit: unit,
+                      activeUnitId: activeUnitId,
+                      selectedTargetId: selectedTargetId,
+                      onSelectTarget: onSelectTarget,
+                    )),
 
-          // Symmetrical spacer when there are no minions
-          if (minions.isEmpty)
-            const Expanded(flex: 2, child: SizedBox.shrink()),
+                // Symmetrical spacer when there are no minions
+                if (minions.isEmpty)
+                  const Expanded(flex: 2, child: SizedBox.shrink()),
 
-          // Centered Dominant Boss Slot (prominent flex & wide constraints)
-          Expanded(
-            flex: 5,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: _buildUnitCard(
-                    unit: boss,
-                    isEnemy: true,
-                    isActive: boss.id == activeUnitId,
-                    isSelectedTarget: boss.id == selectedTargetId,
-                    onTap: () => onSelectTarget?.call(boss.id),
-                    isBossCenterpiece: true,
+                // Centered Dominant Boss Slot (prominent flex & wide constraints)
+                Expanded(
+                  flex: 5,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: _buildUnitCard(
+                          unit: boss,
+                          isEnemy: true,
+                          isActive: boss.id == activeUnitId,
+                          isSelectedTarget: boss.id == selectedTargetId,
+                          onTap: () => onSelectTarget?.call(boss.id),
+                          isBossCenterpiece: true,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+
+                // Right Minions / Henchmen
+                ...rightMinions.map((unit) => _buildMinionSlot(
+                      unit: unit,
+                      activeUnitId: activeUnitId,
+                      selectedTargetId: selectedTargetId,
+                      onSelectTarget: onSelectTarget,
+                    )),
+
+                // Symmetrical spacer when there is 1 minion (on the right) or no minions
+                if (minions.length == 1 || minions.isEmpty)
+                  const Expanded(flex: 2, child: SizedBox.shrink()),
+              ],
             ),
           ),
-
-          // Right Minions / Henchmen
-          ...rightMinions.map((unit) => _buildMinionSlot(
-                unit: unit,
-                activeUnitId: activeUnitId,
-                selectedTargetId: selectedTargetId,
-                onSelectTarget: onSelectTarget,
-              )),
-
-          // Symmetrical spacer when there is 1 minion (on the right) or no minions
-          if (minions.length == 1 || minions.isEmpty)
-            const Expanded(flex: 2, child: SizedBox.shrink()),
-        ],
+        ),
       ),
     );
   }
@@ -1810,32 +1819,46 @@ class _BattleScreenState extends State<BattleScreen> {
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
   }) {
+    // Tighter together width-wise: cluster units in a disciplined squad formation
+    final double maxClusterWidth = (units.length * 200.0).clamp(240.0, 680.0);
+
     return Expanded(
       flex: isFrontline ? 10 : 9,
-      child: Transform.scale(
-        scale: isFrontline ? 1.0 : 0.96,
-        child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: units.map((unit) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3.0, vertical: 1.0),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 220),
-                  child: _buildUnitCard(
-                    unit: unit,
-                    isEnemy: isEnemy,
-                    isActive: unit.id == activeUnitId,
-                    isSelectedTarget: unit.id == selectedTargetId,
-                    onTap: () => onSelectTarget?.call(unit.id),
-                  ),
-                ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: isEnemy ? 0 : 3.0,
+          bottom: isEnemy ? 3.0 : 0,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxClusterWidth),
+            child: Transform.scale(
+              scale: isFrontline ? 1.0 : 0.96,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: units.map((unit) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 210),
+                          child: _buildUnitCard(
+                            unit: unit,
+                            isEnemy: isEnemy,
+                            isActive: unit.id == activeUnitId,
+                            isSelectedTarget: unit.id == selectedTargetId,
+                            onTap: () => onSelectTarget?.call(unit.id),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
-          );
-        }).toList(),
+          ),
         ),
       ),
     );
@@ -1843,13 +1866,13 @@ class _BattleScreenState extends State<BattleScreen> {
 
   Widget _buildClashLine() {
     return Container(
-      height: 20,
-      margin: const EdgeInsets.symmetric(vertical: 2),
+      height: 28,
+      margin: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              height: 1,
+              height: 1.5,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.transparent, Color(0xFF5D4037), Color(0xFFD4AF37)],
@@ -1858,41 +1881,41 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFF14141B),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1),
+              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.6), width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
-                  blurRadius: 6,
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.25),
+                  blurRadius: 8,
                 ),
               ],
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shield_outlined, size: 10, color: Color(0xFFD4AF37)),
-                SizedBox(width: 5),
+                Icon(Icons.shield_outlined, size: 11, color: Color(0xFFD4AF37)),
+                SizedBox(width: 6),
                 Text(
                   'THE ASHEN FRONT',
                   style: TextStyle(
                     color: Color(0xFFD4AF37),
                     fontSize: 8.5,
-                    letterSpacing: 1.8,
+                    letterSpacing: 2.0,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
                   ),
                 ),
-                SizedBox(width: 5),
-                Icon(Icons.shield_outlined, size: 10, color: Color(0xFFD4AF37)),
+                SizedBox(width: 6),
+                Icon(Icons.shield_outlined, size: 11, color: Color(0xFFD4AF37)),
               ],
             ),
           ),
           Expanded(
             child: Container(
-              height: 1,
+              height: 1.5,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFFD4AF37), Color(0xFF5D4037), Colors.transparent],
@@ -2041,11 +2064,9 @@ class _BattleScreenState extends State<BattleScreen> {
             color: unit.isFigurineCutout ? Colors.transparent : (alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12)),
             borderRadius: BorderRadius.circular(6),
             border: unit.isFigurineCutout
-                ? ((isActive || isSelectedTarget || isBossUnit || isDamaged)
-                    ? Border.all(color: borderColor, width: borderWidth)
-                    : Border.all(color: Colors.transparent, width: 0))
+                ? Border.all(color: Colors.transparent, width: 0)
                 : Border.all(color: borderColor, width: borderWidth),
-            boxShadow: shadows,
+            boxShadow: unit.isFigurineCutout ? null : shadows,
           ),
           child: Stack(
             clipBehavior: Clip.none,
@@ -2076,8 +2097,34 @@ class _BattleScreenState extends State<BattleScreen> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // LAYER 1A: 3D Faction Ground Plinth (Painted BEHIND character's feet)
-                    if (unit.isFigurineCutout)
+                    // LAYER 1A: 3D Faction Ground Plinth & Circular Floor Spotlight
+                    if (unit.isFigurineCutout) ...[
+                      // Dynamic circular ground spotlight glow for active / targeted / boss figurines
+                      if (isActive || isSelectedTarget || isBossUnit)
+                        Positioned(
+                          bottom: -3,
+                          left: isBossUnit ? 2 : 8,
+                          right: isBossUnit ? 2 : 8,
+                          height: isBossUnit ? 24 : 18,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.all(Radius.elliptical(
+                                isBossUnit ? 240 : 130,
+                                isBossUnit ? 32 : 22,
+                              )),
+                              gradient: RadialGradient(
+                                colors: [
+                                  (isActive
+                                          ? const Color(0xFFFFD54F)
+                                          : (isSelectedTarget ? const Color(0xFFFF1744) : const Color(0xFFFF5252)))
+                                      .withValues(alpha: isBossUnit ? 0.45 : 0.35),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
                       Positioned(
                         bottom: 0,
                         left: isBossUnit ? 8 : 14,
@@ -2093,20 +2140,36 @@ class _BattleScreenState extends State<BattleScreen> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.85 : 0.6) : 0.15),
+                                (isActive
+                                    ? const Color(0xFFFFD54F)
+                                    : (isSelectedTarget
+                                        ? const Color(0xFFFF1744)
+                                        : _factionGlowColor(unit)))
+                                    .withValues(alpha: alive ? (isBossUnit ? 0.9 : 0.7) : 0.15),
                                 const Color(0xFF1E1E28),
                                 const Color(0xFF0C0C12),
                               ],
                             ),
                             border: Border.all(
-                              color: _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.95 : 0.8) : 0.25),
-                              width: isBossUnit ? 2.0 : 1.0,
+                              color: isActive
+                                  ? const Color(0xFFFFD54F)
+                                  : (isSelectedTarget
+                                      ? const Color(0xFFFF1744)
+                                      : (isDamaged
+                                          ? const Color(0xFFFF1744)
+                                          : _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.95 : 0.8) : 0.25))),
+                              width: (isActive || isSelectedTarget || isBossUnit) ? 2.2 : 1.0,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.75 : 0.5) : 0.15),
-                                blurRadius: isBossUnit ? 18 : 7,
-                                spreadRadius: isBossUnit ? 2.5 : 1,
+                                color: (isActive
+                                        ? const Color(0xFFFFD54F)
+                                        : (isSelectedTarget || isDamaged
+                                            ? const Color(0xFFFF1744)
+                                            : _factionGlowColor(unit)))
+                                    .withValues(alpha: alive ? (isBossUnit ? 0.8 : 0.6) : 0.15),
+                                blurRadius: (isActive || isSelectedTarget || isBossUnit) ? 18 : 7,
+                                spreadRadius: (isActive || isSelectedTarget || isBossUnit) ? 2.5 : 1,
                               ),
                               const BoxShadow(
                                 color: Colors.black87,
@@ -2117,6 +2180,7 @@ class _BattleScreenState extends State<BattleScreen> {
                           ),
                         ),
                       ),
+                    ],
 
                     // LAYER 1B: Character Miniature Artwork (Painted ON TOP of plinth with prominent scale)
                     Positioned.fill(

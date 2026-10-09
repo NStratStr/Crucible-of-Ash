@@ -162,7 +162,7 @@ class UnitEntity {
         speciesId.contains('stalker') ||
         speciesId.contains('slayer') ||
         speciesId.contains('reaper')) {
-      return 'assets/images/flayed_butcher.png';
+      return 'assets/images/feral_warhound.png';
     }
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||
