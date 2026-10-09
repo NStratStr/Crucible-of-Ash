@@ -59,6 +59,15 @@ class LimitBurstBannerData {
   });
 }
 
+/// Greyscale color filter matrix that preserves 100% of alpha transparency,
+/// avoiding the solid-grey bleed bug caused by [BlendMode.saturation] on transparent PNG canvases.
+const ColorFilter kAlphaSafeGreyscaleFilter = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0, // Red
+  0.2126, 0.7152, 0.0722, 0, 0, // Green
+  0.2126, 0.7152, 0.0722, 0, 0, // Blue
+  0,      0,      0,      1, 0, // Alpha (Preserves 100% of original transparency)
+]);
+
 class BattleScreen extends StatefulWidget {
   final InitiativeTickManager tickManager;
   final CombatResolutionService combatService;
@@ -853,11 +862,15 @@ class _BattleScreenState extends State<BattleScreen> {
     final activeBoss = widget.tickManager.enemies
         .where((u) => u.isAlive && u.isBoss)
         .firstOrNull;
+    final bool isBossEncounter =
+        widget.tickManager.enemies.any((u) => u.isBoss) || activeBoss != null;
 
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
       body: LivingAtmosphereBackground(
-        imageAsset: 'assets/images/gothic_arch_battlefield.jpg',
+        imageAsset: isBossEncounter
+            ? 'assets/images/volcanic_chasm_battlefield.jpg'
+            : 'assets/images/gothic_arch_battlefield.jpg',
         enableBreathing: true,
         enableFlicker: false,
         particleColor: const Color(0xFFFF7043),
@@ -2249,12 +2262,15 @@ class _BattleScreenState extends State<BattleScreen> {
                             child: ColorFiltered(
                               colorFilter: alive
                                   ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
-                                  : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
-                              child: Image.asset(
-                                unit.effectiveAvatarAsset,
-                                fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
-                                alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
-                                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                                  : kAlphaSafeGreyscaleFilter,
+                              child: Opacity(
+                                opacity: alive ? 1.0 : (unit.isFigurineCutout ? 0.55 : 0.65),
+                                child: Image.asset(
+                                  unit.effectiveAvatarAsset,
+                                  fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
+                                  alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
+                                  errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                                ),
                               ),
                             ),
                           ),
@@ -2801,32 +2817,68 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // Fallen Overlay
                 if (!alive)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.72),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.dangerous, size: 18, color: Color(0xFFEF5350)),
-                            SizedBox(height: 2),
-                            Text(
-                              'FALLEN',
-                              style: TextStyle(
-                                color: Color(0xFFEF5350),
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
+                  if (unit.isFigurineCutout || isBossUnit)
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1A24).withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFEF5350), width: 1.2),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black87, blurRadius: 8, spreadRadius: 1),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.dangerous, size: 14, color: Color(0xFFEF5350)),
+                              SizedBox(width: 4),
+                              Text(
+                                'FALLEN',
+                                style: TextStyle(
+                                  color: Color(0xFFEF5350),
+                                  fontSize: 9.0,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.dangerous, size: 18, color: Color(0xFFEF5350)),
+                              SizedBox(height: 2),
+                              Text(
+                                'FALLEN',
+                                style: TextStyle(
+                                  color: Color(0xFFEF5350),
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
               ],
             ),
           ),

@@ -134,7 +134,9 @@ class UnitEntity {
 
   String get effectiveAvatarAsset {
     if (customAvatarAsset != null) return customAvatarAsset!;
-    if (speciesId.contains('butcher') ||
+    // Primordial Boss / Titan (Goro / Flayed Butcher)
+    if (isBoss ||
+        speciesId.contains('butcher') ||
         speciesId.contains('flayed') ||
         speciesId.contains('executioner') ||
         speciesId.contains('titan') ||
@@ -144,37 +146,94 @@ class UnitEntity {
         name.contains('Titan')) {
       return 'assets/images/flayed_butcher.png';
     }
-    if (speciesId.contains('cerberus') || (generation >= 2 && speciesId.contains('hound'))) {
-      return 'assets/images/cerberus_progenitor.jpg';
-    }
-    if (speciesId.contains('hound') || speciesId.contains('wolf') || speciesId.contains('beast')) {
+
+    // Evolution flag: only Gen 4 / purebloods get the final evolution model!
+    final bool isFinalEvolution = isPureblood || generation >= 4;
+
+    // Feral Beast / Cerberus line
+    if (speciesId.contains('cerberus') ||
+        speciesId.contains('hound') ||
+        speciesId.contains('wolf') ||
+        speciesId.contains('beast') ||
+        name.contains('Cerberus') ||
+        name.contains('Hound')) {
+      if (isFinalEvolution || speciesId.contains('cerberus') || name.contains('Cerberus')) {
+        return 'assets/images/cerberus_pureblood.png';
+      }
       return 'assets/images/feral_warhound.png';
     }
+
+    // Occultist / Lich line
     if (archetype == Archetype.occultist ||
-        speciesId.contains('ghoul') ||
+        speciesId.contains('occultist') ||
+        speciesId.contains('lich') ||
         speciesId.contains('apothecary') ||
         speciesId.contains('plague') ||
         speciesId.contains('warlock') ||
-        speciesId.contains('witch')) {
-      return 'assets/images/plague_occultist.jpg';
+        speciesId.contains('witch') ||
+        name.contains('Disciple') ||
+        name.contains('Weave') ||
+        name.contains('Lich')) {
+      if (isFinalEvolution || name.contains('Void') || name.contains('Lich') || speciesId.contains('lich')) {
+        return 'assets/images/lich_pureblood.png';
+      }
+      return 'assets/images/occultist_base.png';
     }
+
+    // Marksman / Ballista line
+    if (archetype == Archetype.marksman ||
+        speciesId.contains('archer') ||
+        speciesId.contains('marksman') ||
+        speciesId.contains('sniper') ||
+        speciesId.contains('ballista') ||
+        name.contains('Archer') ||
+        name.contains('Sniper') ||
+        name.contains('Ballista')) {
+      if (isFinalEvolution || speciesId.contains('ballista') || name.contains('Ballista')) {
+        return 'assets/images/ballista_pureblood.png';
+      }
+      return 'assets/images/marksman_base.png';
+    }
+
+    // Assassin / Skirmisher / Vampire / Ghoul line
     if (archetype == Archetype.assassin ||
+        archetype == Archetype.skirmisher ||
         speciesId.contains('stalker') ||
         speciesId.contains('slayer') ||
-        speciesId.contains('reaper')) {
-      return 'assets/images/feral_warhound.png';
+        speciesId.contains('reaper') ||
+        speciesId.contains('vampire') ||
+        speciesId.contains('ghoul') ||
+        name.contains('Shadow') ||
+        name.contains('Blade') ||
+        name.contains('Skirmisher') ||
+        name.contains('Vampire') ||
+        name.contains('Ghoul')) {
+      if (isFinalEvolution || name.contains('Eclipse') || name.contains('Vampire') || speciesId.contains('vampire')) {
+        return 'assets/images/vampire_pureblood.png';
+      }
+      return 'assets/images/ghoul_base.png';
     }
+
+    // Juggernaut / Knight / Footman / Paladin / Dreadnought line
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||
         speciesId.contains('golem') ||
         speciesId.contains('footman') ||
-        speciesId.contains('guardian')) {
-      return 'assets/images/ironclad_dreadnought.png';
+        speciesId.contains('dreadnought') ||
+        speciesId.contains('paladin') ||
+        speciesId.contains('guardian') ||
+        name.contains('Footman') ||
+        name.contains('Dreadnought') ||
+        name.contains('Paladin')) {
+      if (isFinalEvolution || speciesId.contains('dreadnought') || name.contains('Dreadnought')) {
+        return 'assets/images/dreadnought_pureblood.png';
+      }
+      return 'assets/images/footman_base.png';
     }
-    if (archetype == Archetype.marksman || archetype == Archetype.skirmisher) {
-      return 'assets/images/feral_warhound.png';
-    }
-    return 'assets/images/ironclad_dreadnought.png';
+
+    return isFinalEvolution
+        ? 'assets/images/dreadnought_pureblood.png'
+        : 'assets/images/footman_base.png';
   }
 
   String get factionName {
