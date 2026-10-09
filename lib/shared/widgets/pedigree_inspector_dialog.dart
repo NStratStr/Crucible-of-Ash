@@ -303,9 +303,41 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                         ),
                       ),
                       const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)).withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(
+                                color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              unit.isVanguard ? '⚔ FRONTLINE VANGUARD' : '🔮 BACKLINE ARCANUM',
+                              style: TextStyle(
+                                color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              unit.isVanguard ? 'Absorbs Assault (+25% Arm)' : 'Sheltered (Spell Focus)',
+                              style: const TextStyle(color: Color(0xFFC5C5D2), fontSize: 9.5),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Formation: ${unit.isVanguard ? "Frontline Vanguard" : "Backline Arcanum"} • Slot: ${unit.slot.name.toUpperCase()}',
-                        style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10),
+                        'Formation Slot: ${unit.slot.name.toUpperCase()}',
+                        style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
                       ),
                     ],
                   ),

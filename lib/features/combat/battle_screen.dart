@@ -1628,6 +1628,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _buildTierRow(
             units: arcanum,
             isEnemy: true,
+            isFrontline: false,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -1642,6 +1643,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _buildTierRow(
             units: vanguard,
             isEnemy: true,
+            isFrontline: true,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -1655,6 +1657,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _buildTierRow(
             units: vanguard,
             isEnemy: false,
+            isFrontline: true,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -1669,6 +1672,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _buildTierRow(
             units: arcanum,
             isEnemy: false,
+            isFrontline: false,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -1687,12 +1691,16 @@ class _BattleScreenState extends State<BattleScreen> {
   Widget _buildTierRow({
     required List<UnitEntity> units,
     required bool isEnemy,
+    required bool isFrontline,
     required String? activeUnitId,
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
   }) {
     return Expanded(
-      child: Row(
+      flex: isFrontline ? 10 : 9,
+      child: Transform.scale(
+        scale: isFrontline ? 1.0 : 0.94,
+        child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: units.map((unit) {
@@ -1714,6 +1722,7 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           );
         }).toList(),
+        ),
       ),
     );
   }
@@ -1913,17 +1922,22 @@ class _BattleScreenState extends State<BattleScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12),
+            color: unit.isFigurineCutout ? Colors.transparent : (alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12)),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: borderColor, width: borderWidth),
+            border: unit.isFigurineCutout
+                ? ((isActive || isSelectedTarget || unit.isBoss || isDamaged)
+                    ? Border.all(color: borderColor, width: borderWidth)
+                    : Border.all(color: Colors.transparent, width: 0))
+                : Border.all(color: borderColor, width: borderWidth),
             boxShadow: shadows,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: Stack(
               children: [
-                // LAYER 0: Dark Gothic Stone Base
-                Positioned.fill(
+                // LAYER 0: Dark Gothic Stone Base (for classic cards only)
+                if (!unit.isFigurineCutout)
+                  Positioned.fill(
                   child: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -1942,7 +1956,9 @@ class _BattleScreenState extends State<BattleScreen> {
                   left: 3,
                   right: 3,
                   child: Container(
-                    decoration: BoxDecoration(
+                    decoration: unit.isFigurineCutout
+                        ? const BoxDecoration()
+                        : BoxDecoration(
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(12),
                         bottom: Radius.circular(3),
@@ -1996,38 +2012,92 @@ class _BattleScreenState extends State<BattleScreen> {
                       ),
                       child: Stack(
                         children: [
-                          // Character Artwork (Desaturated if fallen)
+                          // Character Artwork (Desaturated if fallen, scaled up if Boss)
                           Positioned.fill(
-                            child: ColorFiltered(
-                              colorFilter: alive
-                                  ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
-                                  : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
-                              child: Image.asset(
-                                unit.effectiveAvatarAsset,
-                                fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
-                                alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
-                                errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                            child: Transform.scale(
+                              scale: unit.isBoss ? 1.08 : 1.0,
+                              child: ColorFiltered(
+                                colorFilter: alive
+                                    ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
+                                    : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
+                                child: Image.asset(
+                                  unit.effectiveAvatarAsset,
+                                  fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
+                                  alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
+                                  errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
+                                ),
                               ),
                             ),
                           ),
 
-                          // Faction Pedestal Grounding Glow for Figurine Cutouts
+                          // 3D Faction Plinth & Tactical Dais Base
                           if (unit.isFigurineCutout)
                             Positioned(
-                              bottom: 2,
+                              bottom: 0,
                               left: 6,
                               right: 6,
-                              height: 8,
-                              child: DecoratedBox(
+                              height: 18,
+                              child: Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: const BorderRadius.all(Radius.elliptical(120, 22)),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      _factionGlowColor(unit).withValues(alpha: alive ? 0.5 : 0.12),
+                                      const Color(0xFF1A1A26),
+                                      const Color(0xFF0C0C12),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: _factionGlowColor(unit).withValues(alpha: alive ? 0.85 : 0.25),
+                                    width: unit.isBoss ? 1.8 : 1.1,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: _factionGlowColor(unit).withValues(alpha: alive ? 0.6 : 0.12),
-                                      blurRadius: 7,
+                                      color: _factionGlowColor(unit).withValues(alpha: alive ? 0.5 : 0.12),
+                                      blurRadius: unit.isBoss ? 12 : 8,
                                       spreadRadius: 1,
                                     ),
+                                    const BoxShadow(
+                                      color: Colors.black87,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 3),
+                                    ),
                                   ],
+                                ),
+                                child: Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (unit.isVanguard) ...[
+                                        const Icon(Icons.shield, size: 7.5, color: Color(0xFFFFD54F)),
+                                        const SizedBox(width: 2),
+                                        const Text(
+                                          '⚔ FRONT',
+                                          style: TextStyle(
+                                            color: Color(0xFFFFD54F),
+                                            fontSize: 7.0,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ] else ...[
+                                        const Icon(Icons.auto_awesome, size: 7.5, color: Color(0xFF80D8FF)),
+                                        const SizedBox(width: 2),
+                                        const Text(
+                                          '🔮 REAR',
+                                          style: TextStyle(
+                                            color: Color(0xFF80D8FF),
+                                            fontSize: 7.0,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -2187,7 +2257,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     fit: BoxFit.scaleDown,
                                     alignment: Alignment.center,
                                     child: SizedBox(
-                                      width: max(constraints.maxWidth, 225.0),
+                                      width: max(constraints.maxWidth, 300.0),
                                       child: Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
@@ -2241,29 +2311,55 @@ class _BattleScreenState extends State<BattleScreen> {
                                               ),
                                             ),
 
-                                          // Middle of Pedestal: Level Badge
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
-                                            decoration: BoxDecoration(
-                                              color: unit.isBoss
-                                                  ? const Color(0xFFB71C1C).withValues(alpha: 0.6)
-                                                  : Colors.black.withValues(alpha: 0.85),
-                                              borderRadius: BorderRadius.circular(3),
-                                              border: Border.all(
-                                                color: unit.isBoss ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
-                                                width: unit.isBoss ? 1.0 : 0.8,
+                                          // Middle of Pedestal: Tactical Formation Role + Level Badge
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1.0),
+                                                decoration: BoxDecoration(
+                                                  color: unit.isVanguard
+                                                      ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
+                                                      : const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  border: Border.all(
+                                                    color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  unit.isVanguard ? '⚔ FRONT' : '🔮 REAR',
+                                                  style: TextStyle(
+                                                    color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                                    fontSize: 6.8,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                            child: Text(
-                                              unit.isBoss ? 'Lv.${unit.level} ★' : 'Lv.${unit.level}',
-                                              style: TextStyle(
-                                                color: unit.isBoss ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
-                                                fontSize: 7.5,
-                                                fontWeight: FontWeight.bold,
+                                              const SizedBox(width: 3),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
+                                                decoration: BoxDecoration(
+                                                  color: unit.isBoss
+                                                      ? const Color(0xFFB71C1C).withValues(alpha: 0.6)
+                                                      : Colors.black.withValues(alpha: 0.85),
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  border: Border.all(
+                                                    color: unit.isBoss ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
+                                                    width: unit.isBoss ? 1.0 : 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  unit.isBoss ? 'Lv.${unit.level} ★' : 'Lv.${unit.level}',
+                                                  style: TextStyle(
+                                                    color: unit.isBoss ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
+                                                    fontSize: 7.5,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
+                                            ],
                                           ),
-
                                           // Bottom-Right of Pedestal: Target / Boss / Status / Gen Badge
                                           if (isSelectedTarget)
                                             Container(
