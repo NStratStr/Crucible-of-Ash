@@ -2004,30 +2004,52 @@ class _BattleScreenState extends State<BattleScreen> {
                                   : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
                               child: Image.asset(
                                 unit.effectiveAvatarAsset,
-                                fit: BoxFit.cover,
-                                alignment: Alignment.topCenter,
+                                fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
+                                alignment: unit.isFigurineCutout ? Alignment.center : Alignment.topCenter,
                                 errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
                               ),
                             ),
                           ),
 
-                          // Inner Silhouette Vignette & Depth Shadow
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  stops: const [0.0, 0.65, 1.0],
-                                  colors: [
-                                    Colors.black.withValues(alpha: 0.12),
-                                    Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.82),
+                          // Faction Pedestal Grounding Glow for Figurine Cutouts
+                          if (unit.isFigurineCutout)
+                            Positioned(
+                              bottom: 2,
+                              left: 6,
+                              right: 6,
+                              height: 8,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _factionGlowColor(unit).withValues(alpha: alive ? 0.6 : 0.12),
+                                      blurRadius: 7,
+                                      spreadRadius: 1,
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
-                          ),
+
+                          // Inner Silhouette Vignette & Depth Shadow (applied to classic card illustrations)
+                          if (!unit.isFigurineCutout)
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    stops: const [0.0, 0.65, 1.0],
+                                    colors: [
+                                      Colors.black.withValues(alpha: 0.12),
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.82),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
 
                           // Critical HP Warning Vignette
                           if (isCriticalHp)
@@ -2050,17 +2072,18 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-                // LAYER 2: Carved Iron Gothic Frame Overlay
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Image.asset(
-                      'assets/images/card_frame.png',
-                      fit: BoxFit.fill,
-                      opacity: const AlwaysStoppedAnimation(0.75),
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                // LAYER 2: Carved Iron Gothic Frame Overlay (for classic card format)
+                if (!unit.isFigurineCutout)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Image.asset(
+                        'assets/images/card_frame.png',
+                        fit: BoxFit.fill,
+                        opacity: const AlwaysStoppedAnimation(0.75),
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
                     ),
                   ),
-                ),
 
                 // LAYER 2.5: Damage Flash & Slash Sparks
                 if (isDamaged) ...[
@@ -2814,6 +2837,19 @@ class _BattleScreenState extends State<BattleScreen> {
         return 'SPD';
       case StatusEffectType.decaying:
         return 'ROT';
+    }
+  }
+
+  Color _factionGlowColor(UnitEntity unit) {
+    if (unit.isBoss) return const Color(0xFFFF1744);
+    switch (unit.factionName) {
+      case 'Feral Beasts':
+        return const Color(0xFF66BB6A);
+      case 'Deathless Undead':
+        return const Color(0xFF26A69A);
+      case 'Iron Vanguard':
+      default:
+        return const Color(0xFF42A5F5);
     }
   }
 }

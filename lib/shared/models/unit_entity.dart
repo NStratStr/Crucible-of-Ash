@@ -148,7 +148,7 @@ class UnitEntity {
       return 'assets/images/cerberus_progenitor.jpg';
     }
     if (speciesId.contains('hound') || speciesId.contains('wolf') || speciesId.contains('beast')) {
-      return 'assets/images/feral_warhound.jpg';
+      return 'assets/images/feral_warhound.png';
     }
     if (archetype == Archetype.occultist ||
         speciesId.contains('ghoul') ||
@@ -169,13 +169,26 @@ class UnitEntity {
         speciesId.contains('golem') ||
         speciesId.contains('footman') ||
         speciesId.contains('guardian')) {
-      return 'assets/images/ironclad_dreadnought.jpg';
+      return 'assets/images/ironclad_dreadnought.png';
     }
     if (archetype == Archetype.marksman || archetype == Archetype.skirmisher) {
-      return 'assets/images/feral_warhound.jpg';
+      return 'assets/images/feral_warhound.png';
     }
-    return 'assets/images/ironclad_dreadnought.jpg';
+    return 'assets/images/ironclad_dreadnought.png';
   }
+
+  String get factionName {
+    if (isBoss) return 'Primordial Titans';
+    if (speciesId.contains('hound') || speciesId.contains('wolf') || speciesId.contains('beast') || speciesId.contains('cerberus')) {
+      return 'Feral Beasts';
+    }
+    if (speciesId.contains('ghoul') || speciesId.contains('plague') || speciesId.contains('deathless') || archetype == Archetype.occultist) {
+      return 'Deathless Undead';
+    }
+    return 'Iron Vanguard';
+  }
+
+  bool get isFigurineCutout => effectiveAvatarAsset.endsWith('.png');
 
   bool get isVanguard => slot.index < 3;
   bool get isArcanum => slot.index >= 3;
