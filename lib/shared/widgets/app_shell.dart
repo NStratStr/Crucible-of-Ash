@@ -64,6 +64,7 @@ class _AppShellState extends State<AppShell> {
   EndgameTrialType? _activeGauntletTrial;
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
   bool _isInitialized = false;
+  bool _isAscensionDialogOpen = false;
 
   @override
   void initState() {
@@ -674,6 +675,11 @@ class _AppShellState extends State<AppShell> {
             _showChapterAscensionDialog(nextCh);
           }
         });
+      } else {
+        setState(() {
+          _currentIndex = 0;
+          _activeNode = null;
+        });
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -687,6 +693,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
+    if (_isAscensionDialogOpen) return;
+    _isAscensionDialogOpen = true;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -748,7 +757,14 @@ class _AppShellState extends State<AppShell> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _isAscensionDialogOpen = false;
+              setState(() {
+                _currentIndex = 0; // Return to Campaign Map
+                _activeNode = null;
+              });
+            },
             child: const Text('REMAIN HERE', style: TextStyle(color: Colors.white60, fontSize: 11)),
           ),
           ElevatedButton.icon(
@@ -760,17 +776,21 @@ class _AppShellState extends State<AppShell> {
             label: Text('ASCEND TO CHAPTER $nextChapter', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
             onPressed: () {
               Navigator.of(ctx).pop();
+              _isAscensionDialogOpen = false;
               setState(() {
                 _currentChapter = nextChapter;
                 _activeExpeditionBoons.clear();
                 _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(nextChapter);
                 _currentIndex = 0; // Return to Campaign Map
+                _activeNode = null;
               });
             },
           ),
         ],
       ),
-    );
+    ).then((_) {
+      _isAscensionDialogOpen = false;
+    });
   }
 
   void _onCombatDefeat() {

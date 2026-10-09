@@ -185,6 +185,21 @@ class UnitEntity {
   bool get isBlighted => activeEffects.any((e) => e.type == StatusEffectType.blight);
   bool get isPureblood => generation >= 4;
   String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
+  bool get isBoss =>
+      id.startsWith('boss_') &&
+          !id.contains('guard') &&
+          !id.contains('priest') &&
+          !id.contains('chanter') ||
+      id == 'world_titan' ||
+      speciesId.contains('chapter_titan') ||
+      speciesId.contains('titan_sovereign') ||
+      speciesId.contains('sunken_lich') ||
+      speciesId.contains('ashen_titan') ||
+      speciesId.contains('boss') ||
+      name.contains('Titan') ||
+      name.contains('Lich King') ||
+      name.contains('Gorgoroth') ||
+      name.contains('Primordial');
 
   List<SkillEntity> get resolvedSkills {
     if (skills.isNotEmpty) return skills;

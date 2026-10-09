@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/combat_math.dart';
@@ -104,6 +105,26 @@ class _BattleScreenState extends State<BattleScreen> {
   Color? _screenFlashColorOverride;
   GeneralOrderBannerData? _activeOrderBanner;
   LimitBurstBannerData? _activeLimitBurstBanner;
+  Offset _screenShake = Offset.zero;
+  Timer? _shakeTimer;
+
+  void _triggerScreenShake({bool isHeavy = false}) {
+    _shakeTimer?.cancel();
+    final double intensity = isHeavy ? 9.0 : 3.5;
+    setState(() {
+      _screenShake = Offset(
+        (intensity * (Random().nextBool() ? 1.0 : -1.0)),
+        (intensity * 0.6 * (Random().nextBool() ? 1.0 : -1.0)),
+      );
+    });
+    _shakeTimer = Timer(const Duration(milliseconds: 180), () {
+      if (mounted) {
+        setState(() {
+          _screenShake = Offset.zero;
+        });
+      }
+    });
+  }
 
   void _addPop(String text, Color color, {bool isCrit = false}) {
     if (!mounted) return;
@@ -117,6 +138,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   void _triggerAttackAnimation(String attackerId, String targetId, {String? vfx}) {
     if (!mounted) return;
+    _triggerScreenShake(isHeavy: false);
     setState(() {
       _attackingUnitId = attackerId;
       _damagedUnitId = targetId;
@@ -183,6 +205,7 @@ class _BattleScreenState extends State<BattleScreen> {
       }
 
       _isProcessingAiTurn = false;
+      _hasDispatchedEndOutcome = false;
       _combatLog = 'Encounter engaged! The Crucible awakens.';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -273,6 +296,7 @@ class _BattleScreenState extends State<BattleScreen> {
     int heal = 0,
   }) {
     if (damage > 0) {
+      _triggerScreenShake(isHeavy: isCrit || damage > 300);
       if (isCrit) {
         HapticFeedback.heavyImpact();
       } else if (isGlancing) {
@@ -451,7 +475,8 @@ class _BattleScreenState extends State<BattleScreen> {
         }
       });
 
-      if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+      if (widget.tickManager.enemies.every((u) => !u.isAlive) && !_hasDispatchedEndOutcome) {
+        _hasDispatchedEndOutcome = true;
         widget.onVictory?.call();
       }
     } catch (e) {
@@ -604,7 +629,8 @@ class _BattleScreenState extends State<BattleScreen> {
       });
       _popTimers.add(bannerTimer);
 
-      if (widget.tickManager.enemies.every((u) => !u.isAlive)) {
+      if (widget.tickManager.enemies.every((u) => !u.isAlive) && !_hasDispatchedEndOutcome) {
+        _hasDispatchedEndOutcome = true;
         widget.onVictory?.call();
       }
     });
@@ -679,12 +705,114 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
+  Widget _buildGrandBossBar(UnitEntity boss) {
+    final double hpRatio = (boss.currentHp / boss.maxHp).clamp(0.0, 1.0);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2E0909), Color(0xFF140505), Color(0xFF2E0909)],
+        ),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFFF5252), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF1744).withValues(alpha: 0.5),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.dangerous, color: Color(0xFFFF5252), size: 14),
+                  const SizedBox(width: 5),
+                  Text(
+                    'PRIMORDIAL BOSS: ${boss.name.toUpperCase()}',
+                    style: const TextStyle(
+                      color: Color(0xFFFFD54F),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB3261E),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: const Color(0xFFFF8A80), width: 0.8),
+                ),
+                child: Text(
+                  'Lv.${boss.level} TITAN',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: hpRatio,
+              minHeight: 7.0,
+              backgroundColor: const Color(0xFF2A2A38),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${boss.currentHp} / ${boss.maxHp} HP',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 7.5,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${(hpRatio * 100).toInt()}%',
+                style: const TextStyle(
+                  color: Color(0xFFFF8A80),
+                  fontSize: 7.5,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeUnit = widget.tickManager.activeUnit;
     final isPlayerTurn = _isPlayerTurnNow;
     final selectedEnemy = widget.tickManager.enemies
         .where((u) => u.id == _selectedEnemyId)
+        .firstOrNull;
+    final activeBoss = widget.tickManager.enemies
+        .where((u) => u.isAlive && u.isBoss)
         .firstOrNull;
 
     return Scaffold(
@@ -699,39 +827,43 @@ class _BattleScreenState extends State<BattleScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              Column(
-                children: [
-                  _buildTopStatusBar(activeUnit, isPlayerTurn),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                      child: Column(
-                        children: [
-                          // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
-                          _buildSquadFormation(
-                            units: widget.tickManager.enemies,
-                            isEnemy: true,
-                            activeUnitId: activeUnit?.id,
-                            selectedTargetId: _selectedEnemyId,
-                            onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
-                          ),
+              Transform.translate(
+                offset: _screenShake,
+                child: Column(
+                  children: [
+                    _buildTopStatusBar(activeUnit, isPlayerTurn),
+                    if (activeBoss != null) _buildGrandBossBar(activeBoss),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                        child: Column(
+                          children: [
+                            // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
+                            _buildSquadFormation(
+                              units: widget.tickManager.enemies,
+                              isEnemy: true,
+                              activeUnitId: activeUnit?.id,
+                              selectedTargetId: _selectedEnemyId,
+                              onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
+                            ),
 
-                          // Center Clash Line: The Ashen Front
-                          _buildClashLine(),
+                            // Center Clash Line: The Ashen Front
+                            _buildClashLine(),
 
-                          // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
-                          _buildSquadFormation(
-                            units: widget.tickManager.allies,
-                            isEnemy: false,
-                            activeUnitId: activeUnit?.id,
-                          ),
-                        ],
+                            // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
+                            _buildSquadFormation(
+                              units: widget.tickManager.allies,
+                              isEnemy: false,
+                              activeUnitId: activeUnit?.id,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  _buildCombatLogBanner(),
-                  _buildBottomControlBar(isPlayerTurn, selectedEnemy, activeUnit),
-                ],
+                    _buildCombatLogBanner(),
+                    _buildBottomControlBar(isPlayerTurn, selectedEnemy, activeUnit),
+                  ],
+                ),
               ),
             // Floating Combat Text Overlay
             Positioned(
@@ -1670,8 +1802,8 @@ class _BattleScreenState extends State<BattleScreen> {
 
     final bool isAttacking = _attackingUnitId == unit.id;
     final bool isDamaged = _damagedUnitId == unit.id;
-    final double lungeY = isAttacking ? (isEnemy ? 12.0 : -12.0) : 0.0;
-    final double shakeX = isDamaged ? 3.5 : 0.0;
+    final double lungeY = isAttacking ? (isEnemy ? 18.0 : -18.0) : 0.0;
+    final double shakeX = isDamaged ? (isEnemy ? -5.5 : 5.5) : 0.0;
     final bool isCriticalHp = hpRatio < 0.25 && alive;
 
     Color borderColor = const Color(0xFF2B2B36);
@@ -1724,6 +1856,21 @@ class _BattleScreenState extends State<BattleScreen> {
       shadows = [
         BoxShadow(
           color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
+          blurRadius: 8,
+          spreadRadius: 1,
+        ),
+      ];
+    } else if (unit.isBoss && alive) {
+      borderColor = const Color(0xFFFF5252);
+      borderWidth = 2.4;
+      shadows = [
+        BoxShadow(
+          color: const Color(0xFFFF1744).withValues(alpha: 0.65),
+          blurRadius: 16,
+          spreadRadius: 2.5,
+        ),
+        BoxShadow(
+          color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
           blurRadius: 8,
           spreadRadius: 1,
         ),
@@ -1805,8 +1952,10 @@ class _BattleScreenState extends State<BattleScreen> {
                             ? const Color(0xFFFFD54F)
                             : (isSelectedTarget
                                 ? const Color(0xFFFF5252)
-                                : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.65 : 0.25)),
-                        width: isActive || isSelectedTarget ? 1.4 : 1.0,
+                                : (unit.isBoss
+                                    ? const Color(0xFFFF5252)
+                                    : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.65 : 0.25))),
+                        width: unit.isBoss ? 1.8 : (isActive || isSelectedTarget ? 1.4 : 1.0),
                       ),
                       boxShadow: [
                         if (isActive)
@@ -1832,8 +1981,10 @@ class _BattleScreenState extends State<BattleScreen> {
                         center: const Alignment(0, -0.3),
                         radius: 0.85,
                         colors: [
-                          _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.38 : 0.08),
-                          const Color(0xFF13131A),
+                          unit.isBoss
+                              ? const Color(0xFFB71C1C).withValues(alpha: alive ? 0.75 : 0.15)
+                              : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.38 : 0.08),
+                          unit.isBoss ? const Color(0xFF2B0808) : const Color(0xFF13131A),
                           const Color(0xFF09090D),
                         ],
                       ),
@@ -1911,13 +2062,36 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-                // LAYER 2.5: Damage Flash
-                if (isDamaged)
+                // LAYER 2.5: Damage Flash & Slash Sparks
+                if (isDamaged) ...[
                   Positioned.fill(
                     child: Container(
-                      color: const Color(0xFFB3261E).withValues(alpha: 0.55),
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.6),
                     ),
                   ),
+                  Positioned.fill(
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: -0.35,
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.transparent, Colors.white, Color(0xFFFFD54F), Colors.transparent],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD54F).withValues(alpha: 0.95),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
 
                 // LAYER 2.8: Bottom Readability Gradient
                 Positioned(
@@ -1959,29 +2133,54 @@ class _BattleScreenState extends State<BattleScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.8),
-                                          borderRadius: BorderRadius.circular(3),
-                                          border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
-                                            const SizedBox(width: 2),
-                                            Text(
-                                              _archetypeShortCode(unit.archetype),
-                                              style: TextStyle(
-                                                color: _archetypeColor(unit.archetype),
-                                                fontSize: 8.0,
-                                                fontWeight: FontWeight.bold,
+                                      if (unit.isBoss)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
+                                            borderRadius: BorderRadius.circular(3),
+                                            border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
+                                              SizedBox(width: 2),
+                                              Text(
+                                                '☠ BOSS',
+                                                style: TextStyle(
+                                                  color: Color(0xFFFFD54F),
+                                                  fontSize: 7.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.8),
+                                            borderRadius: BorderRadius.circular(3),
+                                            border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                _archetypeShortCode(unit.archetype),
+                                                style: TextStyle(
+                                                  color: _archetypeColor(unit.archetype),
+                                                  fontSize: 8.0,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                       if (isSelectedTarget)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
@@ -2056,33 +2255,41 @@ class _BattleScreenState extends State<BattleScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                                           decoration: BoxDecoration(
-                                            color: affinityMult != null && affinityMult > 1.0
-                                                ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
-                                                : (affinityMult != null && affinityMult < 1.0
-                                                    ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
-                                                    : Colors.black.withValues(alpha: 0.75)),
+                                            color: unit.isBoss
+                                                ? const Color(0xFFB71C1C).withValues(alpha: 0.9)
+                                                : (affinityMult != null && affinityMult > 1.0
+                                                    ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
+                                                        : Colors.black.withValues(alpha: 0.75))),
                                             borderRadius: BorderRadius.circular(3),
                                             border: Border.all(
-                                              color: affinityMult != null && affinityMult > 1.0
-                                                  ? const Color(0xFF81C784)
-                                                  : (affinityMult != null && affinityMult < 1.0
-                                                      ? const Color(0xFFFF8A80)
-                                                      : const Color(0xFFE5A93C)),
-                                              width: 0.8,
+                                              color: unit.isBoss
+                                                  ? const Color(0xFFFF5252)
+                                                  : (affinityMult != null && affinityMult > 1.0
+                                                      ? const Color(0xFF81C784)
+                                                      : (affinityMult != null && affinityMult < 1.0
+                                                          ? const Color(0xFFFF8A80)
+                                                          : const Color(0xFFE5A93C))),
+                                              width: unit.isBoss ? 1.2 : 0.8,
                                             ),
                                           ),
                                           child: Text(
-                                            affinityMult != null && affinityMult > 1.0
-                                                ? '▲ ADV'
-                                                : (affinityMult != null && affinityMult < 1.0
-                                                    ? '▼ WEAK'
-                                                    : 'G${unit.generation}'),
+                                            unit.isBoss
+                                                ? '☠ BOSS'
+                                                : (affinityMult != null && affinityMult > 1.0
+                                                    ? '▲ ADV'
+                                                    : (affinityMult != null && affinityMult < 1.0
+                                                        ? '▼ WEAK'
+                                                        : 'G${unit.generation}')),
                                             style: TextStyle(
-                                              color: affinityMult != null && affinityMult > 1.0
-                                                  ? const Color(0xFFA5D6A7)
-                                                  : (affinityMult != null && affinityMult < 1.0
-                                                      ? const Color(0xFFFFCDD2)
-                                                      : const Color(0xFFE5A93C)),
+                                              color: unit.isBoss
+                                                  ? const Color(0xFFFFD54F)
+                                                  : (affinityMult != null && affinityMult > 1.0
+                                                      ? const Color(0xFFA5D6A7)
+                                                      : (affinityMult != null && affinityMult < 1.0
+                                                          ? const Color(0xFFFFCDD2)
+                                                          : const Color(0xFFE5A93C))),
                                               fontSize: 7.5,
                                               fontFamily: 'monospace',
                                               fontWeight: FontWeight.bold,
@@ -2148,14 +2355,19 @@ class _BattleScreenState extends State<BattleScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                                              color: unit.isBoss
+                                                  ? const Color(0xFFB71C1C).withValues(alpha: 0.45)
+                                                  : const Color(0xFFE5A93C).withValues(alpha: 0.25),
                                               borderRadius: BorderRadius.circular(2),
-                                              border: Border.all(color: const Color(0xFFE5A93C), width: 0.6),
+                                              border: Border.all(
+                                                color: unit.isBoss ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
+                                                width: unit.isBoss ? 1.0 : 0.6,
+                                              ),
                                             ),
                                             child: Text(
-                                              'Lv.${unit.level}',
-                                              style: const TextStyle(
-                                                color: Color(0xFFE5A93C),
+                                              unit.isBoss ? 'Lv.${unit.level} ★' : 'Lv.${unit.level}',
+                                              style: TextStyle(
+                                                color: unit.isBoss ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
                                                 fontSize: 7.5,
                                                 fontWeight: FontWeight.bold,
                                               ),
