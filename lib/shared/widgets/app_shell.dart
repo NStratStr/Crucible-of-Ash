@@ -12,6 +12,7 @@ import '../../features/campaign/watchtower_dialog.dart';
 import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
+import '../../features/combat/post_battle_loot_dialog.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
@@ -688,13 +689,26 @@ class _AppShellState extends State<AppShell> {
       if (purebloodDrop != null) {
         extraReward += ' • PINNACLE LINEAGE: ${purebloodDrop.name} (PUREBLOOD GEN 4)!';
       }
+      String? relicDrop;
       if (_activeNode?.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
-        extraReward += ' • Dropped ${drop.displayName}!';
+        relicDrop = drop.displayName;
       } else if (_activeNode?.type == CampaignNodeType.boss) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
-        extraReward += ' • LEGENDARY DROP: ${drop.displayName}!';
+        relicDrop = drop.displayName;
       }
+
+      final rewardsData = CombatRewardsData(
+        isVictory: true,
+        rawAsh: reward + (isFirstConquest ? 500 : 0),
+        emberShards: oreReward,
+        cryptKeys: sigilsReward + (isFirstConquest ? 1 : 0),
+        xpGained: xpReward,
+        levelUps: levelUps,
+        capturedThrall: purebloodDrop ?? captured,
+        relicDropName: relicDrop,
+        encounterTitle: _activeNode?.name ?? 'Ashen Skirmish',
+      );
 
       if (_ftueService.currentStage == FtueStage.encounter1) {
         _ftueService.advanceStage();
@@ -704,33 +718,31 @@ class _AppShellState extends State<AppShell> {
         _ftueService.advanceStage();
       }
 
-      if (_activeNode?.type == CampaignNodeType.boss && _currentChapter < 3) {
-        final nextCh = _currentChapter + 1;
-        if (_maxUnlockedChapter < nextCh) {
-          setState(() {
-            _maxUnlockedChapter = nextCh;
-          });
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _showChapterAscensionDialog(nextCh);
-          }
-        });
-      } else {
+      final bool isBossClear = _activeNode?.type == CampaignNodeType.boss && _currentChapter < 3;
+      final int nextCh = _currentChapter + 1;
+      if (isBossClear && _maxUnlockedChapter < nextCh) {
         setState(() {
-          _currentIndex = 0;
-          _activeNode = null;
+          _maxUnlockedChapter = nextCh;
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('EXPEDITION VICTORY! +$reward Ichor, +$oreReward Ore, +$xpReward XP • Bound ${captured.name} (${captured.archetype.name.toUpperCase()})$extraReward'),
-          backgroundColor: const Color(0xFF1B5E20),
-          duration: const Duration(seconds: 4),
-        ),
-      );
       _saveCurrentState();
+
+      PostBattleLootDialog.show(
+        context: context,
+        rewards: rewardsData,
+        onContinue: () {
+          if (!mounted) return;
+          if (isBossClear) {
+            _showChapterAscensionDialog(nextCh);
+          } else {
+            setState(() {
+              _currentIndex = 0;
+              _activeNode = null;
+            });
+          }
+        },
+      );
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
@@ -836,75 +848,34 @@ class _AppShellState extends State<AppShell> {
 
   void _onCombatDefeat() {
     _activeGauntletTrial = null;
-    showDialog(
+    final consolationAsh = max(25, ((_activeNode?.rewardIchor ?? 150) * 0.20).round());
+    final consolationXp = 50;
+    _grantBrigadeXp(consolationXp);
+    setState(() {
+      _totalIchor += consolationAsh;
+    });
+
+    PostBattleLootDialog.show(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF181820),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFB3261E), width: 1.5),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.dangerous, color: Color(0xFFEF5350), size: 24),
-            SizedBox(width: 8),
-            Text(
-              'BRIGADE VANQUISHED',
-              style: TextStyle(
-                color: Color(0xFFEF5350),
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'All bloodline vessels have fallen in battle. The shadows claim your expedition in ${CampaignMapScreen.chapterTitle(_currentChapter)}.',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111114),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFB3261E).withValues(alpha: 0.5)),
-              ),
-              child: const Text(
-                'Your vessels retreat to the Ashen Encampment to mend mortal wounds. Regroup, refine armaments, and begin a new descent.',
-                style: TextStyle(color: Color(0xFFE5A93C), fontSize: 11),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFB3261E),
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('RETURN TO CAMP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              setState(() {
-                final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
-                _tickManager.updateSquads(allies: revivedAllies);
-                _activeExpeditionBoons.clear();
-                _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
-                _activeNode = null;
-                _currentIndex = 0; // Return to campaign map
-              });
-            },
-          ),
-        ],
+      rewards: CombatRewardsData(
+        isVictory: false,
+        rawAsh: consolationAsh,
+        emberShards: 0,
+        cryptKeys: 0,
+        xpGained: consolationXp,
+        encounterTitle: _activeNode?.name ?? 'Defeat in the Shadows',
       ),
+      onContinue: () {
+        if (!mounted) return;
+        setState(() {
+          final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+          _tickManager.updateSquads(allies: revivedAllies);
+          _activeExpeditionBoons.clear();
+          _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
+          _activeNode = null;
+          _currentIndex = 0; // Return to campaign map
+        });
+      },
     );
   }
 
