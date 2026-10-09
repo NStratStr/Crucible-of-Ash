@@ -303,7 +303,19 @@ class UnitEntity {
   bool get isAlive => currentHp > 0;
   bool get isStunned => activeEffects.any((e) => e.type == StatusEffectType.stun);
   bool get isBleeding => activeEffects.any((e) => e.type == StatusEffectType.bleed);
+  int get bleedStacks => activeEffects
+      .where((e) => e.type == StatusEffectType.bleed)
+      .fold<int>(0, (sum, e) => sum + (e.value > 0 ? e.value : 1))
+      .clamp(0, 10);
   bool get isBlighted => activeEffects.any((e) => e.type == StatusEffectType.blight);
+  int get blightStacks => activeEffects
+      .where((e) => e.type == StatusEffectType.blight)
+      .fold<int>(0, (sum, e) => sum + (e.value > 0 ? e.value : 1))
+      .clamp(0, 10);
+  int get shieldPoints => activeEffects
+      .where((e) => e.type == StatusEffectType.shield)
+      .fold<int>(0, (sum, e) => sum + e.value);
+  bool get hasShield => shieldPoints > 0;
   bool get isPureblood => generation >= 4;
   String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
   bool get isBoss =>

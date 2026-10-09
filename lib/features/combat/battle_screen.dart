@@ -13,6 +13,7 @@ import '../../shared/widgets/hexagonal_affinity_wheel_widget.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
+import 'plinth_rim_status_painter.dart';
 import '../generals/general_command_service.dart';
 import '../generals/general_selection_dialog.dart';
 import '../relics/relic_service.dart';
@@ -2256,53 +2257,61 @@ class _BattleScreenState extends State<BattleScreen> {
                         left: isBossUnit ? 8 : 14,
                         right: isBossUnit ? 8 : 14,
                         height: isBossUnit ? 18 : 14,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.all(Radius.elliptical(
-                              isBossUnit ? 220 : 120,
-                              isBossUnit ? 28 : 20,
-                            )),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                (isActive
+                        child: CustomPaint(
+                          painter: PlinthRimStatusPainter(
+                            bleedStacks: unit.bleedStacks,
+                            blightStacks: unit.blightStacks,
+                            shieldIntegrity: unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp) : 0.0,
+                            isAlive: alive,
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.all(Radius.elliptical(
+                                isBossUnit ? 220 : 120,
+                                isBossUnit ? 28 : 20,
+                              )),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  (isActive
+                                      ? const Color(0xFFFFD54F)
+                                      : (isSelectedTarget
+                                          ? const Color(0xFFFF1744)
+                                          : _factionGlowColor(unit)))
+                                      .withValues(alpha: alive ? (isBossUnit ? 0.9 : 0.7) : 0.15),
+                                  const Color(0xFF1E1E28),
+                                  const Color(0xFF0C0C12),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: isActive
                                     ? const Color(0xFFFFD54F)
                                     : (isSelectedTarget
                                         ? const Color(0xFFFF1744)
-                                        : _factionGlowColor(unit)))
-                                    .withValues(alpha: alive ? (isBossUnit ? 0.9 : 0.7) : 0.15),
-                                const Color(0xFF1E1E28),
-                                const Color(0xFF0C0C12),
+                                        : (isDamaged
+                                            ? const Color(0xFFFF1744)
+                                            : _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.95 : 0.8) : 0.25))),
+                                width: (isActive || isSelectedTarget || isBossUnit) ? 2.2 : 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isActive
+                                          ? const Color(0xFFFFD54F)
+                                          : (isSelectedTarget || isDamaged
+                                              ? const Color(0xFFFF1744)
+                                              : _factionGlowColor(unit)))
+                                      .withValues(alpha: alive ? (isBossUnit ? 0.8 : 0.6) : 0.15),
+                                  blurRadius: (isActive || isSelectedTarget || isBossUnit) ? 18 : 7,
+                                  spreadRadius: (isActive || isSelectedTarget || isBossUnit) ? 2.5 : 1,
+                                ),
+                                const BoxShadow(
+                                  color: Colors.black87,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
                               ],
                             ),
-                            border: Border.all(
-                              color: isActive
-                                  ? const Color(0xFFFFD54F)
-                                  : (isSelectedTarget
-                                      ? const Color(0xFFFF1744)
-                                      : (isDamaged
-                                          ? const Color(0xFFFF1744)
-                                          : _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.95 : 0.8) : 0.25))),
-                              width: (isActive || isSelectedTarget || isBossUnit) ? 2.2 : 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isActive
-                                        ? const Color(0xFFFFD54F)
-                                        : (isSelectedTarget || isDamaged
-                                            ? const Color(0xFFFF1744)
-                                            : _factionGlowColor(unit)))
-                                    .withValues(alpha: alive ? (isBossUnit ? 0.8 : 0.6) : 0.15),
-                                blurRadius: (isActive || isSelectedTarget || isBossUnit) ? 18 : 7,
-                                spreadRadius: (isActive || isSelectedTarget || isBossUnit) ? 2.5 : 1,
-                              ),
-                              const BoxShadow(
-                                color: Colors.black87,
-                                blurRadius: 6,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
                           ),
                         ),
                       ),
