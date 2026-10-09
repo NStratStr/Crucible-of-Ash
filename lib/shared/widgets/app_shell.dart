@@ -1289,11 +1289,12 @@ class _AppShellState extends State<AppShell> {
       body: SafeArea(
         child: Column(
           children: [
-            FtueGuidanceBanner(
-              ftueService: _ftueService,
-              onLaunchStageAction: _handleLaunchFtueStageAction,
-              onReplayAwakening: _showAwakeningDialog,
-            ),
+            if (_currentIndex != 1)
+              FtueGuidanceBanner(
+                ftueService: _ftueService,
+                onLaunchStageAction: _handleLaunchFtueStageAction,
+                onReplayAwakening: _showAwakeningDialog,
+              ),
             Expanded(
               child: IndexedStack(
                 index: _currentIndex,

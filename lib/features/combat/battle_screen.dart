@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/combat_math.dart';
@@ -2086,6 +2087,32 @@ class _BattleScreenState extends State<BattleScreen> {
       ];
     }
 
+    // Organic miniature outline glow around the model silhouette (only for figurines when alive)
+    final bool hasModelGlow = alive &&
+        unit.isFigurineCutout &&
+        (isSelectedTarget || isDamaged || isActive || isBossUnit);
+    Color modelGlowColor = Colors.transparent;
+    double modelGlowAlpha = 0.0;
+    double modelGlowBlur = 6.0;
+
+    if (isDamaged) {
+      modelGlowColor = const Color(0xFFFF1744);
+      modelGlowAlpha = 0.95;
+      modelGlowBlur = 8.0;
+    } else if (isSelectedTarget) {
+      modelGlowColor = const Color(0xFFFF1744);
+      modelGlowAlpha = 0.85;
+      modelGlowBlur = 6.5;
+    } else if (isActive) {
+      modelGlowColor = const Color(0xFFFFD54F);
+      modelGlowAlpha = 0.80;
+      modelGlowBlur = 6.0;
+    } else if (isBossUnit) {
+      modelGlowColor = const Color(0xFFFF5252);
+      modelGlowAlpha = 0.60;
+      modelGlowBlur = 7.5;
+    }
+
     return GestureDetector(
       onTap: () {
         if (isEnemy && alive) {
@@ -2252,6 +2279,38 @@ class _BattleScreenState extends State<BattleScreen> {
                       ),
                     ],
 
+                    // LAYER 1-GLOW: Organic Character Model Silhouette Glow (No rectangular boxes)
+                    if (hasModelGlow)
+                      Positioned.fill(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: isBossUnit ? 6.0 : 4.0),
+                          child: Center(
+                            child: Transform.scale(
+                              scale: isBossUnit ? 1.75 : 1.25,
+                              child: ImageFiltered(
+                                imageFilter: ui.ImageFilter.blur(
+                                  sigmaX: modelGlowBlur,
+                                  sigmaY: modelGlowBlur,
+                                  tileMode: TileMode.decal,
+                                ),
+                                child: ColorFiltered(
+                                  colorFilter: ColorFilter.mode(
+                                    modelGlowColor.withValues(alpha: modelGlowAlpha),
+                                    BlendMode.srcIn,
+                                  ),
+                                  child: Image.asset(
+                                    unit.effectiveAvatarAsset,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.bottomCenter,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     // LAYER 1B: Character Miniature Artwork (Painted ON TOP of plinth with prominent scale)
                     Positioned.fill(
                       child: Padding(
@@ -2264,7 +2323,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                   ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
                                   : kAlphaSafeGreyscaleFilter,
                               child: Opacity(
-                                opacity: alive ? 1.0 : (unit.isFigurineCutout ? 0.55 : 0.65),
+                                opacity: alive ? 1.0 : (unit.isFigurineCutout ? 0.45 : 0.65),
                                 child: Image.asset(
                                   unit.effectiveAvatarAsset,
                                   fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
@@ -2297,16 +2356,16 @@ class _BattleScreenState extends State<BattleScreen> {
                         ),
                       ),
 
-                    // Critical HP Warning Vignette
-                    if (isCriticalHp)
+                    // Critical HP Warning Vignette (only for classic cards)
+                    if (isCriticalHp && !unit.isFigurineCutout)
                       Positioned.fill(
                         child: Container(
                           color: const Color(0xFFB3261E).withValues(alpha: 0.25),
                         ),
                       ),
 
-                    // Death Darkening
-                    if (!alive)
+                    // Death Darkening (only for classic cards)
+                    if (!alive && !unit.isFigurineCutout)
                       Positioned.fill(
                         child: Container(
                           color: Colors.black.withValues(alpha: 0.65),
@@ -2334,11 +2393,12 @@ class _BattleScreenState extends State<BattleScreen> {
 
               // LAYER 2.5: Damage Flash & Slash Sparks
               if (isDamaged) ...[
-                Positioned.fill(
-                  child: Container(
-                    color: const Color(0xFFFF1744).withValues(alpha: 0.6),
+                if (!unit.isFigurineCutout)
+                  Positioned.fill(
+                    child: Container(
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.6),
+                    ),
                   ),
-                ),
                 Positioned.fill(
                   child: Center(
                     child: Transform.rotate(
@@ -2363,25 +2423,26 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ],
 
-              // LAYER 2.8: Bottom Readability Gradient
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 48,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.92),
-                      ],
+              // LAYER 2.8: Bottom Readability Gradient (only for classic cards)
+              if (!unit.isFigurineCutout)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 48,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.92),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
               // LAYER 3: Interactive UI Information anchored to Pedestal & Ground
               Positioned.fill(
