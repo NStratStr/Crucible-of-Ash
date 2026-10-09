@@ -89,8 +89,15 @@ void main() {
       expect(find.text('2X'), findsOneWidget);
       expect(tickManager.speedMultiplier, equals(2.0));
 
-      // Tap again to switch back to 1X
+      // Tap 2X speed toggle to switch to 3X
       await tester.tap(find.text('2X'));
+      await tester.pump();
+
+      expect(find.text('3X'), findsOneWidget);
+      expect(tickManager.speedMultiplier, equals(3.0));
+
+      // Tap 3X speed toggle to cycle back to 1X
+      await tester.tap(find.text('3X'));
       await tester.pump();
 
       expect(find.text('1X'), findsOneWidget);

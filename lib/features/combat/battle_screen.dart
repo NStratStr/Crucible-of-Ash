@@ -338,7 +338,7 @@ class _BattleScreenState extends State<BattleScreen> {
     _isProcessingAiTurn = true;
 
     try {
-      final int aiDelay = (550 / widget.tickManager.speedMultiplier).round();
+      final int aiDelay = (650 / widget.tickManager.speedMultiplier).round();
       await Future.delayed(Duration(milliseconds: aiDelay));
       if (!mounted) return;
 
@@ -1222,7 +1222,7 @@ class _BattleScreenState extends State<BattleScreen> {
                     GestureDetector(
                       onTap: () {
                         final current = widget.tickManager.speedMultiplier;
-                        final next = current == 1.0 ? 2.0 : 1.0;
+                        final next = current == 1.0 ? 2.0 : (current == 2.0 ? 3.0 : 1.0);
                         widget.tickManager.setSpeedMultiplier(next);
                         setState(() {});
                       },
@@ -1949,73 +1949,61 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-                // LAYER 1: Arched Character Cutout Chamber (Elevated Cutout Silhouette)
+                // LAYER 1: Open Character Miniature & 3D Faction Ground Plinth
                 Positioned(
-                  top: 2,
-                  bottom: 58,
-                  left: 3,
-                  right: 3,
-                  child: Container(
-                    decoration: unit.isFigurineCutout
-                        ? const BoxDecoration()
-                        : BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12),
-                        bottom: Radius.circular(3),
-                      ),
-                      border: Border.all(
-                        color: isActive
-                            ? const Color(0xFFFFD54F)
-                            : (isSelectedTarget
-                                ? const Color(0xFFFF5252)
-                                : (unit.isBoss
-                                    ? const Color(0xFFFF5252)
-                                    : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.65 : 0.25))),
-                        width: unit.isBoss ? 1.8 : (isActive || isSelectedTarget ? 1.4 : 1.0),
-                      ),
-                      boxShadow: [
-                        if (isActive)
-                          BoxShadow(
-                            color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          )
-                        else if (isSelectedTarget)
-                          BoxShadow(
-                            color: const Color(0xFFFF1744).withValues(alpha: 0.45),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          )
-                        else
-                          const BoxShadow(
-                            color: Colors.black87,
-                            blurRadius: 5,
-                            offset: Offset(0, 2),
+                  top: 0,
+                  bottom: 34,
+                  left: 2,
+                  right: 2,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // LAYER 1A: 3D Faction Ground Plinth (Painted BEHIND character's feet)
+                      if (unit.isFigurineCutout)
+                        Positioned(
+                          bottom: 0,
+                          left: 14,
+                          right: 14,
+                          height: 14,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.all(Radius.elliptical(120, 20)),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  _factionGlowColor(unit).withValues(alpha: alive ? 0.6 : 0.15),
+                                  const Color(0xFF1E1E28),
+                                  const Color(0xFF0C0C12),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: _factionGlowColor(unit).withValues(alpha: alive ? 0.8 : 0.25),
+                                width: unit.isBoss ? 1.6 : 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _factionGlowColor(unit).withValues(alpha: alive ? 0.5 : 0.15),
+                                  blurRadius: unit.isBoss ? 12 : 7,
+                                  spreadRadius: 1,
+                                ),
+                                const BoxShadow(
+                                  color: Colors.black87,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
                           ),
-                      ],
-                      gradient: RadialGradient(
-                        center: const Alignment(0, -0.3),
-                        radius: 0.85,
-                        colors: [
-                          unit.isBoss
-                              ? const Color(0xFFB71C1C).withValues(alpha: alive ? 0.75 : 0.15)
-                              : _archetypeColor(unit.archetype).withValues(alpha: alive ? 0.38 : 0.08),
-                          unit.isBoss ? const Color(0xFF2B0808) : const Color(0xFF13131A),
-                          const Color(0xFF09090D),
-                        ],
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(11),
-                        bottom: Radius.circular(2),
-                      ),
-                      child: Stack(
-                        children: [
-                          // Character Artwork (Desaturated if fallen, scaled up if Boss)
-                          Positioned.fill(
+                        ),
+
+                      // LAYER 1B: Character Miniature Artwork (Painted ON TOP of plinth with prominent scale)
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Center(
                             child: Transform.scale(
-                              scale: unit.isBoss ? 1.08 : 1.0,
+                              scale: unit.isBoss ? 1.45 : (unit.isFigurineCutout ? 1.30 : 1.0),
                               child: ColorFiltered(
                                 colorFilter: alive
                                     ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
@@ -2029,116 +2017,44 @@ class _BattleScreenState extends State<BattleScreen> {
                               ),
                             ),
                           ),
-
-                          // 3D Faction Plinth & Tactical Dais Base
-                          if (unit.isFigurineCutout)
-                            Positioned(
-                              bottom: 0,
-                              left: 6,
-                              right: 6,
-                              height: 18,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: const BorderRadius.all(Radius.elliptical(120, 22)),
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      _factionGlowColor(unit).withValues(alpha: alive ? 0.5 : 0.12),
-                                      const Color(0xFF1A1A26),
-                                      const Color(0xFF0C0C12),
-                                    ],
-                                  ),
-                                  border: Border.all(
-                                    color: _factionGlowColor(unit).withValues(alpha: alive ? 0.85 : 0.25),
-                                    width: unit.isBoss ? 1.8 : 1.1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _factionGlowColor(unit).withValues(alpha: alive ? 0.5 : 0.12),
-                                      blurRadius: unit.isBoss ? 12 : 8,
-                                      spreadRadius: 1,
-                                    ),
-                                    const BoxShadow(
-                                      color: Colors.black87,
-                                      blurRadius: 6,
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (unit.isVanguard) ...[
-                                        const Icon(Icons.shield, size: 7.5, color: Color(0xFFFFD54F)),
-                                        const SizedBox(width: 2),
-                                        const Text(
-                                          '⚔ FRONT',
-                                          style: TextStyle(
-                                            color: Color(0xFFFFD54F),
-                                            fontSize: 7.0,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.6,
-                                          ),
-                                        ),
-                                      ] else ...[
-                                        const Icon(Icons.auto_awesome, size: 7.5, color: Color(0xFF80D8FF)),
-                                        const SizedBox(width: 2),
-                                        const Text(
-                                          '🔮 REAR',
-                                          style: TextStyle(
-                                            color: Color(0xFF80D8FF),
-                                            fontSize: 7.0,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.6,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                          // Inner Silhouette Vignette & Depth Shadow (applied to classic card illustrations)
-                          if (!unit.isFigurineCutout)
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    stops: const [0.0, 0.65, 1.0],
-                                    colors: [
-                                      Colors.black.withValues(alpha: 0.12),
-                                      Colors.transparent,
-                                      Colors.black.withValues(alpha: 0.82),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                          // Critical HP Warning Vignette
-                          if (isCriticalHp)
-                            Positioned.fill(
-                              child: Container(
-                                color: const Color(0xFFB3261E).withValues(alpha: 0.25),
-                              ),
-                            ),
-
-                          // Death Darkening
-                          if (!alive)
-                            Positioned.fill(
-                              child: Container(
-                                color: Colors.black.withValues(alpha: 0.65),
-                              ),
-                            ),
-                        ],
+                        ),
                       ),
-                    ),
+
+                      // Inner Silhouette Vignette & Depth Shadow (applied to classic card illustrations)
+                      if (!unit.isFigurineCutout)
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: const [0.0, 0.65, 1.0],
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.12),
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.82),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Critical HP Warning Vignette
+                      if (isCriticalHp)
+                        Positioned.fill(
+                          child: Container(
+                            color: const Color(0xFFB3261E).withValues(alpha: 0.25),
+                          ),
+                        ),
+
+                      // Death Darkening
+                      if (!alive)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.65),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
 
@@ -2191,7 +2107,7 @@ class _BattleScreenState extends State<BattleScreen> {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  height: 64,
+                  height: 48,
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

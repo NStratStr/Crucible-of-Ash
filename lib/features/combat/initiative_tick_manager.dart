@@ -44,7 +44,7 @@ class InitiativeTickManager extends ChangeNotifier {
   InitiativeTickManager({
     required List<UnitEntity> initialAllies,
     required List<UnitEntity> initialEnemies,
-    this.tickInterval = const Duration(milliseconds: 100),
+    this.tickInterval = const Duration(milliseconds: 160),
   })  : _allies = List.unmodifiable(initialAllies),
         _enemies = List.unmodifiable(initialEnemies);
 

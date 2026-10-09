@@ -142,7 +142,7 @@ class UnitEntity {
         name.contains('Butcher') ||
         name.contains('Executioner') ||
         name.contains('Titan')) {
-      return 'assets/images/flayed_butcher.jpg';
+      return 'assets/images/flayed_butcher.png';
     }
     if (speciesId.contains('cerberus') || (generation >= 2 && speciesId.contains('hound'))) {
       return 'assets/images/cerberus_progenitor.jpg';
@@ -162,7 +162,7 @@ class UnitEntity {
         speciesId.contains('stalker') ||
         speciesId.contains('slayer') ||
         speciesId.contains('reaper')) {
-      return 'assets/images/flayed_butcher.jpg';
+      return 'assets/images/flayed_butcher.png';
     }
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||

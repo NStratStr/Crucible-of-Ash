@@ -636,6 +636,107 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                           _buildStatCell('LEVEL CAP', 'Lv. ${unit.level} / ${unit.maxLevel}', Colors.white70),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildStatCell(
+                            'ARMOR MITIGATION',
+                            '${((1.0 - CombatMath.calculateMitigation(unit.defense + relicBonuses.bonusDefense)) * 100).toStringAsFixed(1)}%',
+                            const Color(0xFF64B5F6),
+                          ),
+                          _buildStatCell(
+                            'TACTICAL ROLE',
+                            unit.isVanguard ? 'VANGUARD (FRONT)' : 'ARCANUM (REAR)',
+                            unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                          ),
+                          _buildStatCell(
+                            'FACTION BLOOD',
+                            unit.factionName,
+                            const Color(0xFFB39DDB),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Section 2.2: Tactical Formation Strategy & Direct Battle Benefits
+                _buildSectionHeader('FORMATION STRATEGY & TACTICAL BONUS', Icons.shield_outlined),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF181820),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: unit.isVanguard ? const Color(0xFFFFD54F).withValues(alpha: 0.6) : const Color(0xFF80D8FF).withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          unit.isVanguard ? Icons.shield : Icons.auto_awesome,
+                          color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  unit.isVanguard ? 'FRONTLINE VANGUARD (DEFENSE AEGIS)' : 'BACKLINE ARCANUM (TACTICAL FOCUS)',
+                                  style: TextStyle(
+                                    color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text(
+                                    unit.isVanguard ? 'SLOTS 1-3' : 'SLOTS 4-6',
+                                    style: TextStyle(
+                                      color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              unit.isVanguard
+                                  ? '\u2022 Draws Aggro: Enemy single-target attacks prioritize frontline units first, keeping rear casters safe.\n\u2022 Iron Aegis Synergy: Under General Valeria, gains +25% Armor and reflects 15% physical damage back to attackers.\n\u2022 Direct Clash: Absorbs boss cleaves and melee strikes to guard the backline.'
+                                  : '\u2022 Sheltered Position: Completely shielded from enemy single-target strikes while frontline allies stand.\n\u2022 Tactical Focus: Ideal for casting devastating area-of-effect spells, heavy artillery archery, healing, and debilitating blights.\n\u2022 Threat Evasion: Enemy standard AI cannot bypass the vanguard to strike rear units unless specific dive-bomb aerial traits are triggered.',
+                              style: const TextStyle(
+                                color: Color(0xFFC5C5D2),
+                                fontSize: 10,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
