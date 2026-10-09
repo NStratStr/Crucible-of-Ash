@@ -242,6 +242,24 @@ class _BattleScreenState extends State<BattleScreen> {
     super.dispose();
   }
 
+
+  void _openInspectorModal(UnitEntity unit, bool isEnemy) {
+    final wasTicking = widget.tickManager.phase == CombatPhase.ticking;
+    if (wasTicking) {
+      widget.tickManager.pause();
+    }
+    PedigreeInspectorDialog.show(
+      context,
+      unit,
+      isEnemy: isEnemy,
+      relicService: widget.relicService,
+    ).then((_) {
+      if (mounted && wasTicking && widget.tickManager.phase != CombatPhase.battleEnded) {
+        widget.tickManager.start();
+      }
+    });
+  }
+
   String? _lastProcessedTurnStartUnitId;
 
   void _onEngineUpdate() {
@@ -523,7 +541,7 @@ class _BattleScreenState extends State<BattleScreen> {
     }
   }
 
-  void _dispatchOrder(GeneralOrderDefinition order) {
+  void _dispatchOrder(GeneralOrderDefinition order, {String? targetUnitId}) {
     _executeOrder(() {
       final oldAllies = List<UnitEntity>.from(widget.tickManager.allies);
       final oldEnemies = List<UnitEntity>.from(widget.tickManager.enemies);
@@ -533,26 +551,26 @@ class _BattleScreenState extends State<BattleScreen> {
       switch (widget.commandService.activeGeneralType) {
         case GeneralType.vladislav:
           if (order.id == 'rend_flesh') {
-            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
             res = widget.commandService.executeRendFlesh(enemyId);
           } else if (order.id == 'iron_bulwark') {
-            final ally = widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to fortify.'));
-            res = widget.commandService.executeIronBulwark(ally.id);
+            final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to fortify.')).id;
+            res = widget.commandService.executeIronBulwark(allyId);
           } else if (order.id == 'exsanguinating_strike') {
-            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
             res = widget.commandService.executeExsanguinatingStrike(enemyId);
           } else if (order.id == 'sanguine_revival') {
-            final fallenAlly = widget.tickManager.allies.firstWhere(
+            final fallenAllyId = targetUnitId ?? widget.tickManager.allies.firstWhere(
               (a) => !a.isAlive,
               orElse: () => throw StateError('No fallen ally to revive.'),
-            );
-            res = widget.commandService.executeSanguineRevival(fallenAlly.id);
+            ).id;
+            res = widget.commandService.executeSanguineRevival(fallenAllyId);
           } else if (order.id == 'disrupting_cleave') {
-            final enemyId = _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
             res = widget.commandService.executeDisruptingCleave(enemyId);
           } else if (order.id == 'blood_boil') {
-            final ally = widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to buff.'));
-            res = widget.commandService.executeBloodBoil(ally.id);
+            final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to buff.')).id;
+            res = widget.commandService.executeBloodBoil(allyId);
           } else if (order.id == 'siphon_vitality') {
             if (_selectedEnemyId == null) {
               throw StateError('Select an enemy to siphon.');
@@ -2146,45 +2164,23 @@ class _BattleScreenState extends State<BattleScreen> {
       modelGlowBlur = 7.5;
     }
 
-    return GestureDetector(
+    final Widget cardWidget = GestureDetector(
       onTap: () {
         if (isEnemy && alive) {
           if (isSelectedTarget) {
-            // Already selected as target! Tapping again opens the character sheet / inspector!
-            PedigreeInspectorDialog.show(
-              context,
-              unit,
-              isEnemy: isEnemy,
-              relicService: widget.relicService,
-            );
+            _openInspectorModal(unit, isEnemy);
           } else {
-            // First tap selects target to hit
             onTap?.call();
           }
         } else {
-          PedigreeInspectorDialog.show(
-            context,
-            unit,
-            isEnemy: isEnemy,
-            relicService: widget.relicService,
-          );
+          _openInspectorModal(unit, isEnemy);
         }
       },
       onDoubleTap: () {
-        PedigreeInspectorDialog.show(
-          context,
-          unit,
-          isEnemy: isEnemy,
-          relicService: widget.relicService,
-        );
+        _openInspectorModal(unit, isEnemy);
       },
       onLongPress: () {
-        PedigreeInspectorDialog.show(
-          context,
-          unit,
-          isEnemy: isEnemy,
-          relicService: widget.relicService,
-        );
+        _openInspectorModal(unit, isEnemy);
       },
       child: Transform.translate(
         offset: Offset(shakeX, lungeY),
@@ -2778,12 +2774,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                           const SizedBox(width: 3),
                                           GestureDetector(
                                             onTap: () {
-                                              PedigreeInspectorDialog.show(
-                                                context,
-                                                unit,
-                                                isEnemy: isEnemy,
-                                                relicService: widget.relicService,
-                                              );
+                                              _openInspectorModal(unit, isEnemy);
                                             },
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
@@ -2848,21 +2839,25 @@ class _BattleScreenState extends State<BattleScreen> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        '${unit.currentHp}/${unit.maxHp} HP',
-                                        style: TextStyle(
-                                          color: hpRatio > 0.35 ? Colors.white : const Color(0xFFEF5350),
-                                          fontSize: isBossUnit ? 8.5 : 7.5,
-                                          fontFamily: 'monospace',
-                                          fontWeight: FontWeight.bold,
-                                          shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                                      Expanded(
+                                        child: Text(
+                                          '/ HP',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: hpRatio > 0.35 ? Colors.white : const Color(0xFFEF5350),
+                                            fontSize: isBossUnit ? 8.0 : 7.0,
+                                            fontFamily: 'monospace',
+                                            fontWeight: FontWeight.bold,
+                                            shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(width: 2),
                                       Text(
-                                        '${unit.turnMeter.toInt()}% TM',
+                                        '% TM',
                                         style: TextStyle(
                                           color: const Color(0xFF00E5FF),
-                                          fontSize: isBossUnit ? 8.5 : 7.5,
+                                          fontSize: isBossUnit ? 8.0 : 7.0,
                                           fontFamily: 'monospace',
                                           fontWeight: FontWeight.bold,
                                           shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
@@ -2977,6 +2972,46 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
         ),
+      );
+
+      return DragTarget<GeneralOrderDefinition>(
+        onWillAcceptWithDetails: (details) {
+          final order = details.data;
+          if (order.id == 'sanguine_revival') {
+            return !isEnemy && !alive;
+          }
+          if (order.id == 'blood_boil' || order.id == 'iron_bulwark' || order.id == 'stand_resolute') {
+            return !isEnemy && alive;
+          }
+          return isEnemy && alive;
+        },
+        onAcceptWithDetails: (details) {
+          final order = details.data;
+          final bool targetValid = (order.id == 'sanguine_revival') ? !alive : alive;
+          if (targetValid) {
+            _dispatchOrder(order, targetUnitId: unit.id);
+          }
+          widget.commandService.setBulletTime(false);
+          widget.tickManager.setBulletTime(false);
+        },
+        builder: (context, candidateData, rejectedData) {
+          final bool isHovered = candidateData.isNotEmpty;
+          return Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: isHovered
+                    ? Border.all(
+                        color: const Color(0xFFFFD54F),
+                        width: 2.0,
+                      )
+                    : null,
+              ),
+              child: cardWidget,
+            ),
+          );
+        },
       );
     }
 
@@ -3139,29 +3174,98 @@ class _BattleScreenState extends State<BattleScreen> {
                             : profile.orders)
                         .map((order) {
                       final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
+                      final orderButton = _buildOrderButton(
+                        title: order.name,
+                        cost: order.focusCost,
+                        availableFocus: focus,
+                        borderColor: profile.themeColor,
+                        isUnlocked: isUnlocked,
+                        requiredRank: order.requiredPhylacteryRank,
+                        onPressed: () => _dispatchOrder(order),
+                        onLockedTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.',
+                              ),
+                              backgroundColor: const Color(0xFFB3261E),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      );
+
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: SizedBox(
-                          width: 84,
-                          child: _buildOrderButton(
-                            title: order.name,
-                            cost: order.focusCost,
-                            availableFocus: focus,
-                            borderColor: profile.themeColor,
-                            isUnlocked: isUnlocked,
-                            requiredRank: order.requiredPhylacteryRank,
-                            onPressed: () => _dispatchOrder(order),
-                            onLockedTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.',
+                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                        child: Draggable<GeneralOrderDefinition>(
+                          data: order,
+                          onDragStarted: () {
+                            widget.commandService.setBulletTime(true);
+                            widget.tickManager.setBulletTime(true);
+                          },
+                          onDragEnd: (_) {
+                            widget.commandService.setBulletTime(false);
+                            widget.tickManager.setBulletTime(false);
+                          },
+                          onDraggableCanceled: (_, __) {
+                            widget.commandService.setBulletTime(false);
+                            widget.tickManager.setBulletTime(false);
+                          },
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              width: 96,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1418),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: profile.themeColor, width: 2.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: profile.themeColor.withValues(alpha: 0.65),
+                                    blurRadius: 12,
+                                    spreadRadius: 2,
                                   ),
-                                  backgroundColor: const Color(0xFFB3261E),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
+                                ],
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    order.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${order.focusCost} FOCUS',
+                                    style: const TextStyle(
+                                      color: Color(0xFFE5A93C),
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(
+                            opacity: 0.35,
+                            child: SizedBox(
+                              width: 84,
+                              child: orderButton,
+                            ),
+                          ),
+                          child: SizedBox(
+                            width: 84,
+                            child: orderButton,
                           ),
                         ),
                       );
@@ -3170,27 +3274,73 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ),
               if (widget.commandService.hand.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: 'Burn Card (0 Focus)',
-                  child: InkWell(
-                    onTap: () {
-                      final burned = widget.commandService.hand.first;
-                      widget.commandService.burnCard(burned.id);
-                      _addPop('BURNED', const Color(0xFFFF7043));
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E1A1A),
-                        border: Border.all(color: const Color(0xFFFF7043), width: 1.0),
-                        borderRadius: BorderRadius.circular(4),
+                const SizedBox(width: 6),
+                DragTarget<GeneralOrderDefinition>(
+                  onWillAcceptWithDetails: (details) => true,
+                  onAcceptWithDetails: (details) {
+                    final burned = details.data;
+                    widget.commandService.burnCard(burned.id);
+                    _addPop('BURNED', const Color(0xFFFF7043));
+                    widget.commandService.setBulletTime(false);
+                    widget.tickManager.setBulletTime(false);
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    final bool isHovered = candidateData.isNotEmpty;
+                    return Tooltip(
+                      message: 'Burn Card (0 Focus, 6-tick CD)',
+                      child: GestureDetector(
+                        onTap: () {
+                          if (widget.commandService.hand.isNotEmpty) {
+                            final burned = widget.commandService.hand.first;
+                            widget.commandService.burnCard(burned.id);
+                            _addPop('BURNED', const Color(0xFFFF7043));
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: isHovered ? const Color(0xFF5E1A1A) : const Color(0xFF2E1414),
+                            border: Border.all(
+                              color: isHovered ? const Color(0xFFFFAB91) : const Color(0xFFFF7043),
+                              width: isHovered ? 2.0 : 1.2,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: isHovered
+                                ? [
+                                    const BoxShadow(
+                                      color: Color(0xFFFF7043),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.local_fire_department,
+                                size: 18,
+                                color: isHovered ? Colors.white : const Color(0xFFFF7043),
+                              ),
+                              const SizedBox(height: 1),
+                              const Text(
+                                'BURN',
+                                style: TextStyle(
+                                  color: Color(0xFFFFAB91),
+                                  fontSize: 7.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.local_fire_department, size: 16, color: Color(0xFFFF7043)),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ],
             ],

@@ -93,10 +93,30 @@ class InitiativeTickManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  Duration get effectiveTickInterval => Duration(
-        milliseconds:
-            (tickInterval.inMilliseconds / _speedMultiplier).round().clamp(20, 1000),
-      );
+  bool _isBulletTime = false;
+
+  /// Whether bullet-time slow-motion (0.30x speed) is active (e.g. during card drag).
+  bool get isBulletTime => _isBulletTime;
+
+  /// Toggles bullet-time slow-motion (0.30x speed) during tactical interactions.
+  void setBulletTime(bool active) {
+    if (_isBulletTime == active) return;
+    _isBulletTime = active;
+    if (_phase == CombatPhase.ticking && _loopTimer != null) {
+      _loopTimer?.cancel();
+      _loopTimer = Timer.periodic(effectiveTickInterval, (_) => advanceTick());
+    }
+    notifyListeners();
+  }
+
+  Duration get effectiveTickInterval {
+    final double bulletMultiplier = _isBulletTime ? 0.30 : 1.0;
+    final double effectiveSpeed = _speedMultiplier * bulletMultiplier;
+    return Duration(
+      milliseconds:
+          (tickInterval.inMilliseconds / effectiveSpeed).round().clamp(20, 2500),
+    );
+  }
 
   List<UnitEntity> get allUnits => [..._allies, ..._enemies];
 

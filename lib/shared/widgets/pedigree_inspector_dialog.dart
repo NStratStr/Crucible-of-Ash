@@ -783,34 +783,72 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                     children: [
                       Row(
                         children: [
-                          _buildStatCell('HP VITALITY', '${unit.currentHp} / ${unit.maxHp}', Colors.greenAccent),
-                          _buildStatCell('ATTACK POWER', '${unit.attack}${relicBonuses.bonusAttack > 0 ? " (+${relicBonuses.bonusAttack})" : ""}', Colors.redAccent),
-                          _buildStatCell('ARMOR DEFENSE', '${unit.defense}${relicBonuses.bonusDefense > 0 ? " (+${relicBonuses.bonusDefense})" : ""}', Colors.blueAccent),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _buildStatCell('INITIATIVE SPEED', '${unit.speed}${relicBonuses.bonusSpeed > 0 ? " (+${relicBonuses.bonusSpeed})" : ""}', Colors.amberAccent),
-                          _buildStatCell('CRIT CHANCE', '${((unit.critRate + relicBonuses.bonusCritRate) * 100).toInt()}%', Colors.purpleAccent),
-                          _buildStatCell('CRIT DAMAGE', '${((unit.critDamage + relicBonuses.bonusCritDamage) * 100).toInt()}%', Colors.orangeAccent),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _buildStatCell('TURN METER', '${unit.turnMeter.toInt()}%', Colors.cyanAccent),
-                          _buildStatCell('ULTIMATE GAUGE', '${unit.ultimateCharge.toInt()}%', const Color(0xFFE5A93C)),
-                          _buildStatCell('LEVEL CAP', 'Lv. ${unit.level} / ${unit.maxLevel}', Colors.white70),
+                          _buildStatCell(
+                            'HP VITALITY',
+                            '${unit.currentHp} / ${unit.effectiveMaxHp}',
+                            unit.reviveCount > 0 ? const Color(0xFFFFB74D) : Colors.greenAccent,
+                          ),
+                          _buildStatCell(
+                            'ATTACK POWER',
+                            '${unit.attack}${relicBonuses.bonusAttack > 0 ? " (+${relicBonuses.bonusAttack})" : ""}',
+                            Colors.redAccent,
+                          ),
+                          _buildStatCell(
+                            'ARMOR (PRR)',
+                            '${unit.armor} (${(CombatMath.calculatePrr(unit.armor) * 100).toStringAsFixed(1)}%)',
+                            Colors.blueAccent,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
                       Row(
                         children: [
                           _buildStatCell(
-                            'ARMOR MITIGATION',
-                            '${((1.0 - CombatMath.calculateMitigation(unit.defense + relicBonuses.bonusDefense)) * 100).toStringAsFixed(1)}%',
-                            const Color(0xFF64B5F6),
+                            'RESIST (ERR)',
+                            '${unit.resist} (${(CombatMath.calculateErr(unit.resist) * 100).toStringAsFixed(1)}%)',
+                            const Color(0xFF80CBC4),
+                          ),
+                          _buildStatCell(
+                            'EFFECTIVE HP',
+                            '${unit.ehp.round()} EHP',
+                            const Color(0xFFCE93D8),
+                          ),
+                          _buildStatCell(
+                            'INITIATIVE SPEED',
+                            '${unit.speed}${relicBonuses.bonusSpeed > 0 ? " (+${relicBonuses.bonusSpeed})" : ""}',
+                            Colors.amberAccent,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildStatCell(
+                            'CRIT CHANCE',
+                            '${((unit.critRate + relicBonuses.bonusCritRate) * 100).toInt()}%',
+                            Colors.purpleAccent,
+                          ),
+                          _buildStatCell(
+                            'CRIT DAMAGE',
+                            '${((unit.critDamage + relicBonuses.bonusCritDamage) * 100).toInt()}%',
+                            Colors.orangeAccent,
+                          ),
+                          _buildStatCell(
+                            'TURN METER',
+                            '${unit.turnMeter.toInt()}%',
+                            Colors.cyanAccent,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildStatCell(
+                            'SOUL FRACTURE',
+                            unit.reviveCount > 0
+                                ? '-${(100 - pow(0.80, unit.reviveCount) * 100).round()}% Max HP'
+                                : 'NONE (Pristine)',
+                            unit.reviveCount > 0 ? const Color(0xFFEF5350) : const Color(0xFF81C784),
                           ),
                           _buildStatCell(
                             'TACTICAL ROLE',
