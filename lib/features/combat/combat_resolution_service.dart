@@ -197,8 +197,20 @@ class CombatResolutionService {
       triggeredTraits.add('void_corruption');
     }
 
+    // GDD v2.7 Sec 4: SHIELD Expiration AoE pulse dealing 50% remaining shield to opponents
+    int shieldAoePulseDamage = 0;
+    for (final eff in currentUnit.activeEffects) {
+      if (eff.type == StatusEffectType.shield && eff.durationTurns <= 1 && eff.value > 0) {
+        shieldAoePulseDamage += (eff.value * 0.50).round();
+      }
+    }
+
     // Decrement durations on active effects
     final bool wasStunned = currentUnit.isStunned;
+    // GDD v2.7 Sec 4: BURN spreads to units within 1.5m (adjacent formation slots) on expire
+    final bool burnExpired = currentUnit.activeEffects
+        .any((e) => e.type == StatusEffectType.burn && e.durationTurns <= 1);
+
     // Rebind Flesh thralls collapse once their final Decaying turn elapses
     final bool decayExpired = currentUnit.activeEffects
         .any((e) => e.type == StatusEffectType.decaying && e.durationTurns <= 1);
@@ -224,7 +236,34 @@ class CombatResolutionService {
       return u;
     }).toList();
 
+    // GDD v2.7 Sec 4: If Burn expired on unit, spread burn (2 turns, 40 dmg) to adjacent formation slots
+    if (burnExpired) {
+      final int currentSlotIndex = currentUnit.slot.index;
+      updatedFriendly = updatedFriendly.map((u) {
+        if (u.id == currentUnit.id || !u.isAlive) return u;
+        final int diff = (u.slot.index - currentSlotIndex).abs();
+        if (diff == 1 && !u.isBurning) {
+          final newEffects = List<StatusEffect>.from(u.activeEffects)
+            ..add(const StatusEffect(type: StatusEffectType.burn, durationTurns: 2, value: 40));
+          return u.copyWith(activeEffects: newEffects);
+        }
+        return u;
+      }).toList();
+      triggeredTraits.add('burn_spread');
+    }
+
     List<UnitEntity> updatedOpposing = List.of(opposingSquad);
+
+    // GDD v2.7 Sec 4: Apply Shield Expiration AoE Pulse to living opponents
+    if (shieldAoePulseDamage > 0) {
+      updatedOpposing = updatedOpposing.map((foe) {
+        if (!foe.isAlive) return foe;
+        final int dmg = shieldAoePulseDamage;
+        final int newHp = max(0, foe.currentHp - dmg);
+        return foe.copyWith(currentHp: newHp);
+      }).toList();
+      triggeredTraits.add('shield_pulse');
+    }
 
     // If unit died from DoT
     if (netHp <= 0) {
@@ -498,7 +537,11 @@ class CombatResolutionService {
 
     // Trait: Piercing Arrow (ignores 50% defense)
     final bool bypassArmor = skill.ignoresArmor || attackerTraits.contains('piercing_arrow');
-    final int effectiveDefense = bypassArmor ? (baseDefense * 0.5).round() : baseDefense;
+    int effectiveDefense = bypassArmor ? (baseDefense * 0.5).round() : baseDefense;
+    // GDD v2.7 Sec 4: BLEED shears mineral glaze, ignoring 30% Armor
+    if (target.isBleeding) {
+      effectiveDefense = (effectiveDefense * 0.70).round();
+    }
     final double mitigation = CombatMath.calculateMitigation(effectiveDefense);
 
     // 4. Compute Base and Final Damage

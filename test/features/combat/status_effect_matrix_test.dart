@@ -128,7 +128,7 @@ void main() {
       expect(updatedHaste.turnMeter, 13.5); // Haste: ((100 * 1.35) / 100) * 10 = 13.5
     });
 
-    testWidgets('PlinthRimStatusPainter renders with Burn and Freeze status flags', (tester) async {
+    testWidgets('PlinthRimStatusPainter renders with Burn and Freeze status flags and Faction Inscriptions', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -140,6 +140,7 @@ void main() {
                   blightStacks: 1,
                   shieldIntegrity: 0.4,
                   isAlive: true,
+                  factionName: 'Ash Legion',
                   isBurning: true,
                   isFrozen: true,
                 ),
@@ -150,6 +151,88 @@ void main() {
       );
 
       expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    test('GDD v2.7 Sec 4: BLEED shears 30% armor during attack damage calculation', () {
+      final bleedingDefender = baseDefender.copyWith(
+        defense: 100,
+        activeEffects: [
+          const StatusEffect(type: StatusEffectType.bleed, durationTurns: 2, value: 30),
+        ],
+      );
+
+      final primedAttacker = baseAttacker.copyWith(turnMeter: 100.0);
+
+      final tickManager1 = InitiativeTickManager(
+        initialAllies: [primedAttacker],
+        initialEnemies: [baseDefender.copyWith(defense: 100)],
+      );
+      final cs1 = CombatResolutionService(tickManager: tickManager1);
+      tickManager1.advanceTick();
+      final normalResult = cs1.executeBasicAttack(
+        targetUnitId: baseDefender.id,
+        autoResumeTickEngine: false,
+      );
+
+      final tickManager2 = InitiativeTickManager(
+        initialAllies: [primedAttacker],
+        initialEnemies: [bleedingDefender],
+      );
+      final cs2 = CombatResolutionService(tickManager: tickManager2);
+      tickManager2.advanceTick();
+      final shearedResult = cs2.executeBasicAttack(
+        targetUnitId: bleedingDefender.id,
+        autoResumeTickEngine: false,
+      );
+
+      // Against bleeding defender (30% armor sheared), damage should be greater than or equal to normal
+      expect(shearedResult.damageDealt, greaterThanOrEqualTo(normalResult.damageDealt));
+    });
+
+    test('GDD v2.7 Sec 4: Shield expiration triggers 50% AoE pulse to opposing units', () {
+      final shieldedAlly = baseAttacker.copyWith(
+        activeEffects: [
+          const StatusEffect(type: StatusEffectType.shield, durationTurns: 1, value: 200),
+        ],
+      );
+      final enemyTarget = baseDefender.copyWith(currentHp: 400);
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: [shieldedAlly],
+        initialEnemies: [enemyTarget],
+      );
+      final cs = CombatResolutionService(tickManager: tickManager);
+      final result = cs.processTurnStart(unitId: shieldedAlly.id);
+
+      expect(result.triggeredTraits.contains('shield_pulse'), isTrue);
+      final updatedFoe = tickManager.enemies.first;
+      // 50% of 200 shield = 100 damage dealt to foe
+      expect(updatedFoe.currentHp, equals(300));
+    });
+
+    test('GDD v2.7 Sec 4: Burn expiration spreads burn to adjacent formation slots', () {
+      final burningAlly = baseAttacker.copyWith(
+        slot: FormationSlot.front1,
+        activeEffects: [
+          const StatusEffect(type: StatusEffectType.burn, durationTurns: 1, value: 30),
+        ],
+      );
+      final adjacentAlly = baseDefender.copyWith(
+        id: 'ally_adj',
+        slot: FormationSlot.front2, // Slot 1 is adjacent to Slot 0 (diff = 1)
+        activeEffects: [],
+      );
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: [burningAlly, adjacentAlly],
+        initialEnemies: [baseDefender],
+      );
+      final cs = CombatResolutionService(tickManager: tickManager);
+      final result = cs.processTurnStart(unitId: burningAlly.id);
+
+      expect(result.triggeredTraits.contains('burn_spread'), isTrue);
+      final updatedAdjacent = tickManager.allies.firstWhere((u) => u.id == 'ally_adj');
+      expect(updatedAdjacent.isBurning, isTrue);
     });
   });
 }

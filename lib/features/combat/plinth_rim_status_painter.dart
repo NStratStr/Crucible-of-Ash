@@ -13,6 +13,7 @@ class PlinthRimStatusPainter extends CustomPainter {
   final double shieldIntegrity; // 0.0 to 1.0 (shield points / maxHp)
   final bool isAlive;
   final PlinthMaterial plinthMaterial;
+  final String? factionName;
   final bool isBurning;
   final bool isFrozen;
 
@@ -22,6 +23,7 @@ class PlinthRimStatusPainter extends CustomPainter {
     required this.shieldIntegrity,
     required this.isAlive,
     this.plinthMaterial = PlinthMaterial.slate,
+    this.factionName,
     this.isBurning = false,
     this.isFrozen = false,
   });
@@ -60,6 +62,53 @@ class PlinthRimStatusPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4;
       canvas.drawOval(ovalRect, rimPaint);
+
+      // GDD v2.7 Sec 2.2: Faction Grounding Inscriptions
+      // - Ash Legion: Welded cold-iron rims on weathered fortress flagstone (notched bolt pips)
+      // - Crypt Stalkers: Weeping arterial stone basins with creeping black moss (crimson weeping fissures)
+      // - Corrupted Beasts: Trampled black earth with broken bone chips and toxic roots (bone-white flecks)
+      // - Occult Void Cult: Obsidian discs etched with hovering, rift-glass violet runes (arc runes)
+      if (factionName != null) {
+        if (factionName == 'Ash Legion') {
+          final Paint boltPaint = Paint()
+            ..color = const Color(0xFFCFD8DC).withValues(alpha: 0.8)
+            ..style = PaintingStyle.fill;
+          for (final angle in [-math.pi * 0.75, -math.pi * 0.25, math.pi * 0.25, math.pi * 0.75]) {
+            final double bx = center.dx + rx * math.cos(angle);
+            final double by = center.dy + ry * math.sin(angle);
+            canvas.drawCircle(Offset(bx, by), 1.5, boltPaint);
+          }
+        } else if (factionName == 'Crypt Stalkers') {
+          final Paint mossPaint = Paint()
+            ..color = const Color(0xFF1B5E20).withValues(alpha: 0.75)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2;
+          canvas.drawArc(ovalRect, math.pi * 0.35, math.pi * 0.30, false, mossPaint);
+          final Paint arterialPaint = Paint()
+            ..color = const Color(0xFFB71C1C).withValues(alpha: 0.65)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.0;
+          canvas.drawArc(ovalRect, -math.pi * 0.65, math.pi * 0.30, false, arterialPaint);
+        } else if (factionName == 'Corrupted Beasts') {
+          final Paint rootPaint = Paint()
+            ..color = const Color(0xFF3E2723).withValues(alpha: 0.85)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5;
+          canvas.drawArc(ovalRect, math.pi * 0.15, math.pi * 0.70, false, rootPaint);
+          final Paint boneChipPaint = Paint()
+            ..color = const Color(0xFFEFEBE9).withValues(alpha: 0.7)
+            ..style = PaintingStyle.fill;
+          canvas.drawCircle(Offset(center.dx - rx * 0.6, center.dy + ry * 0.7), 1.4, boneChipPaint);
+          canvas.drawCircle(Offset(center.dx + rx * 0.6, center.dy + ry * 0.7), 1.4, boneChipPaint);
+        } else if (factionName == 'Occult Void Cult') {
+          final Paint riftRunePaint = Paint()
+            ..color = const Color(0xFFE040FB).withValues(alpha: 0.75)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6;
+          canvas.drawArc(ovalRect, -math.pi * 0.90, math.pi * 0.40, false, riftRunePaint);
+          canvas.drawArc(ovalRect, math.pi * 0.10, math.pi * 0.40, false, riftRunePaint);
+        }
+      }
     }
 
     if (!isAlive && bleedStacks == 0 && blightStacks == 0 && shieldIntegrity <= 0) {
@@ -191,6 +240,7 @@ class PlinthRimStatusPainter extends CustomPainter {
         oldDelegate.shieldIntegrity != shieldIntegrity ||
         oldDelegate.isAlive != isAlive ||
         oldDelegate.plinthMaterial != plinthMaterial ||
+        oldDelegate.factionName != factionName ||
         oldDelegate.isBurning != isBurning ||
         oldDelegate.isFrozen != isFrozen;
   }

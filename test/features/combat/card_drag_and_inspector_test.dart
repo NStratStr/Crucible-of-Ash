@@ -230,5 +230,68 @@ void main() {
 
       tickManager.pause();
     });
+
+    testWidgets('GDD v2.7 Sec 7.3: Target Failsafe cancels card without consuming focus if target dies during drag', (tester) async {
+      final tickManager = InitiativeTickManager(
+        initialAllies: [ally],
+        initialEnemies: [enemy],
+      );
+      addTearDown(tickManager.dispose);
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+        initialFocus: 6,
+        maxFocus: GeneralCommandService.grimoireMaxFocusCap,
+      );
+      commandService.initializeGrimoire();
+
+      final combatService = CombatResolutionService(
+        tickManager: tickManager,
+        commandService: commandService,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BattleScreen(
+              tickManager: tickManager,
+              combatService: combatService,
+              commandService: commandService,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final initialFocus = commandService.currentFocus;
+
+      // Kill the enemy in the background
+      tickManager.updateSquads(
+        allies: [ally],
+        enemies: [enemy.copyWith(currentHp: 0)],
+      );
+      await tester.pump();
+
+      // Attempt to drop card on the enemy target finder
+      // Find the enemy DragTarget
+      final enemyTargetFinder = find.byType(DragTarget<GeneralOrderDefinition>).first;
+      final targetWidget = tester.widget<DragTarget<GeneralOrderDefinition>>(enemyTargetFinder);
+      
+      // Simulate drop of Rend Flesh on now-dead enemy
+      targetWidget.onAcceptWithDetails?.call(
+        DragTargetDetails<GeneralOrderDefinition>(
+          data: GeneralProfile.rendFleshOrder,
+          offset: Offset.zero,
+        ),
+      );
+      await tester.pump();
+
+      // Focus should not have been spent due to target failsafe
+      expect(commandService.currentFocus, equals(initialFocus));
+      expect(find.text('TARGET LOST'), findsOneWidget);
+
+      tickManager.pause();
+    });
   });
 }

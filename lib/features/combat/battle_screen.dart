@@ -2273,6 +2273,7 @@ class _BattleScreenState extends State<BattleScreen> {
                             shieldIntegrity: unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp) : 0.0,
                             isAlive: alive,
                             plinthMaterial: unit.plinthMaterial,
+                            factionName: unit.factionName,
                             isBurning: unit.isBurning,
                             isFrozen: unit.isFrozen,
                           ),
@@ -3061,9 +3062,18 @@ class _BattleScreenState extends State<BattleScreen> {
         },
         onAcceptWithDetails: (details) {
           final order = details.data;
-          final bool targetValid = (order.id == 'sanguine_revival') ? !alive : alive;
+          // GDD v2.7 Sec 7.3: Target Failsafe: If target dies or becomes invalid while hovering card during bullet-time,
+          // the card snaps safely back to hand with 0 Focus consumed.
+          final liveUnit = isEnemy
+              ? widget.tickManager.enemies.where((e) => e.id == unit.id).firstOrNull
+              : widget.tickManager.allies.where((a) => a.id == unit.id).firstOrNull;
+          final bool isStillAlive = liveUnit?.isAlive ?? false;
+          final bool targetValid = (order.id == 'sanguine_revival') ? !isStillAlive : isStillAlive;
+
           if (targetValid) {
             _dispatchOrder(order, targetUnitId: unit.id);
+          } else {
+            _addPop('TARGET LOST', const Color(0xFFB0BEC5));
           }
           widget.commandService.setBulletTime(false);
           widget.tickManager.setBulletTime(false);
