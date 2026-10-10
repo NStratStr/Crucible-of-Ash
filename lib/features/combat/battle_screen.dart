@@ -3566,6 +3566,8 @@ class _BattleScreenState extends State<BattleScreen> {
         return const Color(0xFFFFD54F);
       case StatusEffectType.invulnerable:
         return const Color(0xFF80CBC4);
+      case StatusEffectType.taunt:
+        return const Color(0xFFFF5722);
     }
   }
 
@@ -3593,6 +3595,8 @@ class _BattleScreenState extends State<BattleScreen> {
         return 'SHD';
       case StatusEffectType.invulnerable:
         return 'GRC';
+      case StatusEffectType.taunt:
+        return 'TNT';
     }
   }
 

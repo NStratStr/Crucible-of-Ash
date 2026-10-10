@@ -328,10 +328,14 @@ class UnitEntity {
   bool get isFrozen => activeEffects.any((e) => e.type == StatusEffectType.freeze);
   bool get isVulnerable => activeEffects.any((e) => e.type == StatusEffectType.vulnerable);
   bool get hasHaste => activeEffects.any((e) => e.type == StatusEffectType.speedUp);
+  bool get isTaunting => activeEffects.any((e) => e.type == StatusEffectType.taunt);
   int get shieldPoints => activeEffects
       .where((e) => e.type == StatusEffectType.shield)
       .fold<int>(0, (sum, e) => sum + e.value);
   bool get hasShield => shieldPoints > 0;
+
+  /// Dynamic Threat Score (GDD v2.6 Sec 3.3): Attack * (1 + CritRate) * (Speed / 100)
+  double get threatScore => attack * (1.0 + critRate) * (speed / 100.0);
   bool get isPureblood => generation >= 4;
   String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
 

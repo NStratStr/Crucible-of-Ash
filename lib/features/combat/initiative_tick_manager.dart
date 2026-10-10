@@ -50,6 +50,7 @@ class InitiativeTickManager extends ChangeNotifier {
   Timer? _loopTimer;
   final Duration tickInterval;
   double _speedMultiplier = 1.0;
+  final VoidCallback? onTick;
 
   // GDD v2.6 Sec 13.2: Multi-Phase Boss Tracking (66% and 33% HP Thresholds)
   final Set<double> _bossPhaseThresholdsCrossed = {};
@@ -59,6 +60,7 @@ class InitiativeTickManager extends ChangeNotifier {
     required List<UnitEntity> initialAllies,
     required List<UnitEntity> initialEnemies,
     this.tickInterval = const Duration(milliseconds: 160),
+    this.onTick,
   })  : _allies = List.unmodifiable(initialAllies),
         _enemies = List.unmodifiable(initialEnemies);
 
@@ -219,6 +221,7 @@ class InitiativeTickManager extends ChangeNotifier {
     }
 
     _tickCount++;
+    onTick?.call();
 
     // GDD v2.6 Sec 13.1: Hard Adjudication at 3,600 ticks (2:00 mark)
     if (_tickCount >= 3600) {

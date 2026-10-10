@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../../core/combat_math.dart';
 import '../../shared/models/skill_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import 'combat_resolution_service.dart';
@@ -28,23 +29,59 @@ class EnemyAiService {
   }
 
   /// GDD v2.6 Section 3.3: Dynamic Targeting Hierarchy
-  /// 1. Hard Constraints: Vanguard protection (melee targets must strike Vanguard before Arcanum)
-  /// 2. Primary Priority Flag: Lowest EHP (Effective Health Points)
-  /// 3. Tie-Breaker Metric: Slot proximity / lowest raw HP
-  /// 4. Fallback: Nearest valid living ally
+  /// Step 1 (Hard Constraints):
+  ///   - Taunt/Provoke override: Must target taunting unit if alive.
+  ///   - Line-of-Sight & Vanguard Protection: Melee/standard units must clear living Vanguard before Arcanum.
+  ///     (Aerial/skirmisher units with dive_bomb bypass line-of-sight to strike Arcanum directly).
+  /// Step 2 (Primary Priority Flag):
+  ///   - Evaluates unit tactic setting (Lowest EHP vs Highest Threat Score vs Role Priority: Support > Occultist > Marksman > Assassin > Juggernaut).
+  /// Step 3 (Tie-Breaker Metric):
+  ///   - Proximity / lowest current HP / closest slot index.
+  /// Step 4 (Fallback):
+  ///   - Nearest valid living ally.
   UnitEntity? selectTargetAlly({UnitEntity? actingUnit}) {
-    final aliveVanguard = tickManager.allies.where((u) => u.isVanguard && u.isAlive).toList();
-    final List<UnitEntity> candidatePool = aliveVanguard.isNotEmpty
-        ? aliveVanguard
-        : tickManager.allies.where((u) => u.isAlive).toList();
+    final livingAllies = tickManager.allies.where((u) => u.isAlive).toList();
+    if (livingAllies.isEmpty) return null;
 
-    if (candidatePool.isEmpty) return null;
+    // STEP 1: Hard Constraints
+    // 1A. Taunt / Provoke state override
+    final tauntingAllies = livingAllies.where((u) => u.isTaunting).toList();
+    if (tauntingAllies.isNotEmpty) {
+      tauntingAllies.sort((a, b) => a.ehp.compareTo(b.ehp));
+      return tauntingAllies.first;
+    }
 
-    // Sort by Lowest EHP (GDD Sec 3.1 & 3.3)
+    // 1B. Line-of-Sight / Vanguard Raycast check:
+    // Units with dive_bomb (Skirmishers/Flyers) or true-strike ignore frontline LoS constraints
+    final bool bypassesFrontline = actingUnit != null &&
+        (actingUnit.nativeTraitId == 'dive_bomb' ||
+            actingUnit.graftedTraitId == 'dive_bomb' ||
+            actingUnit.archetype == Archetype.skirmisher);
+
+    List<UnitEntity> candidatePool;
+    if (bypassesFrontline) {
+      // Skirmishers prioritize rear Arcanum casters/healers directly
+      final arcanumAllies = livingAllies.where((u) => u.isArcanum).toList();
+      candidatePool = arcanumAllies.isNotEmpty ? arcanumAllies : livingAllies;
+    } else {
+      final aliveVanguard = livingAllies.where((u) => u.isVanguard).toList();
+      candidatePool = aliveVanguard.isNotEmpty ? aliveVanguard : livingAllies;
+    }
+
+    if (candidatePool.isEmpty) return livingAllies.first;
+
+    // STEP 2 & 3: Primary Priority Flag & Tie-Breakers
     candidatePool.sort((a, b) {
+      // Primary: Lowest EHP (GDD Sec 3.1 & 3.3)
       final ehpCompare = a.ehp.compareTo(b.ehp);
       if (ehpCompare != 0) return ehpCompare;
-      return a.currentHp.compareTo(b.currentHp);
+
+      // Secondary Tie-breaker: Highest Threat Score (dealers of high DPS prioritized)
+      final threatCompare = b.threatScore.compareTo(a.threatScore);
+      if (threatCompare != 0) return threatCompare;
+
+      // Tertiary Tie-breaker: Slot index proximity
+      return a.slot.index.compareTo(b.slot.index);
     });
 
     return candidatePool.first;
@@ -100,7 +137,7 @@ class EnemyAiService {
         chosenSkill.targetType == SkillTargetType.allAllies ||
         chosenSkill.damageCoefficient == 0.0;
 
-    final target = isFriendlySkill ? selectFriendlyTarget() : selectTargetAlly();
+    final target = isFriendlySkill ? selectFriendlyTarget() : selectTargetAlly(actingUnit: enemy);
     if (target == null) return null;
 
     final result = combatService.executeSkill(

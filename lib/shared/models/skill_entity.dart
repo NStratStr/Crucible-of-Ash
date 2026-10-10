@@ -20,6 +20,7 @@ enum StatusEffectType {
   shield,       // Absorbs incoming damage
   invulnerable, // Invulnerability grace window (e.g. 6 ticks upon revive)
   decaying,     // Rebound thrall: collapses back to death when duration expires
+  taunt,        // Hard Constraint: Forces enemy targeting override (GDD v2.6 Sec 3.3)
 }
 
 @immutable
@@ -69,6 +70,8 @@ class StatusEffect {
         return 'Grace';
       case StatusEffectType.decaying:
         return 'Decaying';
+      case StatusEffectType.taunt:
+        return 'Taunt';
     }
   }
 }

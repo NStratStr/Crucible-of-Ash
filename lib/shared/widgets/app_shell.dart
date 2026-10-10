@@ -120,6 +120,7 @@ class _AppShellState extends State<AppShell> {
               initialAllies: saved.allies,
               initialEnemies: StarterBrigades.createTutorialEnemies(),
               tickInterval: const Duration(milliseconds: 140),
+              onTick: () => _commandService.onSimulationTick(),
             );
             _commandService = GeneralCommandService(
               tickManager: _tickManager,
@@ -197,6 +198,7 @@ class _AppShellState extends State<AppShell> {
       initialAllies: allies,
       initialEnemies: enemies,
       tickInterval: const Duration(milliseconds: 140),
+      onTick: () => _commandService.onSimulationTick(),
     );
 
     final startingFocus = (_phylacteryRanks[_activeGeneralType] ?? 1) >= 3 ? 2 : 1;
@@ -232,6 +234,7 @@ class _AppShellState extends State<AppShell> {
       initialAllies: allies,
       initialEnemies: waves.first,
       tickInterval: const Duration(milliseconds: 140),
+      onTick: () => _commandService.onSimulationTick(),
     );
 
     _commandService = GeneralCommandService(
