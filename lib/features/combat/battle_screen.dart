@@ -187,7 +187,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
     final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive);
     if (aliveEnemies.isNotEmpty) {
-      _selectedEnemyId = aliveEnemies.first.id;
+      _selectedEnemyId = _aiService.selectTargetEnemy()?.id ?? aliveEnemies.first.id;
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -215,7 +215,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
       final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive);
       if (aliveEnemies.isNotEmpty) {
-        _selectedEnemyId = aliveEnemies.first.id;
+        _selectedEnemyId = _aiService.selectTargetEnemy()?.id ?? aliveEnemies.first.id;
       }
 
       _isProcessingAiTurn = false;
@@ -269,8 +269,14 @@ class _BattleScreenState extends State<BattleScreen> {
     final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive).toList();
     if (aliveEnemies.isEmpty) {
       _selectedEnemyId = null;
-    } else if (_selectedEnemyId == null || !aliveEnemies.any((u) => u.id == _selectedEnemyId)) {
-      _selectedEnemyId = aliveEnemies.first.id;
+    } else {
+      final tauntingEnemy = aliveEnemies.where((u) => u.isTaunting).firstOrNull;
+      if (tauntingEnemy != null) {
+        _selectedEnemyId = tauntingEnemy.id;
+      } else if (_selectedEnemyId == null || !aliveEnemies.any((u) => u.id == _selectedEnemyId)) {
+        final optimal = _aiService.selectTargetEnemy(actingUnit: widget.tickManager.activeUnit);
+        _selectedEnemyId = optimal?.id ?? aliveEnemies.first.id;
+      }
     }
 
     final active = widget.tickManager.activeUnit;
@@ -317,6 +323,8 @@ class _BattleScreenState extends State<BattleScreen> {
           _currentWaveIndex++;
           final nextWave = widget.enemyWaves![_currentWaveIndex];
           widget.tickManager.advanceWave(nextWave);
+          final optimalNewTarget = _aiService.selectTargetEnemy();
+          _selectedEnemyId = optimalNewTarget?.id ?? nextWave.firstWhere((e) => e.isAlive).id;
           _addPop('WAVE ${_currentWaveIndex + 1} ENGAGED!', const Color(0xFFFFD54F), isCrit: true);
           _combatLog = '[REINFORCEMENTS] Wave ${_currentWaveIndex + 1} of ${widget.enemyWaves!.length} enters the arena!';
           setState(() {});
@@ -417,12 +425,16 @@ class _BattleScreenState extends State<BattleScreen> {
         setState(() {
           final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
           final critText = result.isCritical ? ' [CRIT!]' : '';
+          final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
           _combatLog =
-              '${result.attacker.name} attacked ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
+              '${result.attacker.name} attacked ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
           if (result.targetDefeated) {
             _combatLog += ' ${result.target.name} fell in combat!';
           }
         });
+        if (result.isGuarded) {
+          _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -449,7 +461,10 @@ class _BattleScreenState extends State<BattleScreen> {
     final skills = active.resolvedSkills;
     final readySkill = skills.reversed.firstWhere((s) => s.isReady, orElse: () => skills.first);
 
-    if (_selectedEnemyId == null) {
+    final optimal = _aiService.selectTargetEnemy(actingUnit: active);
+    if (optimal != null) {
+      _selectedEnemyId = optimal.id;
+    } else if (_selectedEnemyId == null) {
       final aliveEnemies = widget.tickManager.enemies.where((u) => u.isAlive).toList();
       if (aliveEnemies.isNotEmpty) {
         _selectedEnemyId = aliveEnemies.first.id;
@@ -519,12 +534,17 @@ class _BattleScreenState extends State<BattleScreen> {
       setState(() {
         final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
         final critText = result.isCritical ? ' [CRIT!]' : '';
+        final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
         _combatLog =
-            '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText.';
+            '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
         if (result.targetDefeated) {
           _combatLog += ' ${result.target.name} was eradicated!';
         }
       });
+
+      if (result.isGuarded) {
+        _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
+      }
 
       if (widget.tickManager.enemies.every((u) => !u.isAlive) && !_hasDispatchedEndOutcome) {
         _hasDispatchedEndOutcome = true;
@@ -660,6 +680,16 @@ class _BattleScreenState extends State<BattleScreen> {
           } else if (oldE.currentHp > newE.currentHp) {
             final diff = oldE.currentHp - newE.currentHp;
             _addPop('-$diff', const Color(0xFFEF5350));
+          }
+          if (oldE.turnMeter > newE.turnMeter && (oldE.turnMeter - newE.turnMeter) >= 20) {
+            final tmDiff = (oldE.turnMeter - newE.turnMeter).round();
+            _addPop('-$tmDiff% TM STAGGER', const Color(0xFFFF9100), isCrit: true);
+            _triggerScreenShake(isHeavy: true);
+          }
+          final oldBleeds = oldE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
+          final newBleeds = newE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
+          if (newBleeds > oldBleeds) {
+            _addPop('+BLEED (${newBleeds}x)', const Color(0xFFD32F2F));
           }
         }
       }
@@ -958,7 +988,15 @@ class _BattleScreenState extends State<BattleScreen> {
                               isEnemy: true,
                               activeUnitId: activeUnit?.id,
                               selectedTargetId: _selectedEnemyId,
-                              onSelectTarget: (id) => setState(() => _selectedEnemyId = id),
+                              onSelectTarget: (id) {
+                                final tauntingEnemy = widget.tickManager.enemies.where((u) => u.isAlive && u.isTaunting).firstOrNull;
+                                if (tauntingEnemy != null && tauntingEnemy.id != id) {
+                                  _addPop('TAUNTED by ${tauntingEnemy.name}!', const Color(0xFFFF5252), isCrit: true);
+                                  setState(() => _selectedEnemyId = tauntingEnemy.id);
+                                } else {
+                                  setState(() => _selectedEnemyId = id);
+                                }
+                              },
                             ),
 
                             // Center Clash Line: The Ashen Front

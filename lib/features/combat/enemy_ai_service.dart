@@ -28,15 +28,15 @@ class EnemyAiService {
     return tickManager.enemies.any((u) => u.id == active.id && u.isAlive);
   }
 
-  /// GDD v2.6 Section 3.3: Dynamic Targeting Hierarchy
+  /// GDD v2.8 Section 3.3: Dynamic Targeting Hierarchy for Targeting Allies
   /// Step 1 (Hard Constraints):
   ///   - Taunt/Provoke override: Must target taunting unit if alive.
   ///   - Line-of-Sight & Vanguard Protection: Melee/standard units must clear living Vanguard before Arcanum.
   ///     (Aerial/skirmisher units with dive_bomb bypass line-of-sight to strike Arcanum directly).
   /// Step 2 (Primary Priority Flag):
-  ///   - Evaluates unit tactic setting (Lowest EHP vs Highest Threat Score vs Role Priority: Support > Occultist > Marksman > Assassin > Juggernaut).
+  ///   - Evaluates lowest EHP, then Role Class Priority (Support > Occultist > Marksman > Aberration > Tank).
   /// Step 3 (Tie-Breaker Metric):
-  ///   - Proximity / lowest current HP / closest slot index.
+  ///   - Highest Threat Score, Lowest current HP, Slot index proximity.
   /// Step 4 (Fallback):
   ///   - Nearest valid living ally.
   UnitEntity? selectTargetAlly({UnitEntity? actingUnit}) {
@@ -76,11 +76,84 @@ class EnemyAiService {
       final ehpCompare = a.ehp.compareTo(b.ehp);
       if (ehpCompare != 0) return ehpCompare;
 
-      // Secondary Tie-breaker: Highest Threat Score (dealers of high DPS prioritized)
+      // Secondary: Role Class Priority (Support > Occultist > Marksman > Aberration > Tank)
+      final roleCompare = a.rolePriorityOrder.compareTo(b.rolePriorityOrder);
+      if (roleCompare != 0) return roleCompare;
+
+      // Tertiary Tie-breaker: Highest Threat Score (dealers of high DPS prioritized)
       final threatCompare = b.threatScore.compareTo(a.threatScore);
       if (threatCompare != 0) return threatCompare;
 
-      // Tertiary Tie-breaker: Slot index proximity
+      // Quaternary: Lowest current HP
+      final hpCompare = a.currentHp.compareTo(b.currentHp);
+      if (hpCompare != 0) return hpCompare;
+
+      // Final Tie-breaker: Slot index proximity
+      return a.slot.index.compareTo(b.slot.index);
+    });
+
+    return candidatePool.first;
+  }
+
+  /// GDD v2.8 Section 3.3: Dynamic Targeting Hierarchy for Targeting Enemies
+  /// Step 1 (Hard Constraints):
+  ///   - Taunt/Provoke override: Must target taunting unit if alive.
+  ///   - Line-of-Sight & Vanguard Protection: Standard attacks target living Vanguard before Arcanum.
+  ///     (Units with dive_bomb or Skirmisher archetype bypass frontline).
+  /// Step 2 (Primary Priority Flag):
+  ///   - Evaluates lowest EHP, then role class priority (Support > Occultist > Skirmisher > Aberration > Juggernaut/Colossus).
+  /// Step 3 (Tie-Breaker Metric):
+  ///   - Highest threat score, lowest current HP, slot index proximity.
+  /// Step 4 (Fallback):
+  ///   - Nearest valid living enemy.
+  UnitEntity? selectTargetEnemy({UnitEntity? actingUnit}) {
+    final livingEnemies = tickManager.enemies.where((u) => u.isAlive).toList();
+    if (livingEnemies.isEmpty) return null;
+
+    // STEP 1: Hard Constraints
+    // 1A. Taunt / Provoke state override
+    final tauntingEnemies = livingEnemies.where((u) => u.isTaunting).toList();
+    if (tauntingEnemies.isNotEmpty) {
+      tauntingEnemies.sort((a, b) => a.ehp.compareTo(b.ehp));
+      return tauntingEnemies.first;
+    }
+
+    // 1B. Line-of-Sight / Vanguard Raycast check
+    final bool bypassesFrontline = actingUnit != null &&
+        (actingUnit.nativeTraitId == 'dive_bomb' ||
+            actingUnit.graftedTraitId == 'dive_bomb' ||
+            actingUnit.archetype == Archetype.skirmisher);
+
+    List<UnitEntity> candidatePool;
+    if (bypassesFrontline) {
+      final arcanumEnemies = livingEnemies.where((u) => u.isArcanum).toList();
+      candidatePool = arcanumEnemies.isNotEmpty ? arcanumEnemies : livingEnemies;
+    } else {
+      final aliveVanguard = livingEnemies.where((u) => u.isVanguard).toList();
+      candidatePool = aliveVanguard.isNotEmpty ? aliveVanguard : livingEnemies;
+    }
+
+    if (candidatePool.isEmpty) return livingEnemies.first;
+
+    // STEP 2 & 3: Primary Priority Flag & Tie-Breakers
+    candidatePool.sort((a, b) {
+      // Primary: Lowest EHP (GDD Sec 3.1 & 3.3)
+      final ehpCompare = a.ehp.compareTo(b.ehp);
+      if (ehpCompare != 0) return ehpCompare;
+
+      // Secondary: Role Class Priority (Support > Occultist > Skirmisher > Aberration > Tank)
+      final roleCompare = a.rolePriorityOrder.compareTo(b.rolePriorityOrder);
+      if (roleCompare != 0) return roleCompare;
+
+      // Tertiary: Highest Threat Score
+      final threatCompare = b.threatScore.compareTo(a.threatScore);
+      if (threatCompare != 0) return threatCompare;
+
+      // Quaternary: Lowest current HP
+      final hpCompare = a.currentHp.compareTo(b.currentHp);
+      if (hpCompare != 0) return hpCompare;
+
+      // Final Tie-breaker: Slot index proximity
       return a.slot.index.compareTo(b.slot.index);
     });
 

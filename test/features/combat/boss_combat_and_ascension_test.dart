@@ -145,8 +145,8 @@ void main() {
       expect(find.textContaining('TITAN'), findsWidgets);
       expect(find.textContaining('5000 / 5000 HP'), findsOneWidget);
 
-      // 2. Verify Boss badge on unit card
-      expect(find.text('☠ BOSS'), findsOneWidget);
+      // 2. Verify Boss badge on unit card and pedestal
+      expect(find.text('☠ BOSS'), findsWidgets);
 
       // 3. Verify minion is present without boss badge
       expect(find.text('Cultist Zealot'), findsOneWidget);

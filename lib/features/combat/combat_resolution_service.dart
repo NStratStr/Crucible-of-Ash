@@ -22,6 +22,7 @@ class ActionResult {
   final String skillName;
   final String? appliedStatusName;
   final int healAmount;
+  final bool isGuarded;
 
   const ActionResult({
     required this.attacker,
@@ -35,6 +36,7 @@ class ActionResult {
     this.skillName = 'Basic Strike',
     this.appliedStatusName,
     this.healAmount = 0,
+    this.isGuarded = false,
   });
 }
 
@@ -604,11 +606,13 @@ class CombatResolutionService {
 
     // GDD v2.8 Sec 3.4: Backline Guarded buff (-20% damage from direct ranged single-target attacks
     // as long as at least 1 allied Frontline unit remains standing).
+    bool isGuarded = false;
     if (!target.isVanguard) {
       final opposingSquadOfAttacker = attackerIsAlly ? tickManager.enemies : tickManager.allies;
       final bool hasLivingFrontline = opposingSquadOfAttacker.any((u) => u.isVanguard && u.isAlive && u.id != target.id);
       if (hasLivingFrontline) {
         totalDamage *= 0.80;
+        isGuarded = true;
       }
     }
 
@@ -840,6 +844,7 @@ class CombatResolutionService {
       lifestealRecovered: lifestealRecovered,
       skillName: skill.name,
       appliedStatusName: skill.appliedStatus?.displayName,
+      isGuarded: isGuarded,
     );
   }
 

@@ -343,6 +343,24 @@ class UnitEntity {
 
   /// Dynamic Threat Score (GDD v2.6 Sec 3.3): Attack * (1 + CritRate) * (Speed / 100)
   double get threatScore => attack * (1.0 + critRate) * (speed / 100.0);
+
+  /// GDD v2.8 Sec 3.3 Role Class Priority Order:
+  /// Support/Healer (1) > Occultist (2) > Marksman/Assassin/Skirmisher/DPS (3) > Juggernaut/Tank (4)
+  int get rolePriorityOrder {
+    switch (archetype) {
+      case Archetype.support:
+        return 1;
+      case Archetype.occultist:
+        return 2;
+      case Archetype.marksman:
+      case Archetype.assassin:
+      case Archetype.skirmisher:
+        return 3;
+      case Archetype.juggernaut:
+        return 4;
+    }
+  }
+
   bool get isPureblood => generation >= 4;
   String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
 
@@ -569,8 +587,10 @@ class UnitEntity {
 
   UnitEntity copyWith({
     String? id,
+    String? speciesId,
     String? name,
     int? generation,
+    Archetype? archetype,
     int? currentHp,
     int? level,
     int? maxHp,
@@ -593,10 +613,10 @@ class UnitEntity {
   }) {
     return UnitEntity(
       id: id ?? this.id,
-      speciesId: speciesId,
+      speciesId: speciesId ?? this.speciesId,
       name: name ?? this.name,
       generation: generation ?? this.generation,
-      archetype: archetype,
+      archetype: archetype ?? this.archetype,
       slot: slot ?? this.slot,
       plinthMaterial: plinthMaterial ?? this.plinthMaterial,
       level: level ?? this.level,

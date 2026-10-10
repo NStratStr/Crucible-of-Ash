@@ -1630,11 +1630,13 @@ class StarterBrigades {
       baseCrypt[4].copyWith(
         id: 'boss_gorgoroth_flayed',
         name: 'Gorgoroth the Flayed',
+        archetype: Archetype.juggernaut,
         slot: FormationSlot.front3,
         currentHp: 2200,
         maxHp: 2200,
         attack: 180,
         defense: 120,
+        nativeTraitId: 'titanic_cleave',
       ),
     ];
 

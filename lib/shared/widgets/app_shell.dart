@@ -207,7 +207,9 @@ class _AppShellState extends State<AppShell> {
     bool preserveSquad = true,
     List<List<UnitEntity>>? enemyWaves,
   ]) {
-    _activeEnemyWaves = enemyWaves;
+    if (enemyWaves != null) {
+      _activeEnemyWaves = enemyWaves;
+    }
     List<UnitEntity> allies;
     if (preserveSquad && _isInitialized && _tickManager.allies.isNotEmpty) {
       allies = _tickManager.allies.map((u) => u.copyWith(
@@ -219,7 +221,10 @@ class _AppShellState extends State<AppShell> {
       allies = StarterBrigades.createAshLegionPlayerSquad();
     }
     _isInitialized = true;
-    final enemies = customEnemies ?? StarterBrigades.createCryptStalkersEnemySquad();
+    final enemies = customEnemies ??
+        (_activeEnemyWaves != null && _activeEnemyWaves!.isNotEmpty
+            ? _activeEnemyWaves!.first
+            : StarterBrigades.createCryptStalkersEnemySquad());
 
     _tickManager = InitiativeTickManager(
       initialAllies: allies,

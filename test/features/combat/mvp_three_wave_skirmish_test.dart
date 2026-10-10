@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ashen_crucible/core/combat_math.dart';
 import 'package:ashen_crucible/features/combat/combat_resolution_service.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/features/generals/general_command_service.dart';
@@ -27,6 +28,8 @@ void main() {
       expect(waves[2].length, equals(5));
       final boss = waves[2].firstWhere((u) => u.isBoss);
       expect(boss.name, equals('Gorgoroth the Flayed'));
+      expect(boss.archetype, equals(Archetype.juggernaut));
+      expect(boss.nativeTraitId, equals('titanic_cleave'));
       expect(boss.maxHp, equals(2200));
     });
 

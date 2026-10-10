@@ -162,6 +162,72 @@ void main() {
       expect(target, isNotNull);
       expect(target!.id, equals(allyArcanumHealer.id));
     });
+
+    test('selectTargetEnemy targets frontline lowest EHP enemy and respects taunt override', () {
+      final tickManager = InitiativeTickManager(
+        initialAllies: [allyVanguardDPS],
+        initialEnemies: [
+          enemyStandardAttacker,
+          enemyFlyerSkirmisher.copyWith(slot: FormationSlot.back1),
+        ],
+      );
+      final commandService = GeneralCommandService(tickManager: tickManager);
+      final combatService = CombatResolutionService(tickManager: tickManager, commandService: commandService);
+      final aiService = EnemyAiService(
+        tickManager: tickManager,
+        combatService: combatService,
+        commandService: commandService,
+      );
+
+      // Standard ally targets frontline enemy first
+      final target = aiService.selectTargetEnemy(actingUnit: allyVanguardDPS);
+      expect(target, isNotNull);
+      expect(target!.id, equals(enemyStandardAttacker.id));
+
+      // With enemy taunt, targets taunting enemy regardless
+      final tauntingFlyer = enemyFlyerSkirmisher.copyWith(
+        slot: FormationSlot.back1,
+        activeEffects: [const StatusEffect(type: StatusEffectType.taunt, durationTurns: 2)],
+      );
+      final tickManager2 = InitiativeTickManager(
+        initialAllies: [allyVanguardDPS],
+        initialEnemies: [enemyStandardAttacker, tauntingFlyer],
+      );
+      final aiService2 = EnemyAiService(
+        tickManager: tickManager2,
+        combatService: combatService,
+        commandService: commandService,
+      );
+      final target2 = aiService2.selectTargetEnemy(actingUnit: allyVanguardDPS);
+      expect(target2, isNotNull);
+      expect(target2!.id, equals(tauntingFlyer.id));
+    });
+
+    test('Backline Guarded buff flags isGuarded = true and reduces direct damage by 20% while Vanguard lives', () {
+      final primedFlyer = enemyFlyerSkirmisher.copyWith(turnMeter: 100.0);
+      final tickManager = InitiativeTickManager(
+        initialAllies: [primedFlyer],
+        initialEnemies: [allyVanguardTank, allyArcanumHealer],
+      );
+      tickManager.advanceTick();
+      final combatService = CombatResolutionService(tickManager: tickManager);
+
+      // Direct attack against backline allyArcanumHealer while allyVanguardTank is alive
+      final resGuarded = combatService.executeBasicAttack(targetUnitId: allyArcanumHealer.id);
+      expect(resGuarded.isGuarded, isTrue);
+
+      // Defeat the Vanguard tank
+      final tickManagerNoTank = InitiativeTickManager(
+        initialAllies: [primedFlyer],
+        initialEnemies: [allyVanguardTank.copyWith(currentHp: 0), allyArcanumHealer],
+      );
+      tickManagerNoTank.advanceTick();
+      final combatServiceNoTank = CombatResolutionService(tickManager: tickManagerNoTank);
+
+      final resUnguarded = combatServiceNoTank.executeBasicAttack(targetUnitId: allyArcanumHealer.id);
+      expect(resUnguarded.isGuarded, isFalse);
+      expect(resGuarded.damageDealt, lessThan(resUnguarded.damageDealt));
+    });
   });
 }
 
