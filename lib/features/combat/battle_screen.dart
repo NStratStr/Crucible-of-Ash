@@ -1935,6 +1935,12 @@ class _BattleScreenState extends State<BattleScreen> {
     // Tighter together width-wise: cluster units in a disciplined squad formation
     final double maxClusterWidth = (units.length * 200.0).clamp(240.0, 680.0);
 
+    // GDD v2.8 Sec 3.4: Visual Offset: Frontline units render pushed forward (+35 logical px toward
+    // the clash line) with larger drop shadows; Backline units render stepped back (-35 logical px).
+    final double depthOffset = isFrontline
+        ? (isEnemy ? 35.0 : -35.0)
+        : (isEnemy ? -35.0 : 35.0);
+
     return Expanded(
       flex: isFrontline ? 10 : 9,
       child: Padding(
@@ -1945,30 +1951,33 @@ class _BattleScreenState extends State<BattleScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxClusterWidth),
-            child: Transform.scale(
-              scale: isFrontline ? 1.0 : 0.96,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: units.map((unit) {
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 210),
-                          child: _buildUnitCard(
-                            unit: unit,
-                            isEnemy: isEnemy,
-                            isActive: unit.id == activeUnitId,
-                            isSelectedTarget: unit.id == selectedTargetId,
-                            onTap: () => onSelectTarget?.call(unit.id),
+            child: Transform.translate(
+              offset: Offset(0, depthOffset),
+              child: Transform.scale(
+                scale: isFrontline ? 1.0 : 0.94,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: units.map((unit) {
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 210),
+                            child: _buildUnitCard(
+                              unit: unit,
+                              isEnemy: isEnemy,
+                              isActive: unit.id == activeUnitId,
+                              isSelectedTarget: unit.id == selectedTargetId,
+                              onTap: () => onSelectTarget?.call(unit.id),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ),

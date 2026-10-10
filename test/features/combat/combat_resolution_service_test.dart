@@ -16,6 +16,7 @@ UnitEntity buildUnit({
   int defense = 100,
   double turnMeter = 0.0,
   double critRate = 0.0,
+  FormationSlot slot = FormationSlot.front1,
 }) {
   return UnitEntity(
     id: id,
@@ -23,7 +24,7 @@ UnitEntity buildUnit({
     name: name,
     generation: 1,
     archetype: archetype,
-    slot: FormationSlot.front1,
+    slot: slot,
     level: 10,
     maxLevel: 30,
     currentHp: hp,
@@ -230,6 +231,90 @@ void main() {
         );
         expect(result.isGlancing, isFalse);
       }
+    });
+
+    test('GDD v2.8 Sec 3.4: Backline Guarded buff reduces damage by 20% while frontline standing', () {
+      final frontlineHero = buildUnit(
+        id: 'front_hero',
+        name: 'Front Wall',
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        speed: 100,
+      );
+      final backlineHero = buildUnit(
+        id: 'back_hero',
+        name: 'Back Sniper',
+        archetype: Archetype.marksman,
+        slot: FormationSlot.back1,
+        speed: 100,
+        defense: 100,
+      );
+      final attackerFoe = buildUnit(
+        id: 'attacker_foe',
+        name: 'Enemy Striker',
+        archetype: Archetype.assassin,
+        speed: 100,
+        turnMeter: 100.0,
+      );
+
+      // 1. Attack backline hero with frontline ally alive
+      tickManager = InitiativeTickManager(
+        initialAllies: [frontlineHero, backlineHero],
+        initialEnemies: [attackerFoe],
+      );
+      tickManager.advanceTick();
+      combatService = CombatResolutionService(tickManager: tickManager, rng: Random(42));
+      final guardedRes = combatService.executeBasicAttack(
+        targetUnitId: 'back_hero',
+        autoResumeTickEngine: false,
+      );
+
+      // 2. Attack backline hero without frontline ally alive
+      tickManager = InitiativeTickManager(
+        initialAllies: [frontlineHero.copyWith(currentHp: 0), backlineHero],
+        initialEnemies: [attackerFoe],
+      );
+      tickManager.advanceTick();
+      combatService = CombatResolutionService(tickManager: tickManager, rng: Random(42));
+      final unguardedRes = combatService.executeBasicAttack(
+        targetUnitId: 'back_hero',
+        autoResumeTickEngine: false,
+      );
+
+      // Guarded damage should be ~20% lower than unguarded damage
+      expect(guardedRes.damageDealt, lessThan(unguardedRes.damageDealt));
+    });
+
+    test('GDD v2.8 Sec 3.4: Frontline slot gains +15% Action Point / TM upon taking direct hits', () {
+      final frontlineDefender = buildUnit(
+        id: 'front_defender',
+        name: 'Front Guard',
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        turnMeter: 10.0,
+        speed: 100,
+      );
+      final attackerFoe = buildUnit(
+        id: 'attacker_foe',
+        name: 'Enemy Striker',
+        archetype: Archetype.assassin,
+        speed: 100,
+        turnMeter: 100.0,
+      );
+
+      tickManager = InitiativeTickManager(
+        initialAllies: [frontlineDefender],
+        initialEnemies: [attackerFoe],
+      );
+      tickManager.advanceTick();
+      combatService = CombatResolutionService(tickManager: tickManager);
+      final res = combatService.executeBasicAttack(
+        targetUnitId: 'front_defender',
+        autoResumeTickEngine: false,
+      );
+
+      // 10.0 initial + 10.0 from advanceTick + 15.0 on-hit Frontline bonus = 35.0
+      expect(res.target.turnMeter, equals(35.0));
     });
   });
 }

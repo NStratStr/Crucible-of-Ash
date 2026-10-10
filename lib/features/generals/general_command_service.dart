@@ -333,6 +333,7 @@ class GeneralCommandService extends ChangeNotifier {
   final List<GeneralOrderDefinition> _hand = [];
   final List<GeneralOrderDefinition> _discardPile = [];
   int _burnCooldownTicks = 0;
+  int _focusTickAccumulator = 0;
   bool _isBulletTimeActive = false;
 
   final Map<GeneralType, int> _phylacteryRanks = {
@@ -568,13 +569,34 @@ class GeneralCommandService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Called each simulation tick to process burn cooldowns.
+  /// Called each simulation tick to process burn cooldowns and Focus generation.
   void onSimulationTick() {
+    bool stateChanged = false;
+
+    // GDD v2.8 Sec 5: Focus generates at 1 point per 30 global logic ticks
+    // (reduced to 1 point per 60 ticks if the Commander is downed).
+    final commanderUnit = tickManager.allies.where((u) => u.isCommander).firstOrNull;
+    final bool isCommanderDowned = commanderUnit != null && !commanderUnit.isAlive;
+    final int requiredTicks = isCommanderDowned ? 60 : 30;
+
+    if (_currentFocus < _maxFocusCap) {
+      _focusTickAccumulator++;
+      if (_focusTickAccumulator >= requiredTicks) {
+        _focusTickAccumulator = 0;
+        _currentFocus++;
+        stateChanged = true;
+      }
+    }
+
     if (_burnCooldownTicks > 0) {
       _burnCooldownTicks--;
       if (_burnCooldownTicks == 0) {
         drawCard();
       }
+      stateChanged = true;
+    }
+
+    if (stateChanged) {
       notifyListeners();
     }
   }
@@ -696,7 +718,10 @@ class GeneralCommandService extends ChangeNotifier {
       throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
     }
 
-    const int cost = 3;
+    // GDD v2.8 Sec 3.5: Vladislav Backline placement reduces the Focus cost of all Bleed Tuning Slips by 1 (min 1).
+    final vladislavUnit = tickManager.allies.where((u) => u.isCommander).firstOrNull;
+    final bool isVladislavBackline = vladislavUnit != null && vladislavUnit.isArcanum && vladislavUnit.isAlive;
+    final int cost = isVladislavBackline ? 2 : 3;
     _spendFocus(cost);
 
     final UnitEntity target = enemies[enemyIdx];

@@ -602,6 +602,16 @@ class CombatResolutionService {
       totalDamage *= 1.25;
     }
 
+    // GDD v2.8 Sec 3.4: Backline Guarded buff (-20% damage from direct ranged single-target attacks
+    // as long as at least 1 allied Frontline unit remains standing).
+    if (!target.isVanguard) {
+      final opposingSquadOfAttacker = attackerIsAlly ? tickManager.enemies : tickManager.allies;
+      final bool hasLivingFrontline = opposingSquadOfAttacker.any((u) => u.isVanguard && u.isAlive && u.id != target.id);
+      if (hasLivingFrontline) {
+        totalDamage *= 0.80;
+      }
+    }
+
     // GDD v2.6 Sec 13.1: The Ashen Reckoning Phase 1/2 Damage Amplification (2.0x)
     totalDamage *= tickManager.reckoningDamageMultiplier;
 
@@ -673,6 +683,10 @@ class CombatResolutionService {
     }
 
     double targetTurnMeter = target.turnMeter;
+    // GDD v2.8 Sec 3.4: Frontline Slot Modifiers (+15% Action Point / TM accumulation upon taking direct hits)
+    if (target.isVanguard && newTargetHp > 0 && finalDamage > 0) {
+      targetTurnMeter = (targetTurnMeter + 15.0).clamp(0.0, 100.0);
+    }
     // Trait: Terrifying Shriek / Screech (reduces target TM by 15%)
     if (attackerTraits.contains('screech') && newTargetHp > 0) {
       targetTurnMeter = max(0.0, targetTurnMeter - 15.0);
@@ -702,10 +716,15 @@ class CombatResolutionService {
       effectiveLifestealRatio += 0.15;
     }
 
-    // Vladislav's Crimson Tithe: +8% Lifesteal against wounded or bleeding targets
+    // Vladislav's Crimson Tithe / Positional Aura (GDD v2.8 Sec 3.5):
+    // Frontline placement grants adjacent frontline allies +15% Lifesteal.
     if (attackerIsAlly && commandService?.activeGeneralType == GeneralType.vladislav) {
       if (target.isBleeding || target.currentHp < target.maxHp) {
         effectiveLifestealRatio += 0.08;
+      }
+      final commander = tickManager.allies.where((u) => u.isCommander).firstOrNull;
+      if (commander != null && commander.isVanguard && commander.isAlive && attacker.isVanguard) {
+        effectiveLifestealRatio += 0.15;
       }
     }
 

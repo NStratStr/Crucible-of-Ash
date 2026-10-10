@@ -388,6 +388,19 @@ class UnitEntity {
       name.contains('Gorgoroth') ||
       name.contains('Primordial');
 
+  /// GDD v2.8 Sec 3.5: Whether this board unit is an Arch-Sculptor / Commander.
+  bool get isCommander =>
+      id.contains('commander') ||
+      id.contains('vladislav') ||
+      id.contains('valeria') ||
+      id.contains('malakor') ||
+      id.contains('morrigan') ||
+      speciesId.contains('commander') ||
+      name.contains('Vladislav') ||
+      name.contains('Valeria') ||
+      name.contains('Malakor') ||
+      name.contains('Morrigan');
+
   List<SkillEntity> get resolvedSkills {
     if (skills.isNotEmpty) return skills;
     return _generateDefaultSkills(archetype);

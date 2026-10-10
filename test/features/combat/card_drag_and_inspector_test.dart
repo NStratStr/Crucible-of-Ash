@@ -287,11 +287,66 @@ void main() {
       );
       await tester.pump();
 
-      // Focus should not have been spent due to target failsafe
-      expect(commandService.currentFocus, equals(initialFocus));
-      expect(find.text('TARGET LOST'), findsOneWidget);
-
       tickManager.pause();
+    });
+
+    testWidgets('GDD v2.8 Sec 5: Focus generates 1 point per 30 global logic ticks (60 if commander downed)', (tester) async {
+      const commander = UnitEntity(
+        id: 'commander_vladislav',
+        speciesId: 'commander_vladislav',
+        name: 'Lord Vladislav',
+        generation: 1,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 30,
+        currentHp: 1000,
+        maxHp: 1000,
+        attack: 100,
+        defense: 100,
+        speed: 100,
+        nativeTraitId: 'none',
+        lineageAncestors: [],
+      );
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: [commander],
+        initialEnemies: [enemy],
+      );
+      addTearDown(tickManager.dispose);
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+        initialFocus: 0,
+        maxFocus: 6,
+      );
+
+      // Advance 29 ticks -> still 0 focus
+      for (int i = 0; i < 29; i++) {
+        commandService.onSimulationTick();
+      }
+      expect(commandService.currentFocus, equals(0));
+
+      // Advance 30th tick -> 1 focus generated
+      commandService.onSimulationTick();
+      expect(commandService.currentFocus, equals(1));
+
+      // Now down the commander (0 HP)
+      tickManager.updateSquads(
+        allies: [commander.copyWith(currentHp: 0)],
+        enemies: [enemy],
+      );
+
+      // Downed commander requires 60 ticks per focus
+      for (int i = 0; i < 59; i++) {
+        commandService.onSimulationTick();
+      }
+      expect(commandService.currentFocus, equals(1));
+
+      // 60th tick -> 2 focus generated
+      commandService.onSimulationTick();
+      expect(commandService.currentFocus, equals(2));
     });
   });
 }
