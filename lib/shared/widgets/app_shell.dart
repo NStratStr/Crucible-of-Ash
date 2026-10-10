@@ -189,10 +189,10 @@ class _AppShellState extends State<AppShell> {
         activeEffects: const [],
       )).toList();
     } else {
-      allies = StarterBrigades.createPlayerSquad();
+      allies = StarterBrigades.createAshLegionPlayerSquad();
     }
     _isInitialized = true;
-    final enemies = customEnemies ?? StarterBrigades.createTutorialEnemies();
+    final enemies = customEnemies ?? StarterBrigades.createCryptStalkersEnemySquad();
 
     _tickManager = InitiativeTickManager(
       initialAllies: allies,

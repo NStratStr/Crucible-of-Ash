@@ -164,6 +164,11 @@ class UnitEntity {
 
   String get effectiveAvatarAsset {
     if (customAvatarAsset != null) return customAvatarAsset!;
+    // Commander: Lord Vladislav
+    if (id.contains('vladislav') || speciesId.contains('vladislav') || name.contains('Vladislav')) {
+      return 'assets/images/lord_vladislav.jpg';
+    }
+
     // Primordial Boss / Titan (Goro / Flayed Butcher)
     if (isBoss ||
         speciesId.contains('butcher') ||
@@ -308,7 +313,9 @@ class UnitEntity {
     return 'Ash Legion';
   }
 
-  bool get isFigurineCutout => effectiveAvatarAsset.endsWith('.png');
+  bool get isFigurineCutout =>
+      effectiveAvatarAsset.endsWith('.png') ||
+      effectiveAvatarAsset.contains('lord_vladislav');
 
   bool get isVanguard => slot.index < 3;
   bool get isArcanum => slot.index >= 3;

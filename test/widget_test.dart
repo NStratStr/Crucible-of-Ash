@@ -29,11 +29,11 @@ void main() {
     expect(find.text('TAP UNIT TO INSPECT PEDIGREE'), findsOneWidget);
 
     // Tap the first unit card in roster
-    await tester.tap(find.text('Feral War-Hound Alpha').first);
+    await tester.tap(find.text('Lord Vladislav').first);
     await tester.pumpAndSettle();
 
     // Verify modal appeared with level progression and affinity matchup
-    expect(find.text('HEXAGONAL AFFINITY MATCHUP'), findsOneWidget);
+    expect(find.text('HEXAGONAL AFFINITY MATCHUP', skipOffstage: false), findsOneWidget);
     expect(find.text('LEVEL PROGRESSION'), findsOneWidget);
   });
 

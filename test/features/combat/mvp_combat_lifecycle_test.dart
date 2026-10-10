@@ -11,16 +11,16 @@ void main() {
     test('StarterBrigades provides 5 Ash Legion player units and 5 Crypt Stalkers enemy units', () {
       final ashLegion = StarterBrigades.createAshLegionPlayerSquad();
       expect(ashLegion.length, equals(5));
-      expect(ashLegion[0].name, equals('Iron Footman'));
-      expect(ashLegion[0].archetype, equals(Archetype.juggernaut));
-      expect(ashLegion[1].name, equals('Grave Duelist'));
-      expect(ashLegion[1].archetype, equals(Archetype.assassin));
-      expect(ashLegion[2].name, equals('Field Medicus'));
-      expect(ashLegion[2].archetype, equals(Archetype.support));
+      expect(ashLegion[0].name, equals('Lord Vladislav'));
+      expect(ashLegion[0].isCommander, isTrue);
+      expect(ashLegion[1].name, equals('Iron Footman'));
+      expect(ashLegion[1].archetype, equals(Archetype.juggernaut));
+      expect(ashLegion[2].name, equals('Grave Duelist'));
+      expect(ashLegion[2].archetype, equals(Archetype.assassin));
       expect(ashLegion[3].name, equals('Iron Arbalest'));
       expect(ashLegion[3].archetype, equals(Archetype.marksman));
-      expect(ashLegion[4].name, equals('Sun-Scorched Cleric'));
-      expect(ashLegion[4].archetype, equals(Archetype.occultist));
+      expect(ashLegion[4].name, equals('Field Medicus'));
+      expect(ashLegion[4].archetype, equals(Archetype.support));
 
       final cryptStalkers = StarterBrigades.createCryptStalkersEnemySquad();
       expect(cryptStalkers.length, equals(5));
@@ -40,8 +40,8 @@ void main() {
       final allies = StarterBrigades.createAshLegionPlayerSquad();
       final enemies = StarterBrigades.createCryptStalkersEnemySquad();
 
-      // Down the Iron Footman (front1) into an Inert Vessel with a debuff
-      final downedFootman = allies[0].copyWith(
+      // Down Lord Vladislav (front1) into an Inert Vessel with a debuff
+      final downedUnit = allies[0].copyWith(
         currentHp: 0,
         activeEffects: [
           const StatusEffect(type: StatusEffectType.bleed, durationTurns: 2, value: 30),
@@ -49,7 +49,7 @@ void main() {
         ],
       );
 
-      final modifiedAllies = [downedFootman, ...allies.sublist(1)];
+      final modifiedAllies = [downedUnit, ...allies.sublist(1)];
 
       final tickManager = InitiativeTickManager(
         initialAllies: modifiedAllies,
@@ -58,16 +58,16 @@ void main() {
 
       final combatService = CombatResolutionService(tickManager: tickManager);
 
-      // Force Field Medicus (allies[2]) to be the active unit
-      final medicus = allies[2].copyWith(turnMeter: 100.0);
-      tickManager.updateSquads(allies: [downedFootman, allies[1], medicus, allies[3], allies[4]]);
+      // Force Field Medicus (allies[4]) to be the active unit
+      final medicus = allies[4].copyWith(turnMeter: 100.0);
+      tickManager.updateSquads(allies: [downedUnit, allies[1], allies[2], allies[3], medicus]);
       tickManager.advanceTick(); // Trigger awaitingAction
 
       // Medicus ATK = 120, Gen = 1, SkillCoeff = 2.0
       // raw heal = (120 * 2.0) * (1 + 1 * 0.15) = 240 * 1.15 = 276 HP
       // Target maxHp = 900. After 1st revive, effectiveMaxHp = (900 * 0.8) = 720.
       final result = combatService.executeInfusedVitaeRevive(
-        targetUnitId: downedFootman.id,
+        targetUnitId: downedUnit.id,
         skillCoefficient: 2.0,
       );
 
@@ -90,13 +90,13 @@ void main() {
       final allies = StarterBrigades.createAshLegionPlayerSquad();
       final enemies = StarterBrigades.createCryptStalkersEnemySquad();
 
-      // Low max HP unit downed
-      final downedDuelist = allies[1].copyWith(
+      // Low max HP unit downed (Grave Duelist in slot 2)
+      final downedDuelist = allies[2].copyWith(
         maxHp: 200,
         currentHp: 0,
       );
 
-      final modifiedAllies = [allies[0], downedDuelist, ...allies.sublist(2)];
+      final modifiedAllies = [allies[0], allies[1], downedDuelist, ...allies.sublist(3)];
       final tickManager = InitiativeTickManager(
         initialAllies: modifiedAllies,
         initialEnemies: enemies,
@@ -106,8 +106,8 @@ void main() {
       // High attack caster: ATK = 500, Gen = 2, Coeff = 1.0 -> 500 * (1 + 0.3) = 650
       // Target effectiveMaxHp = (200 * 0.8) = 160.
       // Overflow = 650 - 160 = 490. Aegis shield = 490 * 0.50 = 245.
-      final caster = allies[2].copyWith(attack: 500, generation: 2, turnMeter: 100.0);
-      tickManager.updateSquads(allies: [allies[0], downedDuelist, caster, allies[3], allies[4]]);
+      final caster = allies[4].copyWith(attack: 500, generation: 2, turnMeter: 100.0);
+      tickManager.updateSquads(allies: [allies[0], allies[1], downedDuelist, allies[3], caster]);
       tickManager.advanceTick();
 
       final result = combatService.executeInfusedVitaeRevive(

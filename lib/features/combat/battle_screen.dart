@@ -2924,27 +2924,34 @@ class _BattleScreenState extends State<BattleScreen> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            '${unit.currentHp}/${unit.maxHp} HP',
+                                            style: TextStyle(
+                                              color: hpRatio > 0.35 ? Colors.white : const Color(0xFFEF5350),
+                                              fontSize: isBossUnit ? 8.0 : 7.0,
+                                              fontFamily: 'monospace',
+                                              fontWeight: FontWeight.bold,
+                                              shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
                                         child: Text(
-                                          '/ HP',
-                                          overflow: TextOverflow.ellipsis,
+                                          '${unit.turnMeter.clamp(0, 100).toInt()}% TM',
                                           style: TextStyle(
-                                            color: hpRatio > 0.35 ? Colors.white : const Color(0xFFEF5350),
+                                            color: const Color(0xFF00E5FF),
                                             fontSize: isBossUnit ? 8.0 : 7.0,
                                             fontFamily: 'monospace',
                                             fontWeight: FontWeight.bold,
                                             shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
                                           ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '% TM',
-                                        style: TextStyle(
-                                          color: const Color(0xFF00E5FF),
-                                          fontSize: isBossUnit ? 8.0 : 7.0,
-                                          fontFamily: 'monospace',
-                                          fontWeight: FontWeight.bold,
-                                          shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
                                         ),
                                       ),
                                     ],
