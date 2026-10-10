@@ -113,12 +113,33 @@ class _AppShellState extends State<AppShell> {
           _clearedGauntletTrials.clear();
           _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
-          if (saved.allies.isNotEmpty) {
+          List<UnitEntity> alliesToRestore = saved.allies;
+          // MVP migration: if the restored squad doesn't contain Lord Vladislav, ensure Lord Vladislav is leading in slot front1
+          final bool hasVladInAllies = alliesToRestore.any(
+            (u) => u.name.contains('Vladislav') || u.speciesId.contains('vladislav') || u.id.contains('vladislav'),
+          );
+          final bool hasVladInReserve = saved.reserveInventory.any(
+            (u) => u.name.contains('Vladislav') || u.speciesId.contains('vladislav') || u.id.contains('vladislav'),
+          );
+
+          if (!hasVladInAllies && !hasVladInReserve) {
+            final vlad = StarterBrigades.createAshLegionPlayerSquad().first;
+            if (alliesToRestore.isNotEmpty) {
+              alliesToRestore = [
+                vlad.copyWith(slot: alliesToRestore.first.slot),
+                ...alliesToRestore.skip(1),
+              ];
+            } else {
+              alliesToRestore = StarterBrigades.createAshLegionPlayerSquad();
+            }
+          }
+
+          if (alliesToRestore.isNotEmpty) {
             _tickManager.dispose();
             _commandService.dispose();
             _tickManager = InitiativeTickManager(
-              initialAllies: saved.allies,
-              initialEnemies: StarterBrigades.createTutorialEnemies(),
+              initialAllies: alliesToRestore,
+              initialEnemies: StarterBrigades.createCryptStalkersEnemySquad(),
               tickInterval: const Duration(milliseconds: 140),
               onTick: () => _commandService.onSimulationTick(),
             );
@@ -126,8 +147,14 @@ class _AppShellState extends State<AppShell> {
               tickManager: _tickManager,
               generalType: _activeGeneralType,
               initialFocus: (_phylacteryRanks[_activeGeneralType] ?? 1) >= 3 ? 2 : 1,
+              maxFocus: _activeGeneralType == GeneralType.vladislav
+                  ? GeneralCommandService.grimoireMaxFocusCap
+                  : GeneralCommandService.defaultMaxFocusCap,
               initialPhylacteryRanks: _phylacteryRanks,
             );
+            if (_activeGeneralType == GeneralType.vladislav) {
+              _commandService.initializeGrimoire();
+            }
             _combatService = CombatResolutionService(
               tickManager: _tickManager,
               commandService: _commandService,
@@ -1501,6 +1528,47 @@ class _AppShellState extends State<AppShell> {
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: 'Deploy MVP Ash Legion (Lord Vladislav)',
+            icon: const Icon(Icons.refresh, size: 20, color: Color(0xFFE5A93C)),
+            onPressed: () async {
+              setState(() {
+                _activeGeneralType = GeneralType.vladislav;
+                _tickManager.dispose();
+                _commandService.dispose();
+                _tickManager = InitiativeTickManager(
+                  initialAllies: StarterBrigades.createAshLegionPlayerSquad(),
+                  initialEnemies: StarterBrigades.createCryptStalkersEnemySquad(),
+                  tickInterval: const Duration(milliseconds: 140),
+                  onTick: () => _commandService.onSimulationTick(),
+                );
+                _commandService = GeneralCommandService(
+                  tickManager: _tickManager,
+                  generalType: GeneralType.vladislav,
+                  initialFocus: 6,
+                  maxFocus: GeneralCommandService.grimoireMaxFocusCap,
+                  initialPhylacteryRanks: _phylacteryRanks,
+                );
+                _commandService.initializeGrimoire();
+                _combatService = CombatResolutionService(
+                  tickManager: _tickManager,
+                  commandService: _commandService,
+                  relicService: _relicService,
+                );
+                _tickManager.start();
+              });
+              await _saveCurrentState();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('MVP Ash Legion Deployed: Lord Vladislav leading on Frontline!'),
+                    backgroundColor: Color(0xFFB3261E),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          ),
+          IconButton(
             tooltip: 'Save Lineage Progress',
             icon: const Icon(Icons.save_outlined, size: 20, color: Color(0xFF81C784)),
             onPressed: () async {
@@ -1534,7 +1602,18 @@ class _AppShellState extends State<AppShell> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: profile.themeColor.withValues(alpha: 0.3),
-                  child: Icon(profile.icon, color: profile.themeColor, size: 20),
+                  child: profile.type == GeneralType.vladislav
+                      ? ClipOval(
+                          child: Image.asset(
+                            'assets/images/lord_vladislav.png',
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            alignment: const Alignment(0, -0.6),
+                            errorBuilder: (_, __, ___) => Icon(profile.icon, color: profile.themeColor, size: 20),
+                          ),
+                        )
+                      : Icon(profile.icon, color: profile.themeColor, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

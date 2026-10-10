@@ -166,7 +166,7 @@ class UnitEntity {
     if (customAvatarAsset != null) return customAvatarAsset!;
     // Commander: Lord Vladislav
     if (id.contains('vladislav') || speciesId.contains('vladislav') || name.contains('Vladislav')) {
-      return 'assets/images/lord_vladislav.jpg';
+      return 'assets/images/lord_vladislav.png';
     }
 
     // Primordial Boss / Titan (Goro / Flayed Butcher)
