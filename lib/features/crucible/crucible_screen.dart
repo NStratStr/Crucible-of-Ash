@@ -752,8 +752,8 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                         Positioned.fill(
                           child: Image.asset(
                             unit.effectiveAvatarAsset,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
+                            fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
+                            alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
                           ),
                         ),
                         Positioned.fill(
@@ -1004,8 +1004,12 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                             ),
                             child: Image.asset(
                               unit.effectiveAvatarAsset,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
+                              fit: unit.isFigurineCutout
+                                  ? BoxFit.contain
+                                  : BoxFit.cover,
+                              alignment: unit.isFigurineCutout
+                                  ? Alignment.bottomCenter
+                                  : Alignment.topCenter,
                             ),
                           ),
                         ),

@@ -1055,35 +1055,42 @@ class _BattleScreenState extends State<BattleScreen> {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-                        child: Column(
-                          children: [
-                            // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
-                            _buildSquadFormation(
-                              units: widget.tickManager.enemies,
-                              isEnemy: true,
-                              activeUnitId: activeUnit?.id,
-                              selectedTargetId: _selectedEnemyId,
-                              onSelectTarget: (id) {
-                                final tauntingEnemy = widget.tickManager.enemies.where((u) => u.isAlive && u.isTaunting).firstOrNull;
-                                if (tauntingEnemy != null && tauntingEnemy.id != id) {
-                                  _addPop('TAUNTED by ${tauntingEnemy.name}!', const Color(0xFFFF5252), isCrit: true);
-                                  setState(() => _selectedEnemyId = tauntingEnemy.id);
-                                } else {
-                                  setState(() => _selectedEnemyId = id);
-                                }
-                              },
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width >= 1000 ? 1100.0 : 780.0,
                             ),
+                            child: Column(
+                              children: [
+                                // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
+                                _buildSquadFormation(
+                                  units: widget.tickManager.enemies,
+                                  isEnemy: true,
+                                  activeUnitId: activeUnit?.id,
+                                  selectedTargetId: _selectedEnemyId,
+                                  onSelectTarget: (id) {
+                                    final tauntingEnemy = widget.tickManager.enemies.where((u) => u.isAlive && u.isTaunting).firstOrNull;
+                                    if (tauntingEnemy != null && tauntingEnemy.id != id) {
+                                      _addPop('TAUNTED by ${tauntingEnemy.name}!', const Color(0xFFFF5252), isCrit: true);
+                                      setState(() => _selectedEnemyId = tauntingEnemy.id);
+                                    } else {
+                                      setState(() => _selectedEnemyId = id);
+                                    }
+                                  },
+                                ),
 
-                            // Center Clash Line: The Ashen Front
-                            _buildClashLine(),
+                                // Center Clash Line: The Ashen Front
+                                _buildClashLine(),
 
-                            // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
-                            _buildSquadFormation(
-                              units: widget.tickManager.allies,
-                              isEnemy: false,
-                              activeUnitId: activeUnit?.id,
+                                // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
+                                _buildSquadFormation(
+                                  units: widget.tickManager.allies,
+                                  isEnemy: false,
+                                  activeUnitId: activeUnit?.id,
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -2059,13 +2066,21 @@ class _BattleScreenState extends State<BattleScreen> {
       rightMinions = minions.skip(half).toList();
     }
 
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1000;
+    final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+
+    final double stageMaxWidth = isDesktop ? 1050.0 : (isTablet ? 860.0 : 720.0);
+    final double bossMaxWidth = isDesktop ? 460.0 : (isTablet ? 400.0 : 360.0);
+    final double minionMaxWidth = isDesktop ? 240.0 : (isTablet ? 210.0 : 180.0);
+
     return Expanded(
       flex: 12,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 6.0),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: BoxConstraints(maxWidth: stageMaxWidth),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2076,6 +2091,7 @@ class _BattleScreenState extends State<BattleScreen> {
                       activeUnitId: activeUnitId,
                       selectedTargetId: selectedTargetId,
                       onSelectTarget: onSelectTarget,
+                      maxWidth: minionMaxWidth,
                     )),
 
                 // Symmetrical spacer when there are no minions
@@ -2089,7 +2105,7 @@ class _BattleScreenState extends State<BattleScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
+                        constraints: BoxConstraints(maxWidth: bossMaxWidth),
                         child: _buildUnitCard(
                           unit: boss,
                           isEnemy: true,
@@ -2109,6 +2125,7 @@ class _BattleScreenState extends State<BattleScreen> {
                       activeUnitId: activeUnitId,
                       selectedTargetId: selectedTargetId,
                       onSelectTarget: onSelectTarget,
+                      maxWidth: minionMaxWidth,
                     )),
 
                 // Symmetrical spacer when there is 1 minion (on the right) or no minions
@@ -2127,6 +2144,7 @@ class _BattleScreenState extends State<BattleScreen> {
     required String? activeUnitId,
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
+    double maxWidth = 180.0,
   }) {
     return Expanded(
       flex: 2,
@@ -2134,7 +2152,7 @@ class _BattleScreenState extends State<BattleScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 3.0),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
+            constraints: BoxConstraints(maxWidth: maxWidth),
             child: _buildUnitCard(
               unit: unit,
               isEnemy: true,
@@ -2156,8 +2174,13 @@ class _BattleScreenState extends State<BattleScreen> {
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
   }) {
-    // Tighter together width-wise: cluster units in a disciplined squad formation
-    final double maxClusterWidth = (units.length * 200.0).clamp(240.0, 680.0);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1000;
+    final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+
+    final double perUnitWidth = isDesktop ? 280.0 : (isTablet ? 240.0 : 200.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(240.0, isDesktop ? 1050.0 : 760.0);
+    final double cardMaxWidth = isDesktop ? 280.0 : (isTablet ? 240.0 : 210.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -2236,7 +2259,7 @@ class _BattleScreenState extends State<BattleScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
                               child: Center(
                                 child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 210),
+                                  constraints: BoxConstraints(maxWidth: cardMaxWidth),
                                   child: _buildUnitCard(
                                     unit: unit,
                                     isEnemy: isEnemy,
@@ -2458,6 +2481,14 @@ class _BattleScreenState extends State<BattleScreen> {
       modelGlowBlur = 7.5;
     }
 
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1000;
+    final double miniatureScale = isBossUnit
+        ? (isDesktop ? 1.85 : 1.70)
+        : (unit.isFigurineCutout
+            ? (unit.isCommander ? (isDesktop ? 1.48 : 1.38) : (isDesktop ? 1.42 : 1.32))
+            : 1.0);
+
     final Widget cardWidget = GestureDetector(
       onTap: () {
         if (isEnemy && alive) {
@@ -2621,7 +2652,7 @@ class _BattleScreenState extends State<BattleScreen> {
                           padding: EdgeInsets.only(bottom: isBossUnit ? 6.0 : 4.0),
                           child: Center(
                             child: Transform.scale(
-                              scale: isBossUnit ? 1.75 : 1.25,
+                              scale: miniatureScale,
                               child: ImageFiltered(
                                 imageFilter: ui.ImageFilter.blur(
                                   sigmaX: modelGlowBlur,
@@ -2652,7 +2683,7 @@ class _BattleScreenState extends State<BattleScreen> {
                         padding: EdgeInsets.only(bottom: isBossUnit ? 6.0 : 4.0),
                         child: Center(
                           child: Transform.scale(
-                            scale: isBossUnit ? 1.75 : (unit.isFigurineCutout ? 1.25 : 1.0),
+                            scale: miniatureScale,
                             child: ColorFiltered(
                               colorFilter: alive
                                   ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)

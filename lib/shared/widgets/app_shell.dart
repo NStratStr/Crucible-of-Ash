@@ -1812,8 +1812,8 @@ class _AppShellState extends State<AppShell> {
                                     Positioned.fill(
                                       child: Image.asset(
                                         unit.effectiveAvatarAsset,
-                                        fit: BoxFit.cover,
-                                        alignment: Alignment.topCenter,
+                                        fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
+                                        alignment: unit.isFigurineCutout ? Alignment.bottomCenter : Alignment.topCenter,
                                         errorBuilder: (_, __, ___) => Container(
                                           color: const Color(0xFF2B2B36),
                                           child: const Icon(Icons.shield, color: Colors.white24, size: 24),
