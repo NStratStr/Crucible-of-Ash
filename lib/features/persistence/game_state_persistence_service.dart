@@ -15,6 +15,8 @@ class GameSaveData {
   final Map<GeneralType, int> phylacteryRanks;
   final int currentChapter;
   final int maxUnlockedChapter;
+  final int currentAscension;
+  final int maxUnlockedAscension;
   final List<UnitEntity> allies;
   final List<UnitEntity> reserveInventory;
   final List<RelicEntity> relics;
@@ -29,6 +31,8 @@ class GameSaveData {
     required this.phylacteryRanks,
     required this.currentChapter,
     required this.maxUnlockedChapter,
+    this.currentAscension = 0,
+    this.maxUnlockedAscension = 0,
     required this.allies,
     required this.reserveInventory,
     required this.relics,
@@ -46,6 +50,8 @@ class GameSaveData {
       'phylacteryRanks': phylacteryRanks.map((k, v) => MapEntry(k.name, v)),
       'currentChapter': currentChapter,
       'maxUnlockedChapter': maxUnlockedChapter,
+      'currentAscension': currentAscension,
+      'maxUnlockedAscension': maxUnlockedAscension,
       'allies': allies.map((u) => u.toJson()).toList(),
       'reserveInventory': reserveInventory.map((u) => u.toJson()).toList(),
       'relics': relics.map((r) => r.toJson()).toList(),
@@ -99,6 +105,8 @@ class GameSaveData {
       phylacteryRanks: ranks,
       currentChapter: (json['currentChapter'] as num?)?.toInt() ?? 1,
       maxUnlockedChapter: (json['maxUnlockedChapter'] as num?)?.toInt() ?? 1,
+      currentAscension: (json['currentAscension'] as num?)?.toInt() ?? 0,
+      maxUnlockedAscension: (json['maxUnlockedAscension'] as num?)?.toInt() ?? 0,
       allies: allies,
       reserveInventory: reserveInventory,
       relics: relics,

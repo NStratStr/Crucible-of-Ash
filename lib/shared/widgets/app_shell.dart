@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
+import '../../features/campaign/ascension_tier_data.dart';
+import '../../features/campaign/ascension_tier_dialog.dart';
 import '../../features/campaign/blood_altar_dialog.dart';
 import '../../features/campaign/campaign_map_generator.dart';
 import '../../features/campaign/campaign_map_screen.dart';
@@ -52,6 +54,8 @@ class _AppShellState extends State<AppShell> {
   };
   int _currentChapter = 1;
   int _maxUnlockedChapter = 1;
+  int _currentAscension = 0;
+  int _maxUnlockedAscension = 0;
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
@@ -104,6 +108,8 @@ class _AppShellState extends State<AppShell> {
           _phylacteryRanks = Map.from(saved.phylacteryRanks);
           _currentChapter = saved.currentChapter;
           _maxUnlockedChapter = saved.maxUnlockedChapter;
+          _currentAscension = saved.currentAscension;
+          _maxUnlockedAscension = saved.maxUnlockedAscension;
           _clearedGauntletTrials.clear();
           _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
@@ -153,6 +159,8 @@ class _AppShellState extends State<AppShell> {
         phylacteryRanks: _phylacteryRanks,
         currentChapter: _currentChapter,
         maxUnlockedChapter: _maxUnlockedChapter,
+        currentAscension: _currentAscension,
+        maxUnlockedAscension: _maxUnlockedAscension,
         allies: _tickManager.allies,
         reserveInventory: _inventory,
         relics: _relicService.allRelics,
@@ -374,6 +382,22 @@ class _AppShellState extends State<AppShell> {
         enemies = StarterBrigades.createEliteEnemiesForChapter(_currentChapter);
       } else {
         enemies = StarterBrigades.createSkirmishEnemiesForChapter(_currentChapter);
+      }
+
+      // Apply Ascension Tier scaling (GDD v2.6 Sec 1)
+      if (_currentAscension > 0) {
+        final ascData = AscensionTierData.forTier(_currentAscension);
+        enemies = enemies.map((e) {
+          final scaledMaxHp = (e.maxHp * ascData.enemyHpMultiplier).round();
+          final scaledAtk = (e.attack * ascData.enemyDamageMultiplier).round();
+          final scaledSpd = (e.speed * ascData.enemySpeedMultiplier).round();
+          return e.copyWith(
+            maxHp: scaledMaxHp,
+            currentHp: scaledMaxHp,
+            attack: scaledAtk,
+            speed: scaledSpd,
+          );
+        }).toList();
       }
 
       // If all allies were fallen, revive squad before entering next battle
@@ -719,11 +743,22 @@ class _AppShellState extends State<AppShell> {
       }
 
       final bool isBossClear = _activeNode?.type == CampaignNodeType.boss && _currentChapter < 3;
+      final bool isFinalBossClear = _activeNode?.type == CampaignNodeType.boss && _currentChapter == 3;
       final int nextCh = _currentChapter + 1;
       if (isBossClear && _maxUnlockedChapter < nextCh) {
         setState(() {
           _maxUnlockedChapter = nextCh;
         });
+      }
+
+      // Conquering Chapter 3 World Titan unlocks the next Ascension Tier (A1..A10)
+      if (isFinalBossClear && _maxUnlockedAscension < 10) {
+        final nextAscension = min(10, _maxUnlockedAscension + 1);
+        if (nextAscension > _maxUnlockedAscension) {
+          setState(() {
+            _maxUnlockedAscension = nextAscension;
+          });
+        }
       }
 
       _saveCurrentState();
@@ -1323,6 +1358,14 @@ class _AppShellState extends State<AppShell> {
                     onLaunchMvpSkirmish: _launchMvpThreeWaveSkirmish,
                     currentChapter: _currentChapter,
                     maxUnlockedChapter: _maxUnlockedChapter,
+                    currentAscension: _currentAscension,
+                    maxUnlockedAscension: _maxUnlockedAscension,
+                    onAscensionChanged: (tier) {
+                      setState(() {
+                        _currentAscension = tier;
+                      });
+                      _saveCurrentState();
+                    },
                     onChapterChanged: (ch) => setState(() {
                       _currentChapter = ch;
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);

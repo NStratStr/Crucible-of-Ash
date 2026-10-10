@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/expedition_boon.dart';
+import 'ascension_tier_data.dart';
+import 'ascension_tier_dialog.dart';
 import 'campaign_node.dart';
 
 class ChapterTheme {
@@ -90,6 +92,9 @@ class CampaignMapScreen extends StatelessWidget {
   final int currentChapter;
   final int maxUnlockedChapter;
   final ValueChanged<int>? onChapterChanged;
+  final int currentAscension;
+  final int maxUnlockedAscension;
+  final ValueChanged<int>? onAscensionChanged;
   final Set<ExpeditionBoon> activeBoons;
 
   const CampaignMapScreen({
@@ -104,6 +109,9 @@ class CampaignMapScreen extends StatelessWidget {
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
     this.onChapterChanged,
+    this.currentAscension = 0,
+    this.maxUnlockedAscension = 0,
+    this.onAscensionChanged,
     this.activeBoons = const {},
   });
 
@@ -172,6 +180,69 @@ class CampaignMapScreen extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
+          // Ascension Tier Badge (A0–A10)
+          GestureDetector(
+            key: const ValueKey('ascension_tier_button'),
+            onTap: () {
+              if (onAscensionChanged != null) {
+                AscensionTierDialog.show(
+                  context: context,
+                  currentAscension: currentAscension,
+                  maxUnlockedAscension: maxUnlockedAscension,
+                  onSelectAscension: onAscensionChanged!,
+                );
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: currentAscension > 0
+                    ? const Color(0xFFB71C1C).withValues(alpha: 0.35)
+                    : const Color(0xFF1E1E28),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(
+                  color: currentAscension > 0
+                      ? const Color(0xFFFF5252)
+                      : const Color(0xFFE5A93C).withValues(alpha: 0.8),
+                  width: 1.2,
+                ),
+                boxShadow: currentAscension > 0
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFFF1744).withValues(alpha: 0.3),
+                          blurRadius: 6,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_graph,
+                    size: 13,
+                    color: currentAscension > 0
+                        ? const Color(0xFFFF5252)
+                        : const Color(0xFFFFD54F),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'A$currentAscension',
+                    style: TextStyle(
+                      color: currentAscension > 0
+                          ? const Color(0xFFFF5252)
+                          : const Color(0xFFFFD54F),
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10.5,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           if (onLaunchMvpSkirmish != null)
             IconButton(
               icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 20),
