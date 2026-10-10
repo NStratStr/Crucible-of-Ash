@@ -166,7 +166,7 @@ class CombatResolutionService {
       }
     }
 
-    // Damage-Over-Time (Bleed and Blight)
+    // GDD v2.6 Sec 4: Damage-Over-Time (Bleed, Blight, Burn)
     for (final effect in currentUnit.activeEffects) {
       if (effect.type == StatusEffectType.bleed) {
         final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.05).round());
@@ -174,7 +174,15 @@ class CombatResolutionService {
       } else if (effect.type == StatusEffectType.blight) {
         final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.06).round());
         dotDamage += dmg;
+      } else if (effect.type == StatusEffectType.burn) {
+        final dmg = effect.value > 0 ? effect.value : max(1, (currentUnit.maxHp * 0.07).round());
+        dotDamage += dmg;
       }
+    }
+
+    // GDD v2.6 Sec 4: Burn suppresses 100% of all healing
+    if (currentUnit.isBurning) {
+      healAmount = 0;
     }
 
     // Battle Modifier: Corrosive Miasma / Void Corruption / Abyssal Eclipse
@@ -558,12 +566,22 @@ class CombatResolutionService {
       totalDamage *= 0.70;
     }
 
+    // GDD v2.6 Sec 4: Freeze Shatter: Physical hits on frozen targets shatter for 15% max HP bonus damage and end freeze
+    final bool isFrozen = target.isFrozen;
+    if (isFrozen) {
+      final int shatterBonus = max(1, (target.maxHp * 0.15).round());
+      totalDamage += shatterBonus;
+    }
+
     // GDD v2.6 Sec 3.4: Awakening Grace Window (Immune to damage while invulnerable)
     final bool isInvulnerable = target.activeEffects.any((e) => e.type == StatusEffectType.invulnerable);
     int finalDamage = isInvulnerable ? 0 : max(1, totalDamage.round());
 
     // GDD v2.6 Sec 4: Shield absorption
     List<StatusEffect> targetEffects = List.of(target.activeEffects);
+    if (isFrozen) {
+      targetEffects.removeWhere((e) => e.type == StatusEffectType.freeze);
+    }
     final int shieldIndex = targetEffects.indexWhere((e) => e.type == StatusEffectType.shield);
     if (shieldIndex != -1 && finalDamage > 0) {
       final shield = targetEffects[shieldIndex];

@@ -2273,6 +2273,8 @@ class _BattleScreenState extends State<BattleScreen> {
                             shieldIntegrity: unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp) : 0.0,
                             isAlive: alive,
                             plinthMaterial: unit.plinthMaterial,
+                            isBurning: unit.isBurning,
+                            isFrozen: unit.isFrozen,
                           ),
                           child: Container(
                             decoration: BoxDecoration(

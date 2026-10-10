@@ -13,6 +13,8 @@ class PlinthRimStatusPainter extends CustomPainter {
   final double shieldIntegrity; // 0.0 to 1.0 (shield points / maxHp)
   final bool isAlive;
   final PlinthMaterial plinthMaterial;
+  final bool isBurning;
+  final bool isFrozen;
 
   const PlinthRimStatusPainter({
     required this.bleedStacks,
@@ -20,6 +22,8 @@ class PlinthRimStatusPainter extends CustomPainter {
     required this.shieldIntegrity,
     required this.isAlive,
     this.plinthMaterial = PlinthMaterial.slate,
+    this.isBurning = false,
+    this.isFrozen = false,
   });
 
   @override
@@ -151,6 +155,33 @@ class PlinthRimStatusPainter extends CustomPainter {
         canvas.drawCircle(pipCenter, 1.8, blightPaint);
       }
     }
+
+    // 4. Burn Status: Fiery Orange Arc Flame Aura (#FF6D00)
+    if (isBurning && isAlive) {
+      final Paint burnPaint = Paint()
+        ..color = const Color(0xFFFF6D00).withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
+      final Paint burnGlow = Paint()
+        ..color = const Color(0xFFFFAB40).withValues(alpha: 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5;
+
+      // Spans upper arc (-math.pi*0.80 to -math.pi*0.20)
+      canvas.drawArc(ovalRect, -math.pi * 0.80, math.pi * 0.60, false, burnGlow);
+      canvas.drawArc(ovalRect, -math.pi * 0.80, math.pi * 0.60, false, burnPaint);
+    }
+
+    // 5. Freeze Status: Crystalline Frost Cyan Glaze Rim (#00E5FF)
+    if (isFrozen && isAlive) {
+      final Paint frostGlow = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4;
+
+      canvas.drawOval(ovalRect, frostGlow);
+    }
   }
 
   @override
@@ -159,6 +190,8 @@ class PlinthRimStatusPainter extends CustomPainter {
         oldDelegate.blightStacks != blightStacks ||
         oldDelegate.shieldIntegrity != shieldIntegrity ||
         oldDelegate.isAlive != isAlive ||
-        oldDelegate.plinthMaterial != plinthMaterial;
+        oldDelegate.plinthMaterial != plinthMaterial ||
+        oldDelegate.isBurning != isBurning ||
+        oldDelegate.isFrozen != isFrozen;
   }
 }

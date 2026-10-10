@@ -233,16 +233,22 @@ class InitiativeTickManager extends ChangeNotifier {
       _enemies = _enemies.map((u) => u.isAlive ? u.copyWith(currentHp: max(1, u.currentHp - pulse)) : u).toList(growable: false);
     }
 
-    // Increment TM for all surviving combatants: delta = (Speed / 100) * tickScale
+    // GDD v2.6 Sec 3.2 & Sec 4: Increment TM for all surviving combatants:
+    // Stun / Freeze pauses AP/TM accumulation.
+    // Haste increases BaseSPD by +35%.
     _allies = _allies.map((unit) {
       if (!unit.isAlive) return unit;
-      final double delta = (unit.speed / 100.0) * tickScale;
+      if (unit.isStunned || unit.isFrozen) return unit; // Stun/Freeze pauses AP accumulation
+      final double speedMod = unit.hasHaste ? 1.35 : 1.0;
+      final double delta = ((unit.speed * speedMod) / 100.0) * tickScale;
       return unit.copyWith(turnMeter: unit.turnMeter + delta);
     }).toList(growable: false);
 
     _enemies = _enemies.map((unit) {
       if (!unit.isAlive) return unit;
-      final double delta = (unit.speed / 100.0) * tickScale;
+      if (unit.isStunned || unit.isFrozen) return unit; // Stun/Freeze pauses AP accumulation
+      final double speedMod = unit.hasHaste ? 1.35 : 1.0;
+      final double delta = ((unit.speed * speedMod) / 100.0) * tickScale;
       return unit.copyWith(turnMeter: unit.turnMeter + delta);
     }).toList(growable: false);
 

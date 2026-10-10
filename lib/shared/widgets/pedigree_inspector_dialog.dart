@@ -997,6 +997,21 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                       } else if (eff.type == StatusEffectType.speedUp) {
                         effColor = const Color(0xFF00ACC1);
                         effIcon = Icons.speed;
+                      } else if (eff.type == StatusEffectType.burn) {
+                        effColor = const Color(0xFFFF6D00);
+                        effIcon = Icons.local_fire_department;
+                      } else if (eff.type == StatusEffectType.freeze) {
+                        effColor = const Color(0xFF00E5FF);
+                        effIcon = Icons.ac_unit;
+                      } else if (eff.type == StatusEffectType.vulnerable) {
+                        effColor = const Color(0xFFFF4081);
+                        effIcon = Icons.broken_image;
+                      } else if (eff.type == StatusEffectType.shield) {
+                        effColor = const Color(0xFFFFD54F);
+                        effIcon = Icons.security;
+                      } else if (eff.type == StatusEffectType.invulnerable) {
+                        effColor = const Color(0xFFFFF59D);
+                        effIcon = Icons.shield_outlined;
                       }
 
                       return Container(

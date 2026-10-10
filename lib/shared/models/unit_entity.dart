@@ -324,6 +324,10 @@ class UnitEntity {
       .where((e) => e.type == StatusEffectType.blight)
       .fold<int>(0, (sum, e) => sum + (e.value > 0 ? e.value : 1))
       .clamp(0, 10);
+  bool get isBurning => activeEffects.any((e) => e.type == StatusEffectType.burn);
+  bool get isFrozen => activeEffects.any((e) => e.type == StatusEffectType.freeze);
+  bool get isVulnerable => activeEffects.any((e) => e.type == StatusEffectType.vulnerable);
+  bool get hasHaste => activeEffects.any((e) => e.type == StatusEffectType.speedUp);
   int get shieldPoints => activeEffects
       .where((e) => e.type == StatusEffectType.shield)
       .fold<int>(0, (sum, e) => sum + e.value);
