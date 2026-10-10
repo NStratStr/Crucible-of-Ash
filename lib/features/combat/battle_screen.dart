@@ -84,6 +84,7 @@ class BattleScreen extends StatefulWidget {
   final VoidCallback? onDefeat;
   final List<List<UnitEntity>>? enemyWaves;
   final bool initialAutoBattle;
+  final bool startInPreBattleSetup;
 
   const BattleScreen({
     super.key,
@@ -99,6 +100,7 @@ class BattleScreen extends StatefulWidget {
     this.onDefeat,
     this.enemyWaves,
     this.initialAutoBattle = false,
+    this.startInPreBattleSetup = false,
   });
 
   @override
@@ -116,6 +118,48 @@ class _BattleScreenState extends State<BattleScreen> {
   Timer? _aiTurnTimer;
   bool _hasDispatchedEndOutcome = false;
   List<List<UnitEntity>>? _localEnemyWaves;
+  bool _isPreBattleSetup = false;
+
+  void _commenceBattle() {
+    setState(() {
+      _isPreBattleSetup = false;
+      _combatLog = 'Engagement commenced! Honor through blood and steel.';
+    });
+    _addPop('ENGAGEMENT COMMENCED!', const Color(0xFFFFD54F), isCrit: true);
+    if (widget.tickManager.phase == CombatPhase.idle) {
+      widget.tickManager.start();
+    }
+    if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
+      _handleAutoPlayerTurn();
+    } else if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
+      _handleAiTurn();
+    }
+  }
+
+  void _toggleAlliedLane(String unitId) {
+    final updatedAllies = widget.tickManager.allies.map((u) {
+      if (u.id == unitId) {
+        final nextFrontline = !u.isFrontline;
+        return u.copyWith(isFrontlineOverride: nextFrontline);
+      }
+      return u;
+    }).toList();
+    widget.tickManager.updateSquads(allies: updatedAllies);
+    setState(() {});
+  }
+
+  void _applyFormationPreset({required bool? allFrontline}) {
+    final updatedAllies = widget.tickManager.allies.map((u) {
+      if (allFrontline == null) {
+        // Balanced default: default based on slot (front slots = front, back slots = back)
+        return u.copyWith(isFrontlineOverride: u.slot.index < 3);
+      } else {
+        return u.copyWith(isFrontlineOverride: allFrontline);
+      }
+    }).toList();
+    widget.tickManager.updateSquads(allies: updatedAllies);
+    setState(() {});
+  }
 
   void _deployMvpSkirmish() {
     if (widget.onDeployMvpSkirmish != null) {
@@ -128,6 +172,7 @@ class _BattleScreenState extends State<BattleScreen> {
     _currentWaveIndex = 0;
     _hasDispatchedEndOutcome = false;
     _isProcessingAiTurn = false;
+    _isPreBattleSetup = false;
     _selectedEnemyId = waves.first.first.id;
     widget.tickManager.updateSquads(allies: allies, enemies: waves.first);
     widget.commandService.initializeGrimoire();
@@ -213,6 +258,7 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void initState() {
     super.initState();
+    _isPreBattleSetup = widget.startInPreBattleSetup && widget.tickManager.phase != CombatPhase.ticking;
     _autoBattle = widget.initialAutoBattle;
     _aiService = EnemyAiService(
       tickManager: widget.tickManager,
@@ -229,13 +275,15 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.tickManager.phase == CombatPhase.idle) {
-        widget.tickManager.start();
-      }
-      if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
-        _handleAutoPlayerTurn();
-      } else if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
-        _handleAiTurn();
+      if (!_isPreBattleSetup) {
+        if (widget.tickManager.phase == CombatPhase.idle) {
+          widget.tickManager.start();
+        }
+        if (_autoBattle && _isPlayerTurnNow && !_isProcessingAiTurn) {
+          _handleAutoPlayerTurn();
+        } else if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
+          _handleAiTurn();
+        }
       }
     });
   }
@@ -263,10 +311,11 @@ class _BattleScreenState extends State<BattleScreen> {
 
       _isProcessingAiTurn = false;
       _hasDispatchedEndOutcome = false;
+      _isPreBattleSetup = true;
       _combatLog = 'Encounter engaged! The Crucible awakens.';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (widget.tickManager.phase == CombatPhase.idle) {
+        if (!_isPreBattleSetup && widget.tickManager.phase == CombatPhase.idle) {
           widget.tickManager.start();
         }
       });
@@ -1834,6 +1883,47 @@ class _BattleScreenState extends State<BattleScreen> {
       );
     }
 
+    // Pre-Battle Setup phase
+    if (_isPreBattleSetup) {
+      return GestureDetector(
+        onTap: _commenceBattle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.90),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0xFF81C784), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF81C784).withValues(alpha: 0.35),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shield_outlined, size: 13, color: Color(0xFFFFD54F)),
+                SizedBox(width: 5),
+                Text(
+                  'PRE-BATTLE: TAP UNITS TO ASSIGN LANE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     // Idle / Ticking phase
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1985,6 +2075,7 @@ class _BattleScreenState extends State<BattleScreen> {
             units: arcanum,
             isEnemy: true,
             isFrontline: false,
+            hasOppositeTier: hasVanguard,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -2000,6 +2091,7 @@ class _BattleScreenState extends State<BattleScreen> {
             units: vanguard,
             isEnemy: true,
             isFrontline: true,
+            hasOppositeTier: hasArcanum,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -2014,6 +2106,7 @@ class _BattleScreenState extends State<BattleScreen> {
             units: vanguard,
             isEnemy: false,
             isFrontline: true,
+            hasOppositeTier: hasArcanum,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -2029,6 +2122,7 @@ class _BattleScreenState extends State<BattleScreen> {
             units: arcanum,
             isEnemy: false,
             isFrontline: false,
+            hasOppositeTier: hasVanguard,
             activeUnitId: activeUnitId,
             selectedTargetId: selectedTargetId,
             onSelectTarget: onSelectTarget,
@@ -2170,6 +2264,7 @@ class _BattleScreenState extends State<BattleScreen> {
     required List<UnitEntity> units,
     required bool isEnemy,
     required bool isFrontline,
+    required bool hasOppositeTier,
     required String? activeUnitId,
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
@@ -2211,7 +2306,7 @@ class _BattleScreenState extends State<BattleScreen> {
     final Color laneColor = isFrontline ? const Color(0xFFE5A93C) : const Color(0xFF80D8FF);
 
     return Expanded(
-      flex: isFrontline ? 10 : 9,
+      flex: hasOppositeTier ? (isFrontline ? 10 : 9) : 19,
       child: Padding(
         padding: EdgeInsets.only(
           top: isEnemy ? 0 : 2.0,
@@ -2490,7 +2585,13 @@ class _BattleScreenState extends State<BattleScreen> {
             : 1.0);
 
     final Widget cardWidget = GestureDetector(
+      key: Key('unit_card_${unit.id}'),
+      behavior: HitTestBehavior.opaque,
       onTap: () {
+        if (_isPreBattleSetup && !isEnemy && alive) {
+          _toggleAlliedLane(unit.id);
+          return;
+        }
         if (isEnemy && alive) {
           if (isSelectedTarget) {
             _openInspectorModal(unit, isEnemy);
@@ -2978,30 +3079,45 @@ class _BattleScreenState extends State<BattleScreen> {
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.2),
-                                              decoration: BoxDecoration(
-                                                color: isBossUnit
-                                                    ? const Color(0xFF7F0000).withValues(alpha: 0.7)
-                                                    : (unit.isVanguard
-                                                        ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
-                                                        : const Color(0xFF00E5FF).withValues(alpha: 0.2)),
-                                                borderRadius: BorderRadius.circular(3),
-                                                border: Border.all(
+                                            GestureDetector(
+                                              key: Key('unit_lane_badge_${unit.id}'),
+                                              onTap: _isPreBattleSetup && !isEnemy && alive
+                                                  ? () => _toggleAlliedLane(unit.id)
+                                                  : null,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.2),
+                                                decoration: BoxDecoration(
                                                   color: isBossUnit
-                                                      ? const Color(0xFFFF5252)
-                                                      : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
-                                                  width: 0.8,
+                                                      ? const Color(0xFF7F0000).withValues(alpha: 0.7)
+                                                      : (unit.isVanguard
+                                                          ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
+                                                          : const Color(0xFF00E5FF).withValues(alpha: 0.2)),
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  border: Border.all(
+                                                    color: isBossUnit
+                                                        ? const Color(0xFFFF5252)
+                                                        : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
+                                                    width: (_isPreBattleSetup && !isEnemy) ? 1.4 : 0.8,
+                                                  ),
                                                 ),
-                                              ),
-                                              child: Text(
-                                                isBossUnit ? '👑 TITANIC' : (unit.isVanguard ? '⚔ FRONT' : '🔮 REAR'),
-                                                style: TextStyle(
-                                                  color: isBossUnit
-                                                      ? const Color(0xFFFF8A80)
-                                                      : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
-                                                  fontSize: 7.0,
-                                                  fontWeight: FontWeight.w900,
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      isBossUnit ? '👑 TITANIC' : (unit.isVanguard ? '⚔ FRONT' : '🔮 REAR'),
+                                                      style: TextStyle(
+                                                        color: isBossUnit
+                                                            ? const Color(0xFFFF8A80)
+                                                            : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
+                                                        fontSize: 7.0,
+                                                        fontWeight: FontWeight.w900,
+                                                      ),
+                                                    ),
+                                                    if (_isPreBattleSetup && !isEnemy) ...[
+                                                      const SizedBox(width: 2),
+                                                      const Icon(Icons.swap_vert, size: 8, color: Colors.white70),
+                                                    ],
+                                                  ],
                                                 ),
                                               ),
                                             ),
@@ -3483,8 +3599,254 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
+  Widget _buildPreBattleControlBar() {
+    final allies = widget.tickManager.allies;
+    final frontlineCount = allies.where((u) => u.isFrontline).length;
+    final backlineCount = allies.where((u) => u.isBackline).length;
+    final profile = widget.commandService.currentProfile;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF13131A),
+        border: Border(top: BorderSide(color: Color(0xFF2B2B36), width: 1.5)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Upper Info Rail: Formation Counts & Presets
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Lane distribution pills
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5A93C).withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5A93C), width: 1.0),
+                      ),
+                      child: Text(
+                        '🛡️ FRONT: $frontlineCount',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF80D8FF).withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF80D8FF), width: 1.0),
+                      ),
+                      child: Text(
+                        '🔮 REAR: $backlineCount',
+                        style: const TextStyle(
+                          color: Color(0xFF80D8FF),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Tactical Presets (ALL FRONT, BALANCED, ALL REAR)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildPresetButton(
+                      label: 'ALL FRONT',
+                      isActive: frontlineCount == allies.length,
+                      onTap: () => _applyFormationPreset(allFrontline: true),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildPresetButton(
+                      label: 'BALANCED',
+                      isActive: frontlineCount > 0 && backlineCount > 0,
+                      onTap: () => _applyFormationPreset(allFrontline: null),
+                    ),
+                    const SizedBox(width: 4),
+                    _buildPresetButton(
+                      label: 'ALL REAR',
+                      isActive: backlineCount == allies.length,
+                      onTap: () => _applyFormationPreset(allFrontline: false),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Lower Action Rail: Guidance Hint & COMMENCE ENGAGEMENT Button
+          Row(
+            children: [
+              // Tactical formation guidance tooltip
+              Expanded(
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1B24),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF38384A), width: 0.8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.touch_app, size: 14, color: Color(0xFFFFD54F)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          frontlineCount == 0
+                              ? '⚠️ ALL BACKLINE: No melee shield! Enemies engage directly.'
+                              : (backlineCount == 0
+                                  ? '⚔️ ALL FRONTLINE: Maximum Stagger Resist (+10%) & Aggro absorption.'
+                                  : 'Tap any unit to switch lanes. Frontline protects Backline (-20% dmg).'),
+                          style: TextStyle(
+                            color: frontlineCount == 0
+                                ? const Color(0xFFFF8A80)
+                                : (backlineCount == 0 ? const Color(0xFFFFD54F) : Colors.white70),
+                            fontSize: 8.0,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Autobattler toggle before launch
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _autoBattle = !_autoBattle;
+                  });
+                },
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: _autoBattle ? const Color(0xFF1B5E20) : const Color(0xFF2A2A38),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _autoBattle ? const Color(0xFF81C784) : const Color(0xFF555566),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _autoBattle ? Icons.autorenew : Icons.touch_app,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _autoBattle ? 'AUTO ON' : 'MANUAL',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Grand Golden COMMENCE ENGAGEMENT Button
+              SizedBox(
+                height: 42,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFB3261E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      side: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
+                    ),
+                    elevation: 4,
+                    shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                  ),
+                  icon: const Icon(Icons.play_arrow, size: 18, color: Color(0xFFFFD54F)),
+                  label: const Text(
+                    'COMMENCE BATTLE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10.0,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  onPressed: _commenceBattle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPresetButton({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFB3261E).withValues(alpha: 0.4) : const Color(0xFF1E1E28),
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(
+            color: isActive ? const Color(0xFFFFD54F) : const Color(0xFF424254),
+            width: isActive ? 1.2 : 0.8,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? const Color(0xFFFFD54F) : Colors.white60,
+            fontSize: 7.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomControlBar(
       bool isPlayerTurn, UnitEntity? selectedEnemy, UnitEntity? activeUnit) {
+    if (_isPreBattleSetup) {
+      return _buildPreBattleControlBar();
+    }
+
     final focus = widget.commandService.currentFocus;
     final maxFocus = widget.commandService.maxFocus;
     final profile = widget.commandService.currentProfile;

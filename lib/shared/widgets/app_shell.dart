@@ -1454,6 +1454,7 @@ class _AppShellState extends State<AppShell> {
                     bloodlineSigils: _bloodlineSigils,
                     enemyWaves: _activeEnemyWaves,
                     initialAutoBattle: widget.enableAutoBattle,
+                    startInPreBattleSetup: true,
                     onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onResetEncounter: () => setState(_resetEncounter),
                     onDeployMvpSkirmish: _launchMvpThreeWaveSkirmish,

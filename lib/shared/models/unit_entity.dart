@@ -24,6 +24,7 @@ class UnitEntity {
   final Archetype archetype;
   final FormationSlot slot;
   final PlinthMaterial plinthMaterial;
+  final bool? isFrontlineOverride; // When set, overrides slot-based frontline/backline assignment
 
   // Progression & Health
   final int level;
@@ -66,6 +67,7 @@ class UnitEntity {
     required this.archetype,
     required this.slot,
     this.plinthMaterial = PlinthMaterial.slate,
+    this.isFrontlineOverride,
     required this.level,
     required this.maxLevel,
     required this.currentHp,
@@ -352,8 +354,13 @@ class UnitEntity {
       effectiveAvatarAsset.endsWith('.png') ||
       effectiveAvatarAsset.contains('lord_vladislav');
 
-  bool get isVanguard => slot.index < 3;
-  bool get isArcanum => slot.index >= 3;
+  /// GDD v2.8 Sec 3.4: Flexible formation customization allows any unit (including all 5)
+  /// to be stationed in Frontline or Backline.
+  bool get isFrontline => isFrontlineOverride ?? (slot.index < 3);
+  bool get isBackline => !isFrontline;
+
+  bool get isVanguard => isFrontline;
+  bool get isArcanum => isBackline;
   bool get isAlive => currentHp > 0;
   bool get isStunned => activeEffects.any((e) => e.type == StatusEffectType.stun);
   bool get isBleeding => activeEffects.any((e) => e.type == StatusEffectType.bleed);
@@ -645,6 +652,7 @@ class UnitEntity {
     PlinthMaterial? plinthMaterial,
     String? customAvatarAsset,
     int? currentXp,
+    bool? isFrontlineOverride,
   }) {
     return UnitEntity(
       id: id ?? this.id,
@@ -654,6 +662,7 @@ class UnitEntity {
       archetype: archetype ?? this.archetype,
       slot: slot ?? this.slot,
       plinthMaterial: plinthMaterial ?? this.plinthMaterial,
+      isFrontlineOverride: isFrontlineOverride ?? this.isFrontlineOverride,
       level: level ?? this.level,
       maxLevel: maxLevel,
       currentHp: currentHp ?? this.currentHp,
@@ -773,6 +782,7 @@ class UnitEntity {
       'customAvatarAsset': customAvatarAsset,
       'currentXp': currentXp,
       'plinthMaterial': plinthMaterial.name,
+      'isFrontlineOverride': isFrontlineOverride,
     };
   }
 
@@ -794,6 +804,7 @@ class UnitEntity {
         (p) => p.name == json['plinthMaterial'],
         orElse: () => PlinthMaterial.slate,
       ),
+      isFrontlineOverride: json['isFrontlineOverride'] as bool?,
       level: (json['level'] as num).toInt(),
       maxLevel: (json['maxLevel'] as num).toInt(),
       currentHp: (json['currentHp'] as num).toInt(),
