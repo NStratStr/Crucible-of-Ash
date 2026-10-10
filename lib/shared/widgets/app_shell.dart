@@ -766,17 +766,46 @@ class _AppShellState extends State<AppShell> {
         relicDrop = drop.displayName;
       }
 
-      final rewardsData = CombatRewardsData(
-        isVictory: true,
-        rawAsh: reward + (isFirstConquest ? 500 : 0),
-        emberShards: oreReward,
-        cryptKeys: sigilsReward + (isFirstConquest ? 1 : 0),
-        xpGained: xpReward,
-        levelUps: levelUps,
-        capturedThrall: purebloodDrop ?? captured,
-        relicDropName: relicDrop,
-        encounterTitle: _activeNode?.name ?? 'Ashen Skirmish',
-      );
+    // GDD v2.8 Section 1 & 2: Ascension multiplier scaling & target-farmed Vitae
+    final ascData = _currentAscension > 0 ? AscensionTierData.forTier(_currentAscension) : null;
+    final double dropMult = ascData?.resourceDropMultiplier ?? 1.0;
+    final int scaledAsh = ((reward + (isFirstConquest ? 500 : 0)) * dropMult).round();
+    final int scaledOre = (oreReward * dropMult).round();
+    // Distilled Vitae: Primary alchemical fluid extracted from slain mineral vascular channels
+    final int distilledVitae = ((reward * 0.45 + (_activeNode?.type == CampaignNodeType.boss ? 350 : (_activeNode?.type == CampaignNodeType.elite ? 120 : 40))) * dropMult).round();
+
+    String? bossReagent;
+    if (_activeNode?.type == CampaignNodeType.boss) {
+      switch (_currentChapter) {
+        case 1:
+          bossReagent = 'Calcified Heart of Gorgoroth (G1 Progenitor Core)';
+          break;
+        case 2:
+          bossReagent = 'Abyssal Chitin Siphon (G2 Occult Core)';
+          break;
+        case 3:
+          bossReagent = 'Primordial Hearth-Core (G3 World Titan Ember)';
+          break;
+        default:
+          bossReagent = 'Prismatic Mineral Geode';
+      }
+    }
+
+    final rewardsData = CombatRewardsData(
+      isVictory: true,
+      rawAsh: scaledAsh,
+      emberShards: scaledOre,
+      cryptKeys: sigilsReward + (isFirstConquest ? 1 : 0),
+      distilledVitae: distilledVitae,
+      xpGained: xpReward,
+      levelUps: levelUps,
+      capturedThrall: purebloodDrop ?? captured,
+      relicDropName: relicDrop,
+      encounterTitle: _activeNode?.name ?? (_activeEnemyWaves != null ? 'MVP Ashen Skirmish' : 'Ashen Skirmish'),
+      ascensionTier: _currentAscension,
+      resourceDropMultiplier: dropMult,
+      bossReagentDrop: bossReagent,
+    );
 
       if (_ftueService.currentStage == FtueStage.encounter1) {
         _ftueService.advanceStage();

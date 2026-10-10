@@ -6,7 +6,7 @@ import 'package:ashen_crucible/core/combat_math.dart';
 
 void main() {
   group('PostBattleLootDialog Tests', () {
-    testWidgets('renders victory extraction rewards accurately with soul-bound thrall and relic drop', (tester) async {
+    testWidgets('renders victory extraction rewards accurately with soul-bound thrall, Distilled Vitae, boss reagent, and relic drop', (tester) async {
       bool continued = false;
       final capturedUnit = StarterBrigades.createDeathlessCryptReward();
 
@@ -23,11 +23,15 @@ void main() {
                       rawAsh: 450,
                       emberShards: 35,
                       cryptKeys: 2,
+                      distilledVitae: 180,
                       xpGained: 750,
                       levelUps: ['Ashen Vanguard (Lv. 2➔3)'],
                       capturedThrall: capturedUnit,
                       relicDropName: 'Obsidian Skull of Malice',
                       encounterTitle: 'Ironwatch Gatekeeper Skirmish',
+                      ascensionTier: 2,
+                      resourceDropMultiplier: 1.20,
+                      bossReagentDrop: 'Calcified Heart of Gorgoroth (G1 Progenitor Core)',
                     ),
                     onContinue: () {
                       continued = true;
@@ -48,12 +52,21 @@ void main() {
       // Check Header
       expect(find.text('EXTRACTION CONCLUDED'), findsOneWidget);
       expect(find.text('IRONWATCH GATEKEEPER SKIRMISH'), findsOneWidget);
+      expect(find.text('A2'), findsOneWidget);
 
       // Check Currencies & XP
       expect(find.text('+450'), findsOneWidget); // Raw Ash
+      expect(find.text('+180'), findsOneWidget); // Distilled Vitae
       expect(find.text('+35'), findsOneWidget);  // Ember Shards
       expect(find.text('+2'), findsOneWidget);   // Crypt Keys
       expect(find.text('+750 XP'), findsOneWidget); // XP
+
+      // Check Ascension Modifier Pill
+      expect(find.textContaining('ASCENSION 2 MODIFIER'), findsOneWidget);
+
+      // Check Boss Reagent Trophy
+      expect(find.text('TITAN BOSS REAGENT EXTRACTED'), findsOneWidget);
+      expect(find.text('Calcified Heart of Gorgoroth (G1 Progenitor Core)'), findsOneWidget);
 
       // Check Level Up Alert
       expect(find.textContaining('LEVEL UP: Ashen Vanguard (Lv. 2➔3)'), findsOneWidget);
@@ -108,7 +121,7 @@ void main() {
 
       expect(find.text('BRIGADE VANQUISHED'), findsOneWidget);
       expect(find.text('CHAMBER OF BONE'), findsOneWidget);
-      expect(find.textContaining('All frontline and arcanum vessels have collapsed'), findsOneWidget);
+      expect(find.textContaining('All frontline and arcanum vessels have collapsed into inert stone husks'), findsOneWidget);
 
       await tester.tap(find.text('RETURN TO CAMP'));
       await tester.pumpAndSettle();
