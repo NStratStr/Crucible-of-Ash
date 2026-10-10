@@ -2272,6 +2272,7 @@ class _BattleScreenState extends State<BattleScreen> {
                             blightStacks: unit.blightStacks,
                             shieldIntegrity: unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp) : 0.0,
                             isAlive: alive,
+                            plinthMaterial: unit.plinthMaterial,
                           ),
                           child: Container(
                             decoration: BoxDecoration(

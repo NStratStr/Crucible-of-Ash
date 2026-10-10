@@ -5,6 +5,16 @@ import 'skill_entity.dart';
 
 enum FormationSlot { front1, front2, front3, back1, back2 }
 
+/// GDD v2.6 Pillar 1 & Sec 4: Physical Miniature Plinth Crafting
+/// Modular bases and plinth materials providing distinct tabletop tactile aesthetics and passive stat affinity.
+enum PlinthMaterial {
+  slate,      // Weathered Ash Slate (Standard military baseline)
+  obsidian,   // Volcanic Glass (+10% Crit Damage, deep dark purple sheen)
+  bone,       // Defiled Crypt Bone (+5% Lifesteal, pale sepia calcified rim)
+  iron,       // Cold Forged Iron (+15% Armor, industrial brushed metallic sheen)
+  gold,       // Consecrated Pureblood Gold (+10% All-stats, ornate gleaming rim)
+}
+
 @immutable
 class UnitEntity {
   final String id;
@@ -13,6 +23,7 @@ class UnitEntity {
   final int generation; // 1, 2, 3, or 4 (Pureblood)
   final Archetype archetype;
   final FormationSlot slot;
+  final PlinthMaterial plinthMaterial;
 
   // Progression & Health
   final int level;
@@ -54,6 +65,7 @@ class UnitEntity {
     required this.generation,
     required this.archetype,
     required this.slot,
+    this.plinthMaterial = PlinthMaterial.slate,
     required this.level,
     required this.maxLevel,
     required this.currentHp,
@@ -318,6 +330,40 @@ class UnitEntity {
   bool get hasShield => shieldPoints > 0;
   bool get isPureblood => generation >= 4;
   String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
+
+  /// Plinth material title and tactical passive affinity (GDD v2.6 Pillar 1)
+  String get plinthMaterialTitle {
+    switch (plinthMaterial) {
+      case PlinthMaterial.obsidian:
+        return 'Obsidian Plinth (+10% Crit DMG)';
+      case PlinthMaterial.bone:
+        return 'Crypt Bone Plinth (+5% Lifesteal)';
+      case PlinthMaterial.iron:
+        return 'Cold Iron Plinth (+15% Armor)';
+      case PlinthMaterial.gold:
+        return 'Pureblood Gold Plinth (+10% All Stats)';
+      case PlinthMaterial.slate:
+      default:
+        return 'Ashen Slate Plinth (Standard)';
+    }
+  }
+
+  /// Base plinth rim border color for visual compositing
+  int get plinthRimBorderColorValue {
+    switch (plinthMaterial) {
+      case PlinthMaterial.obsidian:
+        return 0xFF7B1FA2; // Deep purple
+      case PlinthMaterial.bone:
+        return 0xFFBCAAA4; // Sepia bone
+      case PlinthMaterial.iron:
+        return 0xFF78909C; // Steel metallic
+      case PlinthMaterial.gold:
+        return 0xFFFFD54F; // Gleaming gold
+      case PlinthMaterial.slate:
+      default:
+        return 0xFF455A64; // Dark ashen slate
+    }
+  }
   bool get isBoss =>
       id.startsWith('boss_') &&
           !id.contains('guard') &&
@@ -513,6 +559,7 @@ class UnitEntity {
     String? nativeTraitId,
     String? graftedTraitId,
     FormationSlot? slot,
+    PlinthMaterial? plinthMaterial,
     String? customAvatarAsset,
     int? currentXp,
   }) {
@@ -523,6 +570,7 @@ class UnitEntity {
       generation: generation ?? this.generation,
       archetype: archetype,
       slot: slot ?? this.slot,
+      plinthMaterial: plinthMaterial ?? this.plinthMaterial,
       level: level ?? this.level,
       maxLevel: maxLevel,
       currentHp: currentHp ?? this.currentHp,
@@ -641,6 +689,7 @@ class UnitEntity {
       'lineageAncestors': lineageAncestors,
       'customAvatarAsset': customAvatarAsset,
       'currentXp': currentXp,
+      'plinthMaterial': plinthMaterial.name,
     };
   }
 
@@ -657,6 +706,10 @@ class UnitEntity {
       slot: FormationSlot.values.firstWhere(
         (s) => s.name == json['slot'],
         orElse: () => FormationSlot.front1,
+      ),
+      plinthMaterial: PlinthMaterial.values.firstWhere(
+        (p) => p.name == json['plinthMaterial'],
+        orElse: () => PlinthMaterial.slate,
       ),
       level: (json['level'] as num).toInt(),
       maxLevel: (json['maxLevel'] as num).toInt(),

@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../shared/models/unit_entity.dart';
 
 /// GDD v2.6 Section 4: Procedural Compositing Rules
+/// - Modular Plinth Material Base Rim (Obsidian, Bone, Iron, Gold, Slate)
 /// - Left arc: Bleed notches (up to 10 stacks, crimson #FF1744)
 /// - Right arc: Blight/Poison pips (emerald #00E676)
 /// - Aegis Barrier Ring: Concentric gold radial ring (#FFD54F) tracking shield integrity
@@ -10,24 +12,55 @@ class PlinthRimStatusPainter extends CustomPainter {
   final int blightStacks;
   final double shieldIntegrity; // 0.0 to 1.0 (shield points / maxHp)
   final bool isAlive;
+  final PlinthMaterial plinthMaterial;
 
   const PlinthRimStatusPainter({
     required this.bleedStacks,
     required this.blightStacks,
     required this.shieldIntegrity,
     required this.isAlive,
+    this.plinthMaterial = PlinthMaterial.slate,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (!isAlive && bleedStacks == 0 && blightStacks == 0 && shieldIntegrity <= 0) {
-      return;
-    }
-
     final Rect ovalRect = Offset.zero & size;
     final Offset center = Offset(size.width / 2, size.height / 2);
     final double rx = size.width / 2;
     final double ry = size.height / 2;
+
+    // 0. Base Plinth Rim Material Tint & Texture Line
+    if (isAlive) {
+      Color materialRimColor;
+      switch (plinthMaterial) {
+        case PlinthMaterial.obsidian:
+          materialRimColor = const Color(0xFFBA68C8); // Volcanic glass purple
+          break;
+        case PlinthMaterial.bone:
+          materialRimColor = const Color(0xFFD7CCC8); // Calcified crypt bone
+          break;
+        case PlinthMaterial.iron:
+          materialRimColor = const Color(0xFF90A4AE); // Cold iron steel
+          break;
+        case PlinthMaterial.gold:
+          materialRimColor = const Color(0xFFFFD54F); // Ornate gold
+          break;
+        case PlinthMaterial.slate:
+        default:
+          materialRimColor = const Color(0xFF546E7A); // Ashen slate
+          break;
+      }
+
+      final Paint rimPaint = Paint()
+        ..color = materialRimColor.withValues(alpha: 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4;
+      canvas.drawOval(ovalRect, rimPaint);
+    }
+
+    if (!isAlive && bleedStacks == 0 && blightStacks == 0 && shieldIntegrity <= 0) {
+      return;
+    }
 
     // 1. Aegis Barrier: Concentric Gold Radial Ring
     if (shieldIntegrity > 0 && isAlive) {
@@ -125,6 +158,7 @@ class PlinthRimStatusPainter extends CustomPainter {
     return oldDelegate.bleedStacks != bleedStacks ||
         oldDelegate.blightStacks != blightStacks ||
         oldDelegate.shieldIntegrity != shieldIntegrity ||
-        oldDelegate.isAlive != isAlive;
+        oldDelegate.isAlive != isAlive ||
+        oldDelegate.plinthMaterial != plinthMaterial;
   }
 }

@@ -862,6 +862,29 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildStatCell(
+                            'PLINTH MATERIAL',
+                            unit.plinthMaterialTitle,
+                            Color(unit.plinthRimBorderColorValue),
+                          ),
+                          _buildStatCell(
+                            'BASE COMPOSITION',
+                            unit.plinthMaterial == PlinthMaterial.gold
+                                ? '+10% All Core Stats'
+                                : (unit.plinthMaterial == PlinthMaterial.obsidian
+                                    ? '+10% Crit Multiplier'
+                                    : (unit.plinthMaterial == PlinthMaterial.bone
+                                        ? '+5% Sanguine Siphon'
+                                        : (unit.plinthMaterial == PlinthMaterial.iron
+                                            ? '+15% Plated Armor'
+                                            : 'Standard Ashen Slate'))),
+                            const Color(0xFFE5A93C),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
