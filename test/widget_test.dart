@@ -65,7 +65,7 @@ void main() {
   });
 
   testWidgets('Opening Endgame Gauntlet renders trials and allows engaging World Titan', (WidgetTester tester) async {
-    await tester.pumpWidget(const AshenCrucibleApp());
+    await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
     await tester.pump();
 
     // On Campaign Map, tap ENDGAME GAUNTLET button

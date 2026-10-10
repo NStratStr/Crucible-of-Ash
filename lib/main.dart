@@ -7,7 +7,8 @@ void main() {
 }
 
 class AshenCrucibleApp extends StatelessWidget {
-  const AshenCrucibleApp({super.key});
+  final bool enableAutoBattle;
+  const AshenCrucibleApp({super.key, this.enableAutoBattle = true});
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +26,7 @@ class AshenCrucibleApp extends StatelessWidget {
         ),
         fontFamily: 'Roboto',
       ),
-      home: const AppShell(),
+      home: AppShell(enableAutoBattle: enableAutoBattle),
     );
   }
 }

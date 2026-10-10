@@ -169,7 +169,7 @@ class UnitEntity {
       return 'assets/images/lord_vladislav.png';
     }
 
-    // Primordial Boss / Titan (Goro / Flayed Butcher)
+    // Primordial Boss / Titan / Colossus
     if (isBoss ||
         speciesId.contains('butcher') ||
         speciesId.contains('flayed') ||
@@ -179,11 +179,54 @@ class UnitEntity {
         name.contains('Butcher') ||
         name.contains('Executioner') ||
         name.contains('Titan')) {
+      if (speciesId.contains('golem') || speciesId.contains('colossus') || name.contains('Golem') || name.contains('Colossus')) {
+        return 'assets/images/magma_golem.png';
+      }
       return 'assets/images/flayed_butcher.png';
     }
 
-    // Evolution flag: only Gen 4 / purebloods get the final evolution model!
+    if (speciesId.contains('golem') || speciesId.contains('colossus') || name.contains('Golem') || name.contains('Colossus')) {
+      return 'assets/images/magma_golem.png';
+    }
+
+    // Evolution flag: Gen 4+ or pureblood triggers sovereign/pureblood evolution
     final bool isFinalEvolution = isPureblood || generation >= 4;
+
+    // Crypt Stalkers: Rotting Husk (Juggernaut)
+    if (speciesId.contains('husk') || name.contains('Husk')) {
+      return 'assets/images/rotting_husk_g1.png';
+    }
+
+    // Crypt Stalkers: Ghoul / Flayer / Strigoi Lord line
+    if (speciesId.contains('strigoi') || name.contains('Strigoi')) {
+      return 'assets/images/strigoi_lord_g6.png';
+    }
+    if (speciesId.contains('flayer') || name.contains('Flayer')) {
+      return 'assets/images/sanguine_flayer_g3.png';
+    }
+    if (speciesId.contains('ghoul') || name.contains('Ghoul')) {
+      if (isFinalEvolution) return 'assets/images/strigoi_lord_g6.png';
+      if (generation >= 3) return 'assets/images/sanguine_flayer_g3.png';
+      return 'assets/images/grave_ghoul_g1.png';
+    }
+
+    // Ash Legion: Iron Footman / Sun-Forged Veteran / Lord Justicar line
+    if (speciesId.contains('justicar') || name.contains('Justicar')) {
+      return 'assets/images/lord_justicar_g6.png';
+    }
+    if (speciesId.contains('veteran') || name.contains('Veteran')) {
+      return 'assets/images/sun_forged_veteran_g3.png';
+    }
+    if (speciesId.contains('footman') || name.contains('Footman')) {
+      if (isFinalEvolution) return 'assets/images/lord_justicar_g6.png';
+      if (generation >= 3) return 'assets/images/sun_forged_veteran_g3.png';
+      return 'assets/images/iron_footman_g1.png';
+    }
+
+    // Ash Legion: Sun-Scorched Cleric / Field Medicus line
+    if (speciesId.contains('cleric') || name.contains('Cleric') || speciesId.contains('medicus') || name.contains('Medicus')) {
+      return 'assets/images/sun_scorched_cleric.png';
+    }
 
     // Feral Beast / Cerberus line
     if (speciesId.contains('cerberus') ||
@@ -207,14 +250,10 @@ class UnitEntity {
         speciesId.contains('plague') ||
         speciesId.contains('warlock') ||
         speciesId.contains('witch') ||
-        speciesId.contains('cleric') ||
-        speciesId.contains('medicus') ||
         speciesId.contains('alchemist') ||
         name.contains('Disciple') ||
         name.contains('Weave') ||
         name.contains('Lich') ||
-        name.contains('Cleric') ||
-        name.contains('Medicus') ||
         name.contains('Alchemist')) {
       if (isFinalEvolution || name.contains('Void') || name.contains('Lich') || speciesId.contains('lich')) {
         return 'assets/images/lich_pureblood.png';
@@ -239,49 +278,45 @@ class UnitEntity {
       return 'assets/images/marksman_base.png';
     }
 
-    // Assassin / Skirmisher / Vampire / Ghoul / Duelist line
+    // Assassin / Skirmisher / Vampire / Duelist line
     if (archetype == Archetype.assassin ||
         archetype == Archetype.skirmisher ||
         speciesId.contains('stalker') ||
         speciesId.contains('slayer') ||
         speciesId.contains('reaper') ||
         speciesId.contains('vampire') ||
-        speciesId.contains('ghoul') ||
         speciesId.contains('duelist') ||
         name.contains('Shadow') ||
         name.contains('Blade') ||
         name.contains('Skirmisher') ||
         name.contains('Vampire') ||
-        name.contains('Ghoul') ||
         name.contains('Duelist')) {
       if (isFinalEvolution || name.contains('Eclipse') || name.contains('Vampire') || speciesId.contains('vampire')) {
         return 'assets/images/vampire_pureblood.png';
       }
-      return 'assets/images/ghoul_base.png';
+      return 'assets/images/grave_ghoul_g1.png';
     }
 
-    // Juggernaut / Knight / Footman / Husk / Paladin / Dreadnought line
+    // Juggernaut / Knight / Paladin / Dreadnought line
     if (archetype == Archetype.juggernaut ||
         speciesId.contains('knight') ||
-        speciesId.contains('golem') ||
-        speciesId.contains('footman') ||
         speciesId.contains('dreadnought') ||
         speciesId.contains('paladin') ||
         speciesId.contains('guardian') ||
-        speciesId.contains('husk') ||
-        name.contains('Footman') ||
         name.contains('Dreadnought') ||
-        name.contains('Paladin') ||
-        name.contains('Husk')) {
+        name.contains('Paladin')) {
       if (isFinalEvolution || speciesId.contains('dreadnought') || name.contains('Dreadnought')) {
-        return 'assets/images/dreadnought_pureblood.png';
+        return 'assets/images/lord_justicar_g6.png';
       }
-      return 'assets/images/footman_base.png';
+      if (generation >= 3) {
+        return 'assets/images/sun_forged_veteran_g3.png';
+      }
+      return 'assets/images/iron_footman_g1.png';
     }
 
     return isFinalEvolution
-        ? 'assets/images/dreadnought_pureblood.png'
-        : 'assets/images/footman_base.png';
+        ? 'assets/images/lord_justicar_g6.png'
+        : 'assets/images/iron_footman_g1.png';
   }
 
   String get factionName {

@@ -608,11 +608,26 @@ class GeneralCommandService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// GDD v2.8 Sec 3.5: Returns the effective focus cost of an order accounting for
+  /// Commander leadership aura (e.g., Lord Vladislav in Arcanum reduces Bleed orders by 1 Focus).
+  int getEffectiveFocusCost(GeneralOrderDefinition order) {
+    int cost = order.focusCost;
+    if (activeGeneralType == GeneralType.vladislav) {
+      final commander = tickManager.allies.where((u) => u.isCommander).firstOrNull;
+      if (commander != null && commander.isArcanum && commander.isAlive) {
+        if (order.id == 'rend_flesh' || order.id == 'exsanguinating_strike') {
+          cost = max(0, cost - 1);
+        }
+      }
+    }
+    return cost;
+  }
+
   // ===========================================================================
   // 1A. LORD VLADISLAV 6-CARD GRIMOIRE ORDERS (MVP SPEC GDD v2.6 SEC 14.1)
   // ===========================================================================
 
-  /// Rend Flesh (Cost: 1 Focus)
+  /// Rend Flesh (Cost: 1 Focus; 0 Focus if Vladislav is in Arcanum)
   /// Strike + Bleed DoT.
   OrderResult executeRendFlesh(String targetEnemyId) {
     _validateOrderUnlocked('rend_flesh');
@@ -622,7 +637,10 @@ class GeneralCommandService extends ChangeNotifier {
       throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
     }
 
-    const int cost = 1;
+    // GDD v2.8 Sec 3.5: Vladislav Backline placement reduces Bleed Tuning Slips cost by 1 (min 0)
+    final vladislavUnit = tickManager.allies.where((u) => u.isCommander).firstOrNull;
+    final bool isVladislavBackline = vladislavUnit != null && vladislavUnit.isArcanum && vladislavUnit.isAlive;
+    final int cost = isVladislavBackline ? 0 : 1;
     _spendFocus(cost);
 
     final UnitEntity target = enemies[enemyIdx];

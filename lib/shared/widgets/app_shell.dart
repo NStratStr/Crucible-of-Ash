@@ -33,7 +33,8 @@ import 'hexagonal_affinity_wheel_widget.dart';
 import 'pedigree_inspector_dialog.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  final bool enableAutoBattle;
+  const AppShell({super.key, this.enableAutoBattle = true});
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -220,16 +221,21 @@ class _AppShellState extends State<AppShell> {
     } else {
       allies = StarterBrigades.createAshLegionPlayerSquad();
     }
+    final previousTickManager = _isInitialized ? _tickManager : null;
+    final previousCommandService = _isInitialized ? _commandService : null;
     _isInitialized = true;
     final enemies = customEnemies ??
         (_activeEnemyWaves != null && _activeEnemyWaves!.isNotEmpty
             ? _activeEnemyWaves!.first
             : StarterBrigades.createCryptStalkersEnemySquad());
 
+    previousTickManager?.dispose();
+    previousCommandService?.dispose();
+
     _tickManager = InitiativeTickManager(
       initialAllies: allies,
       initialEnemies: enemies,
-      tickInterval: const Duration(milliseconds: 140),
+      tickInterval: const Duration(milliseconds: 220),
       onTick: () => _commandService.onSimulationTick(),
     );
 
@@ -262,10 +268,13 @@ class _AppShellState extends State<AppShell> {
     final waves = StarterBrigades.createMvpThreeWaveSkirmish();
     final allies = StarterBrigades.createAshLegionPlayerSquad();
 
+    _tickManager.dispose();
+    _commandService.dispose();
+
     _tickManager = InitiativeTickManager(
       initialAllies: allies,
       initialEnemies: waves.first,
-      tickInterval: const Duration(milliseconds: 140),
+      tickInterval: const Duration(milliseconds: 220),
       onTick: () => _commandService.onSimulationTick(),
     );
 
@@ -1415,8 +1424,10 @@ class _AppShellState extends State<AppShell> {
                     relicService: _relicService,
                     bloodlineSigils: _bloodlineSigils,
                     enemyWaves: _activeEnemyWaves,
+                    initialAutoBattle: widget.enableAutoBattle,
                     onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
                     onResetEncounter: () => setState(_resetEncounter),
+                    onDeployMvpSkirmish: _launchMvpThreeWaveSkirmish,
                     onVictory: _onCombatVictory,
                     onDefeat: _onCombatDefeat,
                   ),
