@@ -199,6 +199,7 @@ class _BattleScreenState extends State<BattleScreen> {
   Color? _screenFlashColorOverride;
   GeneralOrderBannerData? _activeOrderBanner;
   LimitBurstBannerData? _activeLimitBurstBanner;
+  int? _hoveredCardIndex;
   Offset _screenShake = Offset.zero;
   Timer? _shakeTimer;
 
@@ -251,7 +252,7 @@ class _BattleScreenState extends State<BattleScreen> {
     });
 
     final double speedMult = widget.tickManager.speedMultiplier;
-    final int animDurationMs = (600 / speedMult).round().clamp(220, 800);
+    final int animDurationMs = (850 / speedMult).round().clamp(480, 1300);
 
     final timer = Timer(Duration(milliseconds: animDurationMs), () {
       if (mounted) {
@@ -269,7 +270,10 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void initState() {
     super.initState();
-    _isPreBattleSetup = widget.startInPreBattleSetup && widget.tickManager.phase != CombatPhase.ticking;
+    _isPreBattleSetup = widget.startInPreBattleSetup;
+    if (_isPreBattleSetup && widget.tickManager.phase == CombatPhase.ticking) {
+      widget.tickManager.pause();
+    }
     _autoBattle = widget.initialAutoBattle;
     _aiService = EnemyAiService(
       tickManager: widget.tickManager,
@@ -322,7 +326,10 @@ class _BattleScreenState extends State<BattleScreen> {
 
       _isProcessingAiTurn = false;
       _hasDispatchedEndOutcome = false;
-      _isPreBattleSetup = true;
+      _isPreBattleSetup = widget.startInPreBattleSetup;
+      if (_isPreBattleSetup && widget.tickManager.phase == CombatPhase.ticking) {
+        widget.tickManager.pause();
+      }
       _combatLog = 'Encounter engaged! The Crucible awakens.';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -503,13 +510,16 @@ class _BattleScreenState extends State<BattleScreen> {
     _aiTurnTimer?.cancel();
 
     final double bulletMult = (widget.tickManager.isBulletTime || widget.commandService.isBulletTimeActive) ? 0.30 : 1.0;
-    final int aiDelay = ((650 / widget.tickManager.speedMultiplier) / bulletMult).round();
+    final int aiDelay = ((400 / widget.tickManager.speedMultiplier) / bulletMult).round();
 
     _aiTurnTimer = Timer(Duration(milliseconds: aiDelay), () {
       if (!mounted) return;
       try {
         final activeBefore = widget.tickManager.activeUnit;
-        if (activeBefore == null || !_aiService.isEnemyTurn) return;
+        if (activeBefore == null || !_aiService.isEnemyTurn) {
+          _isProcessingAiTurn = false;
+          return;
+        }
 
         final result = _aiService.executeEnemyTurn();
 
@@ -547,7 +557,11 @@ class _BattleScreenState extends State<BattleScreen> {
         if (mounted) {
           setState(() => _combatLog = 'Enemy action paused: $e');
         }
-      } finally {
+      }
+
+      // Tactical Breathing Window: Keep _isProcessingAiTurn active until the attack animation finishes + a 400ms recovery gap
+      final int turnPacingMs = ((1250 / widget.tickManager.speedMultiplier) / bulletMult).round().clamp(600, 4200);
+      Timer(Duration(milliseconds: turnPacingMs), () {
         if (mounted) {
           _isProcessingAiTurn = false;
           if (_aiService.isEnemyTurn) {
@@ -556,7 +570,7 @@ class _BattleScreenState extends State<BattleScreen> {
             _handleAutoPlayerTurn();
           }
         }
-      }
+      });
     });
   }
 
@@ -570,7 +584,7 @@ class _BattleScreenState extends State<BattleScreen> {
     _autoBattleTimer?.cancel();
 
     final double bulletMult = (widget.tickManager.isBulletTime || widget.commandService.isBulletTimeActive) ? 0.30 : 1.0;
-    final int autoDelay = ((550 / widget.tickManager.speedMultiplier) / bulletMult).round();
+    final int autoDelay = ((350 / widget.tickManager.speedMultiplier) / bulletMult).round();
 
     _autoBattleTimer = Timer(Duration(milliseconds: autoDelay), () {
       if (!mounted || !_isPlayerTurnNow) {
@@ -580,7 +594,10 @@ class _BattleScreenState extends State<BattleScreen> {
 
       try {
         final currentActive = widget.tickManager.activeUnit;
-        if (currentActive == null || currentActive.id != active.id) return;
+        if (currentActive == null || currentActive.id != active.id) {
+          _isProcessingAiTurn = false;
+          return;
+        }
 
         final skills = currentActive.resolvedSkills;
         final readySkill = skills.reversed.firstWhere((s) => s.isReady, orElse: () => skills.first);
@@ -598,7 +615,11 @@ class _BattleScreenState extends State<BattleScreen> {
         if (_selectedEnemyId != null) {
           _executePlayerSkill(readySkill);
         }
-      } finally {
+      } catch (_) {}
+
+      // Tactical Recovery Window after auto-attack
+      final int turnPacingMs = ((1200 / widget.tickManager.speedMultiplier) / bulletMult).round().clamp(600, 4000);
+      Timer(Duration(milliseconds: turnPacingMs), () {
         if (mounted) {
           _isProcessingAiTurn = false;
           if (_aiService.isEnemyTurn) {
@@ -607,7 +628,7 @@ class _BattleScreenState extends State<BattleScreen> {
             _handleAutoPlayerTurn();
           }
         }
-      }
+      });
     });
   }
 
@@ -639,6 +660,17 @@ class _BattleScreenState extends State<BattleScreen> {
         result.target.id,
         vfx: _resolveCombatVfx(result.attacker, skill: skill, isCrit: result.isCritical),
       );
+
+      _isProcessingAiTurn = true;
+      final int playerAnimDuration = (1100 / widget.tickManager.speedMultiplier).round().clamp(600, 2500);
+      Timer(Duration(milliseconds: playerAnimDuration), () {
+        if (mounted) {
+          _isProcessingAiTurn = false;
+          if (_aiService.isEnemyTurn) {
+            _handleAiTurn();
+          }
+        }
+      });
 
       _triggerDamagePop(
         damage: result.damageDealt,
@@ -1114,41 +1146,69 @@ class _BattleScreenState extends State<BattleScreen> {
                     if (activeBoss != null) _buildGrandBossBar(activeBoss),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.0,
+                          vertical: MediaQuery.of(context).size.height < 760 ? 1.0 : 4.0,
+                        ),
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
                               maxWidth: MediaQuery.of(context).size.width >= 1000 ? 1280.0 : 780.0,
                             ),
-                            child: Column(
-                              children: [
-                                // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
-                                _buildSquadFormation(
-                                  units: widget.tickManager.enemies,
-                                  isEnemy: true,
-                                  activeUnitId: activeUnit?.id,
-                                  selectedTargetId: _selectedEnemyId,
-                                  onSelectTarget: (id) {
-                                    final tauntingEnemy = widget.tickManager.enemies.where((u) => u.isAlive && u.isTaunting).firstOrNull;
-                                    if (tauntingEnemy != null && tauntingEnemy.id != id) {
-                                      _addPop('TAUNTED by ${tauntingEnemy.name}!', const Color(0xFFFF5252), isCrit: true);
-                                      setState(() => _selectedEnemyId = tauntingEnemy.id);
-                                    } else {
-                                      setState(() => _selectedEnemyId = id);
-                                    }
-                                  },
-                                ),
+                            child: Builder(
+                              builder: (context) {
+                                final double screenHeight = MediaQuery.of(context).size.height;
+                                final bool isCompact = screenHeight < 760;
+                                final bool isUltraCompact = screenHeight < 620;
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // Vertical Initiative Ribbon along the left edge
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 6.0),
+                                      child: Center(
+                                        child: SingleChildScrollView(
+                                          child: _buildVerticalInitiativeTrack(),
+                                        ),
+                                      ),
+                                    ),
 
-                                // Center Clash Line: The Ashen Front
-                                _buildClashLine(),
+                                    // Main Battlefield Formation Field
+                                    Expanded(
+                                      child: Column(
+                                        children: [
+                                          // Hostile Formation (Arcanum backline top -> Vanguard frontline bottom)
+                                          _buildSquadFormation(
+                                            units: widget.tickManager.enemies,
+                                            isEnemy: true,
+                                            activeUnitId: activeUnit?.id,
+                                            selectedTargetId: _selectedEnemyId,
+                                            onSelectTarget: (id) {
+                                              final tauntingEnemy = widget.tickManager.enemies.where((u) => u.isAlive && u.isTaunting).firstOrNull;
+                                              if (tauntingEnemy != null && tauntingEnemy.id != id) {
+                                                _addPop('TAUNTED by ${tauntingEnemy.name}!', const Color(0xFFFF5252), isCrit: true);
+                                                setState(() => _selectedEnemyId = tauntingEnemy.id);
+                                              } else {
+                                                setState(() => _selectedEnemyId = id);
+                                              }
+                                            },
+                                          ),
 
-                                // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
-                                _buildSquadFormation(
-                                  units: widget.tickManager.allies,
-                                  isEnemy: false,
-                                  activeUnitId: activeUnit?.id,
-                                ),
-                              ],
+                                          // Center Clash Line: The Ashen Front
+                                          _buildClashLine(isCompact: isCompact, isUltraCompact: isUltraCompact),
+
+                                          // Allied Formation (Vanguard frontline top -> Arcanum backline bottom)
+                                          _buildSquadFormation(
+                                            units: widget.tickManager.allies,
+                                            isEnemy: false,
+                                            activeUnitId: activeUnit?.id,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ),
@@ -2066,86 +2126,122 @@ class _BattleScreenState extends State<BattleScreen> {
       );
     }
 
-    final vanguard = units.where((u) => u.isVanguard).toList();
-    final arcanum = units.where((u) => u.isArcanum).toList();
-
-    final bool hasArcanum = arcanum.isNotEmpty;
-    final bool hasVanguard = vanguard.isNotEmpty;
-
-    if (!hasArcanum && !hasVanguard) {
+    if (units.isEmpty) {
       return const Expanded(child: SizedBox.shrink());
     }
 
-    final List<Widget> tierWidgets = [];
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool isDesktop = screenWidth >= 1000;
+    final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+    final bool isCompact = screenHeight < 760;
+    final bool isUltraCompact = screenHeight < 620;
 
-    if (isEnemy) {
-      // Enemy: Arcanum (Backline) at top, Vanguard (Frontline) closer to center
-      if (hasArcanum) {
-        tierWidgets.add(
-          _buildTierRow(
-            units: arcanum,
-            isEnemy: true,
-            isFrontline: false,
-            hasOppositeTier: hasVanguard,
-            activeUnitId: activeUnitId,
-            selectedTargetId: selectedTargetId,
-            onSelectTarget: onSelectTarget,
-          ),
-        );
-      }
-      if (hasArcanum && hasVanguard) {
-        tierWidgets.add(const SizedBox(height: 3));
-      }
-      if (hasVanguard) {
-        tierWidgets.add(
-          _buildTierRow(
-            units: vanguard,
-            isEnemy: true,
-            isFrontline: true,
-            hasOppositeTier: hasArcanum,
-            activeUnitId: activeUnitId,
-            selectedTargetId: selectedTargetId,
-            onSelectTarget: onSelectTarget,
-          ),
-        );
-      }
-    } else {
-      // Allies: Vanguard (Frontline) closer to center, Arcanum (Backline) at bottom
-      if (hasVanguard) {
-        tierWidgets.add(
-          _buildTierRow(
-            units: vanguard,
-            isEnemy: false,
-            isFrontline: true,
-            hasOppositeTier: hasArcanum,
-            activeUnitId: activeUnitId,
-            selectedTargetId: selectedTargetId,
-            onSelectTarget: onSelectTarget,
-          ),
-        );
-      }
-      if (hasArcanum && hasVanguard) {
-        tierWidgets.add(const SizedBox(height: 3));
-      }
-      if (hasArcanum) {
-        tierWidgets.add(
-          _buildTierRow(
-            units: arcanum,
-            isEnemy: false,
-            isFrontline: false,
-            hasOppositeTier: hasVanguard,
-            activeUnitId: activeUnitId,
-            selectedTargetId: selectedTargetId,
-            onSelectTarget: onSelectTarget,
-          ),
-        );
-      }
-    }
+    // Responsive squad cluster width tailored for mobile fit and desktop wargaming presence
+    final double perUnitWidth = isDesktop ? 165.0 : (isTablet ? 130.0 : 76.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(260.0, isDesktop ? 960.0 : (isTablet ? 680.0 : (screenWidth - 12.0)));
+    final double cardMaxWidth = isDesktop ? 175.0 : (isTablet ? 135.0 : 80.0);
+    final double horizontalPadding = isDesktop ? 3.0 : (isTablet ? 2.0 : 1.0);
+
+    // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
+    final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
+    final bool isVladCommander = widget.commandService.activeGeneralType == GeneralType.vladislav;
+    final bool vladVanguardAura = !isEnemy && isVladCommander && (commander != null && commander.isVanguard && commander.isAlive);
+    final bool vladArcanumAura = !isEnemy && isVladCommander && (commander != null && commander.isArcanum && commander.isAlive);
+
+    final int vanguardCount = units.where((u) => u.isVanguard).length;
+    final int arcanumCount = units.where((u) => u.isArcanum).length;
+
+    final String rankTitle = isEnemy
+        ? (isCompact ? '⚔️ HOSTILE SQUAD ($vanguardCount FRONT • $arcanumCount REAR)' : '⚔️ HOSTILE REGIMENT: $vanguardCount FRONTLINE • $arcanumCount BACKLINE')
+        : (vladVanguardAura
+            ? (isCompact ? '🛡️ ALLIED FRONT • 🩸 VAMPIRIC' : '🛡️ ALLIED REGIMENT: VAMPIRIC CONDUIT (+15% LIFESTEAL) • $vanguardCount FRONT • $arcanumCount REAR')
+            : (vladArcanumAura
+                ? (isCompact ? '🏹 ALLIED REAR • 🩸 CONDUIT' : '🏹 ALLIED REGIMENT: VAMPIRIC CONDUIT (-1 FOCUS BLEED) • $vanguardCount FRONT • $arcanumCount REAR')
+                : (isCompact ? '🛡️ ALLIED SQUAD ($vanguardCount FRONT • $arcanumCount REAR)' : '🛡️ ALLIED REGIMENT: $vanguardCount FRONTLINE • $arcanumCount BACKLINE')));
+
+    final Color rankColor = isEnemy ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F);
 
     return Expanded(
       flex: 14,
       child: Column(
-        children: tierWidgets,
+        children: [
+          // Tactical Regiment Header (Shown during Pre-Battle setup or when an active general aura is active)
+          if (!isUltraCompact && (_isPreBattleSetup || vladVanguardAura || vladArcanumAura))
+            Container(
+              margin: EdgeInsets.only(
+                top: isEnemy ? 0.0 : (isCompact ? 1.0 : 2.0),
+                bottom: isEnemy ? (isCompact ? 1.0 : 2.0) : 0.0,
+              ),
+              padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 10, vertical: isCompact ? 1.0 : 2.0),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: rankColor.withValues(alpha: 0.45), width: 0.8),
+              ),
+              child: Text(
+                rankTitle,
+                style: TextStyle(
+                  color: rankColor,
+                  fontSize: isCompact ? 6.5 : 7.2,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  fontFamily: 'monospace',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+          // Unified Staggered Squad Row: All units rendered in their formation slot columns
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxClusterWidth),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: units.map((unit) {
+                    final bool isFrontline = unit.isVanguard;
+                    // Stagger Depth: Frontline steps forward towards Ashen Front (-Y for Allies, +Y for Enemy)
+                    // Backline steps back away from Ashen Front (+Y for Allies, -Y for Enemy)
+                    final double depthY = isFrontline
+                        ? (isEnemy ? (isCompact ? 12.0 : 18.0) : (isCompact ? -12.0 : -18.0))
+                        : (isEnemy ? (isCompact ? -8.0 : -12.0) : (isCompact ? 8.0 : 12.0));
+                    final double tierScale = isFrontline ? 1.04 : 0.92;
+
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 1.0),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: cardMaxWidth),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              transform: Matrix4.translationValues(0.0, depthY, 0.0),
+                              child: Transform.scale(
+                                scale: tierScale,
+                                alignment: Alignment.bottomCenter,
+                                child: _buildUnitCard(
+                                  unit: unit,
+                                  isEnemy: isEnemy,
+                                  isActive: unit.id == activeUnitId,
+                                  isSelectedTarget: unit.id == selectedTargetId,
+                                  onTap: () => onSelectTarget?.call(unit.id),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2271,129 +2367,258 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  Widget _buildTierRow({
-    required List<UnitEntity> units,
-    required bool isEnemy,
-    required bool isFrontline,
-    required bool hasOppositeTier,
-    required String? activeUnitId,
-    String? selectedTargetId,
-    ValueChanged<String>? onSelectTarget,
-  }) {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final bool isDesktop = screenWidth >= 1000;
-    final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
 
-    final double perUnitWidth = isDesktop ? 280.0 : (isTablet ? 240.0 : 200.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(240.0, isDesktop ? 1050.0 : 760.0);
-    final double cardMaxWidth = isDesktop ? 280.0 : (isTablet ? 240.0 : 210.0);
 
-    // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
-    final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
-    final bool isVladCommander = widget.commandService.activeGeneralType == GeneralType.vladislav;
-    final bool vladVanguardAura = !isEnemy && isFrontline && isVladCommander &&
-        (commander != null && commander.isVanguard && commander.isAlive);
-    final bool vladArcanumAura = !isEnemy && !isFrontline && isVladCommander &&
-        (commander != null && commander.isArcanum && commander.isAlive);
+  /// Calculates upcoming turn queue based on current Turn Meter and Speed ticks
+  List<UnitEntity> _getUpcomingTurnQueue() {
+    final livingUnits = widget.tickManager.allUnits.where((u) => u.isAlive).toList();
+    if (livingUnits.isEmpty) return [];
 
-    // GDD v2.8 Sec 3.4: Visual Offset: Frontline units scale larger (1.04x) and push forward;
-    // Backline units scale down (0.93x) and step back.
-    final double depthOffset = isFrontline
-        ? (isEnemy ? 4.0 : -4.0)
-        : (isEnemy ? -4.0 : 4.0);
+    final active = widget.tickManager.activeUnit;
+    livingUnits.sort((a, b) {
+      if (a.id == active?.id) return -1;
+      if (b.id == active?.id) return 1;
 
-    final String laneTitle = isFrontline
-        ? (isEnemy
-            ? '🛡️ HOSTILE FRONTLINE: MELEE AGGRO • +10% STAGGER RES • +15% AP ON HIT'
-            : (vladVanguardAura
-                ? '🛡️ ALLIED FRONTLINE: MELEE AGGRO • +10% STAGGER • 🩸 VAMPIRIC CONDUIT (+15% LIFESTEAL)'
-                : '🛡️ ALLIED FRONTLINE: ABSORBS MELEE AGGRO • +10% STAGGER RES • +15% AP ON HIT'))
-        : (isEnemy
-            ? '🏹 HOSTILE BACKLINE: GUARDED (-20% RANGED DMG) • +15% ACC'
-            : (vladArcanumAura
-                ? '🏹 ALLIED BACKLINE: GUARDED (-20% RANGED) • +15% ACC • 🩸 VAMPIRIC CONDUIT (-1 FOCUS BLEED)'
-                : '🏹 ALLIED BACKLINE: GUARDED (-20% RANGED DMG) • +15% ACC'));
+      // Estimate ticks remaining to reach 100% Turn Meter
+      final double tmNeededA = (100.0 - a.turnMeter).clamp(0.0, 100.0);
+      final double speedModA = a.hasHaste ? 1.35 : 1.0;
+      final double deltaA = ((a.speed * speedModA) / 100.0) * InitiativeTickManager.tickScale;
+      final double ticksA = deltaA > 0 ? (tmNeededA / deltaA) : 999.0;
 
-    final Color laneColor = isFrontline ? const Color(0xFFE5A93C) : const Color(0xFF80D8FF);
+      final double tmNeededB = (100.0 - b.turnMeter).clamp(0.0, 100.0);
+      final double speedModB = b.hasHaste ? 1.35 : 1.0;
+      final double deltaB = ((b.speed * speedModB) / 100.0) * InitiativeTickManager.tickScale;
+      final double ticksB = deltaB > 0 ? (tmNeededB / deltaB) : 999.0;
 
-    return Expanded(
-      flex: hasOppositeTier ? (isFrontline ? 10 : 9) : 19,
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: isEnemy ? (isFrontline ? 2.0 : 1.0) : (isFrontline ? 10.0 : 2.0),
-          bottom: isEnemy ? (isFrontline ? 10.0 : 2.0) : (isFrontline ? 2.0 : 1.0),
+      final int tickComp = ticksA.compareTo(ticksB);
+      if (tickComp != 0) return tickComp;
+
+      return b.speed.compareTo(a.speed);
+    });
+
+    return livingUnits.take(6).toList();
+  }
+
+  /// Vertical Initiative Ribbon along the left edge showing who acts next from top to bottom
+  Widget _buildVerticalInitiativeTrack() {
+    final upcomingQueue = _getUpcomingTurnQueue();
+    if (upcomingQueue.isEmpty) return const SizedBox.shrink();
+
+    final active = widget.tickManager.activeUnit;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E0E14).withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withValues(alpha: 0.75),
+          width: 1.2,
         ),
-        child: Column(
-          children: [
-            // Tactical Lane Badge (GDD v2.8 Sec 3.4 & 3.5)
-            Container(
-              margin: const EdgeInsets.only(bottom: 2.0),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.70),
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: laneColor.withValues(alpha: 0.4), width: 0.8),
-              ),
-              child: Text(
-                laneTitle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.7),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(2, 2),
+          ),
+          BoxShadow(
+            color: const Color(0xFFD4AF37).withValues(alpha: 0.20),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header icon and label
+          const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.hourglass_bottom, size: 11, color: Color(0xFFFFD54F)),
+              SizedBox(width: 3),
+              Text(
+                'NEXT',
                 style: TextStyle(
-                  color: laneColor,
-                  fontSize: 7.0,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.4,
+                  color: Color(0xFFFFD54F),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
                   fontFamily: 'monospace',
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            // Units Row with visual scale & depth offset
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxClusterWidth),
-                  child: Transform.translate(
-                    offset: Offset(0, depthOffset),
-                    child: Transform.scale(
-                      scale: isFrontline ? 1.04 : 0.93,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: units.map((unit) {
-                          return Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: cardMaxWidth),
-                                  child: _buildUnitCard(
-                                    unit: unit,
-                                    isEnemy: isEnemy,
-                                    isActive: unit.id == activeUnitId,
-                                    isSelectedTarget: unit.id == selectedTargetId,
-                                    onTap: () => onSelectTarget?.call(unit.id),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Container(
+            width: 36,
+            height: 1,
+            color: const Color(0xFF3E3E52),
+          ),
+          const SizedBox(height: 6),
+
+          // Stack of upcoming combatant tokens
+          ...upcomingQueue.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final UnitEntity u = entry.value;
+            final bool isAlly = widget.tickManager.allies.any((a) => a.id == u.id);
+            final bool isNow = index == 0 && active?.id == u.id;
+            final Color sideColor = isAlly ? const Color(0xFF4CAF50) : const Color(0xFFE53935);
+            final Color borderCol = isNow ? const Color(0xFFFFD54F) : sideColor;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3.5),
+              child: Tooltip(
+                message: '${u.name}\n${isAlly ? "ALLIED" : "HOSTILE"}\nSpeed: ${u.speed} • Turn Meter: ${u.turnMeter.toStringAsFixed(0)}%',
+                child: GestureDetector(
+                  onTap: () {
+                    if (!isAlly && u.isAlive) {
+                      setState(() => _selectedEnemyId = u.id);
+                    }
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      // Unit Avatar Node
+                      Container(
+                        width: isNow ? 38 : 34,
+                        height: isNow ? 38 : 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: borderCol,
+                            width: isNow ? 2.2 : 1.4,
+                          ),
+                          boxShadow: isNow
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFD54F).withValues(alpha: 0.75),
+                                    blurRadius: 8,
+                                    spreadRadius: 1.5,
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: sideColor.withValues(alpha: 0.35),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                        ),
+                        child: ClipOval(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.asset(
+                                u.effectiveAvatarAsset,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: isAlly ? const Color(0xFF1B3B22) : const Color(0xFF3B1B1B),
+                                  child: Icon(
+                                    isAlly ? Icons.shield : Icons.dangerous_outlined,
+                                    size: 16,
+                                    color: borderCol,
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
+                              // Vignette gradient for clear contrast
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.45),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // Rank Badge (1, 2, 3...) or ACT label
+                      Positioned(
+                        bottom: -3,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: isNow ? 4.0 : 3.0, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: isNow ? const Color(0xFFFFD54F) : const Color(0xFF14141B),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: borderCol,
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Text(
+                            isNow ? 'ACT' : '#${index + 1}',
+                            style: TextStyle(
+                              color: isNow ? Colors.black : Colors.white70,
+                              fontSize: isNow ? 6.5 : 6.0,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Target indicator icon if this enemy is currently targeted
+                      if (!isAlly && u.id == _selectedEnemyId)
+                        Positioned(
+                          top: -3,
+                          right: -3,
+                          child: Container(
+                            padding: const EdgeInsets.all(1.5),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFFFF5252),
+                            ),
+                            child: const Icon(
+                              Icons.gps_fixed,
+                              size: 9,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            );
+          }),
+        ],
       ),
     );
   }
 
-  Widget _buildClashLine() {
+  Widget _buildClashLine({bool isCompact = false, bool isUltraCompact = false}) {
+    if (isUltraCompact) {
+      return Container(
+        height: 10,
+        margin: const EdgeInsets.symmetric(vertical: 1),
+        child: Row(
+          children: [
+            Expanded(child: Container(height: 1, color: const Color(0xFF5D4037))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                '• ASHEN FRONT •',
+                style: TextStyle(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.7),
+                  fontSize: 7.0,
+                  letterSpacing: 1.0,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+            Expanded(child: Container(height: 1, color: const Color(0xFF5D4037))),
+          ],
+        ),
+      );
+    }
     return Container(
-      height: 28,
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      height: isCompact ? 16 : 28,
+      margin: EdgeInsets.symmetric(vertical: isCompact ? 2 : 8),
       child: Row(
         children: [
           Expanded(
@@ -2407,7 +2632,7 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 8 : 12, vertical: isCompact ? 2 : 4),
             decoration: BoxDecoration(
               color: const Color(0xFF14141B),
               borderRadius: BorderRadius.circular(10),
@@ -2415,27 +2640,27 @@ class _BattleScreenState extends State<BattleScreen> {
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFFD4AF37).withValues(alpha: 0.25),
-                  blurRadius: 8,
+                  blurRadius: isCompact ? 4 : 8,
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shield_outlined, size: 11, color: Color(0xFFD4AF37)),
-                SizedBox(width: 6),
+                Icon(Icons.shield_outlined, size: isCompact ? 9 : 11, color: const Color(0xFFD4AF37)),
+                SizedBox(width: isCompact ? 4 : 6),
                 Text(
                   'THE ASHEN FRONT',
                   style: TextStyle(
-                    color: Color(0xFFD4AF37),
-                    fontSize: 8.5,
-                    letterSpacing: 2.0,
+                    color: const Color(0xFFD4AF37),
+                    fontSize: isCompact ? 7.5 : 8.5,
+                    letterSpacing: isCompact ? 1.0 : 2.0,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
                   ),
                 ),
-                SizedBox(width: 6),
-                Icon(Icons.shield_outlined, size: 11, color: Color(0xFFD4AF37)),
+                SizedBox(width: isCompact ? 4 : 6),
+                Icon(Icons.shield_outlined, size: isCompact ? 9 : 11, color: const Color(0xFFD4AF37)),
               ],
             ),
           ),
@@ -2722,30 +2947,274 @@ class _BattleScreenState extends State<BattleScreen> {
     }
   }
 
-  double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop) {
+  Widget _buildAssassinBackstabApparition(UnitEntity assassin, bool isTargetEnemy) {
+    return Positioned(
+      top: isTargetEnemy ? -36 : null,
+      bottom: isTargetEnemy ? null : -36,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Transform.scale(
+          scale: 0.95,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A148C).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: const Color(0xFFE040FB), width: 1.0),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0xFFE040FB), blurRadius: 8),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.flash_on, size: 8, color: Color(0xFFE040FB)),
+                    SizedBox(width: 2),
+                    Text(
+                      'SHADOWSTEP BACKSTAB',
+                      style: TextStyle(color: Colors.white, fontSize: 6.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+              SizedBox(
+                height: 56,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7B1FA2).withValues(alpha: 0.8),
+                            blurRadius: 14,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Image.asset(
+                      assassin.effectiveAvatarAsset,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.person,
+                        size: 38,
+                        color: Color(0xFFE040FB),
+                      ),
+                    ),
+                    Transform.rotate(
+                      angle: 0.45,
+                      child: Container(
+                        width: 50,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Colors.transparent, Color(0xFFFF1744), Colors.white, Colors.transparent],
+                          ),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0xFFFF1744), blurRadius: 6),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Transform.rotate(
+                      angle: -0.45,
+                      child: Container(
+                        width: 50,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Colors.transparent, Color(0xFFFF1744), Colors.white, Colors.transparent],
+                          ),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0xFFFF1744), blurRadius: 6),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShadowstepSmokePuff() {
+    return Positioned.fill(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF7B1FA2).withValues(alpha: 0.7),
+                    const Color(0xFF4A148C).withValues(alpha: 0.3),
+                    Colors.transparent,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7B1FA2).withValues(alpha: 0.6),
+                    blurRadius: 14,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.cloud, size: 28, color: Color(0xFFE1BEE7)),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: const Color(0xFFE040FB), width: 0.7),
+              ),
+              child: const Text(
+                '🌀 SHADOWSTEP',
+                style: TextStyle(color: Color(0xFFE040FB), fontSize: 6.5, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIncantingRuneSigil() {
+    return Positioned(
+      top: -24,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A24).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+              ),
+              child: const Text(
+                '✨ INCANTING',
+                style: TextStyle(color: Color(0xFFFFD54F), fontSize: 6.5, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFFFD54F).withValues(alpha: 0.6), blurRadius: 10),
+                ],
+              ),
+              child: const Icon(Icons.auto_fix_high, size: 14, color: Color(0xFFFFD54F)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarksmanAimFlare() {
+    return Positioned(
+      top: 10,
+      right: 8,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              Colors.white,
+              const Color(0xFF00E5FF).withValues(alpha: 0.8),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: const Icon(Icons.flash_on, size: 12, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildMarksmanTargetReticle() {
+    return Positioned.fill(
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF00E5FF), width: 1.4),
+              ),
+            ),
+            const Icon(Icons.gps_fixed, size: 26, color: Color(0xFF00E5FF)),
+            Transform.rotate(
+              angle: -0.6,
+              child: Container(
+                width: 85,
+                height: 3,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, Color(0xFF80D8FF), Colors.white, Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop, {bool isCompact = false}) {
     if (isBossUnit) {
-      return isDesktop ? 2.25 : 1.90;
+      return isDesktop ? 2.05 : (isCompact ? 1.55 : 1.75);
     }
     if (!unit.isFigurineCutout) {
       return 1.0;
     }
 
-    final double baseScale = isDesktop ? 1.75 : 1.45;
+    final double baseScale = isDesktop ? 1.45 : (isCompact ? 1.18 : 1.30);
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
-    // Vlad: tall standing upright with raised sword and cape (799px height) -> scale 0.85 to match infantry eye level
-    // Ghoul / crouched quadruped beasts (Grave Ghoul, Sanguine Flayer): hunched low (413px height) -> scale 1.30 to match infantry mass
+    // Vlad: tall standing upright with raised sword and cape -> scale 0.72 to match infantry eye level
+    // Ghoul / crouched quadruped beasts: ~704px height in raw asset -> scale 1.05 to match infantry visual presence
     double poseCompensation = 1.0;
     final asset = unit.effectiveAvatarAsset.toLowerCase();
     final species = unit.speciesId.toLowerCase();
     final name = unit.name.toLowerCase();
 
     if (asset.contains('vladislav') || species.contains('vladislav') || name.contains('vladislav')) {
-      poseCompensation = 0.85;
+      poseCompensation = 0.72;
     } else if (asset.contains('ghoul') || species.contains('ghoul') || name.contains('ghoul') ||
                asset.contains('flayer') || asset.contains('warhound')) {
-      poseCompensation = 1.30;
+      poseCompensation = 1.05;
     }
 
     return baseScale * poseCompensation;
@@ -2771,13 +3240,46 @@ class _BattleScreenState extends State<BattleScreen> {
       affinityMult = CombatMath.getAffinityMultiplier(activeUnit.archetype, unit.archetype);
     }
 
+    final attackerUnit = _attackingUnitId != null
+        ? (widget.tickManager.allies.where((u) => u.id == _attackingUnitId).firstOrNull ??
+           widget.tickManager.enemies.where((u) => u.id == _attackingUnitId).firstOrNull)
+        : null;
+
     final bool isAttacking = _attackingUnitId == unit.id;
     final bool isDamaged = _damagedUnitId == unit.id;
-    final double lungeY = isAttacking ? (isEnemy ? 34.0 : -34.0) : 0.0;
-    final double attackTilt = isAttacking ? (isEnemy ? 0.08 : -0.08) : 0.0;
-    final double attackScale = isAttacking ? 1.08 : 1.0;
-    final double shakeX = isDamaged ? (isEnemy ? -10.0 : 10.0) : 0.0;
-    final double hitRecoilY = isDamaged ? (isEnemy ? -6.0 : 6.0) : 0.0;
+    final bool isAttackerAssassin = attackerUnit?.archetype == Archetype.assassin;
+    final bool isAttackerMarksman = attackerUnit?.archetype == Archetype.marksman;
+    final bool isAttackerOccultist = attackerUnit?.archetype == Archetype.occultist;
+
+    double lungeY = 0.0;
+    double attackTilt = 0.0;
+    double attackScale = 1.0;
+    double unitOpacity = 1.0;
+
+    if (isAttacking) {
+      if (unit.archetype == Archetype.assassin) {
+        // Assassin Shadowstep: vanishes from original position into shadow smoke
+        unitOpacity = 0.0;
+      } else if (unit.archetype == Archetype.marksman) {
+        // Marksman: small deliberate step forward into kneeling/sniper stance
+        lungeY = isEnemy ? 14.0 : -14.0;
+        attackTilt = isEnemy ? 0.03 : -0.03;
+        attackScale = 1.04;
+      } else if (unit.archetype == Archetype.occultist) {
+        // Occultist / Spellcaster: steps forward towards clash line to incant
+        lungeY = isEnemy ? 26.0 : -26.0;
+        attackScale = 1.06;
+      } else {
+        // Melee / Juggernaut / Skirmisher / Boss / Commander:
+        // Physical tactile charge deep across the neutral ground toward opposing rank!
+        lungeY = isEnemy ? 120.0 : -120.0;
+        attackTilt = isEnemy ? 0.10 : -0.10;
+        attackScale = 1.15;
+      }
+    }
+
+    final double shakeX = isDamaged ? (isEnemy ? -12.0 : 12.0) : 0.0;
+    final double hitRecoilY = isDamaged ? (isEnemy ? -14.0 : 14.0) : 0.0;
     final bool isCriticalHp = hpRatio < 0.25 && alive;
 
     Color borderColor = const Color(0xFF2B2B36);
@@ -2888,8 +3390,18 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     final double screenWidth = MediaQuery.of(context).size.width;
+    final double screenHeight = MediaQuery.of(context).size.height;
     final bool isDesktop = screenWidth >= 1000;
-    final double miniatureScale = _getUnitModelScale(unit, isBossUnit, isDesktop);
+    final bool isCompact = screenHeight < 760;
+    final bool isUltraCompact = screenHeight < 620;
+    final double miniatureScale = _getUnitModelScale(unit, isBossUnit, isDesktop, isCompact: isCompact);
+
+    // Dynamic HUD height tailored to screen size & pre-battle setup mode
+    final double hudHeight = isBossUnit
+        ? (isUltraCompact ? 24.0 : (isCompact ? 28.0 : 34.0))
+        : (_isPreBattleSetup
+            ? (isUltraCompact ? 26.0 : (isCompact ? 32.0 : 42.0))
+            : (isUltraCompact ? 18.0 : (isCompact ? 22.0 : 26.0)));
 
     final Widget cardWidget = GestureDetector(
       key: Key('unit_card_${unit.id}'),
@@ -2915,14 +3427,17 @@ class _BattleScreenState extends State<BattleScreen> {
       onLongPress: () {
         _openInspectorModal(unit, isEnemy);
       },
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..translate(shakeX, lungeY + hitRecoilY)
-          ..rotateZ(attackTilt)
-          ..scale(attackScale),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 260),
+        opacity: unitOpacity,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 320),
+          curve: isAttacking ? Curves.easeOutBack : Curves.easeInOutCubic,
+          transform: Matrix4.identity()
+            ..translate(shakeX, lungeY + hitRecoilY)
+            ..rotateZ(attackTilt)
+            ..scale(attackScale),
+          transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: unit.isFigurineCutout ? Colors.transparent : (alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12)),
             borderRadius: BorderRadius.circular(6),
@@ -2953,97 +3468,49 @@ class _BattleScreenState extends State<BattleScreen> {
 
               // LAYER 1: Open Character Miniature & 3D Faction Ground Plinth
               Positioned(
-                top: isBossUnit ? -14 : (unit.isFigurineCutout ? -4 : 0),
-                bottom: isBossUnit ? 10 : 8,
-                left: 2,
-                right: 2,
+                top: isBossUnit ? (isCompact ? -6 : -14) : (unit.isFigurineCutout ? (isCompact ? -2 : -4) : 0),
+                bottom: hudHeight + 2.0,
+                left: 1,
+                right: 1,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // LAYER 1A: 3D Tabletop Contact Shadow & Plinth Curved Status Arcs
-                    if (unit.isFigurineCutout) ...[
-                      // Natural tabletop contact drop shadow under the plinth base (grounds figurine)
+                    // LAYER 1A: 3D Tabletop Ground Contact Shadow (Soft gradient grounded beneath base)
+                    if (unit.isFigurineCutout)
                       Positioned(
-                        bottom: -1,
-                        left: isBossUnit ? 10 : 14,
-                        right: isBossUnit ? 10 : 14,
-                        height: 14,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.all(Radius.elliptical(120, 18)),
-                            gradient: RadialGradient(
-                              colors: [
-                                Colors.black.withValues(alpha: 0.75),
-                                Colors.black.withValues(alpha: 0.25),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Refined active turn / target selection base ring indicator (clean wargaming ring)
-                      if (isActive || isSelectedTarget)
-                        Positioned(
-                          bottom: 2,
-                          left: isBossUnit ? 8 : 12,
-                          right: isBossUnit ? 8 : 12,
-                          height: 18,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.all(Radius.elliptical(120, 20)),
-                              border: Border.all(
-                                color: isActive ? const Color(0xFFFFD54F) : const Color(0xFFFF1744),
-                                width: 2.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (isActive ? const Color(0xFFFFD54F) : const Color(0xFFFF1744))
-                                      .withValues(alpha: 0.65),
-                                  blurRadius: 8,
-                                  spreadRadius: 1.0,
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SizedBox(
+                            width: isBossUnit ? (isCompact ? 130.0 : 170.0) : (isCompact ? 76.0 : 96.0),
+                            height: isBossUnit ? (isCompact ? 16.0 : 20.0) : (isCompact ? 10.0 : 14.0),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: const BorderRadius.all(Radius.elliptical(50, 10)),
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.65),
+                                    Colors.black.withValues(alpha: 0.15),
+                                    Colors.transparent,
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
-
-                      // GDD v2.8 Tabletop Miniature Inlaid Curved Status Bars (Health Arc & AP Arc)
-                      // Rendered directly on top of the front plinth rim with NO opaque child covering it!
-                      Positioned(
-                        bottom: 10,
-                        left: isBossUnit ? 8 : 12,
-                        right: isBossUnit ? 8 : 12,
-                        height: isBossUnit ? 28 : 22,
-                        child: CustomPaint(
-                          painter: PlinthRimStatusPainter(
-                            bleedStacks: unit.bleedStacks,
-                            blightStacks: unit.blightStacks,
-                            shieldIntegrity: unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp) : 0.0,
-                            isAlive: alive,
-                            plinthMaterial: unit.plinthMaterial,
-                            factionName: unit.factionName,
-                            isBurning: unit.isBurning,
-                            isFrozen: unit.isFrozen,
-                            hpRatio: hpRatio,
-                            tmRatio: tmRatio,
-                            showHpBar: !isBossUnit, // Suppress duplicate health bar on boss
-                            showTmBar: true,
-                            isDamaged: isDamaged,
-                            isAttacking: isAttacking,
-                          ),
-                        ),
                       ),
-                    ],
 
                     // LAYER 1-GLOW: Organic Character Model Silhouette Glow (No rectangular boxes)
                     if (hasModelGlow)
                       Positioned.fill(
                         child: Padding(
-                          padding: EdgeInsets.only(bottom: isBossUnit ? 6.0 : 4.0),
-                          child: Center(
+                          padding: EdgeInsets.only(bottom: isBossUnit ? 4.0 : 2.0),
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
                             child: Transform.scale(
                               scale: miniatureScale,
+                              alignment: Alignment.bottomCenter,
                               child: ImageFiltered(
                                 imageFilter: ui.ImageFilter.blur(
                                   sigmaX: modelGlowBlur,
@@ -3071,10 +3538,12 @@ class _BattleScreenState extends State<BattleScreen> {
                     // LAYER 1B: Character Miniature Artwork (Painted ON TOP of plinth with prominent scale)
                     Positioned.fill(
                       child: Padding(
-                        padding: EdgeInsets.only(bottom: isBossUnit ? 6.0 : 4.0),
-                        child: Center(
+                        padding: EdgeInsets.only(bottom: isBossUnit ? 4.0 : 2.0),
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
                           child: Transform.scale(
                             scale: miniatureScale,
+                            alignment: Alignment.bottomCenter,
                             child: ColorFiltered(
                               colorFilter: isDamaged && alive
                                   ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
@@ -3082,7 +3551,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                       ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply)
                                       : kAlphaSafeGreyscaleFilter),
                               child: Opacity(
-                                opacity: alive ? 1.0 : (unit.isFigurineCutout ? 0.45 : 0.65),
+                                opacity: alive ? unitOpacity : (unit.isFigurineCutout ? 0.45 : 0.65),
                                 child: Image.asset(
                                   unit.effectiveAvatarAsset,
                                   fit: unit.isFigurineCutout ? BoxFit.contain : BoxFit.cover,
@@ -3163,6 +3632,25 @@ class _BattleScreenState extends State<BattleScreen> {
                     child: _buildTargetStrikeVfx(_screenFlashType ?? 'slash', isBossUnit),
                   ),
                 ),
+                // Assassin Blink Strike: Reappears directly adjacent to damaged target!
+                if (isAttackerAssassin && attackerUnit != null)
+                  _buildAssassinBackstabApparition(attackerUnit, isEnemy),
+                // Marksman Piercing Scope Lock & Tracer Impact
+                if (isAttackerMarksman)
+                  _buildMarksmanTargetReticle(),
+              ],
+
+              // Archetype Specific Attacker Overlays
+              if (isAttacking && alive) ...[
+                // Assassin vanishing into shadow smoke at home base
+                if (unit.archetype == Archetype.assassin)
+                  _buildShadowstepSmokePuff(),
+                // Occultist overhead arcane rune sigil
+                if (unit.archetype == Archetype.occultist)
+                  _buildIncantingRuneSigil(),
+                // Marksman muzzle flash / lens flare
+                if (unit.archetype == Archetype.marksman)
+                  _buildMarksmanAimFlare(),
               ],
 
               // LAYER 2.8: Bottom Readability Gradient (only for classic cards)
@@ -3186,374 +3674,435 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-              // LAYER 3: Interactive UI Information anchored to Pedestal & Ground
+              // LAYER 3: Interactive UI Information anchored cleanly beneath Pedestal
               Positioned(
-                left: 2,
-                right: 2,
-                bottom: 2,
+                left: 1,
+                right: 1,
+                bottom: 1,
+                height: hudHeight,
                 child: Opacity(
                   opacity: alive ? 1.0 : 0.25,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 2.0, right: 2.0, bottom: 2.0),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.bottomCenter,
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // GDD v2.6 Sec 13.5: Enemy Boss/Elite Action Intent Telegraphing
-                        if (isEnemy && alive && unit.turnMeter >= 40.0) ...[
-                          Builder(builder: (ctx) {
-                            final intentSkill = _aiService.predictNextSkill(unit);
-                            if (intentSkill == null) return const SizedBox.shrink();
-                            final bool isLimitBurst = intentSkill.isLimitBurst;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 2.0),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: isLimitBurst
-                                      ? const Color(0xFFD50000).withValues(alpha: 0.90)
-                                      : const Color(0xFF263238).withValues(alpha: 0.85),
-                                  borderRadius: BorderRadius.circular(3),
-                                  border: Border.all(
-                                    color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
-                                    width: isLimitBurst ? 1.2 : 0.8,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
-                                      size: 8.5,
-                                      color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      'INTENT: ${intentSkill.name.toUpperCase()}',
-                                      style: TextStyle(
-                                        color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
-                                        fontSize: 7.0,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
+                      // GDD v2.6 Sec 13.5: Enemy Boss/Elite Action Intent Telegraphing
+                      if (isEnemy && alive && unit.turnMeter >= 40.0 && !isUltraCompact) ...[
+                        Builder(builder: (ctx) {
+                          final intentSkill = _aiService.predictNextSkill(unit);
+                          if (intentSkill == null) return const SizedBox.shrink();
+                          final bool isLimitBurst = intentSkill.isLimitBurst;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 1.5),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
+                              decoration: BoxDecoration(
+                                color: isLimitBurst
+                                    ? const Color(0xFFD50000).withValues(alpha: 0.90)
+                                    : const Color(0xFF263238).withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(
+                                  color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                  width: isLimitBurst ? 1.2 : 0.8,
                                 ),
                               ),
-                            );
-                          }),
-                        ],
-
-                        // Status Effect Badges (if active, above the pedestal)
-                        if (unit.activeEffects.isNotEmpty && alive)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 2.0),
-                            child: Wrap(
-                              spacing: 2,
-                              runSpacing: 1,
-                              alignment: WrapAlignment.center,
-                              children: unit.activeEffects.take(4).map((eff) {
-                                final Color color = _statusColor(eff.type);
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: 0.35),
-                                    borderRadius: BorderRadius.circular(2),
-                                    border: Border.all(color: color, width: 0.7),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
+                                    size: 7.5,
+                                    color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
                                   ),
-                                  child: Text(
-                                    _statusAbbr(eff.type),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'INTENT: ${intentSkill.name.toUpperCase()}',
                                     style: TextStyle(
-                                      color: color,
-                                      fontSize: 7.0,
+                                      color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
+                                      fontSize: 6.5,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.4,
                                     ),
                                   ),
-                                );
-                              }).toList(),
+                                ],
+                              ),
                             ),
-                          ),
+                          );
+                        }),
+                      ],
 
-                        // PEDESTAL HUD ROW: Shield (Left) - Level (Center) - Rarity/Target/Boss (Right) - Sheet (Far Right)
-                        FittedBox(
+                      // Status Effect Badges (if active, above the pedestal)
+                      if (unit.activeEffects.isNotEmpty && alive && !isUltraCompact)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 1.5),
+                          child: Wrap(
+                            spacing: 2,
+                            runSpacing: 1,
+                            alignment: WrapAlignment.center,
+                            children: unit.activeEffects.take(3).map((eff) {
+                              final Color color = _statusColor(eff.type);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(2),
+                                  border: Border.all(color: color, width: 0.7),
+                                ),
+                                child: Text(
+                                  _statusAbbr(eff.type),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 6.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+
+                      // Tabletop Miniature Inlaid Health Bar & AP Meter (for non-boss units)
+                      if (!isBossUnit && alive)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: isCompact ? 1.5 : 2.5),
+                          child: _buildUnitStatusMeter(
+                            unit: unit,
+                            hpRatio: hpRatio,
+                            tmRatio: tmRatio,
+                            isDamaged: isDamaged,
+                            isCompact: isCompact,
+                          ),
+                        ),
+
+                      // PEDESTAL HUD ROW: Shield (Left) - Level (Center) - Rarity/Target/Boss (Right) - Sheet (Far Right)
+                      Flexible(
+                        child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.center,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Bottom-Left of Pedestal: Archetype Shield Badge (or ☠ BOSS badge for bosses)
-                              if (isBossUnit)
-                                Builder(builder: (ctx) {
-                                  final String phaseText = hpRatio > 0.66
-                                      ? '☠ BOSS'
-                                      : (hpRatio > 0.33 ? '⚡ BOSS (P2)' : '🔥 BOSS (P3)');
-                                  final Color phaseColor = hpRatio > 0.66
-                                      ? const Color(0xFFFFD54F)
-                                      : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
+                              if (_isPreBattleSetup) ...[
+                                // Bottom-Left of Pedestal: Archetype Shield Badge (or ☠ BOSS badge for bosses)
+                                if (isBossUnit)
+                                  Builder(builder: (ctx) {
+                                    final String phaseText = hpRatio > 0.66
+                                        ? '☠ BOSS'
+                                        : (hpRatio > 0.33 ? '⚡ BOSS (P2)' : '🔥 BOSS (P3)');
+                                    final Color phaseColor = hpRatio > 0.66
+                                        ? const Color(0xFFFFD54F)
+                                        : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(color: phaseColor, width: 1.4),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: phaseColor.withValues(alpha: 0.5),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.dangerous, size: 9, color: phaseColor),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            phaseText,
+                                            style: TextStyle(
+                                              color: phaseColor,
+                                              fontSize: 8.0,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  })
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
+                                      color: Colors.black.withValues(alpha: 0.85),
                                       borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: phaseColor, width: 1.4),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: phaseColor.withValues(alpha: 0.5),
-                                          blurRadius: 6,
-                                        ),
-                                      ],
+                                      border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.dangerous, size: 9, color: phaseColor),
-                                        const SizedBox(width: 3),
+                                        Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
+                                        const SizedBox(width: 2),
                                         Text(
-                                          phaseText,
+                                          _archetypeShortCode(unit.archetype),
                                           style: TextStyle(
-                                            color: phaseColor,
+                                            color: _archetypeColor(unit.archetype),
                                             fontSize: 8.0,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  );
-                                })
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.85),
-                                    borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(_archetypeIcon(unit.archetype), size: 8, color: _archetypeColor(unit.archetype)),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        _archetypeShortCode(unit.archetype),
-                                        style: TextStyle(
-                                          color: _archetypeColor(unit.archetype),
-                                          fontSize: 8.0,
-                                          fontWeight: FontWeight.bold,
+
+                                const SizedBox(width: 4),
+
+                                // Middle of Pedestal: Tactical Formation Role + Level Badge
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      key: Key('unit_lane_badge_${unit.id}'),
+                                      onTap: !isEnemy && alive
+                                          ? () => _toggleAlliedLane(unit.id)
+                                          : null,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.2),
+                                        decoration: BoxDecoration(
+                                          color: isBossUnit
+                                              ? const Color(0xFF7F0000).withValues(alpha: 0.7)
+                                              : (unit.isVanguard
+                                                  ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
+                                                  : const Color(0xFF00E5FF).withValues(alpha: 0.2)),
+                                          borderRadius: BorderRadius.circular(3),
+                                          border: Border.all(
+                                            color: isBossUnit
+                                                ? const Color(0xFFFF5252)
+                                                : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
+                                            width: !isEnemy ? 1.4 : 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              isBossUnit ? '👑 TITANIC' : (unit.isVanguard ? '⚔ FRONT' : '🔮 REAR'),
+                                              style: TextStyle(
+                                                color: isBossUnit
+                                                    ? const Color(0xFFFF8A80)
+                                                    : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
+                                                fontSize: 7.0,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                            if (!isEnemy) ...[
+                                              const SizedBox(width: 2),
+                                              const Icon(Icons.swap_vert, size: 8, color: Colors.white70),
+                                            ],
+                                          ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-
-                              const SizedBox(width: 4),
-
-                              // Middle of Pedestal: Tactical Formation Role + Level Badge
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  GestureDetector(
-                                    key: Key('unit_lane_badge_${unit.id}'),
-                                    onTap: _isPreBattleSetup && !isEnemy && alive
-                                        ? () => _toggleAlliedLane(unit.id)
-                                        : null,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.2),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.2),
                                       decoration: BoxDecoration(
                                         color: isBossUnit
-                                            ? const Color(0xFF7F0000).withValues(alpha: 0.7)
-                                            : (unit.isVanguard
-                                                ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
-                                                : const Color(0xFF00E5FF).withValues(alpha: 0.2)),
+                                            ? const Color(0xFFB71C1C).withValues(alpha: 0.75)
+                                            : Colors.black.withValues(alpha: 0.85),
                                         borderRadius: BorderRadius.circular(3),
                                         border: Border.all(
-                                          color: isBossUnit
-                                              ? const Color(0xFFFF5252)
-                                              : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
-                                          width: (_isPreBattleSetup && !isEnemy) ? 1.4 : 0.8,
+                                          color: isBossUnit ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
+                                          width: isBossUnit ? 1.2 : 0.8,
                                         ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            isBossUnit ? '👑 TITANIC' : (unit.isVanguard ? '⚔ FRONT' : '🔮 REAR'),
-                                            style: TextStyle(
-                                              color: isBossUnit
-                                                  ? const Color(0xFFFF8A80)
-                                                  : (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF)),
-                                              fontSize: 7.0,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                          if (_isPreBattleSetup && !isEnemy) ...[
-                                            const SizedBox(width: 2),
-                                            const Icon(Icons.swap_vert, size: 8, color: Colors.white70),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.2),
-                                    decoration: BoxDecoration(
-                                      color: isBossUnit
-                                          ? const Color(0xFFB71C1C).withValues(alpha: 0.75)
-                                          : Colors.black.withValues(alpha: 0.85),
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(
-                                        color: isBossUnit ? const Color(0xFFFF5252) : const Color(0xFFE5A93C),
-                                        width: isBossUnit ? 1.2 : 0.8,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      isBossUnit ? 'Lv.${unit.level} ★' : 'Lv.${unit.level}',
-                                      style: TextStyle(
-                                        color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
-                                        fontSize: 7.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(width: 4),
-
-                              // Bottom-Right of Pedestal: Target / Boss / Status / Gen Badge
-                              if (isSelectedTarget)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: affinityMult != null && affinityMult > 1.0
-                                        ? const Color(0xFF2E7D32)
-                                        : (affinityMult != null && affinityMult < 1.0
-                                            ? const Color(0xFFC62828)
-                                            : const Color(0xFFB3261E)),
-                                    borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(
-                                      color: affinityMult != null && affinityMult > 1.0
-                                          ? const Color(0xFF81C784)
-                                          : (affinityMult != null && affinityMult < 1.0
-                                              ? const Color(0xFFFF8A80)
-                                              : const Color(0xFFFF5252)),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.gps_fixed, size: 8, color: Colors.white),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        affinityMult != null && affinityMult > 1.0
-                                            ? 'TARGET (▲+30%)'
-                                            : (affinityMult != null && affinityMult < 1.0
-                                                ? 'TARGET (▼WEAK)'
-                                                : 'TARGET'),
-                                        style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else if (isBossUnit)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
-                                    borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
-                                      SizedBox(width: 2),
-                                      Text(
-                                        '☠ BOSS',
+                                      child: Text(
+                                        isBossUnit ? 'Lv.${unit.level} ★' : 'Lv.${unit.level}',
                                         style: TextStyle(
-                                          color: Color(0xFFFFD54F),
+                                          color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFE5A93C),
                                           fontSize: 7.5,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                )
-                              else if (isActive)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE5A93C),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.flash_on, size: 8, color: Colors.black),
-                                      SizedBox(width: 2),
-                                      Text(
-                                        'ACTING',
-                                        style: TextStyle(color: Colors.black, fontSize: 7.5, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else if (ultReady)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD54F),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: const Text(
-                                    'ULT',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 7.5,
-                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: affinityMult != null && affinityMult > 1.0
-                                        ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
-                                        : (affinityMult != null && affinityMult < 1.0
-                                            ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
-                                            : Colors.black.withValues(alpha: 0.85)),
-                                    borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(
-                                      color: affinityMult != null && affinityMult > 1.0
-                                          ? const Color(0xFF81C784)
-                                          : (affinityMult != null && affinityMult < 1.0
-                                              ? const Color(0xFFFF8A80)
-                                              : const Color(0xFFE5A93C)),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    affinityMult != null && affinityMult > 1.0
-                                        ? '▲ ADV'
-                                        : (affinityMult != null && affinityMult < 1.0
-                                            ? '▼ WEAK'
-                                            : (unit.isPureblood ? 'PUREBLOOD' : 'G${unit.generation}')),
-                                    style: TextStyle(
-                                      color: affinityMult != null && affinityMult > 1.0
-                                          ? const Color(0xFFA5D6A7)
-                                          : (affinityMult != null && affinityMult < 1.0
-                                              ? const Color(0xFFFFCDD2)
-                                              : const Color(0xFFE5A93C)),
-                                      fontSize: 7.5,
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  ],
                                 ),
 
-                              const SizedBox(width: 4),
+                                const SizedBox(width: 4),
+
+                                // Bottom-Right of Pedestal: Target / Boss / Status / Gen Badge
+                                if (isSelectedTarget)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: affinityMult != null && affinityMult > 1.0
+                                          ? const Color(0xFF2E7D32)
+                                          : (affinityMult != null && affinityMult < 1.0
+                                              ? const Color(0xFFC62828)
+                                              : const Color(0xFFB3261E)),
+                                      borderRadius: BorderRadius.circular(3),
+                                      border: Border.all(
+                                        color: affinityMult != null && affinityMult > 1.0
+                                            ? const Color(0xFF81C784)
+                                            : (affinityMult != null && affinityMult < 1.0
+                                                ? const Color(0xFFFF8A80)
+                                                : const Color(0xFFFF5252)),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.gps_fixed, size: 8, color: Colors.white),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          affinityMult != null && affinityMult > 1.0
+                                              ? 'TARGET (▲+30%)'
+                                              : (affinityMult != null && affinityMult < 1.0
+                                                  ? 'TARGET (▼WEAK)'
+                                                  : 'TARGET'),
+                                          style: const TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (isBossUnit)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFB71C1C).withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(3),
+                                      border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.dangerous, size: 8, color: Color(0xFFFFD54F)),
+                                        SizedBox(width: 2),
+                                        Text(
+                                          '☠ BOSS',
+                                          style: TextStyle(
+                                            color: Color(0xFFFFD54F),
+                                            fontSize: 7.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE5A93C),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.flash_on, size: 8, color: Colors.black),
+                                        SizedBox(width: 2),
+                                        Text(
+                                          'ACTING',
+                                          style: TextStyle(color: Colors.black, fontSize: 7.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else if (ultReady)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFD54F),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: const Text(
+                                      'ULT',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 7.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: affinityMult != null && affinityMult > 1.0
+                                          ? const Color(0xFF1B5E20).withValues(alpha: 0.85)
+                                          : (affinityMult != null && affinityMult < 1.0
+                                              ? const Color(0xFFB71C1C).withValues(alpha: 0.85)
+                                              : Colors.black.withValues(alpha: 0.85)),
+                                      borderRadius: BorderRadius.circular(3),
+                                      border: Border.all(
+                                        color: affinityMult != null && affinityMult > 1.0
+                                            ? const Color(0xFF81C784)
+                                            : (affinityMult != null && affinityMult < 1.0
+                                                ? const Color(0xFFFF8A80)
+                                                : const Color(0xFFE5A93C)),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      affinityMult != null && affinityMult > 1.0
+                                          ? '▲ ADV'
+                                          : (affinityMult != null && affinityMult < 1.0
+                                              ? '▼ WEAK'
+                                              : (unit.isPureblood ? 'PUREBLOOD' : 'G${unit.generation}')),
+                                      style: TextStyle(
+                                        color: affinityMult != null && affinityMult > 1.0
+                                            ? const Color(0xFFA5D6A7)
+                                            : (affinityMult != null && affinityMult < 1.0
+                                                ? const Color(0xFFFFCDD2)
+                                                : const Color(0xFFE5A93C)),
+                                        fontSize: 7.5,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+
+                                const SizedBox(width: 4),
+                              ] else ...[
+                                // During live combat: keep miniature view clear & uncluttered
+                                if (isBossUnit) ...[
+                                  Builder(builder: (ctx) {
+                                    final String phaseText = hpRatio > 0.66
+                                        ? '☠ BOSS'
+                                        : (hpRatio > 0.33 ? '⚡ BOSS (P2)' : '🔥 BOSS (P3)');
+                                    final Color phaseColor = hpRatio > 0.66
+                                        ? const Color(0xFFFFD54F)
+                                        : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(color: phaseColor, width: 1.4),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: phaseColor.withValues(alpha: 0.5),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.dangerous, size: 9, color: phaseColor),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            phaseText,
+                                            style: TextStyle(
+                                              color: phaseColor,
+                                              fontSize: 8.0,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                  const SizedBox(width: 4),
+                                ],
+                              ],
 
                               // Tactical Character Sheet Modal Button
                               GestureDetector(
@@ -3563,9 +4112,12 @@ class _BattleScreenState extends State<BattleScreen> {
                                   _openInspectorModal(unit, isEnemy);
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: _isPreBattleSetup ? 5 : 4,
+                                    vertical: _isPreBattleSetup ? 2.5 : 1.5,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1E1E28),
+                                    color: const Color(0xFF1E1E28).withValues(alpha: 0.9),
                                     borderRadius: BorderRadius.circular(3),
                                     border: Border.all(
                                       color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
@@ -3577,18 +4129,20 @@ class _BattleScreenState extends State<BattleScreen> {
                                     children: [
                                       Icon(
                                         Icons.assignment,
-                                        size: 7.5,
+                                        size: _isPreBattleSetup ? 7.5 : 8.5,
                                         color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
                                       ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        'SHEET',
-                                        style: TextStyle(
-                                          color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
-                                          fontSize: 7.0,
-                                          fontWeight: FontWeight.bold,
+                                      if (_isPreBattleSetup) ...[
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          'SHEET',
+                                          style: TextStyle(
+                                            color: isBossUnit ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
+                                            fontSize: 7.0,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -3596,11 +4150,50 @@ class _BattleScreenState extends State<BattleScreen> {
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+
+                      // Live Battle Subtle Target Pip (Only during active combat when selected)
+                      if (!_isPreBattleSetup && isSelectedTarget && isEnemy && alive)
+                        Container(
+                          margin: const EdgeInsets.only(top: 1.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.0),
+                          decoration: BoxDecoration(
+                            color: affinityMult != null && affinityMult > 1.0
+                                ? const Color(0xFF2E7D32).withValues(alpha: 0.90)
+                                : (affinityMult != null && affinityMult < 1.0
+                                    ? const Color(0xFFC62828).withValues(alpha: 0.90)
+                                    : const Color(0xFFB3261E).withValues(alpha: 0.90)),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(
+                              color: affinityMult != null && affinityMult > 1.0
+                                  ? const Color(0xFF81C784)
+                                  : (affinityMult != null && affinityMult < 1.0
+                                      ? const Color(0xFFFF8A80)
+                                      : const Color(0xFFFF5252)),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.gps_fixed, size: 7.5, color: Colors.white),
+                              const SizedBox(width: 2),
+                              Text(
+                                affinityMult != null && affinityMult > 1.0
+                                    ? 'TARGET (▲+30%)'
+                                    : (affinityMult != null && affinityMult < 1.0
+                                        ? 'TARGET (▼WEAK)'
+                                        : 'TARGET'),
+                                style: const TextStyle(color: Colors.white, fontSize: 6.5, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
+            ),
 
                 // Fallen Overlay
                 if (!alive)
@@ -3708,51 +4301,29 @@ class _BattleScreenState extends State<BattleScreen> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: isHovered
-                        ? Border.all(
-                            color: const Color(0xFFFFD54F),
-                            width: 3.0,
-                          )
-                        : null,
-                    boxShadow: isHovered
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
-                              blurRadius: 18,
-                              spreadRadius: 3,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: cardWidget,
-                ),
-                if (isHovered && candidateData.isNotEmpty && candidateData.first != null)
+                cardWidget,
+                // Subtle organic tabletop targeting ring around unit base
+                if (isHovered)
                   Positioned(
-                    top: -16,
-                    left: 0,
-                    right: 0,
-                    child: Center(
+                    bottom: 24,
+                    left: 4,
+                    right: 4,
+                    height: 24,
+                    child: IgnorePointer(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF14141B).withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black87, blurRadius: 6),
-                          ],
-                        ),
-                        child: Text(
-                          '🎯 TARGET: ${candidateData.first!.name.toUpperCase()}',
-                          style: const TextStyle(
-                            color: Color(0xFFFFD54F),
-                            fontSize: 7.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                          borderRadius: const BorderRadius.all(Radius.elliptical(50, 14)),
+                          border: Border.all(
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
+                            width: 1.8,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -3788,7 +4359,6 @@ class _BattleScreenState extends State<BattleScreen> {
     final allies = widget.tickManager.allies;
     final frontlineCount = allies.where((u) => u.isFrontline).length;
     final backlineCount = allies.where((u) => u.isBackline).length;
-    final profile = widget.commandService.currentProfile;
 
     return Container(
       decoration: const BoxDecoration(
@@ -4218,99 +4788,223 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-                // Autobattler Status Pill (GDD v2.8 Sec 1 & 2.3)
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _autoBattle = !_autoBattle;
-                      if (_autoBattle && _isPlayerTurnNow) {
-                        _handleAutoPlayerTurn();
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: _autoBattle ? const Color(0xFF1B5E20) : const Color(0xFF424250),
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(
-                        color: _autoBattle ? const Color(0xFF81C784) : const Color(0xFF757575),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _autoBattle ? Icons.autorenew : Icons.touch_app,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          _autoBattle ? 'AUTOBATTLER ON' : 'MANUAL',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 7.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.4,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tactical Bullet-Time Slow-Mo Toggle
+                    GestureDetector(
+                      onTap: () {
+                        final bool isCurrentlyBullet = widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime;
+                        final bool nextState = !isCurrentlyBullet;
+                        widget.commandService.setBulletTime(nextState);
+                        widget.tickManager.setBulletTime(nextState);
+                        setState(() {});
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: (widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime)
+                              ? const Color(0xFF004D40)
+                              : const Color(0xFF263238),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(
+                            color: (widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime)
+                                ? const Color(0xFF00E5FF)
+                                : const Color(0xFF546E7A),
+                            width: 1,
                           ),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.hourglass_bottom,
+                              size: 10,
+                              color: (widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime)
+                                  ? const Color(0xFF00E5FF)
+                                  : Colors.white70,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              (widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime)
+                                  ? 'BULLET-TIME (30%)'
+                                  : 'BULLET-TIME',
+                              style: TextStyle(
+                                color: (widget.commandService.isBulletTimeActive || widget.tickManager.isBulletTime)
+                                    ? const Color(0xFF00E5FF)
+                                    : Colors.white70,
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 5),
+
+                    // Autobattler Status Pill (GDD v2.8 Sec 1 & 2.3)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _autoBattle = !_autoBattle;
+                          if (_autoBattle && _isPlayerTurnNow) {
+                            _handleAutoPlayerTurn();
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: _autoBattle ? const Color(0xFF1B5E20) : const Color(0xFF424250),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(
+                            color: _autoBattle ? const Color(0xFF81C784) : const Color(0xFF757575),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _autoBattle ? Icons.autorenew : Icons.touch_app,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              _autoBattle ? 'AUTOBATTLER ON' : 'MANUAL',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          // Lower Rail: The 3 Tuning Slips Carousel + Under-Rail Burn Pit (GDD v2.8 Sec 2.3 & 7.3)
-          Row(
-            children: [
-              // Tuning Slips Carousel
-              Expanded(
-                child: Row(
-                  children: handCards.take(3).map((order) {
-                    final int effCost = widget.commandService.getEffectiveFocusCost(order);
-                    final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
-                    final bool canAfford = focus >= effCost && isUnlocked;
-
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                        child: _buildTuningSlipCard(
-                          order: order,
-                          effectiveCost: effCost,
-                          availableFocus: focus,
-                          canAfford: canAfford,
-                          isUnlocked: isUnlocked,
-                          themeColor: profile.themeColor,
-                          onTap: () => _dispatchOrder(order),
-                          onLockedTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.',
-                                ),
-                                backgroundColor: const Color(0xFFB3261E),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              const SizedBox(width: 6),
-
-              // Under-Rail Burn Pit
-              _buildBurnPit(profile.themeColor),
-            ],
+          // Lower Rail: Fanned Hand of Collectible Wargaming Cards + Burn Pit
+          _buildFannedHandTray(
+            handCards: handCards,
+            focus: focus,
+            profile: profile,
+            isCompact: MediaQuery.of(context).size.height < 760,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFannedHandTray({
+    required List<GeneralOrderDefinition> handCards,
+    required int focus,
+    required GeneralProfile profile,
+    required bool isCompact,
+  }) {
+    final cardsToDisplay = handCards.take(4).toList();
+    final int count = cardsToDisplay.length;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isDesktop = screenWidth >= 1000;
+    final double cardWidth = isDesktop ? 106.0 : (isCompact ? 82.0 : 96.0);
+    final double cardHeight = isDesktop ? 158.0 : (isCompact ? 122.0 : 142.0);
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 860),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Fanned Hand of Cards (Physical Tabletop Hand Spread)
+            Flexible(
+              child: SizedBox(
+                height: cardHeight + 22,
+                child: Center(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(count, (index) {
+                        final order = cardsToDisplay[index];
+                        final int effCost = widget.commandService.getEffectiveFocusCost(order);
+                        final bool isUnlocked = widget.commandService.isOrderUnlocked(order);
+                        final bool canAfford = focus >= effCost && isUnlocked;
+                        final bool isHovered = _hoveredCardIndex == index;
+
+                        // Physical tabletop fan geometry: arched curve and radial rotation
+                        final double centerIdx = (count - 1) / 2.0;
+                        final double offsetFromCenter = index - centerIdx;
+                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * 0.055);
+                        final double arcY = isHovered ? -18.0 : (offsetFromCenter.abs() * 4.5);
+                        final double overlapX = index > 0 ? (isCompact ? -10.0 : -14.0) : 0.0;
+
+                        return Transform.translate(
+                          offset: Offset(overlapX, arcY),
+                          child: Transform.rotate(
+                            angle: fanAngle,
+                            child: AnimatedScale(
+                              scale: isHovered ? 1.07 : 1.0,
+                              duration: const Duration(milliseconds: 140),
+                              child: MouseRegion(
+                                onEnter: (_) => setState(() => _hoveredCardIndex = index),
+                                onExit: (_) => setState(() => _hoveredCardIndex = null),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                                  child: _buildTuningSlipCard(
+                                    order: order,
+                                    effectiveCost: effCost,
+                                    availableFocus: focus,
+                                    canAfford: canAfford,
+                                    isUnlocked: isUnlocked,
+                                    themeColor: profile.themeColor,
+                                    width: cardWidth,
+                                    height: cardHeight,
+                                    onTap: () => _dispatchOrder(order),
+                                    onLockedTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '${order.name} is sealed! Anoint ${profile.name} to Phylactery Rank ${order.requiredPhylacteryRank} in the Commander Sanctuary.',
+                                          ),
+                                          backgroundColor: const Color(0xFFB3261E),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            // Under-Rail Burn Pit (48x48 tabletop brazier)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6.0),
+              child: _buildBurnPit(profile.themeColor),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -4324,7 +5018,12 @@ class _BattleScreenState extends State<BattleScreen> {
     required Color themeColor,
     required VoidCallback onTap,
     required VoidCallback onLockedTap,
+    double? width,
+    double? height,
   }) {
+    final double cardW = width ?? 105.0;
+    final double cardH = height ?? 150.0;
+
     final slipWidget = WargamingSpellCard(
       order: order,
       effectiveCost: effectiveCost,
@@ -4333,8 +5032,9 @@ class _BattleScreenState extends State<BattleScreen> {
       themeColor: themeColor,
       onTap: onTap,
       onLockedTap: onLockedTap,
-      isCompact: true,
-      height: 66,
+      isCompact: false,
+      width: cardW,
+      height: cardH,
     );
 
     if (!isUnlocked) {
@@ -4344,8 +5044,7 @@ class _BattleScreenState extends State<BattleScreen> {
     return Draggable<GeneralOrderDefinition>(
       data: order,
       dragAnchorStrategy: (draggable, context, position) {
-        // Precise center of the 140x190 collectible card anchored directly under pointer/touch
-        return const Offset(70, 95);
+        return const Offset(36, 53);
       },
       onDragStarted: () {
         widget.commandService.setBulletTime(true);
@@ -4368,8 +5067,8 @@ class _BattleScreenState extends State<BattleScreen> {
           isUnlocked: isUnlocked,
           themeColor: themeColor,
           isCompact: false,
-          width: 140,
-          height: 190,
+          width: 72,
+          height: 106,
         ),
       ),
       childWhenDragging: Opacity(
@@ -4450,6 +5149,128 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
+  Widget _buildUnitStatusMeter({
+    required UnitEntity unit,
+    required double hpRatio,
+    required double tmRatio,
+    required bool isDamaged,
+    bool isCompact = false,
+  }) {
+    Color hpColor = const Color(0xFF00E676); // High-contrast emerald
+    if (hpRatio < 0.20) {
+      hpColor = const Color(0xFFFF1744); // Critical red
+    } else if (hpRatio < 0.45) {
+      hpColor = const Color(0xFFFFB300); // Amber warning
+    }
+    if (isDamaged) {
+      hpColor = const Color(0xFFFF1744);
+    }
+
+    final double clampedHp = hpRatio.clamp(0.0, 1.0);
+    final double clampedTm = tmRatio.clamp(0.0, 1.0);
+    final double shieldIntegrity = unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      width: isCompact ? 84 : 96,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 3, vertical: isCompact ? 1 : 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C0C12).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: const Color(0xFF38384A), width: 0.8),
+        boxShadow: const [
+          BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // HP Bar track with shield overlay
+          SizedBox(
+            height: isCompact ? 3.0 : 4.5,
+            child: Stack(
+              children: [
+                // Track background
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E28),
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+                // Health fill
+                FractionallySizedBox(
+                  widthFactor: clampedHp,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: hpColor,
+                      borderRadius: BorderRadius.circular(1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: hpColor.withValues(alpha: 0.5),
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Aegis Shield overlay if present
+                if (shieldIntegrity > 0)
+                  FractionallySizedBox(
+                    widthFactor: shieldIntegrity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.80),
+                        borderRadius: BorderRadius.circular(1.5),
+                        border: Border.all(color: Colors.white, width: 0.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(height: isCompact ? 1.0 : 1.5),
+          // AP / Turn Meter Bar
+          SizedBox(
+            height: isCompact ? 1.5 : 2.0,
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A1520),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: clampedTm,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isCompact) ...[
+            const SizedBox(height: 1.0),
+            // Numerical HP readout
+            Text(
+              '${unit.currentHp}/${unit.maxHp}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 6.5,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   String _archetypeShortCode(Archetype a) {
     switch (a) {

@@ -204,7 +204,7 @@ void main() {
     });
 
     test('Backline Guarded buff flags isGuarded = true and reduces direct damage by 20% while Vanguard lives', () {
-      final primedFlyer = enemyFlyerSkirmisher.copyWith(turnMeter: 100.0);
+      final primedFlyer = enemyFlyerSkirmisher.copyWith(turnMeter: 100.0, critRate: 0.0);
       final tickManager = InitiativeTickManager(
         initialAllies: [primedFlyer],
         initialEnemies: [allyVanguardTank, allyArcanumHealer],

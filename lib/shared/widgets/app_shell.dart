@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../features/campaign/ascension_tier_data.dart';
-import '../../features/campaign/ascension_tier_dialog.dart';
 import '../../features/campaign/blood_altar_dialog.dart';
 import '../../features/campaign/campaign_map_generator.dart';
 import '../../features/campaign/campaign_map_screen.dart';
@@ -161,7 +160,6 @@ class _AppShellState extends State<AppShell> {
               commandService: _commandService,
               relicService: _relicService,
             );
-            _tickManager.start();
           }
 
           if (saved.reserveInventory.isNotEmpty) {
@@ -260,8 +258,6 @@ class _AppShellState extends State<AppShell> {
       battleModifier: battleModifier,
       activeBoons: _activeExpeditionBoons,
     );
-
-    _tickManager.start();
   }
 
   void _launchMvpThreeWaveSkirmish() {
@@ -294,7 +290,6 @@ class _AppShellState extends State<AppShell> {
     );
 
     _activeEnemyWaves = waves;
-    _tickManager.start();
 
     setState(() {
       _currentIndex = 1; // Switch to Tactical Arena
@@ -1686,12 +1681,19 @@ class _AppShellState extends State<AppShell> {
                   child: profile.type == GeneralType.vladislav
                       ? ClipOval(
                           child: Image.asset(
-                            'assets/images/lord_vladislav.png',
+                            'assets/images/Crypt Stalkers/lord_vladislav_g1.png',
                             width: 36,
                             height: 36,
                             fit: BoxFit.cover,
                             alignment: const Alignment(0, -0.6),
-                            errorBuilder: (_, __, ___) => Icon(profile.icon, color: profile.themeColor, size: 20),
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/lord_vladislav.png',
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              alignment: const Alignment(0, -0.6),
+                              errorBuilder: (_, __, ___) => Icon(profile.icon, color: profile.themeColor, size: 20),
+                            ),
                           ),
                         )
                       : Icon(profile.icon, color: profile.themeColor, size: 20),

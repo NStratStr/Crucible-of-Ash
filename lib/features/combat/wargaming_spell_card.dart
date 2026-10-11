@@ -36,6 +36,28 @@ class WargamingSpellCard extends StatelessWidget {
     this.height,
   });
 
+  static String resolveSpellAsset(GeneralOrderDefinition order) {
+    final nameLower = order.name.toLowerCase();
+    final idLower = order.id.toLowerCase();
+    if (nameLower.contains('siphon') || idLower.contains('siphon')) {
+      return 'assets/images/Spells/Sanguine Siphon.jpg';
+    }
+    if (nameLower.contains('reviv') || idLower.contains('reviv')) {
+      return 'assets/images/Spells/Sanguine Revival.jpg';
+    }
+    if (nameLower.contains('armour') || nameLower.contains('armor') || nameLower.contains('ward') || nameLower.contains('bulwark')) {
+      return 'assets/images/Spells/Ash Armour.jpg';
+    }
+    if (nameLower.contains('sun') || nameLower.contains('flame') || nameLower.contains('solar') || nameLower.contains('stand')) {
+      return 'assets/images/Spells/SunBurst Spell frame image.png';
+    }
+    // Rend Flesh, Soul Shatter, Cleave, Execute, and physical/dark orders
+    if (nameLower.contains('rend') || nameLower.contains('shatter') || nameLower.contains('cleave') || nameLower.contains('exsanguin') || nameLower.contains('feast') || nameLower.contains('execute')) {
+      return 'assets/images/Spells/Soul Shatter.jpg';
+    }
+    return 'assets/images/Spells/Soul Shatter.jpg';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isCompact) {
@@ -220,168 +242,189 @@ class WargamingSpellCard extends StatelessWidget {
 
   /// Full Physical Wargaming Collectible Tray Card (Used for Drag Feedback & High-Res Inspection)
   Widget _buildCollectibleTrayCard() {
-    final double cardW = width ?? 140.0;
-    final double cardH = height ?? 200.0;
+    final double cardW = width ?? 110.0;
+    final double cardH = height ?? 160.0;
 
-    return Container(
-      width: cardW,
-      height: cardH,
-      decoration: BoxDecoration(
-        color: const Color(0xFF13131B),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF616175), width: 2.2),
-        boxShadow: [
-          BoxShadow(
-            color: (canAfford ? const Color(0xFFFFD54F) : const Color(0xFFB3261E)).withValues(alpha: 0.55),
-            blurRadius: 16,
-            spreadRadius: 2,
-          ),
-          const BoxShadow(
-            color: Colors.black87,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Stack(
-          children: [
-            // Frame Asset Overlay (if available) or procedural iron plate
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/Spells/SunBurst Spell frame image.png',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF20202C), Color(0xFF0F0F16)],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: isUnlocked ? (canAfford ? onTap : null) : onLockedTap,
+      child: Container(
+        width: cardW,
+        height: cardH,
+        decoration: BoxDecoration(
+          color: const Color(0xFF101016),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: [
+            BoxShadow(
+              color: (canAfford ? const Color(0xFFFFD54F) : const Color(0xFFB3261E)).withValues(alpha: 0.45),
+              blurRadius: 10,
+              spreadRadius: 1,
+            ),
+            const BoxShadow(
+              color: Colors.black87,
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Stack(
+            children: [
+              // 1. Base dark obsidian fill
+              Positioned.fill(
+                child: Container(
+                  color: const Color(0xFF0F0F14),
+                ),
+              ),
+
+              // 2. Wargaming Dark-Iron Riveted Frame Tablet
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/images/Spells/Spell frame template.jpg',
+                  fit: BoxFit.fill,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/Spells/wargaming_card_frame.png',
+                    fit: BoxFit.fill,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+
+              // 3. Magic Spell Artwork placed directly over the center window
+              Positioned(
+                left: cardW * 0.166,
+                top: cardH * 0.221,
+                width: cardW * 0.671,
+                height: cardH * 0.322,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: const Color(0xFF1E1E28), width: 1.2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Image.asset(
+                      resolveSpellAsset(order),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFF1E1E28),
+                        child: Center(
+                          child: Icon(
+                            order.icon ?? Icons.auto_awesome,
+                            size: cardW * 0.25,
+                            color: themeColor,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Inner Card Layout
-            Padding(
-              padding: const EdgeInsets.all(7.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Top Banner Iron Plaque: Name & Socket
-                  Row(
-                    children: [
-                      // Glowing Amber Focus Socket
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const RadialGradient(
-                            colors: [Color(0xFFFFD54F), Color(0xFFE65100)],
-                          ),
-                          border: Border.all(color: Colors.white70, width: 1.5),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0xFFFFD54F), blurRadius: 8),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$effectiveCost',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Iron Banner Plaque with Gothic Typography
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF181822).withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
-                          ),
-                          child: Text(
-                            order.name.toUpperCase(),
-                            style: const TextStyle(
-                              color: Color(0xFFFFD54F),
-                              fontSize: 9.0,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                    ],
+              // 4. Circular Metallic Focus Socket (top-left)
+              Positioned(
+                top: cardH * 0.035,
+                left: cardW * 0.052,
+                child: Container(
+                  width: cardW * 0.17,
+                  height: cardW * 0.17,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: !isUnlocked
+                          ? const [Color(0xFF2A2A38), Color(0xFF121218)]
+                          : (canAfford
+                              ? const [Color(0xFFFFD54F), Color(0xFFE65100)]
+                              : const [Color(0xFF37474F), Color(0xFF1A2327)]),
+                    ),
+                    border: Border.all(
+                      color: !isUnlocked
+                          ? const Color(0xFF455A64)
+                          : (canAfford ? const Color(0xFFFFE082) : const Color(0xFF546E7A)),
+                      width: 1.0,
+                    ),
+                    boxShadow: (isUnlocked && canAfford)
+                        ? const [
+                            BoxShadow(color: Color(0xFFFFD54F), blurRadius: 5),
+                          ]
+                        : null,
                   ),
-
-                  // Centered Ability Illustration
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: Center(
-                        child: order.name.toLowerCase().contains('sun') ||
-                                order.name.toLowerCase().contains('iron') ||
-                                order.name.toLowerCase().contains('stand')
-                            ? Image.asset(
-                                'assets/images/Spells/Sunburst - Tier 1 Spell no text.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  order.icon ?? Icons.flash_on,
-                                  size: 42,
-                                  color: const Color(0xFFFFD54F),
-                                ),
-                              )
-                            : Image.asset(
-                                'assets/images/Spells/Vitae Erution - Tier 1 no txt.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  order.icon ?? Icons.bloodtype,
-                                  size: 42,
-                                  color: const Color(0xFFFF1744),
-                                ),
-                              ),
+                  child: Center(
+                    child: Text(
+                      !isUnlocked ? 'RANK ${order.requiredPhylacteryRank}' : '$effectiveCost',
+                      style: TextStyle(
+                        color: !isUnlocked
+                            ? const Color(0xFFE5A93C)
+                            : (canAfford ? Colors.black : Colors.white70),
+                        fontSize: !isUnlocked ? (cardW * 0.055) : (cardW * 0.095),
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ),
+                ),
+              ),
 
-                  // Bottom Text Window: Recessed Dark Stone Plaque
-                  Container(
-                    padding: const EdgeInsets.all(5.0),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0E0E14).withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF3D3D52), width: 1.0),
+              // 5. Header Plaque: Spell Name
+              Positioned(
+                top: cardH * 0.052,
+                left: cardW * 0.23,
+                right: cardW * 0.18,
+                height: cardH * 0.075,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      order.name.toUpperCase(),
+                      style: TextStyle(
+                        color: const Color(0xFFFFE082),
+                        fontSize: cardW * 0.085,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        shadows: const [
+                          Shadow(color: Colors.black, blurRadius: 2, offset: Offset(1, 1)),
+                        ],
+                      ),
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
                     ),
+                  ),
+                ),
+              ),
+
+              // 6. Recessed Stone Plaque: Rules Description
+              Positioned(
+                left: cardW * 0.11,
+                right: cardW * 0.11,
+                top: cardH * 0.590,
+                bottom: cardH * 0.085,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Text(
                       order.description,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8.0,
-                        height: 1.2,
-                        fontWeight: FontWeight.w500,
+                      style: TextStyle(
+                        color: const Color(0xFFE2E2E8),
+                        fontSize: (cardW * 0.065).clamp(6.5, 9.5),
+                        height: 1.15,
+                        fontWeight: FontWeight.w600,
+                        shadows: const [
+                          Shadow(color: Colors.black, blurRadius: 2, offset: Offset(0.5, 0.5)),
+                        ],
                       ),
-                      maxLines: 3,
+                      maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -166,9 +166,26 @@ class UnitEntity {
 
   String get effectiveAvatarAsset {
     if (customAvatarAsset != null) return customAvatarAsset!;
-    // Commander: Lord Vladislav
+    // Commander: Lord Vladislav (Generational Evolution: G1, G3, G6)
     if (id.contains('vladislav') || speciesId.contains('vladislav') || name.contains('Vladislav')) {
-      return 'assets/images/lord_vladislav.png';
+      if (generation >= 6) {
+        return 'assets/images/Crypt Stalkers/lord_vladislav_g6.png';
+      }
+      if (generation >= 3) {
+        return 'assets/images/Crypt Stalkers/lord_vladislav_g3.png';
+      }
+      return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
+    }
+
+    // Commander: Lady Valeria (Generational Evolution: G1, G3, G6)
+    if (id.contains('valeria') || speciesId.contains('valeria') || name.contains('Valeria')) {
+      if (generation >= 6) {
+        return 'assets/images/Ash Legion/lady_valeria_g6.png';
+      }
+      if (generation >= 3) {
+        return 'assets/images/Ash Legion/lady_valeria_g3.png';
+      }
+      return 'assets/images/Ash Legion/lady_valeria_g1.png';
     }
 
     // Primordial Boss / Titan / Colossus
@@ -352,7 +369,7 @@ class UnitEntity {
 
   bool get isFigurineCutout =>
       effectiveAvatarAsset.endsWith('.png') ||
-      effectiveAvatarAsset.contains('lord_vladislav');
+      effectiveAvatarAsset.toLowerCase().contains('vladislav');
 
   /// GDD v2.8 Sec 3.4: Flexible formation customization allows any unit (including all 5)
   /// to be stationed in Frontline or Backline.
@@ -642,6 +659,8 @@ class UnitEntity {
     int? resist,
     int? flatAbsorb,
     int? reviveCount,
+    double? critRate,
+    double? critDamage,
     double? turnMeter,
     double? ultimateCharge,
     List<StatusEffect>? activeEffects,
@@ -673,8 +692,8 @@ class UnitEntity {
       resist: resist ?? this.resist,
       flatAbsorb: flatAbsorb ?? this.flatAbsorb,
       reviveCount: reviveCount ?? this.reviveCount,
-      critRate: critRate,
-      critDamage: critDamage,
+      critRate: critRate ?? this.critRate,
+      critDamage: critDamage ?? this.critDamage,
       turnMeter: turnMeter ?? this.turnMeter,
       ultimateCharge: ultimateCharge ?? this.ultimateCharge,
       activeEffects: activeEffects ?? this.activeEffects,

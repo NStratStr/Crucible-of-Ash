@@ -5,7 +5,6 @@ import 'package:ashen_crucible/features/combat/combat_resolution_service.dart';
 import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/features/generals/general_command_service.dart';
 import 'package:ashen_crucible/shared/data/starter_brigades.dart';
-import 'package:ashen_crucible/shared/models/unit_entity.dart';
 
 void main() {
   group('Pre-Battle Setup & Flexible Formations Tests (GDD v2.8 Sec 3.4)', () {
@@ -113,6 +112,77 @@ void main() {
       expect(find.text('COMMENCE BATTLE'), findsNothing);
 
       tickManager.pause();
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    test('Lord Vladislav resolves to G1, G3, and G6 evolution assets based on generation tier', () {
+      final baseVlad = StarterBrigades.createAshLegionPlayerSquad()[0];
+
+      // G1
+      final g1Vlad = baseVlad.copyWith(generation: 1);
+      expect(g1Vlad.effectiveAvatarAsset, equals('assets/images/Crypt Stalkers/lord_vladislav_g1.png'));
+
+      // G2
+      final g2Vlad = baseVlad.copyWith(generation: 2);
+      expect(g2Vlad.effectiveAvatarAsset, equals('assets/images/Crypt Stalkers/lord_vladislav_g1.png'));
+
+      // G3
+      final g3Vlad = baseVlad.copyWith(generation: 3);
+      expect(g3Vlad.effectiveAvatarAsset, equals('assets/images/Crypt Stalkers/lord_vladislav_g3.png'));
+
+      // G5
+      final g5Vlad = baseVlad.copyWith(generation: 5);
+      expect(g5Vlad.effectiveAvatarAsset, equals('assets/images/Crypt Stalkers/lord_vladislav_g3.png'));
+
+      // G6 / Pureblood
+      final g6Vlad = baseVlad.copyWith(generation: 6);
+      expect(g6Vlad.isPureblood, isTrue);
+      expect(g6Vlad.effectiveAvatarAsset, equals('assets/images/Crypt Stalkers/lord_vladislav_g6.png'));
+    });
+
+    testWidgets('BattleScreen pauses ticking tickManager when startInPreBattleSetup is true',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final allies = StarterBrigades.createAshLegionPlayerSquad();
+      final enemies = StarterBrigades.createCryptStalkersEnemySquad();
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: allies,
+        initialEnemies: enemies,
+      );
+      addTearDown(tickManager.dispose);
+
+      // Prematurely start tick manager
+      tickManager.start();
+      expect(tickManager.phase, equals(CombatPhase.ticking));
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+      );
+      addTearDown(commandService.dispose);
+
+      final combatService = CombatResolutionService(tickManager: tickManager);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BattleScreen(
+            tickManager: tickManager,
+            commandService: commandService,
+            combatService: combatService,
+            startInPreBattleSetup: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Verified: BattleScreen forced tickManager to pause and renders COMMENCE BATTLE
+      expect(tickManager.phase, equals(CombatPhase.idle));
+      expect(find.text('COMMENCE BATTLE'), findsOneWidget);
+
       await tester.pumpWidget(const SizedBox());
     });
   });
