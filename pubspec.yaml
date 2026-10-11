@@ -60,6 +60,10 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/Ash Legion/
+    - assets/images/Crypt Stalkers/
+    - assets/images/Spells/
+    - assets/images/UI/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

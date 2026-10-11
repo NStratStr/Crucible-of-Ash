@@ -15,6 +15,7 @@ import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
 import 'plinth_rim_status_painter.dart';
+import 'wargaming_spell_card.dart';
 import '../generals/general_command_service.dart';
 import '../generals/general_selection_dialog.dart';
 import '../relics/relic_service.dart';
@@ -2607,34 +2608,64 @@ class _BattleScreenState extends State<BattleScreen> {
           ),
         );
       case 'magic':
+      case 'sunfire':
+      case 'sunburst':
         return Center(
           child: Stack(
             alignment: Alignment.center,
             children: [
+              Image.asset(
+                'assets/images/Spells/Sunburst - Tier 1 Spell no text.png',
+                width: isBossUnit ? 190 : 130,
+                height: isBossUnit ? 190 : 130,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.auto_fix_high, size: 38, color: Color(0xFFFFD54F)),
+              ),
               Container(
-                width: isBossUnit ? 150 : 100,
-                height: isBossUnit ? 150 : 100,
+                width: isBossUnit ? 140 : 90,
+                height: isBossUnit ? 140 : 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE040FB), width: 2.2),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFE040FB).withValues(alpha: 0.6),
+                      color: const Color(0xFFFFD54F).withValues(alpha: 0.7),
                       blurRadius: 18,
-                      spreadRadius: 3,
+                      spreadRadius: 2,
                     ),
                   ],
                 ),
               ),
+            ],
+          ),
+        );
+      case 'vampiric':
+      case 'bleed':
+      case 'vitae':
+        return Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                'assets/images/Spells/Vitae Erution - Tier 1 no txt.png',
+                width: isBossUnit ? 190 : 130,
+                height: isBossUnit ? 190 : 130,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(Icons.bloodtype, size: 38, color: Color(0xFFFF1744)),
+              ),
               Container(
-                width: isBossUnit ? 110 : 70,
-                height: isBossUnit ? 110 : 70,
+                width: isBossUnit ? 140 : 90,
+                height: isBossUnit ? 140 : 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.7),
+                      blurRadius: 18,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
               ),
-              const Icon(Icons.auto_fix_high, size: 30, color: Color(0xFFEA80FC)),
             ],
           ),
         );
@@ -2689,6 +2720,35 @@ class _BattleScreenState extends State<BattleScreen> {
           ),
         );
     }
+  }
+
+  double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop) {
+    if (isBossUnit) {
+      return isDesktop ? 2.25 : 1.90;
+    }
+    if (!unit.isFigurineCutout) {
+      return 1.0;
+    }
+
+    final double baseScale = isDesktop ? 1.75 : 1.45;
+
+    // Tabletop Miniature Equalization:
+    // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
+    // Vlad: tall standing upright with raised sword and cape (799px height) -> scale 0.85 to match infantry eye level
+    // Ghoul / crouched quadruped beasts (Grave Ghoul, Sanguine Flayer): hunched low (413px height) -> scale 1.30 to match infantry mass
+    double poseCompensation = 1.0;
+    final asset = unit.effectiveAvatarAsset.toLowerCase();
+    final species = unit.speciesId.toLowerCase();
+    final name = unit.name.toLowerCase();
+
+    if (asset.contains('vladislav') || species.contains('vladislav') || name.contains('vladislav')) {
+      poseCompensation = 0.85;
+    } else if (asset.contains('ghoul') || species.contains('ghoul') || name.contains('ghoul') ||
+               asset.contains('flayer') || asset.contains('warhound')) {
+      poseCompensation = 1.30;
+    }
+
+    return baseScale * poseCompensation;
   }
 
   Widget _buildUnitCard({
@@ -2829,11 +2889,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isDesktop = screenWidth >= 1000;
-    final double miniatureScale = isBossUnit
-        ? (isDesktop ? 2.50 : 2.05)
-        : (unit.isFigurineCutout
-            ? (unit.isCommander ? (isDesktop ? 2.15 : 1.70) : (isDesktop ? 1.85 : 1.55))
-            : 1.0);
+    final double miniatureScale = _getUnitModelScale(unit, isBossUnit, isDesktop);
 
     final Widget cardWidget = GestureDetector(
       key: Key('unit_card_${unit.id}'),
@@ -2904,39 +2960,61 @@ class _BattleScreenState extends State<BattleScreen> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // LAYER 1A: 3D Faction Ground Plinth & Circular Floor Spotlight
+                    // LAYER 1A: 3D Tabletop Contact Shadow & Plinth Curved Status Arcs
                     if (unit.isFigurineCutout) ...[
-                      // Dynamic circular ground spotlight glow for active / targeted / boss figurines
-                      if (isActive || isSelectedTarget || isBossUnit)
+                      // Natural tabletop contact drop shadow under the plinth base (grounds figurine)
+                      Positioned(
+                        bottom: -1,
+                        left: isBossUnit ? 10 : 14,
+                        right: isBossUnit ? 10 : 14,
+                        height: 14,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.all(Radius.elliptical(120, 18)),
+                            gradient: RadialGradient(
+                              colors: [
+                                Colors.black.withValues(alpha: 0.75),
+                                Colors.black.withValues(alpha: 0.25),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Refined active turn / target selection base ring indicator (clean wargaming ring)
+                      if (isActive || isSelectedTarget)
                         Positioned(
-                          bottom: -3,
-                          left: isBossUnit ? 2 : 8,
-                          right: isBossUnit ? 2 : 8,
-                          height: isBossUnit ? 28 : 22,
+                          bottom: 2,
+                          left: isBossUnit ? 8 : 12,
+                          right: isBossUnit ? 8 : 12,
+                          height: 18,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.all(Radius.elliptical(
-                                isBossUnit ? 240 : 130,
-                                isBossUnit ? 36 : 24,
-                              )),
-                              gradient: RadialGradient(
-                                colors: [
-                                  (isActive
-                                          ? const Color(0xFFFFD54F)
-                                          : (isSelectedTarget ? const Color(0xFFFF1744) : const Color(0xFFFF5252)))
-                                      .withValues(alpha: isBossUnit ? 0.45 : 0.35),
-                                  Colors.transparent,
-                                ],
+                              borderRadius: const BorderRadius.all(Radius.elliptical(120, 20)),
+                              border: Border.all(
+                                color: isActive ? const Color(0xFFFFD54F) : const Color(0xFFFF1744),
+                                width: 2.0,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isActive ? const Color(0xFFFFD54F) : const Color(0xFFFF1744))
+                                      .withValues(alpha: 0.65),
+                                  blurRadius: 8,
+                                  spreadRadius: 1.0,
+                                ),
+                              ],
                             ),
                           ),
                         ),
 
+                      // GDD v2.8 Tabletop Miniature Inlaid Curved Status Bars (Health Arc & AP Arc)
+                      // Rendered directly on top of the front plinth rim with NO opaque child covering it!
                       Positioned(
-                        bottom: 0,
-                        left: isBossUnit ? 6 : 10,
-                        right: isBossUnit ? 6 : 10,
-                        height: isBossUnit ? 26 : 20,
+                        bottom: 10,
+                        left: isBossUnit ? 8 : 12,
+                        right: isBossUnit ? 8 : 12,
+                        height: isBossUnit ? 28 : 22,
                         child: CustomPaint(
                           painter: PlinthRimStatusPainter(
                             bleedStacks: unit.bleedStacks,
@@ -2953,55 +3031,6 @@ class _BattleScreenState extends State<BattleScreen> {
                             showTmBar: true,
                             isDamaged: isDamaged,
                             isAttacking: isAttacking,
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.all(Radius.elliptical(
-                                isBossUnit ? 220 : 120,
-                                isBossUnit ? 32 : 22,
-                              )),
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  (isActive
-                                      ? const Color(0xFFFFD54F)
-                                      : (isSelectedTarget
-                                          ? const Color(0xFFFF1744)
-                                          : _factionGlowColor(unit)))
-                                      .withValues(alpha: alive ? (isBossUnit ? 0.9 : 0.7) : 0.15),
-                                  const Color(0xFF1E1E28),
-                                  const Color(0xFF0C0C12),
-                                ],
-                              ),
-                              border: Border.all(
-                                color: isActive
-                                    ? const Color(0xFFFFD54F)
-                                    : (isSelectedTarget
-                                        ? const Color(0xFFFF1744)
-                                        : (isDamaged
-                                            ? const Color(0xFFFF1744)
-                                            : _factionGlowColor(unit).withValues(alpha: alive ? (isBossUnit ? 0.95 : 0.8) : 0.25))),
-                                width: (isActive || isSelectedTarget || isBossUnit) ? 2.2 : 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (isActive
-                                          ? const Color(0xFFFFD54F)
-                                          : (isSelectedTarget || isDamaged
-                                              ? const Color(0xFFFF1744)
-                                              : _factionGlowColor(unit)))
-                                      .withValues(alpha: alive ? (isBossUnit ? 0.8 : 0.6) : 0.15),
-                                  blurRadius: (isActive || isSelectedTarget || isBossUnit) ? 18 : 7,
-                                  spreadRadius: (isActive || isSelectedTarget || isBossUnit) ? 2.5 : 1,
-                                ),
-                                const BoxShadow(
-                                  color: Colors.black87,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 3),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       ),
@@ -4296,108 +4325,16 @@ class _BattleScreenState extends State<BattleScreen> {
     required VoidCallback onTap,
     required VoidCallback onLockedTap,
   }) {
-    final slipWidget = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: isUnlocked ? (canAfford ? onTap : null) : onLockedTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: !isUnlocked
-                  ? [const Color(0xFF14141A), const Color(0xFF0E0E14)]
-                  : (canAfford
-                      ? [const Color(0xFF25222E), const Color(0xFF15141C)]
-                      : [const Color(0xFF1C1A22), const Color(0xFF100F15)]),
-            ),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: !isUnlocked
-                  ? const Color(0xFF383844)
-                  : (canAfford ? themeColor : const Color(0xFF383844)),
-              width: (!isUnlocked || !canAfford) ? 0.8 : 1.5,
-            ),
-            boxShadow: (isUnlocked && canAfford)
-                ? [
-                    BoxShadow(
-                      color: themeColor.withValues(alpha: 0.25),
-                      blurRadius: 6,
-                    ),
-                  ]
-                : null,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header: Cost Badge or Lock with Required Rank
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
-                    decoration: BoxDecoration(
-                      color: !isUnlocked
-                          ? const Color(0xFF1F1F28)
-                          : (canAfford ? const Color(0xFFE5A93C) : const Color(0xFF2A2A38)),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Text(
-                      !isUnlocked
-                          ? 'RANK ${order.requiredPhylacteryRank}'
-                          : '$effectiveCost FOCUS',
-                      style: TextStyle(
-                        color: !isUnlocked
-                            ? const Color(0xFFE5A93C)
-                            : (canAfford ? Colors.black : Colors.white38),
-                        fontSize: 7.0,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    !isUnlocked ? Icons.lock : (order.icon ?? Icons.auto_awesome),
-                    size: 11,
-                    color: !isUnlocked
-                        ? Colors.white38
-                        : (canAfford ? themeColor : Colors.white30),
-                  ),
-                ],
-              ),
-              // Name
-              Text(
-                order.name,
-                style: TextStyle(
-                  color: !isUnlocked
-                      ? Colors.white38
-                      : (canAfford ? Colors.white : Colors.white54),
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              // Description
-              Text(
-                order.description,
-                style: TextStyle(
-                  color: !isUnlocked ? Colors.white24 : Colors.white60,
-                  fontSize: 6.8,
-                  height: 1.1,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
+    final slipWidget = WargamingSpellCard(
+      order: order,
+      effectiveCost: effectiveCost,
+      canAfford: canAfford,
+      isUnlocked: isUnlocked,
+      themeColor: themeColor,
+      onTap: onTap,
+      onLockedTap: onLockedTap,
+      isCompact: true,
+      height: 66,
     );
 
     if (!isUnlocked) {
@@ -4407,8 +4344,8 @@ class _BattleScreenState extends State<BattleScreen> {
     return Draggable<GeneralOrderDefinition>(
       data: order,
       dragAnchorStrategy: (draggable, context, position) {
-        // Precise center of the 110x60 feedback card anchored directly under pointer/touch
-        return const Offset(55, 30);
+        // Precise center of the 140x190 collectible card anchored directly under pointer/touch
+        return const Offset(70, 95);
       },
       onDragStarted: () {
         widget.commandService.setBulletTime(true);
@@ -4424,62 +4361,15 @@ class _BattleScreenState extends State<BattleScreen> {
       },
       feedback: Material(
         color: Colors.transparent,
-        child: Container(
-          width: 110,
-          height: 56,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1418),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: themeColor, width: 2.0),
-            boxShadow: [
-              BoxShadow(
-                color: themeColor.withValues(alpha: 0.8),
-                blurRadius: 18,
-                spreadRadius: 2,
-              ),
-              const BoxShadow(
-                color: Colors.black87,
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(order.icon ?? Icons.flash_on, size: 10, color: themeColor),
-                    const SizedBox(width: 3),
-                    Text(
-                      order.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$effectiveCost FOCUS',
-                  style: const TextStyle(
-                    color: Color(0xFFE5A93C),
-                    fontSize: 8.0,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        child: WargamingSpellCard(
+          order: order,
+          effectiveCost: effectiveCost,
+          canAfford: canAfford,
+          isUnlocked: isUnlocked,
+          themeColor: themeColor,
+          isCompact: false,
+          width: 140,
+          height: 190,
         ),
       ),
       childWhenDragging: Opacity(

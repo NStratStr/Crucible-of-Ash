@@ -249,35 +249,35 @@ class PlinthRimStatusPainter extends CustomPainter {
       final double clampedHp = hpRatio.clamp(0.0, 1.0);
       final Rect hpRect = Rect.fromCenter(
         center: center,
-        width: size.width + 4.0,
-        height: size.height + 4.0,
+        width: size.width + 6.0,
+        height: size.height + 5.0,
       );
 
-      // Total sweep angle along the front edge of the plinth ellipse
+      // Total sweep angle along the front edge of the plinth ellipse (bottom curve)
       const double startAngle = math.pi * 0.92;
       const double totalSweep = math.pi * 0.84;
 
-      // Dark background groove track
-      final Paint hpBorderPaint = Paint()
-        ..color = const Color(0xFF2E2E3C).withValues(alpha: 0.6)
+      // Dark iron beveled background track
+      final Paint hpBevelPaint = Paint()
+        ..color = const Color(0xFF454558).withValues(alpha: 0.85)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = 4.4;
-      canvas.drawArc(hpRect, math.pi * 0.08, totalSweep, false, hpBorderPaint);
+        ..strokeWidth = 6.4;
+      canvas.drawArc(hpRect, math.pi * 0.08, totalSweep, false, hpBevelPaint);
 
       final Paint hpTrackPaint = Paint()
-        ..color = const Color(0xFF0F0F14).withValues(alpha: 0.90)
+        ..color = const Color(0xFF101016)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = 3.6;
+        ..strokeWidth = 5.2;
       canvas.drawArc(hpRect, math.pi * 0.08, totalSweep, false, hpTrackPaint);
 
       if (clampedHp > 0) {
         Color hpColor;
         Color hpGlowColor;
         if (clampedHp > 0.45) {
-          hpColor = const Color(0xFF43A047); // Vibrant Emerald Green
-          hpGlowColor = const Color(0xFF66BB6A);
+          hpColor = const Color(0xFF00E676); // High-contrast Emerald Green
+          hpGlowColor = const Color(0xFF69F0AE);
         } else if (clampedHp > 0.20) {
           hpColor = const Color(0xFFFFB300); // Amber warning
           hpGlowColor = const Color(0xFFFFD54F);
@@ -293,20 +293,20 @@ class PlinthRimStatusPainter extends CustomPainter {
 
         final double filledSweep = totalSweep * clampedHp;
 
-        // Subtle glow aura behind the filled portion
+        // Vivid liquid health glow
         final Paint hpGlowPaint = Paint()
-          ..color = hpGlowColor.withValues(alpha: isDamaged ? 0.75 : 0.40)
+          ..color = hpGlowColor.withValues(alpha: isDamaged ? 0.90 : 0.55)
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
-          ..strokeWidth = 5.2;
+          ..strokeWidth = 6.8;
         canvas.drawArc(hpRect, startAngle, -filledSweep, false, hpGlowPaint);
 
-        // Core glowing liquid health arc
+        // Core liquid health arc
         final Paint hpFillPaint = Paint()
           ..color = hpColor
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
-          ..strokeWidth = 3.2;
+          ..strokeWidth = 4.2;
         canvas.drawArc(hpRect, startAngle, -filledSweep, false, hpFillPaint);
       }
     }
@@ -317,7 +317,7 @@ class PlinthRimStatusPainter extends CustomPainter {
       final Rect apRect = Rect.fromCenter(
         center: center,
         width: size.width - 4.0,
-        height: size.height - 2.5,
+        height: size.height - 3.0,
       );
 
       const double apStartAngle = math.pi * 0.90;
@@ -325,10 +325,10 @@ class PlinthRimStatusPainter extends CustomPainter {
 
       // Dark background track groove
       final Paint apTrackPaint = Paint()
-        ..color = const Color(0xFF09141E).withValues(alpha: 0.85)
+        ..color = const Color(0xFF08121A)
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = 2.4;
+        ..strokeWidth = 3.6;
       canvas.drawArc(apRect, math.pi * 0.10, apTotalSweep, false, apTrackPaint);
 
       if (clampedTm > 0) {
@@ -338,10 +338,10 @@ class PlinthRimStatusPainter extends CustomPainter {
 
         // Outer glow
         final Paint apGlowPaint = Paint()
-          ..color = apColor.withValues(alpha: isReady ? 0.65 : 0.35)
+          ..color = apColor.withValues(alpha: isReady ? 0.85 : 0.45)
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
-          ..strokeWidth = 3.6;
+          ..strokeWidth = 4.8;
         canvas.drawArc(apRect, apStartAngle, -filledApSweep, false, apGlowPaint);
 
         // Core cyan / gold AP arc
@@ -349,7 +349,7 @@ class PlinthRimStatusPainter extends CustomPainter {
           ..color = apColor
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
-          ..strokeWidth = 2.0;
+          ..strokeWidth = 2.6;
         canvas.drawArc(apRect, apStartAngle, -filledApSweep, false, apFillPaint);
       }
     }

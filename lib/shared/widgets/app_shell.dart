@@ -1506,28 +1506,51 @@ class _AppShellState extends State<AppShell> {
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.map),
             label: 'Campaign Map',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shield),
+            icon: Image.asset(
+              'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
+              width: 21,
+              height: 21,
+              errorBuilder: (_, __, ___) => const Icon(Icons.shield),
+            ),
             label: 'Battle Arena',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.fireplace),
+            icon: Image.asset(
+              'assets/images/UI/Flame Shield icon Transparent.png',
+              width: 21,
+              height: 21,
+              errorBuilder: (_, __, ___) => const Icon(Icons.fireplace),
+            ),
             label: 'Crucible Altar',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.auto_awesome),
             label: 'Relic Forge',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people_alt),
+            icon: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(Icons.people_alt, size: 21, color: Colors.transparent),
+                IgnorePointer(
+                  child: Image.asset(
+                    'assets/images/UI/Skull Shield Icon Transparent.png',
+                    width: 21,
+                    height: 21,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.people_alt),
+                  ),
+                ),
+              ],
+            ),
             label: 'Brigade Roster',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.menu_book),
             label: 'Affinity Codex',
           ),
@@ -1632,9 +1655,21 @@ class _AppShellState extends State<AppShell> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Commander Bar
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.22,
+              child: Image.asset(
+                'assets/images/UI/Main Page HUD background with less people.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              // Commander Bar
           Container(
             margin: const EdgeInsets.fromLTRB(14, 12, 14, 6),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2008,6 +2043,8 @@ class _AppShellState extends State<AppShell> {
               },
             ),
           ),
+        ],
+      ),
         ],
       ),
     );
