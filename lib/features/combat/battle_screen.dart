@@ -1153,11 +1153,13 @@ class _BattleScreenState extends State<BattleScreen> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width >= 1000 ? 1280.0 : 780.0,
+                              maxWidth: MediaQuery.of(context).size.width >= 1000 ? 1440.0 : double.infinity,
                             ),
                             child: Builder(
                               builder: (context) {
+                                final double screenWidth = MediaQuery.of(context).size.width;
                                 final double screenHeight = MediaQuery.of(context).size.height;
+                                final bool isMobile = screenWidth < 600;
                                 final bool isCompact = screenHeight < 760;
                                 final bool isUltraCompact = screenHeight < 620;
                                 return Row(
@@ -1165,10 +1167,13 @@ class _BattleScreenState extends State<BattleScreen> {
                                   children: [
                                     // Vertical Initiative Ribbon along the left edge
                                     Padding(
-                                      padding: const EdgeInsets.only(right: 6.0),
+                                      padding: EdgeInsets.only(right: isMobile ? 3.0 : 6.0),
                                       child: Center(
                                         child: SingleChildScrollView(
-                                          child: _buildVerticalInitiativeTrack(),
+                                          child: _buildVerticalInitiativeTrack(
+                                            isCompact: isCompact,
+                                            isMobile: isMobile,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -2137,11 +2142,11 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isCompact = screenHeight < 760;
     final bool isUltraCompact = screenHeight < 620;
 
-    // Responsive squad cluster width tailored for mobile fit and desktop wargaming presence
-    final double perUnitWidth = isDesktop ? 165.0 : (isTablet ? 130.0 : 76.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(260.0, isDesktop ? 960.0 : (isTablet ? 680.0 : (screenWidth - 12.0)));
-    final double cardMaxWidth = isDesktop ? 175.0 : (isTablet ? 135.0 : 80.0);
-    final double horizontalPadding = isDesktop ? 3.0 : (isTablet ? 2.0 : 1.0);
+    // Responsive squad cluster width tailored for commanding mobile presence & desktop wargaming scale
+    final double perUnitWidth = isDesktop ? 220.0 : (isTablet ? 170.0 : 96.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(280.0, isDesktop ? 1220.0 : (isTablet ? 740.0 : screenWidth));
+    final double cardMaxWidth = isDesktop ? 230.0 : (isTablet ? 180.0 : 105.0);
+    final double horizontalPadding = isDesktop ? 4.0 : (isTablet ? 2.5 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -2400,31 +2405,37 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   /// Vertical Initiative Ribbon along the left edge showing who acts next from top to bottom
-  Widget _buildVerticalInitiativeTrack() {
+  Widget _buildVerticalInitiativeTrack({bool isCompact = false, bool isMobile = false}) {
     final upcomingQueue = _getUpcomingTurnQueue();
     if (upcomingQueue.isEmpty) return const SizedBox.shrink();
 
     final active = widget.tickManager.activeUnit;
+    final double avatarSize = isMobile ? 26.0 : (isCompact ? 28.0 : 34.0);
+    final double activeAvatarSize = isMobile ? 30.0 : (isCompact ? 32.0 : 38.0);
+    final int displayCount = isMobile ? 4 : 5;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 3 : 5,
+        vertical: isMobile ? 4 : 6,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF0E0E14).withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: const Color(0xFFD4AF37).withValues(alpha: 0.75),
-          width: 1.2,
+          width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.7),
-            blurRadius: 10,
+            blurRadius: 8,
             spreadRadius: 1,
-            offset: const Offset(2, 2),
+            offset: const Offset(1, 1),
           ),
           BoxShadow(
             color: const Color(0xFFD4AF37).withValues(alpha: 0.20),
-            blurRadius: 8,
+            blurRadius: 6,
           ),
         ],
       ),
@@ -2432,33 +2443,33 @@ class _BattleScreenState extends State<BattleScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Header icon and label
-          const Row(
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.hourglass_bottom, size: 11, color: Color(0xFFFFD54F)),
-              SizedBox(width: 3),
+              Icon(Icons.hourglass_bottom, size: isMobile ? 9 : 11, color: const Color(0xFFFFD54F)),
+              const SizedBox(width: 2),
               Text(
                 'NEXT',
                 style: TextStyle(
-                  color: Color(0xFFFFD54F),
-                  fontSize: 8.5,
+                  color: const Color(0xFFFFD54F),
+                  fontSize: isMobile ? 7.0 : 8.5,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 1.0,
+                  letterSpacing: 0.8,
                   fontFamily: 'monospace',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 5),
+          SizedBox(height: isMobile ? 3 : 4),
           Container(
-            width: 36,
+            width: isMobile ? 24 : 32,
             height: 1,
             color: const Color(0xFF3E3E52),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: isMobile ? 3 : 5),
 
           // Stack of upcoming combatant tokens
-          ...upcomingQueue.asMap().entries.map((entry) {
+          ...upcomingQueue.take(displayCount).toList().asMap().entries.map((entry) {
             final int index = entry.key;
             final UnitEntity u = entry.value;
             final bool isAlly = widget.tickManager.allies.any((a) => a.id == u.id);
@@ -2467,7 +2478,7 @@ class _BattleScreenState extends State<BattleScreen> {
             final Color borderCol = isNow ? const Color(0xFFFFD54F) : sideColor;
 
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3.5),
+              padding: EdgeInsets.symmetric(vertical: isMobile ? 2.0 : 3.0),
               child: Tooltip(
                 message: '${u.name}\n${isAlly ? "ALLIED" : "HOSTILE"}\nSpeed: ${u.speed} • Turn Meter: ${u.turnMeter.toStringAsFixed(0)}%',
                 child: GestureDetector(
@@ -2482,26 +2493,26 @@ class _BattleScreenState extends State<BattleScreen> {
                     children: [
                       // Unit Avatar Node
                       Container(
-                        width: isNow ? 38 : 34,
-                        height: isNow ? 38 : 34,
+                        width: isNow ? activeAvatarSize : avatarSize,
+                        height: isNow ? activeAvatarSize : avatarSize,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: borderCol,
-                            width: isNow ? 2.2 : 1.4,
+                            width: isNow ? 1.8 : 1.2,
                           ),
                           boxShadow: isNow
                               ? [
                                   BoxShadow(
                                     color: const Color(0xFFFFD54F).withValues(alpha: 0.75),
-                                    blurRadius: 8,
-                                    spreadRadius: 1.5,
+                                    blurRadius: 6,
+                                    spreadRadius: 1.0,
                                   ),
                                 ]
                               : [
                                   BoxShadow(
                                     color: sideColor.withValues(alpha: 0.35),
-                                    blurRadius: 4,
+                                    blurRadius: 3,
                                   ),
                                 ],
                         ),
@@ -3193,17 +3204,18 @@ class _BattleScreenState extends State<BattleScreen> {
 
   double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop, {bool isCompact = false}) {
     if (isBossUnit) {
-      return isDesktop ? 2.05 : (isCompact ? 1.55 : 1.75);
+      return isDesktop ? 2.50 : (isCompact ? 1.95 : 2.25);
     }
     if (!unit.isFigurineCutout) {
-      return 1.0;
+      return 1.15;
     }
 
-    final double baseScale = isDesktop ? 1.45 : (isCompact ? 1.18 : 1.30);
+    // Command presence: miniatures scale prominently to command battlefield space
+    final double baseScale = isDesktop ? 1.95 : (isCompact ? 1.65 : 1.82);
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
-    // Vlad: tall standing upright with raised sword and cape -> scale 0.72 to match infantry eye level
+    // Vlad: tall standing upright with raised sword and cape -> scale 0.76 to match infantry eye level
     // Ghoul / crouched quadruped beasts: ~704px height in raw asset -> scale 1.05 to match infantry visual presence
     double poseCompensation = 1.0;
     final asset = unit.effectiveAvatarAsset.toLowerCase();
@@ -3211,7 +3223,7 @@ class _BattleScreenState extends State<BattleScreen> {
     final name = unit.name.toLowerCase();
 
     if (asset.contains('vladislav') || species.contains('vladislav') || name.contains('vladislav')) {
-      poseCompensation = 0.72;
+      poseCompensation = 0.76;
     } else if (asset.contains('ghoul') || species.contains('ghoul') || name.contains('ghoul') ||
                asset.contains('flayer') || asset.contains('warhound')) {
       poseCompensation = 1.05;
