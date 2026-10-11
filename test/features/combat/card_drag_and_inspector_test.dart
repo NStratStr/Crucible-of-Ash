@@ -207,7 +207,7 @@ void main() {
       // Tap the assignment / inspector icon on miniature
       final inspectButtonFinder = find.byIcon(Icons.assignment);
       expect(inspectButtonFinder, findsWidgets);
-      await tester.tap(inspectButtonFinder.first);
+      await tester.tap(inspectButtonFinder.last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 

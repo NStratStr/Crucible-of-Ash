@@ -149,7 +149,7 @@ void main() {
       expect(find.text('☠ BOSS'), findsWidgets);
 
       // 3. Verify minion is present without boss badge
-      expect(find.text('Cultist Zealot'), findsOneWidget);
+      expect(find.byKey(Key('unit_card_${testMinion.id}')), findsOneWidget);
 
       // Stop ticks before widget unmount
       tickManager.pause();

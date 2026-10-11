@@ -152,7 +152,7 @@ void main() {
       expect(find.text('READY (100%)'), findsOneWidget);
 
       // Select target
-      await tester.tap(find.text('Cultist'));
+      await tester.tap(find.byKey(const Key('unit_card_enemy_1')));
       await tester.pump();
 
       // Trigger Limit Burst

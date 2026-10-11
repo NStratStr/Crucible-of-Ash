@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
@@ -167,7 +168,7 @@ void main() {
         initialAllies: [primedAttacker],
         initialEnemies: [baseDefender.copyWith(defense: 100)],
       );
-      final cs1 = CombatResolutionService(tickManager: tickManager1);
+      final cs1 = CombatResolutionService(tickManager: tickManager1, rng: Random(42));
       tickManager1.advanceTick();
       final normalResult = cs1.executeBasicAttack(
         targetUnitId: baseDefender.id,
@@ -178,7 +179,7 @@ void main() {
         initialAllies: [primedAttacker],
         initialEnemies: [bleedingDefender],
       );
-      final cs2 = CombatResolutionService(tickManager: tickManager2);
+      final cs2 = CombatResolutionService(tickManager: tickManager2, rng: Random(42));
       tickManager2.advanceTick();
       final shearedResult = cs2.executeBasicAttack(
         targetUnitId: bleedingDefender.id,

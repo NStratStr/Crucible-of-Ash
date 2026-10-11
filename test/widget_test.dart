@@ -82,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify engaged into Battle Arena
-    expect(find.text('The Ashen World Titan'), findsOneWidget);
+    expect(find.textContaining('THE ASHEN WORLD TITAN'), findsOneWidget);
   });
 }
 

@@ -16,6 +16,12 @@ class PlinthRimStatusPainter extends CustomPainter {
   final String? factionName;
   final bool isBurning;
   final bool isFrozen;
+  final double hpRatio;
+  final double tmRatio;
+  final bool showHpBar;
+  final bool showTmBar;
+  final bool isDamaged;
+  final bool isAttacking;
 
   const PlinthRimStatusPainter({
     required this.bleedStacks,
@@ -26,6 +32,12 @@ class PlinthRimStatusPainter extends CustomPainter {
     this.factionName,
     this.isBurning = false,
     this.isFrozen = false,
+    this.hpRatio = 1.0,
+    this.tmRatio = 0.0,
+    this.showHpBar = true,
+    this.showTmBar = true,
+    this.isDamaged = false,
+    this.isAttacking = false,
   });
 
   @override
@@ -231,6 +243,116 @@ class PlinthRimStatusPainter extends CustomPainter {
 
       canvas.drawOval(ovalRect, frostGlow);
     }
+
+    // 6. GDD v2.8 Tabletop Miniature Inlaid Curved Health Bar Arc (Lower Front Rim)
+    if (isAlive && showHpBar) {
+      final double clampedHp = hpRatio.clamp(0.0, 1.0);
+      final Rect hpRect = Rect.fromCenter(
+        center: center,
+        width: size.width + 4.0,
+        height: size.height + 4.0,
+      );
+
+      // Total sweep angle along the front edge of the plinth ellipse
+      const double startAngle = math.pi * 0.92;
+      const double totalSweep = math.pi * 0.84;
+
+      // Dark background groove track
+      final Paint hpBorderPaint = Paint()
+        ..color = const Color(0xFF2E2E3C).withValues(alpha: 0.6)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 4.4;
+      canvas.drawArc(hpRect, math.pi * 0.08, totalSweep, false, hpBorderPaint);
+
+      final Paint hpTrackPaint = Paint()
+        ..color = const Color(0xFF0F0F14).withValues(alpha: 0.90)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 3.6;
+      canvas.drawArc(hpRect, math.pi * 0.08, totalSweep, false, hpTrackPaint);
+
+      if (clampedHp > 0) {
+        Color hpColor;
+        Color hpGlowColor;
+        if (clampedHp > 0.45) {
+          hpColor = const Color(0xFF43A047); // Vibrant Emerald Green
+          hpGlowColor = const Color(0xFF66BB6A);
+        } else if (clampedHp > 0.20) {
+          hpColor = const Color(0xFFFFB300); // Amber warning
+          hpGlowColor = const Color(0xFFFFD54F);
+        } else {
+          hpColor = const Color(0xFFFF1744); // Critical Crimson
+          hpGlowColor = const Color(0xFFFF5252);
+        }
+
+        if (isDamaged) {
+          hpColor = const Color(0xFFFF1744);
+          hpGlowColor = Colors.white;
+        }
+
+        final double filledSweep = totalSweep * clampedHp;
+
+        // Subtle glow aura behind the filled portion
+        final Paint hpGlowPaint = Paint()
+          ..color = hpGlowColor.withValues(alpha: isDamaged ? 0.75 : 0.40)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 5.2;
+        canvas.drawArc(hpRect, startAngle, -filledSweep, false, hpGlowPaint);
+
+        // Core glowing liquid health arc
+        final Paint hpFillPaint = Paint()
+          ..color = hpColor
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 3.2;
+        canvas.drawArc(hpRect, startAngle, -filledSweep, false, hpFillPaint);
+      }
+    }
+
+    // 7. GDD v2.8 Tabletop Miniature Inlaid Curved AP / Turn Meter Arc (Concentric Inner Rim)
+    if (isAlive && showTmBar) {
+      final double clampedTm = tmRatio.clamp(0.0, 1.0);
+      final Rect apRect = Rect.fromCenter(
+        center: center,
+        width: size.width - 4.0,
+        height: size.height - 2.5,
+      );
+
+      const double apStartAngle = math.pi * 0.90;
+      const double apTotalSweep = math.pi * 0.80;
+
+      // Dark background track groove
+      final Paint apTrackPaint = Paint()
+        ..color = const Color(0xFF09141E).withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 2.4;
+      canvas.drawArc(apRect, math.pi * 0.10, apTotalSweep, false, apTrackPaint);
+
+      if (clampedTm > 0) {
+        final bool isReady = clampedTm >= 0.999;
+        final Color apColor = isReady ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF);
+        final double filledApSweep = apTotalSweep * clampedTm;
+
+        // Outer glow
+        final Paint apGlowPaint = Paint()
+          ..color = apColor.withValues(alpha: isReady ? 0.65 : 0.35)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 3.6;
+        canvas.drawArc(apRect, apStartAngle, -filledApSweep, false, apGlowPaint);
+
+        // Core cyan / gold AP arc
+        final Paint apFillPaint = Paint()
+          ..color = apColor
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 2.0;
+        canvas.drawArc(apRect, apStartAngle, -filledApSweep, false, apFillPaint);
+      }
+    }
   }
 
   @override
@@ -242,6 +364,12 @@ class PlinthRimStatusPainter extends CustomPainter {
         oldDelegate.plinthMaterial != plinthMaterial ||
         oldDelegate.factionName != factionName ||
         oldDelegate.isBurning != isBurning ||
-        oldDelegate.isFrozen != isFrozen;
+        oldDelegate.isFrozen != isFrozen ||
+        oldDelegate.hpRatio != hpRatio ||
+        oldDelegate.tmRatio != tmRatio ||
+        oldDelegate.showHpBar != showHpBar ||
+        oldDelegate.showTmBar != showTmBar ||
+        oldDelegate.isDamaged != isDamaged ||
+        oldDelegate.isAttacking != isAttacking;
   }
 }
