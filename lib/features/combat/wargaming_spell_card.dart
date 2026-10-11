@@ -278,13 +278,13 @@ class WargamingSpellCard extends StatelessWidget {
                 ),
               ),
 
-              // 2. Wargaming Dark-Iron Riveted Frame Tablet
+              // 2. Wargaming Dark-Iron Riveted Frame Tablet (Transparent PNG without white margin)
               Positioned.fill(
                 child: Image.asset(
-                  'assets/images/Spells/Spell frame template.jpg',
+                  'assets/images/Spells/wargaming_card_frame.png',
                   fit: BoxFit.fill,
                   errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/images/Spells/wargaming_card_frame.png',
+                    'assets/images/Spells/Spell frame template.jpg',
                     fit: BoxFit.fill,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
@@ -293,14 +293,14 @@ class WargamingSpellCard extends StatelessWidget {
 
               // 3. Magic Spell Artwork placed directly over the center window
               Positioned(
-                left: cardW * 0.166,
-                top: cardH * 0.221,
-                width: cardW * 0.671,
-                height: cardH * 0.322,
+                left: cardW * 0.190,
+                top: cardH * 0.218,
+                width: cardW * 0.620,
+                height: cardH * 0.328,
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: const Color(0xFF1E1E28), width: 1.2),
+                    border: Border.all(color: const Color(0xFF1E1E28), width: 1.5),
                     boxShadow: const [
                       BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
                     ],

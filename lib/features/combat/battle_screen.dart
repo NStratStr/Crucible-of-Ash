@@ -2211,9 +2211,10 @@ class _BattleScreenState extends State<BattleScreen> {
                     // Stagger Depth: Frontline steps forward towards Ashen Front (-Y for Allies, +Y for Enemy)
                     // Backline steps back away from Ashen Front (+Y for Allies, -Y for Enemy)
                     final double depthY = isFrontline
-                        ? (isEnemy ? (isCompact ? 12.0 : 18.0) : (isCompact ? -12.0 : -18.0))
-                        : (isEnemy ? (isCompact ? -8.0 : -12.0) : (isCompact ? 8.0 : 12.0));
-                    final double tierScale = isFrontline ? 1.04 : 0.92;
+                        ? (isEnemy ? (isCompact ? 10.0 : 14.0) : (isCompact ? -10.0 : -14.0))
+                        : (isEnemy ? (isCompact ? -6.0 : -10.0) : (isCompact ? 6.0 : 10.0));
+                    // Consistent scale: Units maintain 100% equal size regardless of lane assignment
+                    const double tierScale = 1.0;
 
                     return Expanded(
                       child: Padding(
