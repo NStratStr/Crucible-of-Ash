@@ -2027,11 +2027,11 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 SizedBox(width: isMobile ? 4 : 8),
 
-                // Right: Speed Toggle, Wheel Info, Auto Mode & Tick Indicator
+                // Right: Speed Multiplier badge & Tactical Settings Popout Trigger [⚙️]
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Speed Multiplier Toggle
+                    // Quick 1-tap Speed Multiplier Toggle
                     GestureDetector(
                       onTap: () {
                         final current = widget.tickManager.speedMultiplier;
@@ -2040,7 +2040,7 @@ class _BattleScreenState extends State<BattleScreen> {
                         setState(() {});
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                         decoration: BoxDecoration(
                           color: widget.tickManager.speedMultiplier > 1.0
                               ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
@@ -2065,86 +2065,39 @@ class _BattleScreenState extends State<BattleScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    // Affinity Wheel Modal Trigger
+                    const SizedBox(width: 5),
+
+                    // Sleek Collapsible Tactical Settings Popout Button
                     GestureDetector(
-                      onTap: () => _showHexWheelDialog(activeUnit?.archetype),
+                      onTap: () => _showTacticalSettingsModal(context, activeUnit),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2B2B36),
+                          color: const Color(0xFF232330),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFF424250), width: 1),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.hexagon_outlined, size: 11, color: Color(0xFFD4AF37)),
-                            SizedBox(width: 2),
-                            Text(
-                              'WHEEL',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFD4AF37),
-                              ),
-                            ),
+                          border: Border.all(color: const Color(0xFF4D4D64), width: 1.1),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 1)),
                           ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _autoBattle = !_autoBattle;
-                          if (_autoBattle && _isPlayerTurnNow) {
-                            _handleAutoPlayerTurn();
-                          }
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _autoBattle ? const Color(0xFFB3261E) : const Color(0xFF2B2B36),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: _autoBattle ? const Color(0xFFFF5252) : const Color(0xFF424250),
-                            width: 1,
-                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              _autoBattle ? Icons.play_arrow : Icons.pause,
-                              size: 12,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              _autoBattle ? 'AUTO' : 'MANUAL',
-                              style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold),
-                            ),
+                            const Icon(Icons.settings, size: 12, color: Color(0xFFFFD54F)),
+                            if (!isMobile) ...[
+                              const SizedBox(width: 4),
+                              const Text(
+                                'TACTICS',
+                                style: TextStyle(
+                                  color: Color(0xFFFFD54F),
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
                           ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1F1F2A),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF38384A), width: 1),
-                      ),
-                      child: Text(
-                        'TICK ${widget.tickManager.tickCount}',
-                        style: const TextStyle(
-                          color: Color(0xFF9E9EB0),
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 9.0,
                         ),
                       ),
                     ),
@@ -2159,6 +2112,195 @@ class _BattleScreenState extends State<BattleScreen> {
             _buildCompactModifierAndCovenantsBar(modifier, boons),
         ],
       ),
+    );
+  }
+
+  /// Collapsible Frosted Tactical Settings Sheet
+  void _showTacticalSettingsModal(BuildContext context, UnitEntity? activeUnit) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final double currentSpeed = widget.tickManager.speedMultiplier;
+            return Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14141E).withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.6), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.8),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.tune, color: Color(0xFFFFD54F), size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'TACTICAL BATTLEFIELD SETTINGS',
+                            style: TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF222230),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'TICK ${widget.tickManager.tickCount}',
+                          style: const TextStyle(
+                            color: Color(0xFF9E9EB0),
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Color(0xFF2D2D40), height: 20),
+
+                  // Battle Speed Multiplier Controls
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Battle Speed',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      Row(
+                        children: [1.0, 2.0, 3.0].map((s) {
+                          final bool isSelected = currentSpeed == s;
+                          return GestureDetector(
+                            onTap: () {
+                              widget.tickManager.setSpeedMultiplier(s);
+                              setModalState(() {});
+                              setState(() {});
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF262636),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: isSelected ? const Color(0xFFFFD54F) : const Color(0xFF444458),
+                                ),
+                              ),
+                              child: Text(
+                                '${s.toInt()}X',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : Colors.white70,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Automation Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Combat Automation',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            'AI auto-resolves turns when initiative triggers',
+                            style: TextStyle(color: Colors.white54, fontSize: 9.5),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _autoBattle,
+                        activeColor: const Color(0xFFFFD54F),
+                        activeTrackColor: const Color(0xFFB3261E),
+                        inactiveThumbColor: Colors.grey,
+                        inactiveTrackColor: const Color(0xFF2B2B36),
+                        onChanged: (val) {
+                          setState(() {
+                            _autoBattle = val;
+                            if (_autoBattle && _isPlayerTurnNow) {
+                              _handleAutoPlayerTurn();
+                            }
+                          });
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Hex Affinity Wheel Trigger Button
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF252538),
+                      foregroundColor: const Color(0xFFFFD54F),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Color(0xFF555570), width: 1),
+                      ),
+                    ),
+                    icon: const Icon(Icons.hexagon_outlined, size: 16),
+                    label: const Text(
+                      'VIEW HEX AFFINITY WHEEL',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.6),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showHexWheelDialog(activeUnit?.archetype);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Close Button
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text(
+                      'CLOSE',
+                      style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -2498,11 +2640,13 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isCompact = screenHeight < 760;
     final bool isUltraCompact = screenHeight < 620;
 
-    // Responsive squad cluster width tailored for commanding mobile presence & desktop wargaming scale
-    final double perUnitWidth = isDesktop ? 230.0 : (isTablet ? 180.0 : 130.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 1280.0 : (isTablet ? 820.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 240.0 : (isTablet ? 190.0 : 140.0);
-    final double horizontalPadding = isDesktop ? 4.0 : (isTablet ? 2.5 : 1.0);
+    // Responsive squad cluster width tailored for commanding mobile presence & cohesive tabletop formation
+    // On widescreen and fullscreen displays, we cap cluster width tightly so units don't separate
+    // with huge empty chasms between columns.
+    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : 130.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 960.0 : (isTablet ? 820.0 : screenWidth));
+    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : 140.0);
+    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -3565,16 +3709,31 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop, {bool isCompact = false}) {
+  double _getUnitModelScale(
+    UnitEntity unit,
+    bool isBossUnit,
+    bool isDesktop, {
+    bool isCompact = false,
+    double screenHeight = 800.0,
+    double screenWidth = 1200.0,
+  }) {
     if (isBossUnit) {
-      return isDesktop ? 2.15 : (isCompact ? 1.80 : 2.05);
+      final double bossHeightFactor = (screenHeight / 850.0).clamp(0.85, 1.25);
+      return (isDesktop ? 2.10 : (isCompact ? 1.75 : 2.0)) * bossHeightFactor;
     }
     if (!unit.isFigurineCutout) {
       return 1.25;
     }
 
-    // Command presence: miniatures scale prominently to command battlefield space
-    final double baseScale = isDesktop ? 2.10 : (isCompact ? 1.85 : 2.05);
+    // Adaptive Tabletop Figurine Presence:
+    // Scale adjusts based on vertical battlefield slot availability and aspect ratio,
+    // ensuring figurines maintain consistent eye level and physical presence across
+    // mobile portrait, desktop window, and 16:9 fullscreen without ballooning or shrinking into specks.
+    final double aspectRatio = screenWidth / (screenHeight > 0 ? screenHeight : 1.0);
+    final double heightFactor = (screenHeight / 800.0).clamp(0.80, 1.25);
+    final double aspectClamp = aspectRatio > 1.6 ? 0.92 : 1.0;
+
+    final double baseScale = (isDesktop ? 2.05 : (isCompact ? 1.80 : 1.95)) * heightFactor * aspectClamp;
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
@@ -3786,7 +3945,14 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isDesktop = screenWidth >= 1000;
     final bool isCompact = screenHeight < 760;
     final bool isUltraCompact = screenHeight < 620;
-    final double miniatureScale = _getUnitModelScale(unit, isBossUnit, isDesktop, isCompact: isCompact);
+    final double miniatureScale = _getUnitModelScale(
+      unit,
+      isBossUnit,
+      isDesktop,
+      isCompact: isCompact,
+      screenHeight: screenHeight,
+      screenWidth: screenWidth,
+    );
 
     // Dynamic HUD height tailored to screen size (sleek Blood Brothers style single meter)
     final double hudHeight = isBossUnit
@@ -5316,15 +5482,16 @@ class _BattleScreenState extends State<BattleScreen> {
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
-    // When dragged onto the battlefield, shrink the card token significantly so the player
-    // can clearly see the battlefield and units beneath and around the spell target
-    final double feedbackW = isMobile ? 64.0 : 88.0;
-    final double feedbackH = isMobile ? 92.0 : 126.0;
+    // When dragged onto the battlefield, shrink the card token to an ultra-compact reticle
+    // so it never overlaps multiple units or covers the target.
+    final double feedbackW = isMobile ? 44.0 : 54.0;
+    final double feedbackH = isMobile ? 62.0 : 76.0;
 
     return Draggable<GeneralOrderDefinition>(
       data: order,
       dragAnchorStrategy: (draggable, context, position) {
-        return Offset(feedbackW / 2, feedbackH / 2);
+        // Anchor near bottom center so card floats directly under/around the reticle
+        return Offset(feedbackW / 2, feedbackH * 0.75);
       },
       onDragStarted: () {
         widget.commandService.setBulletTime(true);
