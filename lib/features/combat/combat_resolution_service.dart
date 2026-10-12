@@ -396,16 +396,6 @@ class CombatResolutionService {
 
     int healValue = max(50, (target.maxHp * 0.25).round());
     healValue = (healValue * tickManager.reckoningHealingMultiplier).round();
-    final int newHp = min(target.maxHp, target.currentHp + healValue);
-    List<StatusEffect> effects = List.of(target.activeEffects);
-    if (skill.appliedStatus != null) {
-      effects.add(skill.appliedStatus!);
-    }
-
-    final UnitEntity updatedTarget = target.copyWith(
-      currentHp: newHp,
-      activeEffects: effects,
-    );
 
     final List<SkillEntity> updatedSkills = attacker.resolvedSkills.map((s) {
       if (s.id == skill.id) {
@@ -416,25 +406,48 @@ class CombatResolutionService {
       return s;
     }).toList();
 
-    final UnitEntity updatedAttacker = attacker.id == updatedTarget.id
-        ? updatedTarget.copyWith(skills: updatedSkills)
-        : attacker.copyWith(skills: updatedSkills);
+    final bool isAllAllies = skill.targetType == SkillTargetType.allAllies;
+    List<UnitEntity> updatedFriendly = friendlySquad.map((ally) {
+      if (!ally.isAlive) return ally;
+      final bool isPrimary = ally.id == target.id;
+      final bool isAttacker = ally.id == attacker.id;
+
+      int hp = ally.currentHp;
+      if (healValue > 0 && (isAllAllies || isPrimary)) {
+        final allyHeal = (max(50, (ally.maxHp * 0.25).round()) * tickManager.reckoningHealingMultiplier).round();
+        hp = min(ally.maxHp, ally.currentHp + allyHeal);
+      }
+
+      List<StatusEffect> effects = List.of(ally.activeEffects);
+      if (skill.appliedStatus != null && (isAllAllies || isPrimary)) {
+        effects.add(skill.appliedStatus!);
+      }
+
+      List<SkillEntity> skills = isAttacker ? updatedSkills : ally.resolvedSkills;
+
+      return ally.copyWith(
+        currentHp: hp,
+        activeEffects: effects,
+        skills: skills,
+      );
+    }).toList();
+
+    final UnitEntity updatedTarget = updatedFriendly.firstWhere(
+      (u) => u.id == target.id,
+      orElse: () => target,
+    );
+    final UnitEntity updatedAttacker = updatedFriendly.firstWhere(
+      (u) => u.id == attacker.id,
+      orElse: () => attacker,
+    );
 
     List<UnitEntity> updatedAllies = List.of(tickManager.allies);
     List<UnitEntity> updatedEnemies = List.of(tickManager.enemies);
 
     if (attackerIsAlly) {
-      updatedAllies = updatedAllies.map((u) {
-        if (u.id == updatedAttacker.id) return updatedAttacker;
-        if (u.id == updatedTarget.id) return updatedTarget;
-        return u;
-      }).toList();
+      updatedAllies = updatedFriendly;
     } else {
-      updatedEnemies = updatedEnemies.map((u) {
-        if (u.id == updatedAttacker.id) return updatedAttacker;
-        if (u.id == updatedTarget.id) return updatedTarget;
-        return u;
-      }).toList();
+      updatedEnemies = updatedFriendly;
     }
 
     tickManager.consumeTurn(
@@ -784,28 +797,44 @@ class CombatResolutionService {
       activeEffects: attackerEffects,
     );
 
-    // 8. Reconstruct Squad State
+    // 8. Reconstruct Squad State & Resolve AoE / Cleave Strikes
     List<UnitEntity> updatedAllies = List.of(tickManager.allies);
     List<UnitEntity> updatedEnemies = List.of(tickManager.enemies);
 
+    final bool isAoe = skill.targetType == SkillTargetType.allEnemies;
+    final bool isFrontlineCleave = skill.targetType == SkillTargetType.frontlineEnemies ||
+        (!attackerIsAlly && (battleModifier == BattleModifier.titanicFury || battleModifier == BattleModifier.abyssalEclipse) && target.isVanguard);
+    final bool isBacklineVolley = skill.targetType == SkillTargetType.backlineEnemies;
+    final int aoeDmg = max(1, (finalDamage * 0.75).round());
+
     if (attackerIsAlly) {
       updatedAllies = updatedAllies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
-      updatedEnemies = updatedEnemies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
+      updatedEnemies = updatedEnemies.map((u) {
+        if (u.id == updatedTarget.id) return updatedTarget;
+        if (!u.isAlive) return u;
+        final bool shouldHit = isAoe ||
+            (isFrontlineCleave && u.isFrontline) ||
+            (isBacklineVolley && u.isBackline);
+        if (shouldHit) {
+          final newHp = max(0, u.currentHp - aoeDmg);
+          return u.copyWith(currentHp: newHp);
+        }
+        return u;
+      }).toList();
     } else {
       updatedEnemies = updatedEnemies.map((u) => u.id == updatedAttacker.id ? updatedAttacker : u).toList();
-      updatedAllies = updatedAllies.map((u) => u.id == updatedTarget.id ? updatedTarget : u).toList();
-
-      // Battle Modifier: Titanic Fury / Abyssal Eclipse (Boss attacks strike all frontline Vanguard units simultaneously)
-      if ((battleModifier == BattleModifier.titanicFury || battleModifier == BattleModifier.abyssalEclipse) && target.isVanguard) {
-        final cleaveDmg = max(1, (finalDamage * 0.75).round());
-        updatedAllies = updatedAllies.map((ally) {
-          if (ally.id != updatedTarget.id && ally.isVanguard && ally.isAlive) {
-            final newHp = max(0, ally.currentHp - cleaveDmg);
-            return ally.copyWith(currentHp: newHp);
-          }
-          return ally;
-        }).toList();
-      }
+      updatedAllies = updatedAllies.map((u) {
+        if (u.id == updatedTarget.id) return updatedTarget;
+        if (!u.isAlive) return u;
+        final bool shouldHit = isAoe ||
+            (isFrontlineCleave && u.isFrontline) ||
+            (isBacklineVolley && u.isBackline);
+        if (shouldHit) {
+          final newHp = max(0, u.currentHp - aoeDmg);
+          return u.copyWith(currentHp: newHp);
+        }
+        return u;
+      }).toList();
     }
 
     // Malakor's Carrion Miasma: When an ally falls, all enemies gain 2 stacks of Blight

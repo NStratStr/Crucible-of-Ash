@@ -3,8 +3,12 @@ import 'package:flutter/foundation.dart';
 enum SkillTargetType {
   singleEnemy,
   allEnemies,
+  frontlineEnemies,
+  backlineEnemies,
+  lowestHpEnemy,
   singleAlly,
   allAllies,
+  lowestHpAlly,
   self,
 }
 

@@ -377,6 +377,75 @@ class GeneralCommandService extends ChangeNotifier {
       (_accumulatedDamageProgress / focusChargeThreshold).clamp(0.0, 1.0);
   double get focusChargeProgress => focusProgressRatio;
 
+  /// GDD v2.9 Section 4.1: Asymmetric Commander Deck Capacity Matrix
+  int get deckLimit {
+    switch (_activeGeneralType) {
+      case GeneralType.valeria:
+        return 10;
+      case GeneralType.vladislav:
+        return 12;
+      case GeneralType.malakor:
+        return 14;
+      case GeneralType.morrigan:
+        return 20;
+    }
+  }
+
+  /// GDD v2.9 Section 4.1: Asymmetric Commander Hand Size
+  int get maxHandSizeForGeneral {
+    switch (_activeGeneralType) {
+      case GeneralType.morrigan:
+        return 4; // Rapid Sky-Chymist: 4 Slips
+      case GeneralType.valeria:
+      case GeneralType.vladislav:
+      case GeneralType.malakor:
+      default:
+        return 3;
+    }
+  }
+
+  /// GDD v2.9 Section 4.1: Baseline Starting Focus per Commander
+  int get defaultStartingFocus {
+    switch (_activeGeneralType) {
+      case GeneralType.vladislav:
+        return 2;
+      case GeneralType.valeria:
+        return 3;
+      case GeneralType.morrigan:
+        return 3;
+      case GeneralType.malakor:
+        return 1;
+    }
+  }
+
+  /// GDD v2.9 Section 4.1: Maximum Focus Cap per Commander
+  int get grimoireMaxFocusCapForGeneral {
+    switch (_activeGeneralType) {
+      case GeneralType.vladislav:
+        return 6;
+      case GeneralType.valeria:
+        return 7;
+      case GeneralType.morrigan:
+        return 5;
+      case GeneralType.malakor:
+        return 8;
+    }
+  }
+
+  /// GDD v2.9 Section 4.1: Baseline Focus Tick Interval (Ticks required to generate 1 Focus)
+  int get baseFocusTickInterval {
+    switch (_activeGeneralType) {
+      case GeneralType.morrigan:
+        return 20; // 0.66s at 30Hz
+      case GeneralType.vladislav:
+        return 30; // 1.0s at 30Hz
+      case GeneralType.malakor:
+        return 35; // Ramping
+      case GeneralType.valeria:
+        return 40; // 1.33s at 30Hz
+    }
+  }
+
   // Grimoire Getters (GDD v2.6 Sec 5)
   List<GeneralOrderDefinition> get hand => List.unmodifiable(_hand);
   List<GeneralOrderDefinition> get grimoireDeck => List.unmodifiable(_grimoireDeck);
@@ -508,35 +577,104 @@ class GeneralCommandService extends ChangeNotifier {
     }
   }
 
-  /// Initializes the 10-card Grimoire deck and draws the initial 3-card hand.
+  /// GDD v2.9 Section 4.1 & 5.1: Builds the default asymmetric Grimoire deck per Commander.
+  static List<GeneralOrderDefinition> buildDefaultGrimoireForGeneral(GeneralType type) {
+    switch (type) {
+      case GeneralType.valeria:
+        return [
+          GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'stand_resolute'),
+          GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'stand_resolute'),
+          GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
+          GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
+          GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'smite_the_wicked'),
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.sanguineRevivalOrder,
+        ]; // Exactly 10 cards
+      case GeneralType.malakor:
+        return [
+          GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'corpse_burst'),
+          GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'corpse_burst'),
+          GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'virulent_cascade'),
+          GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'virulent_cascade'),
+          GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'rebind_flesh'),
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.sanguineRevivalOrder,
+          GeneralProfile.bloodBoilOrder,
+          GeneralProfile.bloodBoilOrder,
+        ]; // Exactly 14 cards
+      case GeneralType.morrigan:
+        return [
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'quicken'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'quicken'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'quicken'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'unravel_hex'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'unravel_hex'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'echoing_hourglass'),
+          GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'echoing_hourglass'),
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.exsanguinatingStrikeOrder,
+          GeneralProfile.exsanguinatingStrikeOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.disruptingCleaveOrder,
+          GeneralProfile.bloodBoilOrder,
+          GeneralProfile.bloodBoilOrder,
+        ]; // Exactly 20 cards
+      case GeneralType.vladislav:
+      default:
+        return [
+          GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'siphon_vitality'),
+          GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'siphon_vitality'),
+          GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'sanguine_ward'),
+          GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'feast_of_ruin'),
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.rendFleshOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.ironBulwarkOrder,
+          GeneralProfile.exsanguinatingStrikeOrder,
+          GeneralProfile.exsanguinatingStrikeOrder,
+          GeneralProfile.sanguineRevivalOrder,
+          GeneralProfile.bloodBoilOrder,
+        ]; // Exactly 12 cards
+    }
+  }
+
+  /// Initializes the asymmetric Grimoire deck and draws initial hand.
   void initializeGrimoire({List<GeneralOrderDefinition>? customDeck}) {
     _hand.clear();
     _discardPile.clear();
     _burnCooldownTicks = 0;
     _isBulletTimeActive = false;
-    _maxFocusCap = grimoireMaxFocusCap;
+    _maxFocusCap = grimoireMaxFocusCapForGeneral;
+    if (_currentFocus < defaultStartingFocus) {
+      _currentFocus = defaultStartingFocus;
+    }
+    if (_currentFocus > _maxFocusCap) {
+      _currentFocus = _maxFocusCap;
+    }
 
     _grimoireDeck.clear();
     if (customDeck != null && customDeck.isNotEmpty) {
       _grimoireDeck.addAll(customDeck);
     } else {
-      // Standard 10-card Grimoire for Lord Vladislav (MVP GDD v2.6 Sec 14.1)
-      _grimoireDeck.addAll([
-        GeneralProfile.rendFleshOrder,
-        GeneralProfile.rendFleshOrder,
-        GeneralProfile.ironBulwarkOrder,
-        GeneralProfile.ironBulwarkOrder,
-        GeneralProfile.exsanguinatingStrikeOrder,
-        GeneralProfile.exsanguinatingStrikeOrder,
-        GeneralProfile.sanguineRevivalOrder,
-        GeneralProfile.disruptingCleaveOrder,
-        GeneralProfile.disruptingCleaveOrder,
-        GeneralProfile.bloodBoilOrder,
-      ]);
+      _grimoireDeck.addAll(buildDefaultGrimoireForGeneral(_activeGeneralType));
     }
 
-    // Draw up to maxHandSize (3) cards
-    while (_hand.length < maxHandSize && _grimoireDeck.isNotEmpty) {
+    // Draw up to maxHandSizeForGeneral cards
+    while (_hand.length < maxHandSizeForGeneral && _grimoireDeck.isNotEmpty) {
       _hand.add(_grimoireDeck.removeAt(0));
     }
     notifyListeners();
@@ -544,7 +682,7 @@ class GeneralCommandService extends ChangeNotifier {
 
   /// Draws a card from the deck into hand. Reshuffles discard pile if deck is empty.
   GeneralOrderDefinition? drawCard() {
-    if (_hand.length >= maxHandSize) return null;
+    if (_hand.length >= maxHandSizeForGeneral) return null;
     if (_grimoireDeck.isEmpty) {
       if (_discardPile.isEmpty) return null;
       // Deck Reshuffle: recycles discard pile with zero penalty
@@ -573,11 +711,11 @@ class GeneralCommandService extends ChangeNotifier {
   void onSimulationTick() {
     bool stateChanged = false;
 
-    // GDD v2.8 Sec 5: Focus generates at 1 point per 30 global logic ticks
-    // (reduced to 1 point per 60 ticks if the Commander is downed).
+    // GDD v2.9 Sec 4.1: Asymmetric Focus generation intervals
     final commanderUnit = tickManager.allies.where((u) => u.isCommander).firstOrNull;
     final bool isCommanderDowned = commanderUnit != null && !commanderUnit.isAlive;
-    final int requiredTicks = isCommanderDowned ? 60 : 30;
+    final int baseTicks = baseFocusTickInterval;
+    final int requiredTicks = isCommanderDowned ? (baseTicks * 2) : baseTicks;
 
     if (_currentFocus < _maxFocusCap) {
       _focusTickAccumulator++;

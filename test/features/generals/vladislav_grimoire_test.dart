@@ -24,11 +24,12 @@ void main() {
       );
     });
 
-    test('initializeGrimoire builds 10-card deck and draws 3-card hand', () {
+    test('initializeGrimoire builds 12-card deck for Vladislav and draws 3-card hand (GDD v2.9 Sec 4.1)', () {
       commandService.initializeGrimoire();
 
       expect(commandService.hand.length, equals(3));
-      expect(commandService.grimoireDeck.length, equals(7));
+      expect(commandService.grimoireDeck.length, equals(9));
+      expect(commandService.deckLimit, equals(12));
       expect(commandService.discardPile, isEmpty);
       expect(commandService.burnCooldownTicks, equals(0));
       expect(commandService.maxFocus, equals(6));
@@ -255,6 +256,44 @@ void main() {
       expect(updated.currentHp, lessThan(initialHp));
       expect(updated.speed, equals((initialSpeed * 1.35).round()));
       expect(updated.activeEffects.any((e) => e.type == StatusEffectType.speedUp), isTrue);
+    });
+
+    test('GDD v2.9 Section 4.1 Asymmetric Commander Deck Matrix initializes correctly for all commanders', () {
+      // Lady Valeria (Ash Legion): 10 slips, 3 hand, 3 starting Focus
+      final valeriaService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.valeria,
+      );
+      valeriaService.initializeGrimoire();
+      expect(valeriaService.deckLimit, equals(10));
+      expect(valeriaService.hand.length, equals(3));
+      expect(valeriaService.grimoireDeck.length, equals(7));
+      expect(valeriaService.currentFocus, equals(3));
+      expect(valeriaService.maxFocus, equals(7));
+
+      // Malakor (Mire Coven): 14 slips, 3 hand, 1 starting Focus
+      final malakorService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.malakor,
+      );
+      malakorService.initializeGrimoire();
+      expect(malakorService.deckLimit, equals(14));
+      expect(malakorService.hand.length, equals(3));
+      expect(malakorService.grimoireDeck.length, equals(11));
+      expect(malakorService.currentFocus, equals(1));
+      expect(malakorService.maxFocus, equals(8));
+
+      // Morrigan (Calx Order): 20 slips, 4 hand, 3 starting Focus
+      final morriganService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.morrigan,
+      );
+      morriganService.initializeGrimoire();
+      expect(morriganService.deckLimit, equals(20));
+      expect(morriganService.hand.length, equals(4));
+      expect(morriganService.grimoireDeck.length, equals(16));
+      expect(morriganService.currentFocus, equals(3));
+      expect(morriganService.maxFocus, equals(5));
     });
   });
 }

@@ -25,6 +25,7 @@ class UnitEntity {
   final FormationSlot slot;
   final PlinthMaterial plinthMaterial;
   final bool? isFrontlineOverride; // When set, overrides slot-based frontline/backline assignment
+  final int? columnIndexOverride; // When set, explicitly assigns column (0..4)
 
   // Progression & Health
   final int level;
@@ -68,6 +69,7 @@ class UnitEntity {
     required this.slot,
     this.plinthMaterial = PlinthMaterial.slate,
     this.isFrontlineOverride,
+    this.columnIndexOverride,
     required this.level,
     required this.maxLevel,
     required this.currentHp,
@@ -242,6 +244,11 @@ class UnitEntity {
       return 'assets/images/iron_footman_g1.png';
     }
 
+    // Ash Legion: Solar Inquisitor / Inquisitor line
+    if (speciesId.contains('inquisitor') || name.contains('Inquisitor')) {
+      return 'assets/images/UI/Solar Inquisitor - ASH - 02 -  ASN - G3 Tansparent.png';
+    }
+
     // Ash Legion: Sun-Scorched Cleric / Field Medicus line
     if (speciesId.contains('cleric') || name.contains('Cleric') || speciesId.contains('medicus') || name.contains('Medicus')) {
       return 'assets/images/sun_scorched_cleric.png';
@@ -370,6 +377,10 @@ class UnitEntity {
   bool get isFigurineCutout =>
       effectiveAvatarAsset.endsWith('.png') ||
       effectiveAvatarAsset.toLowerCase().contains('vladislav');
+
+  /// GDD v2.9 Section 3.1 & 3.2: Deterministic 5-Column & Dual-Row Spatial Geometry
+  /// Each unit occupies a column index from 0 (Far Left) to 4 (Far Right).
+  int get columnIndex => columnIndexOverride ?? slot.index.clamp(0, 4);
 
   /// GDD v2.8 Sec 3.4: Flexible formation customization allows any unit (including all 5)
   /// to be stationed in Frontline or Backline.
@@ -536,8 +547,9 @@ class UnitEntity {
           SkillEntity(
             id: 'asn_ult',
             name: 'Heartseeker Strike',
-            description: 'Devastating critical burst.',
+            description: 'Devastating execution burst targeting lowest HP enemy.',
             damageCoefficient: 2.4,
+            targetType: SkillTargetType.lowestHpEnemy,
             isLimitBurst: true,
           ),
         ];
@@ -672,6 +684,7 @@ class UnitEntity {
     String? customAvatarAsset,
     int? currentXp,
     bool? isFrontlineOverride,
+    int? columnIndexOverride,
   }) {
     return UnitEntity(
       id: id ?? this.id,
@@ -682,6 +695,7 @@ class UnitEntity {
       slot: slot ?? this.slot,
       plinthMaterial: plinthMaterial ?? this.plinthMaterial,
       isFrontlineOverride: isFrontlineOverride ?? this.isFrontlineOverride,
+      columnIndexOverride: columnIndexOverride ?? this.columnIndexOverride,
       level: level ?? this.level,
       maxLevel: maxLevel,
       currentHp: currentHp ?? this.currentHp,
@@ -802,6 +816,7 @@ class UnitEntity {
       'currentXp': currentXp,
       'plinthMaterial': plinthMaterial.name,
       'isFrontlineOverride': isFrontlineOverride,
+      'columnIndexOverride': columnIndexOverride,
     };
   }
 
@@ -824,6 +839,7 @@ class UnitEntity {
         orElse: () => PlinthMaterial.slate,
       ),
       isFrontlineOverride: json['isFrontlineOverride'] as bool?,
+      columnIndexOverride: (json['columnIndexOverride'] as num?)?.toInt(),
       level: (json['level'] as num).toInt(),
       maxLevel: (json['maxLevel'] as num).toInt(),
       currentHp: (json['currentHp'] as num).toInt(),

@@ -28,22 +28,33 @@ class EnemyAiService {
     return tickManager.enemies.any((u) => u.id == active.id && u.isAlive);
   }
 
-  /// GDD v2.8 Section 3.3: Dynamic Targeting Hierarchy for Targeting Allies
-  /// Step 1 (Hard Constraints):
-  ///   - Taunt/Provoke override: Must target taunting unit if alive.
-  ///   - Line-of-Sight & Vanguard Protection: Melee/standard units must clear living Vanguard before Arcanum.
-  ///     (Aerial/skirmisher units with dive_bomb bypass line-of-sight to strike Arcanum directly).
-  /// Step 2 (Primary Priority Flag):
-  ///   - Evaluates lowest EHP, then Role Class Priority (Support > Occultist > Marksman > Aberration > Tank).
-  /// Step 3 (Tie-Breaker Metric):
-  ///   - Highest Threat Score, Lowest current HP, Slot index proximity.
-  /// Step 4 (Fallback):
-  ///   - Nearest valid living ally.
-  UnitEntity? selectTargetAlly({UnitEntity? actingUnit}) {
+  /// GDD v2.9 Section 3.1 - 3.3: Dynamic Targeting with Deterministic Column Geometry & Rule-Breaking
+  ///
+  /// STEP 1 (Hard Constraints & Rule-Breakers):
+  ///   - 1A. Taunt/Provoke override: Must target taunting unit if alive.
+  ///   - 1B. Rule-Breaking Skill Target Types:
+  ///         * lowestHpEnemy: Targets opponent with lowest current HP (Assassinate / Execution).
+  ///         * frontlineEnemies: Targets primary Frontline opponent (cleaves all Frontline).
+  ///         * backlineEnemies: Targets primary Backline opponent (strikes all Backline).
+  ///         * allEnemies: Targets primary lowest HP opponent (AoE strikes all opponents).
+  ///   - 1C. Aerial / Skirmisher Trait: dive_bomb bypasses Frontline to strike Backline directly.
+  ///
+  /// STEP 2 (Deterministic 5-Column & Row Grid Geometry - Basic Attacks & Standard Single-Target):
+  ///   - 2A. Direct Column Target: Attacks fire directly across into the opposing unit occupying
+  ///         the same column index (Col N -> Col N).
+  ///   - 2B. Line Precedence: If the target column has a unit in the Frontline, the Frontline unit
+  ///         absorbs the attack. If Frontline is empty, the attack penetrates directly into Backline.
+  ///   - 2C. Adjacency Fallback: If the direct column is completely empty, targeting cascades
+  ///         to nearest adjacent columns (|Col_target - Col_actor| = 1, then 2, etc.)
+  ///         maintaining Line Precedence (Frontline absorbs before Backline).
+  ///
+  /// STEP 3 (Tie-Breakers & Graceful Fallback):
+  ///   - Lowest current HP, lowest EHP, role priority.
+  UnitEntity? selectTargetAlly({UnitEntity? actingUnit, SkillEntity? skill}) {
     final livingAllies = tickManager.allies.where((u) => u.isAlive).toList();
     if (livingAllies.isEmpty) return null;
 
-    // STEP 1: Hard Constraints
+    // STEP 1: Hard Constraints & Rule-Breaking Overrides
     // 1A. Taunt / Provoke state override
     final tauntingAllies = livingAllies.where((u) => u.isTaunting).toList();
     if (tauntingAllies.isNotEmpty) {
@@ -51,66 +62,77 @@ class EnemyAiService {
       return tauntingAllies.first;
     }
 
-    // 1B. Line-of-Sight / Vanguard Raycast check:
-    // Units with dive_bomb (Skirmishers/Flyers) or true-strike ignore frontline LoS constraints
+    // 1B. Special Skill Target Rule-Breakers (AoE, Execution, Cleave)
+    if (skill != null) {
+      if (skill.targetType == SkillTargetType.lowestHpEnemy) {
+        final sortedByHp = List<UnitEntity>.from(livingAllies)
+          ..sort((a, b) {
+            final hpComp = a.currentHp.compareTo(b.currentHp);
+            if (hpComp != 0) return hpComp;
+            return a.ehp.compareTo(b.ehp);
+          });
+        return sortedByHp.first;
+      }
+      if (skill.targetType == SkillTargetType.frontlineEnemies) {
+        final vanguards = livingAllies.where((u) => u.isFrontline).toList();
+        if (vanguards.isNotEmpty) {
+          vanguards.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+          return vanguards.first;
+        }
+      }
+      if (skill.targetType == SkillTargetType.backlineEnemies) {
+        final arcanums = livingAllies.where((u) => u.isBackline).toList();
+        if (arcanums.isNotEmpty) {
+          arcanums.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+          return arcanums.first;
+        }
+      }
+      if (skill.targetType == SkillTargetType.allEnemies) {
+        final sortedByHp = List<UnitEntity>.from(livingAllies)
+          ..sort((a, b) => a.currentHp.compareTo(b.currentHp));
+        return sortedByHp.first;
+      }
+    }
+
+    // 1C. Aerial / Skirmisher Trait: dive_bomb bypasses Frontline to strike Backline directly
     final bool bypassesFrontline = actingUnit != null &&
         (actingUnit.nativeTraitId == 'dive_bomb' ||
             actingUnit.graftedTraitId == 'dive_bomb' ||
             actingUnit.archetype == Archetype.skirmisher);
 
-    List<UnitEntity> candidatePool;
     if (bypassesFrontline) {
-      // Skirmishers prioritize rear Arcanum casters/healers directly
       final arcanumAllies = livingAllies.where((u) => u.isArcanum).toList();
-      candidatePool = arcanumAllies.isNotEmpty ? arcanumAllies : livingAllies;
-    } else {
-      final aliveVanguard = livingAllies.where((u) => u.isVanguard).toList();
-      candidatePool = aliveVanguard.isNotEmpty ? aliveVanguard : livingAllies;
+      if (arcanumAllies.isNotEmpty) {
+        if (actingUnit != null) {
+          return _resolveDeterministicColumnTarget(
+            livingOpponents: arcanumAllies,
+            actorCol: actingUnit.columnIndex,
+          );
+        }
+        arcanumAllies.sort((a, b) => a.ehp.compareTo(b.ehp));
+        return arcanumAllies.first;
+      }
     }
 
-    if (candidatePool.isEmpty) return livingAllies.first;
+    // STEP 2: Deterministic Column & Row Geometry (Basic Attacks and Single-Target Strikes)
+    if (actingUnit != null) {
+      return _resolveDeterministicColumnTarget(
+        livingOpponents: livingAllies,
+        actorCol: actingUnit.columnIndex,
+      );
+    }
 
-    // STEP 2 & 3: Primary Priority Flag & Tie-Breakers
-    candidatePool.sort((a, b) {
-      // Primary: Lowest EHP (GDD Sec 3.1 & 3.3)
-      final ehpCompare = a.ehp.compareTo(b.ehp);
-      if (ehpCompare != 0) return ehpCompare;
-
-      // Secondary: Role Class Priority (Support > Occultist > Marksman > Aberration > Tank)
-      final roleCompare = a.rolePriorityOrder.compareTo(b.rolePriorityOrder);
-      if (roleCompare != 0) return roleCompare;
-
-      // Tertiary Tie-breaker: Highest Threat Score (dealers of high DPS prioritized)
-      final threatCompare = b.threatScore.compareTo(a.threatScore);
-      if (threatCompare != 0) return threatCompare;
-
-      // Quaternary: Lowest current HP
-      final hpCompare = a.currentHp.compareTo(b.currentHp);
-      if (hpCompare != 0) return hpCompare;
-
-      // Final Tie-breaker: Slot index proximity
-      return a.slot.index.compareTo(b.slot.index);
-    });
-
-    return candidatePool.first;
+    // Fallback if no acting unit specified: Lowest EHP living ally
+    final sortedFallback = List<UnitEntity>.from(livingAllies)..sort((a, b) => a.ehp.compareTo(b.ehp));
+    return sortedFallback.first;
   }
 
-  /// GDD v2.8 Section 3.3: Dynamic Targeting Hierarchy for Targeting Enemies
-  /// Step 1 (Hard Constraints):
-  ///   - Taunt/Provoke override: Must target taunting unit if alive.
-  ///   - Line-of-Sight & Vanguard Protection: Standard attacks target living Vanguard before Arcanum.
-  ///     (Units with dive_bomb or Skirmisher archetype bypass frontline).
-  /// Step 2 (Primary Priority Flag):
-  ///   - Evaluates lowest EHP, then role class priority (Support > Occultist > Skirmisher > Aberration > Juggernaut/Colossus).
-  /// Step 3 (Tie-Breaker Metric):
-  ///   - Highest threat score, lowest current HP, slot index proximity.
-  /// Step 4 (Fallback):
-  ///   - Nearest valid living enemy.
-  UnitEntity? selectTargetEnemy({UnitEntity? actingUnit}) {
+  /// GDD v2.9 Section 3.1 - 3.3: Deterministic Column & Row Geometry for Targeting Enemies
+  UnitEntity? selectTargetEnemy({UnitEntity? actingUnit, SkillEntity? skill}) {
     final livingEnemies = tickManager.enemies.where((u) => u.isAlive).toList();
     if (livingEnemies.isEmpty) return null;
 
-    // STEP 1: Hard Constraints
+    // STEP 1: Hard Constraints & Rule-Breaking Overrides
     // 1A. Taunt / Provoke state override
     final tauntingEnemies = livingEnemies.where((u) => u.isTaunting).toList();
     if (tauntingEnemies.isNotEmpty) {
@@ -118,50 +140,151 @@ class EnemyAiService {
       return tauntingEnemies.first;
     }
 
-    // 1B. Line-of-Sight / Vanguard Raycast check
+    // 1B. Special Skill Target Rule-Breakers (AoE, Execution, Cleave)
+    if (skill != null) {
+      if (skill.targetType == SkillTargetType.lowestHpEnemy) {
+        final sortedByHp = List<UnitEntity>.from(livingEnemies)
+          ..sort((a, b) {
+            final hpComp = a.currentHp.compareTo(b.currentHp);
+            if (hpComp != 0) return hpComp;
+            return a.ehp.compareTo(b.ehp);
+          });
+        return sortedByHp.first;
+      }
+      if (skill.targetType == SkillTargetType.frontlineEnemies) {
+        final vanguards = livingEnemies.where((u) => u.isFrontline).toList();
+        if (vanguards.isNotEmpty) {
+          vanguards.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+          return vanguards.first;
+        }
+      }
+      if (skill.targetType == SkillTargetType.backlineEnemies) {
+        final arcanums = livingEnemies.where((u) => u.isBackline).toList();
+        if (arcanums.isNotEmpty) {
+          arcanums.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+          return arcanums.first;
+        }
+      }
+      if (skill.targetType == SkillTargetType.allEnemies) {
+        final sortedByHp = List<UnitEntity>.from(livingEnemies)
+          ..sort((a, b) => a.currentHp.compareTo(b.currentHp));
+        return sortedByHp.first;
+      }
+    }
+
+    // 1C. Aerial / Skirmisher Trait: dive_bomb bypasses Frontline
     final bool bypassesFrontline = actingUnit != null &&
         (actingUnit.nativeTraitId == 'dive_bomb' ||
             actingUnit.graftedTraitId == 'dive_bomb' ||
             actingUnit.archetype == Archetype.skirmisher);
 
-    List<UnitEntity> candidatePool;
     if (bypassesFrontline) {
       final arcanumEnemies = livingEnemies.where((u) => u.isArcanum).toList();
-      candidatePool = arcanumEnemies.isNotEmpty ? arcanumEnemies : livingEnemies;
-    } else {
-      final aliveVanguard = livingEnemies.where((u) => u.isVanguard).toList();
-      candidatePool = aliveVanguard.isNotEmpty ? aliveVanguard : livingEnemies;
+      if (arcanumEnemies.isNotEmpty) {
+        if (actingUnit != null) {
+          return _resolveDeterministicColumnTarget(
+            livingOpponents: arcanumEnemies,
+            actorCol: actingUnit.columnIndex,
+          );
+        }
+        arcanumEnemies.sort((a, b) => a.ehp.compareTo(b.ehp));
+        return arcanumEnemies.first;
+      }
     }
 
-    if (candidatePool.isEmpty) return livingEnemies.first;
+    // STEP 2: Deterministic Column & Row Geometry
+    if (actingUnit != null) {
+      return _resolveDeterministicColumnTarget(
+        livingOpponents: livingEnemies,
+        actorCol: actingUnit.columnIndex,
+      );
+    }
 
-    // STEP 2 & 3: Primary Priority Flag & Tie-Breakers
-    candidatePool.sort((a, b) {
-      // Primary: Lowest EHP (GDD Sec 3.1 & 3.3)
-      final ehpCompare = a.ehp.compareTo(b.ehp);
-      if (ehpCompare != 0) return ehpCompare;
+    final sortedFallback = List<UnitEntity>.from(livingEnemies)..sort((a, b) => a.ehp.compareTo(b.ehp));
+    return sortedFallback.first;
+  }
 
-      // Secondary: Role Class Priority (Support > Occultist > Skirmisher > Aberration > Tank)
-      final roleCompare = a.rolePriorityOrder.compareTo(b.rolePriorityOrder);
-      if (roleCompare != 0) return roleCompare;
+  /// Resolves target among [livingOpponents] using GDD v2.9 Section 3.2 deterministic geometry:
+  /// 1. Direct Column Target: Opposing unit with same columnIndex.
+  ///    Line Precedence: Frontline absorbs before Backline in that column.
+  /// 2. Adjacency Fallback: If direct column is empty, cascades to nearest adjacent columns
+  ///    (|Col_target - Col_actor| = 1, then 2, etc.) prioritizing Frontline over Backline.
+  /// 3. Tie-Breaker: Lowest current HP, lowest EHP, role priority.
+  UnitEntity _resolveDeterministicColumnTarget({
+    required List<UnitEntity> livingOpponents,
+    required int actorCol,
+  }) {
+    // 1. Direct Column Check
+    final directColOpponents = livingOpponents.where((u) => u.columnIndex == actorCol).toList();
+    if (directColOpponents.isNotEmpty) {
+      // Line Precedence: Frontline absorbs before Backline
+      final vanguards = directColOpponents.where((u) => u.isFrontline).toList();
+      if (vanguards.isNotEmpty) {
+        vanguards.sort((a, b) {
+          final hpComp = a.currentHp.compareTo(b.currentHp);
+          if (hpComp != 0) return hpComp;
+          return a.ehp.compareTo(b.ehp);
+        });
+        return vanguards.first;
+      }
+      final arcanums = directColOpponents.where((u) => u.isBackline).toList();
+      if (arcanums.isNotEmpty) {
+        arcanums.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+        return arcanums.first;
+      }
+      return directColOpponents.first;
+    }
 
-      // Tertiary: Highest Threat Score
-      final threatCompare = b.threatScore.compareTo(a.threatScore);
-      if (threatCompare != 0) return threatCompare;
+    // 2. Adjacency Fallback: Check nearest columns (|dist| = 1..4)
+    for (int dist = 1; dist <= 4; dist++) {
+      final candidateCols = [actorCol - dist, actorCol + dist].where((c) => c >= 0 && c <= 4).toSet();
+      final adjacentOpponents = livingOpponents.where((u) => candidateCols.contains(u.columnIndex)).toList();
 
-      // Quaternary: Lowest current HP
-      final hpCompare = a.currentHp.compareTo(b.currentHp);
-      if (hpCompare != 0) return hpCompare;
+      if (adjacentOpponents.isNotEmpty) {
+        // Line Precedence: Check if any adjacent opponent is Frontline
+        final vanguards = adjacentOpponents.where((u) => u.isFrontline).toList();
+        if (vanguards.isNotEmpty) {
+          vanguards.sort((a, b) {
+            // Distance proximity first
+            final distA = (a.columnIndex - actorCol).abs();
+            final distB = (b.columnIndex - actorCol).abs();
+            if (distA != distB) return distA.compareTo(distB);
+            // Tie-breaker: Lowest current HP
+            final hpComp = a.currentHp.compareTo(b.currentHp);
+            if (hpComp != 0) return hpComp;
+            return a.ehp.compareTo(b.ehp);
+          });
+          return vanguards.first;
+        }
 
-      // Final Tie-breaker: Slot index proximity
-      return a.slot.index.compareTo(b.slot.index);
-    });
+        final arcanums = adjacentOpponents.where((u) => u.isBackline).toList();
+        if (arcanums.isNotEmpty) {
+          arcanums.sort((a, b) {
+            final distA = (a.columnIndex - actorCol).abs();
+            final distB = (b.columnIndex - actorCol).abs();
+            if (distA != distB) return distA.compareTo(distB);
+            return a.currentHp.compareTo(b.currentHp);
+          });
+          return arcanums.first;
+        }
 
-    return candidatePool.first;
+        return adjacentOpponents.first;
+      }
+    }
+
+    // 3. Fallback: Lowest EHP living opponent
+    final sortedFallback = List<UnitEntity>.from(livingOpponents)..sort((a, b) => a.ehp.compareTo(b.ehp));
+    return sortedFallback.first;
   }
 
   /// Selects a friendly enemy target (for healing / buffs)
-  UnitEntity? selectFriendlyTarget() {
+  UnitEntity? selectFriendlyTarget({SkillEntity? skill}) {
+    if (skill?.targetType == SkillTargetType.lowestHpAlly) {
+      final living = tickManager.enemies.where((u) => u.isAlive).toList();
+      if (living.isEmpty) return null;
+      living.sort((a, b) => (a.currentHp / a.maxHp).compareTo(b.currentHp / b.maxHp));
+      return living.first;
+    }
     final wounded = tickManager.enemies.where((u) => u.isAlive && u.currentHp < u.maxHp).toList();
     if (wounded.isNotEmpty) {
       wounded.sort((a, b) => (a.currentHp / a.maxHp).compareTo(b.currentHp / b.maxHp));
@@ -208,9 +331,12 @@ class EnemyAiService {
 
     final bool isFriendlySkill = chosenSkill.targetType == SkillTargetType.singleAlly ||
         chosenSkill.targetType == SkillTargetType.allAllies ||
+        chosenSkill.targetType == SkillTargetType.lowestHpAlly ||
         chosenSkill.damageCoefficient == 0.0;
 
-    final target = isFriendlySkill ? selectFriendlyTarget() : selectTargetAlly(actingUnit: enemy);
+    final target = isFriendlySkill
+        ? selectFriendlyTarget(skill: chosenSkill)
+        : selectTargetAlly(actingUnit: enemy, skill: chosenSkill);
     if (target == null) return null;
 
     final result = combatService.executeSkill(

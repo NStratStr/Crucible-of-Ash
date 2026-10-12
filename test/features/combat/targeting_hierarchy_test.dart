@@ -99,10 +99,10 @@ void main() {
       lineageAncestors: [],
     );
 
-    test('Standard attacker targets lowest EHP Vanguard first (respects line-of-sight)', () {
+    test('Direct Column Target: Col 0 attacker fires directly into Col 0 Vanguard Tank (GDD v2.9 Sec 3.2)', () {
       final tickManager = InitiativeTickManager(
         initialAllies: [allyVanguardTank, allyVanguardDPS, allyArcanumHealer],
-        initialEnemies: [enemyStandardAttacker],
+        initialEnemies: [enemyStandardAttacker], // Col 0
       );
       final commandService = GeneralCommandService(tickManager: tickManager);
       final combatService = CombatResolutionService(tickManager: tickManager, commandService: commandService);
@@ -114,9 +114,63 @@ void main() {
 
       final target = aiService.selectTargetAlly(actingUnit: enemyStandardAttacker);
 
-      // Must select Vanguard with lower EHP (DPS) over higher EHP (Tank), and cannot hit backline Arcanum Healer
+      // Direct Column: enemy at Col 0 strikes ally at Col 0 (Tank)
+      expect(target, isNotNull);
+      expect(target!.id, equals(allyVanguardTank.id));
+    });
+
+    test('Adjacency Fallback: If Col 0 is defeated, Col 0 attacker cascades to adjacent Col 1 (GDD v2.9 Sec 3.2)', () {
+      final tickManager = InitiativeTickManager(
+        initialAllies: [
+          allyVanguardTank.copyWith(currentHp: 0), // Col 0 defeated
+          allyVanguardDPS,                        // Col 1 alive
+          allyArcanumHealer,                      // Col 3 alive
+        ],
+        initialEnemies: [enemyStandardAttacker],   // Col 0
+      );
+      final commandService = GeneralCommandService(tickManager: tickManager);
+      final combatService = CombatResolutionService(tickManager: tickManager, commandService: commandService);
+      final aiService = EnemyAiService(
+        tickManager: tickManager,
+        combatService: combatService,
+        commandService: commandService,
+      );
+
+      final target = aiService.selectTargetAlly(actingUnit: enemyStandardAttacker);
+
+      // Adjacency Fallback: cascades to Col 1 (Grave Duelist DPS)
       expect(target, isNotNull);
       expect(target!.id, equals(allyVanguardDPS.id));
+    });
+
+    test('Rule-Breaking Skill: lowestHpEnemy skill targets lowest HP ally regardless of column', () {
+      final tickManager = InitiativeTickManager(
+        initialAllies: [allyVanguardTank, allyVanguardDPS, allyArcanumHealer],
+        initialEnemies: [enemyStandardAttacker], // Col 0
+      );
+      final commandService = GeneralCommandService(tickManager: tickManager);
+      final combatService = CombatResolutionService(tickManager: tickManager, commandService: commandService);
+      final aiService = EnemyAiService(
+        tickManager: tickManager,
+        combatService: combatService,
+        commandService: commandService,
+      );
+
+      const assassinateSkill = SkillEntity(
+        id: 'assassinate',
+        name: 'Heartseeker Strike',
+        description: 'Hits lowest HP',
+        targetType: SkillTargetType.lowestHpEnemy,
+      );
+
+      final target = aiService.selectTargetAlly(
+        actingUnit: enemyStandardAttacker,
+        skill: assassinateSkill,
+      );
+
+      // Rule-breaker overrides column: targets allyArcanumHealer (lowest current HP: 500)
+      expect(target, isNotNull);
+      expect(target!.id, equals(allyArcanumHealer.id));
     });
 
     test('Taunt override forces targeting of taunting unit even if higher EHP or in backline', () {
