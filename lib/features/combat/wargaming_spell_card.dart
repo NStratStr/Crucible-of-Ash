@@ -254,12 +254,17 @@ class WargamingSpellCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF101016),
           borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: (canAfford ? const Color(0xFFD4AF37) : const Color(0xFF383644)).withValues(alpha: canAfford ? 0.75 : 0.5),
+            width: canAfford ? 1.2 : 0.8,
+          ),
           boxShadow: [
-            BoxShadow(
-              color: (canAfford ? const Color(0xFFFFD54F) : const Color(0xFFB3261E)).withValues(alpha: 0.45),
-              blurRadius: 10,
-              spreadRadius: 1,
-            ),
+            if (canAfford)
+              BoxShadow(
+                color: themeColor.withValues(alpha: 0.35),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
             const BoxShadow(
               color: Colors.black87,
               blurRadius: 6,
@@ -409,8 +414,8 @@ class WargamingSpellCard extends StatelessWidget {
                       order.description,
                       style: TextStyle(
                         color: const Color(0xFFE2E2E8),
-                        fontSize: (cardW * 0.065).clamp(6.5, 9.5),
-                        height: 1.15,
+                        fontSize: (cardW * 0.066).clamp(7.0, 10.5),
+                        height: 1.20,
                         fontWeight: FontWeight.w600,
                         shadows: const [
                           Shadow(color: Colors.black, blurRadius: 2, offset: Offset(0.5, 0.5)),

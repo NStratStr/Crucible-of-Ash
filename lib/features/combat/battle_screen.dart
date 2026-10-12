@@ -3656,19 +3656,19 @@ class _BattleScreenState extends State<BattleScreen> {
                   right: 2,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: unit.isVanguard ? const Color(0xFF1E1708) : const Color(0xFF081924),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(3),
                         border: Border.all(
                           color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                          width: 1.6,
+                          width: 1.0,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.55),
-                            blurRadius: 8,
-                            spreadRadius: 1,
+                            color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.28),
+                            blurRadius: 4,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
@@ -3677,17 +3677,17 @@ class _BattleScreenState extends State<BattleScreen> {
                         children: [
                           Icon(
                             unit.isVanguard ? Icons.shield : Icons.auto_awesome,
-                            size: 9,
+                            size: 8,
                             color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 2.5),
                           Text(
                             unit.isVanguard ? '⚔ FRONT' : '🔮 REAR',
                             style: TextStyle(
                               color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                              fontSize: 8.0,
+                              fontSize: 7.5,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
+                              letterSpacing: 0.6,
                             ),
                           ),
                         ],
@@ -4561,55 +4561,60 @@ class _BattleScreenState extends State<BattleScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   cardWidget,
-                  // Radiant golden/cyan plinth targeting ring and Front/Rear drop zone indicator when dragging
+                  // Sleek wargaming tactical placement guide when dragging
                   if (isHovered) ...[
-                    // Highlight border over target half
+                    // Sleek framing bracket over target slot
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                            color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(6),
                             border: Border.all(
                               color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                              width: 2.2,
+                              width: 1.1,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.55),
-                                blurRadius: 16,
-                                spreadRadius: 2.5,
+                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.22),
+                                blurRadius: 6,
+                                spreadRadius: 0,
                               ),
                             ],
                           ),
                           child: Align(
                             alignment: isFrontHover ? Alignment.topCenter : Alignment.bottomCenter,
                             child: Container(
-                              margin: const EdgeInsets.all(4),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                               decoration: BoxDecoration(
-                                color: (isFrontHover ? const Color(0xFF1A1608) : const Color(0xFF081722)).withValues(alpha: 0.95),
-                                borderRadius: BorderRadius.circular(4),
+                                color: const Color(0xFF101018).withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(3),
                                 border: Border.all(
                                   color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                                  width: 1.2,
+                                  width: 0.9,
                                 ),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
+                                ],
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     isFrontHover ? Icons.shield : Icons.auto_awesome,
-                                    size: 11,
+                                    size: 9.5,
                                     color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 3.5),
                                   Text(
-                                    isFrontHover ? '⚔ DROP IN FRONT' : '🔮 DROP IN REAR',
+                                    isFrontHover ? '⚔ FRONT' : '🔮 REAR',
                                     style: TextStyle(
                                       color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                                      fontSize: 8.5,
+                                      fontSize: 7.5,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.8,
+                                      letterSpacing: 0.6,
+                                      fontFamily: 'monospace',
                                     ),
                                   ),
                                 ],
@@ -4620,25 +4625,25 @@ class _BattleScreenState extends State<BattleScreen> {
                       ),
                     ),
 
-                    // Ground plinth ring
+                    // Refined ground plinth alignment seal
                     Positioned(
-                      bottom: isFrontHover ? 32 : 10,
-                      left: 2,
-                      right: 2,
-                      height: 28,
+                      bottom: isFrontHover ? 28 : 8,
+                      left: 4,
+                      right: 4,
+                      height: 18,
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.all(Radius.elliptical(50, 14)),
+                            borderRadius: const BorderRadius.all(Radius.elliptical(50, 10)),
                             border: Border.all(
                               color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                              width: 2.5,
+                              width: 1.0,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.8),
-                                blurRadius: 16,
-                                spreadRadius: 2.5,
+                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.28),
+                                blurRadius: 4,
+                                spreadRadius: 0,
                               ),
                             ],
                           ),
@@ -5112,13 +5117,30 @@ class _BattleScreenState extends State<BattleScreen> {
     final handCards = widget.commandService.hand.isNotEmpty
         ? widget.commandService.hand
         : profile.orders;
+    final bool isCompact = MediaQuery.of(context).size.height < 760;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF13131A),
-        border: Border(top: BorderSide(color: Color(0xFF2B2B36), width: 1.5)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF161622),
+            Color(0xFF0C0C12),
+          ],
+        ),
+        border: const Border(
+          top: BorderSide(color: Color(0xFF383648), width: 1.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.65),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isCompact ? 4 : 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -5212,45 +5234,67 @@ class _BattleScreenState extends State<BattleScreen> {
                 // Focus Orbs & Spindle Label
                 GestureDetector(
                   onTap: _showGeneralSelectionDialog,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (int i = 0; i < maxFocus; i++)
-                        Container(
-                          margin: const EdgeInsets.only(right: 3),
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: i < focus ? profile.themeColor : Colors.transparent,
-                            border: Border.all(color: profile.themeColor, width: 1.5),
-                            boxShadow: i < focus
-                                ? [
-                                    BoxShadow(
-                                      color: profile.themeColor.withValues(alpha: 0.6),
-                                      blurRadius: 4,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D0D14).withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: profile.themeColor.withValues(alpha: 0.35),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (int i = 0; i < maxFocus; i++)
+                          Container(
+                            margin: const EdgeInsets.only(right: 3),
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: i < focus
+                                  ? RadialGradient(
+                                      colors: [
+                                        profile.themeColor,
+                                        profile.themeColor.withValues(alpha: 0.7),
+                                      ],
+                                    )
+                                  : null,
+                              color: i < focus ? null : const Color(0xFF15151D),
+                              border: Border.all(
+                                color: i < focus ? profile.themeColor : profile.themeColor.withValues(alpha: 0.25),
+                                width: 1.0,
+                              ),
+                              boxShadow: i < focus
+                                  ? [
+                                      BoxShadow(
+                                        color: profile.themeColor.withValues(alpha: 0.5),
+                                        blurRadius: 4,
+                                        spreadRadius: 0.5,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'FOCUS $focus/$maxFocus',
+                          style: TextStyle(
+                            color: profile.themeColor,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
                           ),
                         ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'FOCUS $focus/$maxFocus',
-                        style: TextStyle(
-                          color: profile.themeColor,
-                          fontSize: 9.0,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
+                        const SizedBox(width: 3),
+                        const Text(
+                          '(1pt/30t)',
+                          style: TextStyle(color: Colors.white38, fontSize: 7.0),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '(1pt/30t)',
-                        style: TextStyle(color: Colors.white38, fontSize: 7.5),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
@@ -5401,9 +5445,17 @@ class _BattleScreenState extends State<BattleScreen> {
     final cardsToDisplay = handCards.take(4).toList();
     final int count = cardsToDisplay.length;
     final double screenWidth = MediaQuery.of(context).size.width;
+    final double screenHeight = MediaQuery.of(context).size.height;
     final bool isDesktop = screenWidth >= 1000;
-    final double cardWidth = isDesktop ? 106.0 : (isCompact ? 82.0 : 96.0);
-    final double cardHeight = isDesktop ? 158.0 : (isCompact ? 122.0 : 142.0);
+    final bool isUltraCompact = screenHeight < 620;
+
+    // Responsive card dimensions: elevated scale for readability & tactical wargaming presence
+    final double cardWidth = isDesktop
+        ? 132.0
+        : (isUltraCompact ? 88.0 : (isCompact ? 102.0 : 118.0));
+    final double cardHeight = isDesktop
+        ? 194.0
+        : (isUltraCompact ? 128.0 : (isCompact ? 148.0 : 172.0));
 
     return Center(
       child: ConstrainedBox(
@@ -5415,7 +5467,7 @@ class _BattleScreenState extends State<BattleScreen> {
             // Fanned Hand of Cards (Physical Tabletop Hand Spread)
             Flexible(
               child: SizedBox(
-                height: cardHeight + 22,
+                height: cardHeight + 26,
                 child: Center(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -5435,9 +5487,9 @@ class _BattleScreenState extends State<BattleScreen> {
                         // Physical tabletop fan geometry: arched curve and radial rotation
                         final double centerIdx = (count - 1) / 2.0;
                         final double offsetFromCenter = index - centerIdx;
-                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * 0.055);
-                        final double arcY = isHovered ? -18.0 : (offsetFromCenter.abs() * 4.5);
-                        final double overlapX = index > 0 ? (isCompact ? -10.0 : -14.0) : 0.0;
+                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * 0.045);
+                        final double arcY = isHovered ? -20.0 : (offsetFromCenter.abs() * 4.5);
+                        final double overlapX = index > 0 ? (isCompact ? -12.0 : -16.0) : 0.0;
 
                         return Transform.translate(
                           offset: Offset(overlapX, arcY),
@@ -5535,7 +5587,7 @@ class _BattleScreenState extends State<BattleScreen> {
     return Draggable<GeneralOrderDefinition>(
       data: order,
       dragAnchorStrategy: (draggable, context, position) {
-        return const Offset(36, 53);
+        return Offset((cardW * 0.85) / 2, (cardH * 0.85) / 2);
       },
       onDragStarted: () {
         widget.commandService.setBulletTime(true);
@@ -5558,8 +5610,8 @@ class _BattleScreenState extends State<BattleScreen> {
           isUnlocked: isUnlocked,
           themeColor: themeColor,
           isCompact: false,
-          width: 72,
-          height: 106,
+          width: cardW * 0.85,
+          height: cardH * 0.85,
         ),
       ),
       childWhenDragging: Opacity(
@@ -5594,41 +5646,48 @@ class _BattleScreenState extends State<BattleScreen> {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
-              width: 48,
-              height: 48,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
-                color: isHovered ? const Color(0xFF5E1A1A) : const Color(0xFF261416),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isHovered
+                      ? const [Color(0xFF5E1A1A), Color(0xFF380E0E)]
+                      : const [Color(0xFF261416), Color(0xFF160A0C)],
+                ),
                 border: Border.all(
-                  color: isHovered ? const Color(0xFFFFAB91) : const Color(0xFFFF7043),
-                  width: isHovered ? 2.0 : 1.2,
+                  color: isHovered ? const Color(0xFFFFAB91) : const Color(0xFFFF7043).withValues(alpha: 0.75),
+                  width: isHovered ? 1.8 : 1.1,
                 ),
                 borderRadius: BorderRadius.circular(6),
-                boxShadow: isHovered
-                    ? [
-                        const BoxShadow(
-                          color: Color(0xFFFF7043),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: isHovered
+                        ? const Color(0xFFFF7043).withValues(alpha: 0.8)
+                        : Colors.black87,
+                    blurRadius: isHovered ? 8 : 4,
+                    spreadRadius: isHovered ? 1 : 0,
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.local_fire_department,
-                    size: 16,
+                    size: 18,
                     color: isHovered ? Colors.white : const Color(0xFFFF7043),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   const Text(
                     'BURN',
                     style: TextStyle(
                       color: Color(0xFFFFAB91),
                       fontSize: 8.0,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.8,
+                      fontFamily: 'monospace',
                     ),
                   ),
                 ],
