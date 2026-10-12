@@ -2352,11 +2352,15 @@ class _BattleScreenState extends State<BattleScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: units.map((unit) {
                     final bool isFrontline = unit.isVanguard;
-                    // Stagger Depth: Frontline steps forward towards Ashen Front (-Y for Allies, +Y for Enemy)
-                    // Backline steps back away from Ashen Front (+Y for Allies, -Y for Enemy)
+                    // Stagger Depth: Frontline steps prominently forward towards Ashen Front (-Y for Allies, +Y for Enemy)
+                    // Backline steps prominently back away from Ashen Front (+Y for Allies, -Y for Enemy)
                     final double depthY = isFrontline
-                        ? (isEnemy ? (isCompact ? 10.0 : 14.0) : (isCompact ? -10.0 : -14.0))
-                        : (isEnemy ? (isCompact ? -6.0 : -10.0) : (isCompact ? 6.0 : 10.0));
+                        ? (isEnemy
+                            ? (isCompact ? 16.0 : 22.0)
+                            : (isDesktop ? -44.0 : (isCompact ? -26.0 : -36.0)))
+                        : (isEnemy
+                            ? (isCompact ? -12.0 : -18.0)
+                            : (isDesktop ? 38.0 : (isCompact ? 22.0 : 30.0)));
                     // Consistent scale: Units maintain 100% equal size regardless of lane assignment
                     const double tierScale = 1.0;
 
@@ -3582,19 +3586,7 @@ class _BattleScreenState extends State<BattleScreen> {
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_isPreBattleSetup && !isEnemy && alive) {
-          if (_selectedSwapUnitId == null) {
-            setState(() {
-              _selectedSwapUnitId = unit.id;
-              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Drag or tap another unit to swap, or tap again to flip Front/Rear.';
-            });
-          } else if (_selectedSwapUnitId == unit.id) {
-            _toggleAlliedLane(unit.id);
-            setState(() => _selectedSwapUnitId = null);
-          } else {
-            final indexA = widget.tickManager.allies.indexWhere((u) => u.id == _selectedSwapUnitId);
-            final indexB = allyIndex;
-            _swapAlliedUnits(indexA, indexB);
-          }
+          _toggleAlliedLane(unit.id);
           return;
         }
         if (isEnemy && alive) {
@@ -3651,6 +3643,54 @@ class _BattleScreenState extends State<BattleScreen> {
                           end: Alignment.bottomCenter,
                           colors: [Color(0xFF161622), Color(0xFF09090D)],
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Tactical Formation Lane Crest (Pre-Battle Setup)
+              if (_isPreBattleSetup && !isEnemy && alive)
+                Positioned(
+                  top: -12,
+                  left: 2,
+                  right: 2,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: unit.isVanguard ? const Color(0xFF1E1708) : const Color(0xFF081924),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                          width: 1.6,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.55),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            unit.isVanguard ? Icons.shield : Icons.auto_awesome,
+                            size: 9,
+                            color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            unit.isVanguard ? '⚔ FRONT' : '🔮 REAR',
+                            style: TextStyle(
+                              color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                              fontSize: 8.0,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

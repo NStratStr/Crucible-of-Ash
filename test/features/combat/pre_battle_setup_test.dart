@@ -304,25 +304,30 @@ void main() {
       expect(tickManager.allies[0].id, equals(unit1Id));
       expect(tickManager.allies[0].columnIndex, equals(0));
 
-      // 2. Tap-to-swap: Tap Vladislav (select), then tap unit at Col 3 (swap)
-      final unit3Id = tickManager.allies[3].id;
+      // 2. Direct Tap on unit: tapping unit immediately toggles Frontline <-> Backline
       final bool vladWasFront = tickManager.allies[1].isFrontline;
-      final bool unit3WasFront = tickManager.allies[3].isFrontline;
-
       await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.tap(find.byKey(Key('unit_card_$unit3Id')));
-      await tester.pump(const Duration(milliseconds: 400));
+      // Vladislav immediately flipped lane depth on single tap!
+      expect(tickManager.allies[1].isFrontline, equals(!vladWasFront));
 
-      // Positions swapped, front/back lane overrides preserved!
+      // 3. Drag and drop onto Col 3: swaps columns cleanly
+      final unit3Id = tickManager.allies[3].id;
+      final vladPos = tester.getCenter(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      final unit3Pos = tester.getCenter(find.byKey(Key('unit_card_$unit3Id')));
+
+      final TestGesture dragTo3 = await tester.startGesture(vladPos);
+      await tester.pump(const Duration(milliseconds: 100));
+      await dragTo3.moveTo(unit3Pos);
+      await tester.pump(const Duration(milliseconds: 100));
+      await dragTo3.up();
+      await tester.pumpAndSettle();
+
       expect(tickManager.allies[3].id, equals('ash_vladislav_01'));
       expect(tickManager.allies[3].columnIndex, equals(3));
-      expect(tickManager.allies[3].isFrontline, equals(vladWasFront));
-
       expect(tickManager.allies[1].id, equals(unit3Id));
       expect(tickManager.allies[1].columnIndex, equals(1));
-      expect(tickManager.allies[1].isFrontline, equals(unit3WasFront));
 
       await tester.pumpWidget(const SizedBox());
     });
@@ -397,15 +402,17 @@ void main() {
       expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
       expect(tickManager.allies[0].isFrontline, isTrue);
 
-      // 3. Tap Vladislav once (select), then tap again (flips lane Front <-> Rear)
+      // 3. Tap Vladislav once -> directly flips to Backline!
       await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
       await tester.pump(const Duration(milliseconds: 400));
 
-      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // Tapped again -> toggled to Backline!
       expect(tickManager.allies[0].isFrontline, isFalse);
+
+      // Tap Vladislav again -> directly flips back to Frontline!
+      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(tickManager.allies[0].isFrontline, isTrue);
 
       await tester.pumpWidget(const SizedBox());
     });
