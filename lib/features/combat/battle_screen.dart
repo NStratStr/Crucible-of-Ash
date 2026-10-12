@@ -2468,13 +2468,14 @@ class _BattleScreenState extends State<BattleScreen> {
                     final bool isFrontline = unit.isVanguard;
                     // Stagger Depth: Frontline steps forward towards Ashen Front (-Y for Allies, +Y for Enemy)
                     // Backline steps back away from Ashen Front (+Y for Allies, -Y for Enemy)
+                    // Calibrated carefully so back row units are never cut off by bottom bounds
                     final double depthY = isFrontline
                         ? (isEnemy
-                            ? (isCompact ? 10.0 : 14.0)
-                            : (isDesktop ? -26.0 : (isCompact ? -14.0 : -20.0)))
+                            ? (isCompact ? 8.0 : 12.0)
+                            : (isDesktop ? -20.0 : (isCompact ? -12.0 : -16.0)))
                         : (isEnemy
-                            ? (isCompact ? -8.0 : -12.0)
-                            : (isDesktop ? 22.0 : (isCompact ? 12.0 : 18.0)));
+                            ? (isCompact ? -6.0 : -8.0)
+                            : (isDesktop ? 12.0 : (isCompact ? 6.0 : 10.0)));
                     // Consistent scale: Units maintain 100% equal size regardless of lane assignment
                     const double tierScale = 1.0;
 
@@ -3692,12 +3693,10 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isUltraCompact = screenHeight < 620;
     final double miniatureScale = _getUnitModelScale(unit, isBossUnit, isDesktop, isCompact: isCompact);
 
-    // Dynamic HUD height tailored to screen size & pre-battle setup mode
+    // Dynamic HUD height tailored to screen size (sleek Blood Brothers style single meter)
     final double hudHeight = isBossUnit
         ? (isUltraCompact ? 14.0 : (isCompact ? 16.0 : 20.0))
-        : (_isPreBattleSetup
-            ? (isUltraCompact ? 26.0 : (isCompact ? 32.0 : 42.0))
-            : (isUltraCompact ? 18.0 : (isCompact ? 22.0 : 26.0)));
+        : (isUltraCompact ? 18.0 : (isCompact ? 22.0 : 26.0));
 
     final Widget cardWidget = GestureDetector(
       key: Key('unit_card_${unit.id}'),
@@ -3764,53 +3763,7 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-              // Tactical Formation Lane Crest (Pre-Battle Setup)
-              if (_isPreBattleSetup && !isEnemy && alive)
-                Positioned(
-                  top: -12,
-                  left: 2,
-                  right: 2,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: unit.isVanguard ? const Color(0xFF1E1708) : const Color(0xFF081924),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(
-                          color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                          width: 1.0,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.28),
-                            blurRadius: 4,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            unit.isVanguard ? Icons.shield : Icons.auto_awesome,
-                            size: 8,
-                            color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                          ),
-                          const SizedBox(width: 2.5),
-                          Text(
-                            unit.isVanguard ? '⚔ FRONT' : '🔮 REAR',
-                            style: TextStyle(
-                              color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                              fontSize: 7.5,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+
 
               // LAYER 1: Open Character Miniature & 3D Faction Ground Plinth
               Positioned(
@@ -4120,109 +4073,6 @@ class _BattleScreenState extends State<BattleScreen> {
                             tmRatio: tmRatio,
                             isDamaged: isDamaged,
                             isCompact: isCompact,
-                          ),
-                        ),
-
-                      // PEDESTAL HUD ROW: Clean Lane Toggle & Level (or Target Pip) - Minimal & Tactile
-                      if (!isBossUnit)
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.center,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_isPreBattleSetup) ...[
-                                  // Archetype Shield Badge
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.85),
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: _archetypeColor(unit.archetype), width: 1.0),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(_archetypeIcon(unit.archetype), size: 9, color: _archetypeColor(unit.archetype)),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          _archetypeShortCode(unit.archetype),
-                                          style: TextStyle(
-                                            color: _archetypeColor(unit.archetype),
-                                            fontSize: 9.0,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 4),
-
-                                  // Pre-Battle Lane Toggle Badge: Bold & easy to tap
-                                  GestureDetector(
-                                    key: Key('unit_lane_badge_${unit.id}'),
-                                    onTap: !isEnemy && alive
-                                        ? () => _toggleAlliedLane(unit.id)
-                                        : null,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.0),
-                                      decoration: BoxDecoration(
-                                        color: unit.isVanguard
-                                            ? const Color(0xFFE5A93C).withValues(alpha: 0.28)
-                                            : const Color(0xFF00E5FF).withValues(alpha: 0.22),
-                                        borderRadius: BorderRadius.circular(3),
-                                        border: Border.all(
-                                          color: !isEnemy
-                                              ? (unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF))
-                                              : Colors.white24,
-                                          width: !isEnemy ? 1.4 : 0.8,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            unit.isVanguard ? '⚔ FRONT' : '🔮 REAR',
-                                            style: TextStyle(
-                                              color: unit.isVanguard ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                                              fontSize: 8.5,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                          if (!isEnemy) ...[
-                                            const SizedBox(width: 3),
-                                            const Icon(Icons.swap_vert, size: 9, color: Colors.white),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 4),
-
-                                  // Level Badge
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.85),
-                                      borderRadius: BorderRadius.circular(3),
-                                      border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
-                                    ),
-                                    child: Text(
-                                      'Lv.${unit.level}',
-                                      style: const TextStyle(
-                                        color: Color(0xFFE5A93C),
-                                        fontSize: 8.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
                           ),
                         ),
 
@@ -5563,121 +5413,182 @@ class _BattleScreenState extends State<BattleScreen> {
     final double clampedHp = hpRatio.clamp(0.0, 1.0);
     final double clampedTm = tmRatio.clamp(0.0, 1.0);
     final double shieldIntegrity = unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp).clamp(0.0, 1.0) : 0.0;
+    final Color sigilColor = _archetypeColor(unit.archetype);
 
     return Container(
-      width: isCompact ? 116 : 138,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 4 : 5, vertical: isCompact ? 2.5 : 3.5),
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 3.0 : 4.0,
+        vertical: isCompact ? 1.5 : 2.0,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0C12).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFF5A5A72), width: 1.1),
+        color: const Color(0xFF08080E).withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF4A4A62), width: 1.0),
         boxShadow: const [
           BoxShadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // HP Bar track with shield overlay (bold, high-visibility wargaming gauge)
+          // Blood Brothers Style: Circular Archetype Sigil Gem (Tappable in Pre-Battle to toggle lane)
+          GestureDetector(
+            key: Key('unit_lane_badge_${unit.id}'),
+            onTap: _isPreBattleSetup && unit.isAlive ? () => _toggleAlliedLane(unit.id) : null,
+            child: Container(
+              width: isCompact ? 16.0 : 19.0,
+              height: isCompact ? 16.0 : 19.0,
+              margin: const EdgeInsets.only(right: 3.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF14141E),
+                border: Border.all(color: sigilColor, width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: sigilColor.withValues(alpha: 0.5),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  _archetypeIcon(unit.archetype),
+                  size: isCompact ? 9.5 : 11.5,
+                  color: sigilColor,
+                ),
+              ),
+            ),
+          ),
+
+          // Central Gauge: HP Bar, AP Bar, and Large Bold Monospace Readout
           SizedBox(
-            height: isCompact ? 7.5 : 9.5,
-            child: Stack(
+            width: isCompact ? 112 : 132,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Track background
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E28),
-                    borderRadius: BorderRadius.circular(2.5),
-                    border: Border.all(color: Colors.white12, width: 0.6),
-                  ),
-                ),
-                // Health fill
-                FractionallySizedBox(
-                  widthFactor: clampedHp,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: hpColor,
-                      borderRadius: BorderRadius.circular(2.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: hpColor.withValues(alpha: 0.65),
-                          blurRadius: 4,
+                // Top Row: Bold high-contrast Level, HP & AP readout
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Lv.${unit.level}',
+                        style: TextStyle(
+                          color: const Color(0xFFFFD54F),
+                          fontSize: isCompact ? 8.0 : 9.0,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                          letterSpacing: 0.2,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 3),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Aegis Shield overlay if present
-                if (shieldIntegrity > 0)
-                  FractionallySizedBox(
-                    widthFactor: shieldIntegrity,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD54F).withValues(alpha: 0.90),
-                        borderRadius: BorderRadius.circular(2.5),
-                        border: Border.all(color: Colors.white, width: 1.0),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          SizedBox(height: isCompact ? 2.0 : 2.5),
-          // AP / Turn Meter Bar (clearly legible electric cyan/gold gauge)
-          SizedBox(
-            height: isCompact ? 3.5 : 4.5,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF081018),
-                    borderRadius: BorderRadius.circular(2.0),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: clampedTm,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                      borderRadius: BorderRadius.circular(2.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
-                          blurRadius: 3,
+                      const SizedBox(width: 5),
+                      Text(
+                        '${unit.currentHp}/${unit.maxHp} HP',
+                        style: TextStyle(
+                          color: hpColor,
+                          fontSize: isCompact ? 9.0 : 10.0,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                          letterSpacing: 0.2,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 3),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${(clampedTm * 100).toInt()}% AP',
+                        style: TextStyle(
+                          color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                          fontSize: isCompact ? 8.0 : 9.0,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 3),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          SizedBox(height: isCompact ? 1.5 : 2.5),
-          // Numerical HP & AP readout (Bold high-contrast monospace text)
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${unit.currentHp}/${unit.maxHp} HP',
-                  style: TextStyle(
-                    color: hpColor,
-                    fontSize: isCompact ? 8.0 : 9.5,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'monospace',
-                    letterSpacing: 0.3,
+                const SizedBox(height: 1.5),
+
+                // Main HP Gauge Track
+                SizedBox(
+                  height: isCompact ? 6.0 : 8.0,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E28),
+                          borderRadius: BorderRadius.circular(2.0),
+                          border: Border.all(color: Colors.white12, width: 0.5),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: clampedHp,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: hpColor,
+                            borderRadius: BorderRadius.circular(2.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: hpColor.withValues(alpha: 0.65),
+                                blurRadius: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (shieldIntegrity > 0)
+                        FractionallySizedBox(
+                          widthFactor: shieldIntegrity,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.90),
+                              borderRadius: BorderRadius.circular(2.0),
+                              border: Border.all(color: Colors.white, width: 0.8),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${(clampedTm * 100).toInt()}% AP',
-                  style: TextStyle(
-                    color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                    fontSize: isCompact ? 7.5 : 9.0,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'monospace',
+                const SizedBox(height: 1.5),
+
+                // Sub AP / Turn Meter Track
+                SizedBox(
+                  height: isCompact ? 2.5 : 3.5,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF060B10),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: clampedTm,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                            borderRadius: BorderRadius.circular(1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.5),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
