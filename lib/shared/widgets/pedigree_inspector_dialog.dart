@@ -54,6 +54,8 @@ class PedigreeInspectorDialog extends StatefulWidget {
 class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
   late UnitEntity _currentUnit;
   late int _currentIchor;
+  bool _showCharacterSheet = false;
+  bool _sheetViewingBack = false;
 
   @override
   void initState() {
@@ -382,6 +384,45 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                     ],
                   ),
                 ),
+                // Character Sheet Parchment Switcher
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showCharacterSheet = !_showCharacterSheet;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _showCharacterSheet ? const Color(0xFFE5A93C) : const Color(0xFF1E1E28),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _showCharacterSheet ? Colors.white : const Color(0xFFE5A93C),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.style,
+                          size: 13,
+                          color: _showCharacterSheet ? Colors.black : const Color(0xFFE5A93C),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _showCharacterSheet ? 'STATS VIEW' : 'FACTION SHEET',
+                          style: TextStyle(
+                            color: _showCharacterSheet ? Colors.black : const Color(0xFFE5A93C),
+                            fontSize: 9.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white54),
                   onPressed: () => Navigator.pop(context),
@@ -394,20 +435,133 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
 
           // Scrollable Content
           Expanded(
-            child: ListView(
-              cacheExtent: 1500,
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Section 0: Grand Portrait Card
-                Center(
-                  child: GothicCardFrameWidget(
-                    unit: unit,
-                    width: 210,
-                    height: 280,
-                    showStats: false,
-                  ),
-                ),
-                const SizedBox(height: 14),
+            child: _showCharacterSheet
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: !_sheetViewingBack ? const Color(0xFFE5A93C) : const Color(0xFF262632),
+                                foregroundColor: !_sheetViewingBack ? Colors.black : Colors.white70,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                              onPressed: () => setState(() => _sheetViewingBack = false),
+                              icon: const Icon(Icons.badge, size: 16),
+                              label: const Text('FRONT (VITALS & PORTRAIT)', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 10),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _sheetViewingBack ? const Color(0xFFE5A93C) : const Color(0xFF262632),
+                                foregroundColor: _sheetViewingBack ? Colors.black : Colors.white70,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                              onPressed: () => setState(() => _sheetViewingBack = true),
+                              icon: const Icon(Icons.flip_to_back, size: 16),
+                              label: const Text('BACK (SKILLS & RELICS)', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // Character Sheet Container
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                                blurRadius: 16,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  _sheetViewingBack
+                                      ? 'assets/images/UI/character_sheet_back_ash_legion.png'
+                                      : 'assets/images/UI/character_sheet_front_ash_legion.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              // Live Unit Avatar layered on Front
+                              if (!_sheetViewingBack)
+                                Positioned(
+                                  top: 50,
+                                  child: SizedBox(
+                                    width: 170,
+                                    height: 220,
+                                    child: Image.asset(
+                                      unit.effectiveAvatarAsset,
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.bottomCenter,
+                                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                    ),
+                                  ),
+                                ),
+                              // Live Name Banner
+                              if (!_sheetViewingBack)
+                                Positioned(
+                                  bottom: 42,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.85),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFE5A93C), width: 1.2),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          unit.name.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFFFFD54F),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Lv.${unit.level} • ${unit.archetype.name.toUpperCase()}',
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView(
+                    cacheExtent: 1500,
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // Section 0: Grand Portrait Card
+                      Center(
+                        child: GothicCardFrameWidget(
+                          unit: unit,
+                          width: 210,
+                          height: 280,
+                          showStats: false,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
 
                 // Section 0.5: Generational Progression / Boss Combat Vitals
                 if (isBoss)

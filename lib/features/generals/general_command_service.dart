@@ -1108,6 +1108,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('siphon_vitality');
 
     return OrderResult(
       orderId: 'siphon_vitality',
@@ -1145,6 +1146,7 @@ class GeneralCommandService extends ChangeNotifier {
 
     final List<UnitEntity> enemies = List.of(tickManager.enemies);
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('sanguine_ward');
 
     return OrderResult(
       orderId: 'sanguine_ward',
@@ -1189,6 +1191,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('feast_of_ruin');
 
     return OrderResult(
       orderId: 'feast_of_ruin',
@@ -1223,6 +1226,7 @@ class GeneralCommandService extends ChangeNotifier {
 
     final List<UnitEntity> enemies = List.of(tickManager.enemies);
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('stand_resolute');
 
     return OrderResult(
       orderId: 'stand_resolute',
@@ -1261,6 +1265,7 @@ class GeneralCommandService extends ChangeNotifier {
     enemies[targetIdx] = target.copyWith(currentHp: newHp);
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('retributive_stride');
 
     return OrderResult(
       orderId: 'retributive_stride',
@@ -1301,6 +1306,7 @@ class GeneralCommandService extends ChangeNotifier {
     enemies[enemyIdx] = target.copyWith(currentHp: newHp);
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('smite_the_wicked');
 
     return OrderResult(
       orderId: 'smite_the_wicked',
@@ -1346,6 +1352,7 @@ class GeneralCommandService extends ChangeNotifier {
     }).toList();
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('corpse_burst');
 
     return OrderResult(
       orderId: 'corpse_burst',
@@ -1399,6 +1406,7 @@ class GeneralCommandService extends ChangeNotifier {
     }).toList();
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('virulent_cascade');
 
     return OrderResult(
       orderId: 'virulent_cascade',
@@ -1452,6 +1460,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('rebind_flesh');
 
     return OrderResult(
       orderId: 'rebind_flesh',
@@ -1486,6 +1495,7 @@ class GeneralCommandService extends ChangeNotifier {
 
     final List<UnitEntity> enemies = List.of(tickManager.enemies);
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('quicken');
 
     return OrderResult(
       orderId: 'quicken',
@@ -1524,6 +1534,7 @@ class GeneralCommandService extends ChangeNotifier {
     }).toList();
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('unravel_hex');
 
     return OrderResult(
       orderId: 'unravel_hex',
@@ -1569,6 +1580,7 @@ class GeneralCommandService extends ChangeNotifier {
       }).toList();
 
       _applyStateToTickManager(allies, enemies);
+      _onCardPlayed('echoing_hourglass');
 
       return OrderResult(
         orderId: 'echoing_hourglass',
@@ -1616,6 +1628,7 @@ class GeneralCommandService extends ChangeNotifier {
     }
 
     _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('echoing_hourglass');
 
     return OrderResult(
       orderId: 'echoing_hourglass',

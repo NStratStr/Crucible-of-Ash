@@ -8,6 +8,7 @@ class GeneralSelectionDialog extends StatefulWidget {
   final GeneralCommandService? commandService;
   final int bloodlineSigils;
   final ValueChanged<int>? onSigilsChanged;
+  final void Function(GeneralType type, int newRank)? onPhylacteryUpgraded;
 
   const GeneralSelectionDialog({
     super.key,
@@ -16,6 +17,7 @@ class GeneralSelectionDialog extends StatefulWidget {
     this.commandService,
     this.bloodlineSigils = 0,
     this.onSigilsChanged,
+    this.onPhylacteryUpgraded,
   });
 
   static Future<GeneralType?> show(
@@ -24,6 +26,7 @@ class GeneralSelectionDialog extends StatefulWidget {
     GeneralCommandService? commandService,
     int bloodlineSigils = 0,
     ValueChanged<int>? onSigilsChanged,
+    void Function(GeneralType type, int newRank)? onPhylacteryUpgraded,
   }) {
     return showModalBottomSheet<GeneralType>(
       context: context,
@@ -34,6 +37,7 @@ class GeneralSelectionDialog extends StatefulWidget {
         commandService: commandService,
         bloodlineSigils: bloodlineSigils,
         onSigilsChanged: onSigilsChanged,
+        onPhylacteryUpgraded: onPhylacteryUpgraded,
         onGeneralSelected: (type) => Navigator.pop(ctx, type),
       ),
     );
@@ -319,6 +323,8 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
                             }
                             widget.onSigilsChanged?.call(widget.bloodlineSigils - sigilCost);
                             widget.commandService!.upgradePhylactery(gen.type);
+                            final int newRank = widget.commandService!.getPhylacteryRank(gen.type);
+                            widget.onPhylacteryUpgraded?.call(gen.type, newRank);
                             setState(() {});
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

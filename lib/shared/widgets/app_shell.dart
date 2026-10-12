@@ -1450,7 +1450,16 @@ class _AppShellState extends State<AppShell> {
                     enemyWaves: _activeEnemyWaves,
                     initialAutoBattle: widget.enableAutoBattle,
                     startInPreBattleSetup: true,
-                    onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
+                    onSigilsChanged: (val) {
+                      setState(() => _bloodlineSigils = val);
+                      _saveCurrentState();
+                    },
+                    onPhylacteryUpgraded: (genType, newRank) {
+                      setState(() {
+                        _phylacteryRanks[genType] = newRank;
+                      });
+                      _saveCurrentState();
+                    },
                     onResetEncounter: () => setState(_resetEncounter),
                     onDeployMvpSkirmish: _launchMvpThreeWaveSkirmish,
                     onVictory: _onCombatVictory,
@@ -1560,7 +1569,16 @@ class _AppShellState extends State<AppShell> {
       currentGeneralType: _commandService.activeGeneralType,
       commandService: _commandService,
       bloodlineSigils: _bloodlineSigils,
-      onSigilsChanged: (val) => setState(() => _bloodlineSigils = val),
+      onSigilsChanged: (val) {
+        setState(() => _bloodlineSigils = val);
+        _saveCurrentState();
+      },
+      onPhylacteryUpgraded: (genType, newRank) {
+        setState(() {
+          _phylacteryRanks[genType] = newRank;
+        });
+        _saveCurrentState();
+      },
     );
     if (!mounted || chosen == null) return;
 
@@ -1569,6 +1587,7 @@ class _AppShellState extends State<AppShell> {
       _commandService.setActiveGeneral(chosen);
       _phylacteryRanks = Map.of(_commandService.allPhylacteryRanks);
     });
+    _saveCurrentState();
     final profile = _commandService.currentProfile;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

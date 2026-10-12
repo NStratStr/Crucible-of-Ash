@@ -87,6 +87,8 @@ class BattleScreen extends StatefulWidget {
   final bool initialAutoBattle;
   final bool startInPreBattleSetup;
 
+  final void Function(GeneralType type, int newRank)? onPhylacteryUpgraded;
+
   const BattleScreen({
     super.key,
     required this.tickManager,
@@ -95,6 +97,7 @@ class BattleScreen extends StatefulWidget {
     this.relicService,
     this.bloodlineSigils = 0,
     this.onSigilsChanged,
+    this.onPhylacteryUpgraded,
     this.onResetEncounter,
     this.onDeployMvpSkirmish,
     this.onVictory,
@@ -1056,6 +1059,7 @@ class _BattleScreenState extends State<BattleScreen> {
       commandService: widget.commandService,
       bloodlineSigils: widget.bloodlineSigils,
       onSigilsChanged: widget.onSigilsChanged,
+      onPhylacteryUpgraded: widget.onPhylacteryUpgraded,
     );
     if (!mounted || chosen == null) return;
 
@@ -1176,13 +1180,29 @@ class _BattleScreenState extends State<BattleScreen> {
                         borderRadius: BorderRadius.circular(3),
                         border: Border.all(color: const Color(0xFFFF8A80), width: 0.8),
                       ),
-                      child: Text(
-                        'Lv.${boss.level} TITAN',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8.0,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.dangerous, size: 8, color: Colors.white),
+                          const SizedBox(width: 2),
+                          const Text(
+                            '☠ BOSS',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 8.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Lv.${boss.level} TITAN',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontSize: 8.0,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1249,6 +1269,100 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ],
             ),
+            // Boss Action Intent Telegraphing & Phase Badge (relocated from beneath pedestal)
+            Builder(builder: (ctx) {
+              final intentSkill = _aiService.predictNextSkill(boss);
+              final bool isLimitBurst = intentSkill?.isLimitBurst ?? false;
+              final String phaseText = hpRatio > 0.66
+                  ? 'PHASE 1: DORMANT EMBER'
+                  : (hpRatio > 0.33 ? 'PHASE 2: MOLTEN ENRAGE' : 'PHASE 3: APOCALYPTIC RUIN');
+              final Color phaseColor = hpRatio > 0.66
+                  ? const Color(0xFFFFD54F)
+                  : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 3.5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Intent Chip
+                    if (intentSkill != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: isLimitBurst
+                              ? const Color(0xFFD50000).withValues(alpha: 0.90)
+                              : const Color(0xFF1E1E28).withValues(alpha: 0.90),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(
+                            color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                            width: isLimitBurst ? 1.2 : 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
+                              size: 9.0,
+                              color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'INTENT: ${intentSkill.name.toUpperCase()}',
+                              style: TextStyle(
+                                color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                            if (intentSkill.damageCoefficient > 0) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '(${intentSkill.damageCoefficient}x)',
+                                style: const TextStyle(
+                                  color: Color(0xFFFF8A80),
+                                  fontSize: 7.0,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+
+                    // Phase Tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: phaseColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: phaseColor, width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.whatshot, size: 8.5, color: phaseColor),
+                          const SizedBox(width: 3),
+                          Text(
+                            phaseText,
+                            style: TextStyle(
+                              color: phaseColor,
+                              fontSize: 7.0,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -3580,7 +3694,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
     // Dynamic HUD height tailored to screen size & pre-battle setup mode
     final double hudHeight = isBossUnit
-        ? (isUltraCompact ? 24.0 : (isCompact ? 28.0 : 34.0))
+        ? (isUltraCompact ? 14.0 : (isCompact ? 16.0 : 20.0))
         : (_isPreBattleSetup
             ? (isUltraCompact ? 26.0 : (isCompact ? 32.0 : 42.0))
             : (isUltraCompact ? 18.0 : (isCompact ? 22.0 : 26.0)));
@@ -3923,8 +4037,8 @@ class _BattleScreenState extends State<BattleScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                      // GDD v2.6 Sec 13.5: Enemy Boss/Elite Action Intent Telegraphing
-                      if (isEnemy && alive && unit.turnMeter >= 40.0 && !isUltraCompact) ...[
+                      // GDD v2.6 Sec 13.5: Enemy Boss/Elite Action Intent Telegraphing (Boss intent shown in Grand Top Bar)
+                      if (isEnemy && alive && unit.turnMeter >= 40.0 && !isUltraCompact && !isBossUnit) ...[
                         Builder(builder: (ctx) {
                           final intentSkill = _aiService.predictNextSkill(unit);
                           if (intentSkill == null) return const SizedBox.shrink();
@@ -4296,46 +4410,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                 const SizedBox(width: 4),
                               ] else ...[
                                 // During live combat: keep miniature view clear & uncluttered
-                                if (isBossUnit) ...[
-                                  Builder(builder: (ctx) {
-                                    final String phaseText = hpRatio > 0.66
-                                        ? '☠ BOSS'
-                                        : (hpRatio > 0.33 ? '⚡ BOSS (P2)' : '🔥 BOSS (P3)');
-                                    final Color phaseColor = hpRatio > 0.66
-                                        ? const Color(0xFFFFD54F)
-                                        : (hpRatio > 0.33 ? const Color(0xFFFF9800) : const Color(0xFFFF1744));
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFB71C1C).withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(3),
-                                        border: Border.all(color: phaseColor, width: 1.4),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: phaseColor.withValues(alpha: 0.5),
-                                            blurRadius: 6,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.dangerous, size: 9, color: phaseColor),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            phaseText,
-                                            style: TextStyle(
-                                              color: phaseColor,
-                                              fontSize: 8.0,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                  const SizedBox(width: 4),
-                                ],
+                                // Note: Boss intent and phase are displayed in the Grand Top Bar
                               ],
 
                               // Tactical Character Sheet Modal Button
@@ -5725,30 +5800,31 @@ class _BattleScreenState extends State<BattleScreen> {
     final double shieldIntegrity = unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp).clamp(0.0, 1.0) : 0.0;
 
     return Container(
-      width: isCompact ? 84 : 96,
-      padding: EdgeInsets.symmetric(horizontal: isCompact ? 2 : 3, vertical: isCompact ? 1 : 2),
+      width: isCompact ? 100 : 116,
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 3 : 4, vertical: isCompact ? 2 : 2.5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0C12).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(3),
-        border: Border.all(color: const Color(0xFF38384A), width: 0.8),
+        color: const Color(0xFF0C0C12).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFF4A4A60), width: 1.0),
         boxShadow: const [
-          BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1)),
+          BoxShadow(color: Colors.black87, blurRadius: 5, offset: Offset(0, 1.5)),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // HP Bar track with shield overlay
+          // HP Bar track with shield overlay (enlarged for tabletop clarity)
           SizedBox(
-            height: isCompact ? 3.0 : 4.5,
+            height: isCompact ? 5.0 : 7.0,
             child: Stack(
               children: [
                 // Track background
                 Container(
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E1E28),
-                    borderRadius: BorderRadius.circular(1.5),
+                    borderRadius: BorderRadius.circular(2.0),
+                    border: Border.all(color: Colors.white10, width: 0.5),
                   ),
                 ),
                 // Health fill
@@ -5757,11 +5833,11 @@ class _BattleScreenState extends State<BattleScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: hpColor,
-                      borderRadius: BorderRadius.circular(1.5),
+                      borderRadius: BorderRadius.circular(2.0),
                       boxShadow: [
                         BoxShadow(
-                          color: hpColor.withValues(alpha: 0.5),
-                          blurRadius: 2,
+                          color: hpColor.withValues(alpha: 0.6),
+                          blurRadius: 3,
                         ),
                       ],
                     ),
@@ -5773,25 +5849,25 @@ class _BattleScreenState extends State<BattleScreen> {
                     widthFactor: shieldIntegrity,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD54F).withValues(alpha: 0.80),
-                        borderRadius: BorderRadius.circular(1.5),
-                        border: Border.all(color: Colors.white, width: 0.5),
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(2.0),
+                        border: Border.all(color: Colors.white, width: 0.8),
                       ),
                     ),
                   ),
               ],
             ),
           ),
-          SizedBox(height: isCompact ? 1.0 : 1.5),
-          // AP / Turn Meter Bar
+          SizedBox(height: isCompact ? 1.5 : 2.0),
+          // AP / Turn Meter Bar (enlarged for tabletop clarity)
           SizedBox(
-            height: isCompact ? 1.5 : 2.0,
+            height: isCompact ? 2.5 : 3.5,
             child: Stack(
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A1520),
-                    borderRadius: BorderRadius.circular(1),
+                    color: const Color(0xFF081018),
+                    borderRadius: BorderRadius.circular(1.5),
                   ),
                 ),
                 FractionallySizedBox(
@@ -5799,28 +5875,49 @@ class _BattleScreenState extends State<BattleScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                      borderRadius: BorderRadius.circular(1),
+                      borderRadius: BorderRadius.circular(1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.5),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          if (!isCompact) ...[
-            const SizedBox(height: 1.0),
-            // Numerical HP readout
-            Text(
-              '${unit.currentHp}/${unit.maxHp}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 6.5,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-                letterSpacing: 0.2,
-              ),
+          SizedBox(height: isCompact ? 1.0 : 1.5),
+          // Numerical HP readout (Always shown with bold high-contrast font, scaled to fit)
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${unit.currentHp}/${unit.maxHp} HP',
+                  style: TextStyle(
+                    color: hpColor,
+                    fontSize: isCompact ? 6.5 : 7.5,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'monospace',
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${(clampedTm * 100).toInt()}% AP',
+                  style: TextStyle(
+                    color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                    fontSize: isCompact ? 6.0 : 7.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
