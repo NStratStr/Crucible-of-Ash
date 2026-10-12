@@ -131,17 +131,20 @@ class CampaignMapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = ChapterTheme.forChapter(currentChapter);
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
 
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         backgroundColor: theme.surfaceColor,
+        titleSpacing: 8,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (currentChapter > 1 && onChapterChanged != null)
               IconButton(
-                icon: Icon(Icons.arrow_left, size: 20, color: theme.secondaryColor),
+                icon: Icon(Icons.arrow_left, size: 18, color: theme.secondaryColor),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () => onChapterChanged!(currentChapter - 1),
@@ -154,31 +157,39 @@ class CampaignMapScreen extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(theme.chapterIcon, size: 12, color: theme.secondaryColor),
+                      Icon(theme.chapterIcon, size: 11, color: theme.secondaryColor),
                       const SizedBox(width: 4),
                       Text(
                         chapterTitle(currentChapter),
-                        style: const TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 12),
+                        style: TextStyle(
+                          letterSpacing: 1.0,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isMobile ? 10.5 : 12,
+                        ),
                       ),
                     ],
                   ),
                   Text(
                     theme.subtitle,
-                    style: TextStyle(letterSpacing: 0.8, color: theme.secondaryColor.withValues(alpha: 0.75), fontSize: 8),
+                    style: TextStyle(
+                      letterSpacing: 0.6,
+                      color: theme.secondaryColor.withValues(alpha: 0.75),
+                      fontSize: 7.5,
+                    ),
                   ),
                 ],
               ),
             ),
             if (currentChapter < maxUnlockedChapter && onChapterChanged != null)
               IconButton(
-                icon: Icon(Icons.arrow_right, size: 20, color: theme.secondaryColor),
+                icon: Icon(Icons.arrow_right, size: 18, color: theme.secondaryColor),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () => onChapterChanged!(currentChapter + 1),
               ),
           ],
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           // Ascension Tier Badge (A0–A10)
           GestureDetector(
@@ -194,24 +205,24 @@ class CampaignMapScreen extends StatelessWidget {
               }
             },
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
                 color: currentAscension > 0
                     ? const Color(0xFFB71C1C).withValues(alpha: 0.35)
                     : const Color(0xFF1E1E28),
-                borderRadius: BorderRadius.circular(5),
+                borderRadius: BorderRadius.circular(4),
                 border: Border.all(
                   color: currentAscension > 0
                       ? const Color(0xFFFF5252)
                       : const Color(0xFFE5A93C).withValues(alpha: 0.8),
-                  width: 1.2,
+                  width: 1.0,
                 ),
                 boxShadow: currentAscension > 0
                     ? [
                         BoxShadow(
                           color: const Color(0xFFFF1744).withValues(alpha: 0.3),
-                          blurRadius: 6,
+                          blurRadius: 4,
                         ),
                       ]
                     : null,
@@ -221,12 +232,12 @@ class CampaignMapScreen extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.auto_graph,
-                    size: 13,
+                    size: 11,
                     color: currentAscension > 0
                         ? const Color(0xFFFF5252)
                         : const Color(0xFFFFD54F),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                   Text(
                     'A$currentAscension',
                     style: TextStyle(
@@ -235,7 +246,7 @@ class CampaignMapScreen extends StatelessWidget {
                           : const Color(0xFFFFD54F),
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w900,
-                      fontSize: 10.5,
+                      fontSize: 9.5,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -243,67 +254,68 @@ class CampaignMapScreen extends StatelessWidget {
               ),
             ),
           ),
-          if (onLaunchMvpSkirmish != null)
+          if (!isMobile && onLaunchMvpSkirmish != null)
             IconButton(
-              icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 20),
+              icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 18),
               tooltip: 'MVP 3-Wave Skirmish (GDD Sec 14.1)',
               onPressed: onLaunchMvpSkirmish,
             ),
-          if (onOpenEndgameGauntlet != null)
+          if (!isMobile && onOpenEndgameGauntlet != null)
             IconButton(
-              icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 20),
+              icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 18),
               tooltip: 'Endgame Gauntlet',
               onPressed: onOpenEndgameGauntlet,
             ),
           // Tri-Currency Display
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: const EdgeInsets.only(right: 8.0),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Ichor
-                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
-                const SizedBox(width: 3),
+                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 12),
+                const SizedBox(width: 2),
                 Text(
                   '$totalIchor',
                   style: const TextStyle(
                     color: Color(0xFFEF5350),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 // Cursed Ore
-                const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
-                const SizedBox(width: 3),
+                const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 12),
+                const SizedBox(width: 2),
                 Text(
                   '$cursedOre',
                   style: const TextStyle(
                     color: Color(0xFF80CBC4),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 // Bloodline Sigils
                 ClipOval(
                   child: Image.asset(
                     'assets/images/blood_altar_sigil.jpg',
-                    width: 14,
-                    height: 14,
+                    width: 12,
+                    height: 12,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 14),
+                    errorBuilder: (_, __, ___) => const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 12),
                   ),
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(width: 2),
                 Text(
                   '$bloodlineSigils',
                   style: const TextStyle(
                     color: Color(0xFFFFD54F),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                   ),
                 ),
               ],

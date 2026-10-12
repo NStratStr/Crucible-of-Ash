@@ -1917,6 +1917,8 @@ class _BattleScreenState extends State<BattleScreen> {
     final modifier = widget.combatService.battleModifier;
     final boons = widget.combatService.activeBoons;
     final bool hasModifierOrBoons = modifier != BattleModifier.none || boons.isNotEmpty;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
 
     return Container(
       decoration: const BoxDecoration(
@@ -1928,14 +1930,14 @@ class _BattleScreenState extends State<BattleScreen> {
         children: [
           // Main 1-Line Status Bar: Commander (Left) | Turn & Phase Pill (Center) | Controls (Right)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 6.0 : 10.0, vertical: isMobile ? 4.0 : 6.0),
             child: Row(
               children: [
                 // Commander Profile Pill
                 GestureDetector(
                   onTap: _showGeneralSelectionDialog,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 8, vertical: isMobile ? 3 : 4),
                     decoration: BoxDecoration(
                       color: profile.themeColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -1944,8 +1946,8 @@ class _BattleScreenState extends State<BattleScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(profile.icon, color: profile.themeColor, size: 16),
-                        const SizedBox(width: 5),
+                        Icon(profile.icon, color: profile.themeColor, size: isMobile ? 14 : 16),
+                        SizedBox(width: isMobile ? 3 : 5),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -1954,20 +1956,21 @@ class _BattleScreenState extends State<BattleScreen> {
                               children: [
                                 Text(
                                   profile.name.toUpperCase(),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                    letterSpacing: 0.8,
+                                    fontSize: isMobile ? 9 : 10,
+                                    letterSpacing: 0.6,
                                   ),
                                 ),
-                                const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 14),
+                                Icon(Icons.arrow_drop_down, color: Colors.white70, size: isMobile ? 12 : 14),
                               ],
                             ),
-                            Text(
-                              profile.title,
-                              style: TextStyle(color: profile.themeColor, fontSize: 7.5),
-                            ),
+                            if (!isMobile)
+                              Text(
+                                profile.title,
+                                style: TextStyle(color: profile.themeColor, fontSize: 7.5),
+                              ),
                           ],
                         ),
                       ],
@@ -1975,51 +1978,53 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
 
-                const SizedBox(width: 6),
+                if (!isMobile) ...[
+                  const SizedBox(width: 6),
 
-                // 1-Tap MVP 3-Wave Skirmish Launcher (GDD v2.8 MVP Spec)
-                GestureDetector(
-                  onTap: _deployMvpSkirmish,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFB3261E).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          'MVP SKIRMISH',
-                          style: TextStyle(
-                            color: Color(0xFFFFD54F),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 9.0,
-                            letterSpacing: 0.8,
+                  // 1-Tap MVP 3-Wave Skirmish Launcher (GDD v2.8 MVP Spec)
+                  GestureDetector(
+                    onTap: _deployMvpSkirmish,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB3261E).withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
+                            blurRadius: 6,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.military_tech, color: Color(0xFFFFD54F), size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'MVP SKIRMISH',
+                            style: TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9.0,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
 
-                const SizedBox(width: 6),
+                SizedBox(width: isMobile ? 4 : 6),
 
                 // Center: Dynamic Turn & Phase Guidance Pill
                 Expanded(
                   child: _buildTurnStatusPill(activeUnit, isPlayerTurn),
                 ),
 
-                const SizedBox(width: 8),
+                SizedBox(width: isMobile ? 4 : 8),
 
                 // Right: Speed Toggle, Wheel Info, Auto Mode & Tick Indicator
                 Row(
@@ -5108,15 +5113,16 @@ class _BattleScreenState extends State<BattleScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double screenHeight = MediaQuery.of(context).size.height;
     final bool isDesktop = screenWidth >= 1000;
+    final bool isMobile = screenWidth < 600;
     final bool isUltraCompact = screenHeight < 620;
 
-    // Responsive card dimensions: elevated scale for maximum readability & tactile presence
+    // Responsive card dimensions: compact on mobile so miniatures and battlefield take center stage
     final double cardWidth = isDesktop
         ? 156.0
-        : (isUltraCompact ? 104.0 : (isCompact ? 124.0 : 142.0));
+        : (isMobile ? 96.0 : (isUltraCompact ? 104.0 : (isCompact ? 124.0 : 142.0)));
     final double cardHeight = isDesktop
         ? 224.0
-        : (isUltraCompact ? 148.0 : (isCompact ? 174.0 : 202.0));
+        : (isMobile ? 134.0 : (isUltraCompact ? 148.0 : (isCompact ? 174.0 : 202.0)));
 
     return Center(
       child: ConstrainedBox(
@@ -5128,7 +5134,7 @@ class _BattleScreenState extends State<BattleScreen> {
             // Fanned Hand of Cards (Physical Tabletop Hand Spread)
             Flexible(
               child: SizedBox(
-                height: cardHeight + 26,
+                height: cardHeight + (isMobile ? 14 : 26),
                 child: Center(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -5148,9 +5154,9 @@ class _BattleScreenState extends State<BattleScreen> {
                         // Physical tabletop fan geometry: arched curve and radial rotation
                         final double centerIdx = (count - 1) / 2.0;
                         final double offsetFromCenter = index - centerIdx;
-                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * 0.045);
-                        final double arcY = isHovered ? -20.0 : (offsetFromCenter.abs() * 4.5);
-                        final double overlapX = index > 0 ? (isCompact ? -12.0 : -16.0) : 0.0;
+                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * (isMobile ? 0.03 : 0.045));
+                        final double arcY = isHovered ? -16.0 : (offsetFromCenter.abs() * (isMobile ? 2.5 : 4.5));
+                        final double overlapX = index > 0 ? (isMobile ? -8.0 : (isCompact ? -12.0 : -16.0)) : 0.0;
 
                         return Transform.translate(
                           offset: Offset(overlapX, arcY),
@@ -5200,12 +5206,12 @@ class _BattleScreenState extends State<BattleScreen> {
               ),
             ),
 
-            const SizedBox(width: 8),
+            SizedBox(width: isMobile ? 4 : 8),
 
             // Under-Rail Burn Pit (48x48 tabletop brazier)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6.0),
-              child: _buildBurnPit(profile.themeColor),
+              padding: EdgeInsets.only(bottom: isMobile ? 2.0 : 6.0),
+              child: _buildBurnPit(profile.themeColor, isMobile: isMobile),
             ),
           ],
         ),
@@ -5283,7 +5289,7 @@ class _BattleScreenState extends State<BattleScreen> {
     );
   }
 
-  Widget _buildBurnPit(Color themeColor) {
+  Widget _buildBurnPit(Color themeColor, {bool isMobile = false}) {
     return DragTarget<GeneralOrderDefinition>(
       onWillAcceptWithDetails: (details) => true,
       onAcceptWithDetails: (details) {
@@ -5307,8 +5313,8 @@ class _BattleScreenState extends State<BattleScreen> {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
-              width: 78,
-              height: 68,
+              width: isMobile ? 54 : 78,
+              height: isMobile ? 54 : 68,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
