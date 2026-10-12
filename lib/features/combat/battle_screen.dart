@@ -892,43 +892,46 @@ class _BattleScreenState extends State<BattleScreen> {
       final profile = widget.commandService.currentProfile;
 
       OrderResult res;
-      switch (widget.commandService.activeGeneralType) {
-        case GeneralType.vladislav:
-          if (order.id == 'rend_flesh') {
-            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
-            res = widget.commandService.executeRendFlesh(enemyId);
-          } else if (order.id == 'iron_bulwark') {
-            final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to fortify.')).id;
-            res = widget.commandService.executeIronBulwark(allyId);
-          } else if (order.id == 'exsanguinating_strike') {
-            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
-            res = widget.commandService.executeExsanguinatingStrike(enemyId);
-          } else if (order.id == 'sanguine_revival') {
-            final fallenAllyId = targetUnitId ?? widget.tickManager.allies.firstWhere(
-              (a) => !a.isAlive,
-              orElse: () => throw StateError('No fallen ally to revive.'),
-            ).id;
-            res = widget.commandService.executeSanguineRevival(fallenAllyId);
-          } else if (order.id == 'disrupting_cleave') {
-            final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
-            res = widget.commandService.executeDisruptingCleave(enemyId);
-          } else if (order.id == 'blood_boil') {
-            final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to buff.')).id;
-            res = widget.commandService.executeBloodBoil(allyId);
-          } else if (order.id == 'siphon_vitality') {
-            if (_selectedEnemyId == null) {
-              throw StateError('Select an enemy to siphon.');
+      // 1. Shared Neutral Tactics (Castable by any Commander)
+      if (order.id == 'rend_flesh') {
+        final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+        res = widget.commandService.executeRendFlesh(enemyId);
+      } else if (order.id == 'iron_bulwark') {
+        final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to fortify.')).id;
+        res = widget.commandService.executeIronBulwark(allyId);
+      } else if (order.id == 'exsanguinating_strike') {
+        final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+        res = widget.commandService.executeExsanguinatingStrike(enemyId);
+      } else if (order.id == 'sanguine_revival') {
+        final fallenAllyId = targetUnitId ?? widget.tickManager.allies.firstWhere(
+          (a) => !a.isAlive,
+          orElse: () => throw StateError('No fallen ally to revive.'),
+        ).id;
+        res = widget.commandService.executeSanguineRevival(fallenAllyId);
+      } else if (order.id == 'disrupting_cleave') {
+        final enemyId = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.firstWhere((e) => e.isAlive).id;
+        res = widget.commandService.executeDisruptingCleave(enemyId);
+      } else if (order.id == 'blood_boil') {
+        final allyId = targetUnitId ?? widget.tickManager.allies.firstWhere((a) => a.isAlive, orElse: () => throw StateError('No living ally to buff.')).id;
+        res = widget.commandService.executeBloodBoil(allyId);
+      } else {
+        // 2. Commander-Specific Signature Orders
+        switch (widget.commandService.activeGeneralType) {
+          case GeneralType.vladislav:
+            if (order.id == 'siphon_vitality') {
+              if (_selectedEnemyId == null) {
+                throw StateError('Select an enemy to siphon.');
+              }
+              res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
+            } else if (order.id == 'sanguine_ward') {
+              res = widget.commandService.executeSanguineWard();
+            } else {
+              if (_selectedEnemyId == null) {
+                throw StateError('Select an enemy to execute.');
+              }
+              res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
             }
-            res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
-          } else if (order.id == 'sanguine_ward') {
-            res = widget.commandService.executeSanguineWard();
-          } else {
-            if (_selectedEnemyId == null) {
-              throw StateError('Select an enemy to execute.');
-            }
-            res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
-          }
-          break;
+            break;
         case GeneralType.valeria:
           if (order.id == 'stand_resolute') {
             final firstAliveAlly = widget.tickManager.allies.firstWhere(
@@ -970,6 +973,7 @@ class _BattleScreenState extends State<BattleScreen> {
           }
           break;
       }
+    }
 
       setState(() {
         _combatLog = '[${profile.name.toUpperCase()}] ${order.name}: ${res.summary}';
@@ -1282,83 +1286,171 @@ class _BattleScreenState extends State<BattleScreen> {
 
               return Padding(
                 padding: const EdgeInsets.only(top: 3.5),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Intent Chip
-                    if (intentSkill != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: isLimitBurst
-                              ? const Color(0xFFD50000).withValues(alpha: 0.90)
-                              : const Color(0xFF1E1E28).withValues(alpha: 0.90),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(
-                            color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
-                            width: isLimitBurst ? 1.2 : 0.8,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
-                              size: 9.0,
-                              color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              'INTENT: ${intentSkill.name.toUpperCase()}',
-                              style: TextStyle(
-                                color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
-                                fontSize: 7.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.4,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Intent Chip
+                        if (intentSkill != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isLimitBurst
+                                  ? const Color(0xFFD50000).withValues(alpha: 0.90)
+                                  : const Color(0xFF1E1E28).withValues(alpha: 0.90),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(
+                                color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                width: isLimitBurst ? 1.2 : 0.8,
                               ),
                             ),
-                            if (intentSkill.damageCoefficient > 0) ...[
-                              const SizedBox(width: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
+                                  size: 9.0,
+                                  color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'INTENT: ${intentSkill.name.toUpperCase()}',
+                                  style: TextStyle(
+                                    color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                                if (intentSkill.damageCoefficient > 0) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${intentSkill.damageCoefficient}x)',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFF8A80),
+                                      fontSize: 7.0,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                        else
+                          const SizedBox.shrink(),
+
+                        // Phase Tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: phaseColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: phaseColor, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.whatshot, size: 8.5, color: phaseColor),
+                              const SizedBox(width: 3),
                               Text(
-                                '(${intentSkill.damageCoefficient}x)',
-                                style: const TextStyle(
-                                  color: Color(0xFFFF8A80),
+                                phaseText,
+                                style: TextStyle(
+                                  color: phaseColor,
                                   fontSize: 7.0,
                                   fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-
-                    // Phase Tag
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: phaseColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: phaseColor, width: 0.8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.whatshot, size: 8.5, color: phaseColor),
-                          const SizedBox(width: 3),
-                          Text(
-                            phaseText,
-                            style: TextStyle(
-                              color: phaseColor,
-                              fontSize: 7.0,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.3,
-                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+
+                    // Boss Skill Arsenal Icons Strip directly under health bar & intent
+                    if (boss.skills.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: boss.skills.map((skill) {
+                            final bool isIntent = intentSkill?.id == skill.id;
+                            final bool isUlt = skill.isLimitBurst;
+                            final bool onCooldown = skill.currentCooldown > 0;
+                            final Color borderCol = isIntent
+                                ? const Color(0xFFFFD54F)
+                                : (isUlt
+                                    ? const Color(0xFFFF5252)
+                                    : (onCooldown ? const Color(0xFF424250) : const Color(0xFFEF5350).withValues(alpha: 0.7)));
+                            final Color bgCol = isIntent
+                                ? const Color(0xFFB3261E).withValues(alpha: 0.4)
+                                : (onCooldown ? const Color(0xFF161620) : const Color(0xFF261214));
+
+                            return Tooltip(
+                              message: '${skill.name}\n${skill.description}',
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: bgCol,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: borderCol, width: isIntent ? 1.2 : 0.8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isUlt
+                                          ? Icons.warning_amber_rounded
+                                          : (skill.damageCoefficient > 1.5 ? Icons.flash_on : Icons.colorize),
+                                      size: 10,
+                                      color: isIntent
+                                          ? const Color(0xFFFFD54F)
+                                          : (onCooldown ? Colors.white38 : const Color(0xFFFF8A80)),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      skill.name.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 7.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isIntent
+                                            ? const Color(0xFFFFD54F)
+                                            : (onCooldown ? Colors.white38 : Colors.white),
+                                      ),
+                                    ),
+                                    if (onCooldown) ...[
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '(${skill.currentCooldown}T)',
+                                        style: const TextStyle(
+                                          fontSize: 7.0,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF9E9EB0),
+                                        ),
+                                      ),
+                                    ] else if (isIntent) ...[
+                                      const SizedBox(width: 3),
+                                      const Text(
+                                        '• NEXT',
+                                        style: TextStyle(
+                                          fontSize: 6.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFFFD54F),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -2538,8 +2630,8 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
 
     final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 860.0 : 720.0);
-    final double bossMaxWidth = isDesktop ? 460.0 : (isTablet ? 380.0 : 320.0);
-    final double minionMaxWidth = isDesktop ? 200.0 : (isTablet ? 160.0 : 130.0);
+    final double bossMaxWidth = isDesktop ? 480.0 : (isTablet ? 400.0 : 340.0);
+    final double minionMaxWidth = isDesktop ? 160.0 : (isTablet ? 130.0 : 105.0);
 
     return Expanded(
       flex: 12,
@@ -2567,7 +2659,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // Centered Dominant Boss Slot (prominent flex & wide constraints)
                 Expanded(
-                  flex: 5,
+                  flex: 6,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Center(
@@ -2611,7 +2703,7 @@ class _BattleScreenState extends State<BattleScreen> {
     required String? activeUnitId,
     String? selectedTargetId,
     ValueChanged<String>? onSelectTarget,
-    double maxWidth = 180.0,
+    double maxWidth = 130.0,
   }) {
     return Expanded(
       flex: 2,
@@ -2621,7 +2713,7 @@ class _BattleScreenState extends State<BattleScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Transform.scale(
-              scale: 0.90,
+              scale: 0.82,
               alignment: Alignment.bottomCenter,
               child: _buildUnitCard(
                 unit: unit,
