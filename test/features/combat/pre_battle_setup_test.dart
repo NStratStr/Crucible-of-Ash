@@ -283,27 +283,30 @@ void main() {
       expect(tickManager.allies[0].columnIndex, equals(0));
       final unit1Id = tickManager.allies[1].id;
 
-      // 1. Nudge right using shift_right_ash_vladislav_01
-      await tester.tap(find.byKey(const Key('shift_right_ash_vladislav_01')));
-      await tester.pump(const Duration(milliseconds: 400));
+      // Verify ugly arrows are removed
+      expect(find.byIcon(Icons.chevron_left), findsNothing);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
 
-      // Vladislav is now at index 1 (Column 2), and previous unit 1 is at index 0 (Column 1)
+      // 1. Drag and drop: drag Vladislav (Col 0) onto unit 1 (Col 1)
+      final firstUnitCenter = tester.getCenter(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      final targetUnitCenter = tester.getCenter(find.byKey(Key('unit_card_$unit1Id')));
+
+      final TestGesture gesture = await tester.startGesture(firstUnitCenter);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveTo(targetUnitCenter);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Vladislav and unit 1 swapped!
       expect(tickManager.allies[1].id, equals('ash_vladislav_01'));
       expect(tickManager.allies[1].columnIndex, equals(1));
       expect(tickManager.allies[0].id, equals(unit1Id));
       expect(tickManager.allies[0].columnIndex, equals(0));
 
-      // 2. Nudge left using shift_left_ash_vladislav_01
-      await tester.tap(find.byKey(const Key('shift_left_ash_vladislav_01')));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // Restored back to Col 0
-      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
-      expect(tickManager.allies[0].columnIndex, equals(0));
-
-      // 3. Tap-to-swap: Tap Vladislav (select), then tap unit at Col 3 (swap)
+      // 2. Tap-to-swap: Tap Vladislav (select), then tap unit at Col 3 (swap)
       final unit3Id = tickManager.allies[3].id;
-      final bool vladWasFront = tickManager.allies[0].isFrontline;
+      final bool vladWasFront = tickManager.allies[1].isFrontline;
       final bool unit3WasFront = tickManager.allies[3].isFrontline;
 
       await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
@@ -317,9 +320,9 @@ void main() {
       expect(tickManager.allies[3].columnIndex, equals(3));
       expect(tickManager.allies[3].isFrontline, equals(vladWasFront));
 
-      expect(tickManager.allies[0].id, equals(unit3Id));
-      expect(tickManager.allies[0].columnIndex, equals(0));
-      expect(tickManager.allies[0].isFrontline, equals(unit3WasFront));
+      expect(tickManager.allies[1].id, equals(unit3Id));
+      expect(tickManager.allies[1].columnIndex, equals(1));
+      expect(tickManager.allies[1].isFrontline, equals(unit3WasFront));
 
       await tester.pumpWidget(const SizedBox());
     });

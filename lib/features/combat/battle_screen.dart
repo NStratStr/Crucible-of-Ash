@@ -3552,7 +3552,7 @@ class _BattleScreenState extends State<BattleScreen> {
           if (_selectedSwapUnitId == null) {
             setState(() {
               _selectedSwapUnitId = unit.id;
-              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Tap another unit to swap, or use ◀ / ▶.';
+              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Drag & drop or tap another unit to swap.';
             });
           } else if (_selectedSwapUnitId == unit.id) {
             setState(() => _selectedSwapUnitId = null);
@@ -4347,74 +4347,6 @@ class _BattleScreenState extends State<BattleScreen> {
               ),
             ),
 
-            // Pre-Battle Column Navigation Pill & Nudge Arrows
-            if (_isPreBattleSetup && !isEnemy && alive)
-              Positioned(
-                top: 2,
-                left: 2,
-                right: 2,
-                child: Container(
-                  height: 20,
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: isSelectedForSwap
-                        ? const Color(0xFFE5A93C).withValues(alpha: 0.95)
-                        : const Color(0xFF161622).withValues(alpha: 0.90),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: isSelectedForSwap ? const Color(0xFFFFD54F) : const Color(0xFF424254),
-                      width: isSelectedForSwap ? 1.5 : 0.8,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        key: Key('shift_left_${unit.id}'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: allyIndex > 0 ? () => _shiftAlliedUnit(allyIndex, -1) : null,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Icon(
-                            Icons.chevron_left,
-                            size: 13,
-                            color: allyIndex > 0
-                                ? (isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F))
-                                : Colors.white24,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        isSelectedForSwap ? 'SWAP' : 'COL ${allyIndex + 1}',
-                        style: TextStyle(
-                          color: isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F),
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      GestureDetector(
-                        key: Key('shift_right_${unit.id}'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: allyIndex < widget.tickManager.allies.length - 1
-                            ? () => _shiftAlliedUnit(allyIndex, 1)
-                            : null,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Icon(
-                            Icons.chevron_right,
-                            size: 13,
-                            color: allyIndex < widget.tickManager.allies.length - 1
-                                ? (isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F))
-                                : Colors.white24,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
             // Fallen Overlay
                 if (!alive)
                   if (unit.isFigurineCutout || isBossUnit)
@@ -4484,6 +4416,106 @@ class _BattleScreenState extends State<BattleScreen> {
           ),
         ),
       );
+
+      if (_isPreBattleSetup && !isEnemy && alive) {
+        final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+        final double cardWidth = isDesktop ? 220.0 : (isTablet ? 170.0 : 96.0);
+        final double draggedCardHeight = isBossUnit
+            ? (isUltraCompact ? 170.0 : 210.0)
+            : (isUltraCompact ? 130.0 : (isCompact ? 150.0 : 180.0));
+
+        return DragTarget<String>(
+          onWillAcceptWithDetails: (details) => details.data != unit.id,
+          onAcceptWithDetails: (details) {
+            final draggedUnitId = details.data;
+            final indexA = widget.tickManager.allies.indexWhere((u) => u.id == draggedUnitId);
+            final indexB = allyIndex;
+            _swapAlliedUnits(indexA, indexB);
+          },
+          builder: (context, candidateData, rejectedData) {
+            final bool isHovered = candidateData.isNotEmpty;
+            final Widget unitSlot = Padding(
+              padding: const EdgeInsets.all(4.0),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  cardWidget,
+                  // Radiant golden plinth targeting ring when another unit is dragged over this slot
+                  if (isHovered)
+                    Positioned(
+                      bottom: 16,
+                      left: 2,
+                      right: 2,
+                      height: 28,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.all(Radius.elliptical(50, 14)),
+                            border: Border.all(
+                              color: const Color(0xFFFFD54F),
+                              width: 2.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                                blurRadius: 16,
+                                spreadRadius: 2.5,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+
+            return Draggable<String>(
+              data: unit.id,
+              feedback: Material(
+                color: Colors.transparent,
+                child: Transform.scale(
+                  scale: 1.08,
+                  child: SizedBox(
+                    width: cardWidth,
+                    height: draggedCardHeight,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        cardWidget,
+                        // Floating shadow under lifted miniature
+                        Positioned(
+                          bottom: 0,
+                          left: 10,
+                          right: 10,
+                          height: 16,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.all(Radius.elliptical(50, 10)),
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                                  Colors.black.withValues(alpha: 0.75),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              childWhenDragging: Opacity(
+                opacity: 0.35,
+                child: unitSlot,
+              ),
+              child: unitSlot,
+            );
+          },
+        );
+      }
 
       return DragTarget<GeneralOrderDefinition>(
         onWillAcceptWithDetails: (details) {
@@ -4738,12 +4770,12 @@ class _BattleScreenState extends State<BattleScreen> {
                       Expanded(
                         child: Text(
                           _selectedSwapUnitId != null
-                              ? 'Tap another allied unit to swap column positions, or tap ◀ / ▶.'
+                              ? 'Tap another allied unit or drag to swap column positions.'
                               : (frontlineCount == 0
                                   ? '⚠️ ALL BACKLINE: No melee shield! Enemies engage directly.'
                                   : (backlineCount == 0
                                       ? '⚔️ ALL FRONTLINE: Maximum Stagger Resist (+10%) & Aggro absorption.'
-                                      : 'Tap ◀ / ▶ to move units left/right. Tap FRONT/REAR to toggle lane depth.')),
+                                      : 'Drag & drop units to swap columns. Tap FRONT/REAR to toggle lane depth.')),
                           style: TextStyle(
                             color: _selectedSwapUnitId != null
                                 ? const Color(0xFFFFD54F)
