@@ -2637,16 +2637,17 @@ class _BattleScreenState extends State<BattleScreen> {
     final double screenHeight = MediaQuery.of(context).size.height;
     final bool isDesktop = screenWidth >= 1000;
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+    final bool isMobile = screenWidth < 600;
     final bool isCompact = screenHeight < 760;
     final bool isUltraCompact = screenHeight < 620;
 
     // Responsive squad cluster width tailored for commanding mobile presence & cohesive tabletop formation
     // On widescreen and fullscreen displays, we cap cluster width tightly so units don't separate
     // with huge empty chasms between columns.
-    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : 130.0);
+    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : (units.length <= 3 ? 120.0 : 76.0));
     final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 960.0 : (isTablet ? 820.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : 140.0);
-    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : 1.0);
+    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : (units.length <= 3 ? 128.0 : 92.0));
+    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : (units.length <= 3 ? 4.0 : 1.0));
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -2778,15 +2779,16 @@ class _BattleScreenState extends State<BattleScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isDesktop = screenWidth >= 1000;
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
+    final bool isMobile = screenWidth < 600;
 
     final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 860.0 : 720.0);
-    final double bossMaxWidth = isDesktop ? 480.0 : (isTablet ? 400.0 : 340.0);
+    final double bossMaxWidth = isDesktop ? 500.0 : (isTablet ? 420.0 : 360.0);
     final double minionMaxWidth = isDesktop ? 160.0 : (isTablet ? 130.0 : 105.0);
 
     return Expanded(
-      flex: 12,
+      flex: isMobile ? 15 : 13,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 6.0),
+        padding: const EdgeInsets.only(bottom: 4.0),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: stageMaxWidth),
@@ -2805,13 +2807,13 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // Symmetrical spacer when there are no minions
                 if (minions.isEmpty)
-                  const Expanded(flex: 2, child: SizedBox.shrink()),
+                  const Expanded(flex: 1, child: SizedBox.shrink()),
 
                 // Centered Dominant Boss Slot (prominent flex & wide constraints)
                 Expanded(
-                  flex: 6,
+                  flex: isMobile ? 9 : 7,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: bossMaxWidth),
@@ -2839,7 +2841,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // Symmetrical spacer when there is 1 minion (on the right) or no minions
                 if (minions.length == 1 || minions.isEmpty)
-                  const Expanded(flex: 2, child: SizedBox.shrink()),
+                  const Expanded(flex: 1, child: SizedBox.shrink()),
               ],
             ),
           ),
@@ -2863,7 +2865,7 @@ class _BattleScreenState extends State<BattleScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Transform.scale(
-              scale: 0.82,
+              scale: 0.90,
               alignment: Alignment.bottomCenter,
               child: _buildUnitCard(
                 unit: unit,
@@ -3717,9 +3719,13 @@ class _BattleScreenState extends State<BattleScreen> {
     double screenHeight = 800.0,
     double screenWidth = 1200.0,
   }) {
+    final bool isMobile = screenWidth < 600;
     if (isBossUnit) {
-      final double bossHeightFactor = (screenHeight / 850.0).clamp(0.85, 1.25);
-      return (isDesktop ? 2.10 : (isCompact ? 1.75 : 2.0)) * bossHeightFactor;
+      // Boss units are colossal centerpiece titans. On mobile portrait and desktop alike,
+      // they should command huge visual authority across their pedestal.
+      final double bossHeightFactor = (screenHeight / 800.0).clamp(0.90, 1.30);
+      final double baseBossScale = isDesktop ? 2.65 : (isMobile ? 2.85 : 2.50);
+      return baseBossScale * bossHeightFactor;
     }
     if (!unit.isFigurineCutout) {
       return 1.25;
@@ -3730,15 +3736,16 @@ class _BattleScreenState extends State<BattleScreen> {
     // ensuring figurines maintain consistent eye level and physical presence across
     // mobile portrait, desktop window, and 16:9 fullscreen without ballooning or shrinking into specks.
     final double aspectRatio = screenWidth / (screenHeight > 0 ? screenHeight : 1.0);
-    final double heightFactor = (screenHeight / 800.0).clamp(0.80, 1.25);
+    final double heightFactor = (screenHeight / 800.0).clamp(0.85, 1.25);
     final double aspectClamp = aspectRatio > 1.6 ? 0.92 : 1.0;
 
-    final double baseScale = (isDesktop ? 2.05 : (isCompact ? 1.80 : 1.95)) * heightFactor * aspectClamp;
+    final double baseScale = (isDesktop ? 2.10 : (isMobile ? 2.20 : (isCompact ? 1.90 : 2.05))) * heightFactor * aspectClamp;
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
     // Vlad: tall standing upright with raised sword and cape -> scale 0.76 to match infantry eye level
     // Ghoul / crouched quadruped beasts: ~704px height in raw asset -> scale 1.05 to match infantry visual presence
+    // Butcher / Titan: wide hulking posture -> 1.15 to ensure monstrous tabletop mass
     double poseCompensation = 1.0;
     final asset = unit.effectiveAvatarAsset.toLowerCase();
     final species = unit.speciesId.toLowerCase();
@@ -3746,6 +3753,8 @@ class _BattleScreenState extends State<BattleScreen> {
 
     if (asset.contains('vladislav') || species.contains('vladislav') || name.contains('vladislav')) {
       poseCompensation = 0.76;
+    } else if (asset.contains('flayed') || asset.contains('butcher') || species.contains('titan') || name.contains('gorgoroth')) {
+      poseCompensation = 1.15;
     } else if (asset.contains('ghoul') || species.contains('ghoul') || name.contains('ghoul') ||
                asset.contains('flayer') || asset.contains('warhound')) {
       poseCompensation = 1.05;
