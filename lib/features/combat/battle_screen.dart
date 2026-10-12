@@ -121,6 +121,9 @@ class _BattleScreenState extends State<BattleScreen> {
   List<List<UnitEntity>>? _localEnemyWaves;
   bool _isPreBattleSetup = false;
   String? _selectedSwapUnitId;
+  String? _dragHoveringSlotUnitId;
+  bool _dragHoveringIsFrontline = true;
+  final List<GlobalKey> _alliedSlotKeys = List.generate(5, (_) => GlobalKey());
 
   void _commenceBattle() {
     setState(() {
@@ -139,42 +142,72 @@ class _BattleScreenState extends State<BattleScreen> {
     }
   }
 
-  void _swapAlliedUnits(int indexA, int indexB) {
-    if (indexA < 0 ||
-        indexA >= widget.tickManager.allies.length ||
-        indexB < 0 ||
-        indexB >= widget.tickManager.allies.length ||
-        indexA == indexB) {
+  void _repositionAlliedUnit({
+    required int fromIndex,
+    required int toIndex,
+    bool? targetFrontline,
+  }) {
+    if (fromIndex < 0 ||
+        fromIndex >= widget.tickManager.allies.length ||
+        toIndex < 0 ||
+        toIndex >= widget.tickManager.allies.length) {
       return;
     }
     final List<UnitEntity> allies = List<UnitEntity>.from(widget.tickManager.allies);
-    final unitA = allies[indexA];
-    final unitB = allies[indexB];
+    final unitA = allies[fromIndex];
 
-    final FormationSlot slotA = indexA < FormationSlot.values.length
-        ? FormationSlot.values[indexA]
+    // Dropped in the same column: update lane assignment
+    if (fromIndex == toIndex) {
+      if (targetFrontline != null) {
+        final updatedA = unitA.copyWith(isFrontlineOverride: targetFrontline);
+        allies[fromIndex] = updatedA;
+        widget.tickManager.updateSquads(allies: allies);
+        setState(() {
+          _selectedSwapUnitId = null;
+          _combatLog = '${unitA.name} positioned in ${targetFrontline ? "Vanguard (Front)" : "Arcanum (Rear)"}.';
+        });
+        _addPop(
+          targetFrontline ? 'ADVANCED TO FRONT' : 'MOVED TO REAR',
+          targetFrontline ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+        );
+      }
+      return;
+    }
+
+    // Swapping columns (fromIndex != toIndex)
+    final unitB = allies[toIndex];
+    final FormationSlot slotA = fromIndex < FormationSlot.values.length
+        ? FormationSlot.values[fromIndex]
         : FormationSlot.front1;
-    final FormationSlot slotB = indexB < FormationSlot.values.length
-        ? FormationSlot.values[indexB]
+    final FormationSlot slotB = toIndex < FormationSlot.values.length
+        ? FormationSlot.values[toIndex]
         : FormationSlot.front1;
 
-    allies[indexA] = unitB.copyWith(
+    final newFrontlineA = targetFrontline ?? unitA.isFrontline;
+    allies[fromIndex] = unitB.copyWith(
       slot: slotA,
-      columnIndexOverride: indexA,
+      columnIndexOverride: fromIndex,
       isFrontlineOverride: unitB.isFrontline,
     );
-    allies[indexB] = unitA.copyWith(
+    allies[toIndex] = unitA.copyWith(
       slot: slotB,
-      columnIndexOverride: indexB,
-      isFrontlineOverride: unitA.isFrontline,
+      columnIndexOverride: toIndex,
+      isFrontlineOverride: newFrontlineA,
     );
 
     widget.tickManager.updateSquads(allies: allies);
     setState(() {
       _selectedSwapUnitId = null;
-      _combatLog = 'Repositioned: ${unitA.name} to Col ${indexB + 1}, ${unitB.name} to Col ${indexA + 1}.';
+      _combatLog = 'Repositioned: ${unitA.name} to Col ${toIndex + 1} (${newFrontlineA ? "Front" : "Rear"}), ${unitB.name} to Col ${fromIndex + 1}.';
     });
-    _addPop('SWAPPED COLUMNS!', const Color(0xFFFFD54F));
+    _addPop(
+      'COL ${toIndex + 1} (${newFrontlineA ? "FRONT" : "REAR"})',
+      const Color(0xFFFFD54F),
+    );
+  }
+
+  void _swapAlliedUnits(int indexA, int indexB) {
+    _repositionAlliedUnit(fromIndex: indexA, toIndex: indexB);
   }
 
   void _shiftAlliedUnit(int currentIndex, int direction) {
@@ -3552,9 +3585,10 @@ class _BattleScreenState extends State<BattleScreen> {
           if (_selectedSwapUnitId == null) {
             setState(() {
               _selectedSwapUnitId = unit.id;
-              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Drag & drop or tap another unit to swap.';
+              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Drag or tap another unit to swap, or tap again to flip Front/Rear.';
             });
           } else if (_selectedSwapUnitId == unit.id) {
+            _toggleAlliedLane(unit.id);
             setState(() => _selectedSwapUnitId = null);
           } else {
             final indexA = widget.tickManager.allies.indexWhere((u) => u.id == _selectedSwapUnitId);
@@ -3574,6 +3608,10 @@ class _BattleScreenState extends State<BattleScreen> {
         }
       },
       onDoubleTap: () {
+        if (_isPreBattleSetup && !isEnemy && alive) {
+          _toggleAlliedLane(unit.id);
+          return;
+        }
         _openInspectorModal(unit, isEnemy);
       },
       onLongPress: () {
@@ -4424,26 +4462,127 @@ class _BattleScreenState extends State<BattleScreen> {
             ? (isUltraCompact ? 170.0 : 210.0)
             : (isUltraCompact ? 130.0 : (isCompact ? 150.0 : 180.0));
 
+        final GlobalKey? currentSlotKey = allyIndex < _alliedSlotKeys.length ? _alliedSlotKeys[allyIndex] : null;
+
         return DragTarget<String>(
-          onWillAcceptWithDetails: (details) => details.data != unit.id,
+          key: currentSlotKey,
+          onWillAcceptWithDetails: (details) => details.data != null,
+          onMove: (details) {
+            final slotBox = currentSlotKey?.currentContext?.findRenderObject() as RenderBox?;
+            if (slotBox != null && slotBox.hasSize) {
+              final local = slotBox.globalToLocal(details.offset);
+              final dropCenterY = local.dy + (draggedCardHeight * 0.5);
+              final isFront = dropCenterY < (slotBox.size.height * 0.5);
+              if (_dragHoveringSlotUnitId != unit.id || _dragHoveringIsFrontline != isFront) {
+                setState(() {
+                  _dragHoveringSlotUnitId = unit.id;
+                  _dragHoveringIsFrontline = isFront;
+                });
+              }
+            }
+          },
+          onLeave: (data) {
+            if (_dragHoveringSlotUnitId == unit.id) {
+              setState(() {
+                _dragHoveringSlotUnitId = null;
+              });
+            }
+          },
           onAcceptWithDetails: (details) {
             final draggedUnitId = details.data;
-            final indexA = widget.tickManager.allies.indexWhere((u) => u.id == draggedUnitId);
-            final indexB = allyIndex;
-            _swapAlliedUnits(indexA, indexB);
+            final fromIndex = widget.tickManager.allies.indexWhere((u) => u.id == draggedUnitId);
+            final toIndex = allyIndex;
+
+            final slotBox = currentSlotKey?.currentContext?.findRenderObject() as RenderBox?;
+            bool? targetFrontline;
+            if (slotBox != null && slotBox.hasSize) {
+              final local = slotBox.globalToLocal(details.offset);
+              final dropCenterY = local.dy + (draggedCardHeight * 0.5);
+              targetFrontline = dropCenterY < (slotBox.size.height * 0.5);
+            }
+
+            setState(() {
+              _dragHoveringSlotUnitId = null;
+            });
+
+            _repositionAlliedUnit(
+              fromIndex: fromIndex,
+              toIndex: toIndex,
+              targetFrontline: targetFrontline,
+            );
           },
           builder: (context, candidateData, rejectedData) {
             final bool isHovered = candidateData.isNotEmpty;
+            final bool isFrontHover = _dragHoveringSlotUnitId == unit.id ? _dragHoveringIsFrontline : true;
+
             final Widget unitSlot = Padding(
               padding: const EdgeInsets.all(4.0),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   cardWidget,
-                  // Radiant golden plinth targeting ring when another unit is dragged over this slot
-                  if (isHovered)
+                  // Radiant golden/cyan plinth targeting ring and Front/Rear drop zone indicator when dragging
+                  if (isHovered) ...[
+                    // Highlight border over target half
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                              width: 2.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.55),
+                                blurRadius: 16,
+                                spreadRadius: 2.5,
+                              ),
+                            ],
+                          ),
+                          child: Align(
+                            alignment: isFrontHover ? Alignment.topCenter : Alignment.bottomCenter,
+                            child: Container(
+                              margin: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (isFrontHover ? const Color(0xFF1A1608) : const Color(0xFF081722)).withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isFrontHover ? Icons.shield : Icons.auto_awesome,
+                                    size: 11,
+                                    color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isFrontHover ? '⚔ DROP IN FRONT' : '🔮 DROP IN REAR',
+                                    style: TextStyle(
+                                      color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Ground plinth ring
                     Positioned(
-                      bottom: 16,
+                      bottom: isFrontHover ? 32 : 10,
                       left: 2,
                       right: 2,
                       height: 28,
@@ -4452,12 +4591,12 @@ class _BattleScreenState extends State<BattleScreen> {
                           decoration: BoxDecoration(
                             borderRadius: const BorderRadius.all(Radius.elliptical(50, 14)),
                             border: Border.all(
-                              color: const Color(0xFFFFD54F),
+                              color: isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
                               width: 2.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                                color: (isFrontHover ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.8),
                                 blurRadius: 16,
                                 spreadRadius: 2.5,
                               ),
@@ -4466,12 +4605,14 @@ class _BattleScreenState extends State<BattleScreen> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             );
 
             return Draggable<String>(
               data: unit.id,
+              dragAnchorStrategy: (draggable, context, position) => Offset(cardWidth / 2, draggedCardHeight / 2),
               feedback: Material(
                 color: Colors.transparent,
                 child: Transform.scale(

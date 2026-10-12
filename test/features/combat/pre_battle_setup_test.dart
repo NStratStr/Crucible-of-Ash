@@ -326,5 +326,88 @@ void main() {
 
       await tester.pumpWidget(const SizedBox());
     });
+
+    testWidgets('BattleScreen enables 2D Drag & Drop for Front/Back lane placement and tap-again lane toggling',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final allies = StarterBrigades.createAshLegionPlayerSquad();
+      final enemies = StarterBrigades.createCryptStalkersEnemySquad();
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: allies,
+        initialEnemies: enemies,
+      );
+      addTearDown(tickManager.dispose);
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+      );
+      addTearDown(commandService.dispose);
+
+      final combatService = CombatResolutionService(tickManager: tickManager);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BattleScreen(
+            tickManager: tickManager,
+            commandService: commandService,
+            combatService: combatService,
+            startInPreBattleSetup: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Initially Vladislav (Col 0) is in Frontline
+      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[0].isFrontline, isTrue);
+
+      // 1. Drag Vladislav downwards within his column (bottom half -> Backline)
+      final vladCenter = tester.getCenter(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      final vladBottom = vladCenter + const Offset(0, 50);
+
+      TestGesture gesture = await tester.startGesture(vladCenter);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveTo(vladBottom);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Vladislav moved to Backline in Col 0!
+      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[0].isFrontline, isFalse);
+      expect(tickManager.allies[0].isBackline, isTrue);
+
+      // 2. Drag Vladislav upwards within his column (top half -> Frontline)
+      final vladNowCenter = tester.getCenter(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      final vladTop = vladNowCenter - const Offset(0, 50);
+
+      gesture = await tester.startGesture(vladNowCenter);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveTo(vladTop);
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      // Vladislav restored to Frontline!
+      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[0].isFrontline, isTrue);
+
+      // 3. Tap Vladislav once (select), then tap again (flips lane Front <-> Rear)
+      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Tapped again -> toggled to Backline!
+      expect(tickManager.allies[0].isFrontline, isFalse);
+
+      await tester.pumpWidget(const SizedBox());
+    });
   });
 }
