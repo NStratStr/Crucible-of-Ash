@@ -185,5 +185,143 @@ void main() {
 
       await tester.pumpWidget(const SizedBox());
     });
+
+    testWidgets('BattleScreen displays Opening Hand cards in Pre-Battle Setup and allows card inspection',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final allies = StarterBrigades.createAshLegionPlayerSquad();
+      final enemies = StarterBrigades.createCryptStalkersEnemySquad();
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: allies,
+        initialEnemies: enemies,
+      );
+      addTearDown(tickManager.dispose);
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+      );
+      addTearDown(commandService.dispose);
+
+      final combatService = CombatResolutionService(tickManager: tickManager);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BattleScreen(
+            tickManager: tickManager,
+            commandService: commandService,
+            combatService: combatService,
+            startInPreBattleSetup: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // 1. Verify Opening Hand header and cards are rendered
+      expect(find.textContaining('OPENING HAND'), findsOneWidget);
+      final cards = commandService.hand.isNotEmpty
+          ? commandService.hand
+          : commandService.currentProfile.orders;
+      expect(cards.isNotEmpty, isTrue);
+
+      // Verify the first card name is visible
+      final firstCardName = cards.first.name.toUpperCase();
+      expect(find.text(firstCardName), findsWidgets);
+
+      // 2. Tap the first card in the opening hand to open pre-battle inspection sheet
+      await tester.tap(find.text(firstCardName).first);
+      await tester.pumpAndSettle();
+
+      // Modal bottom sheet appears with focus cost & description
+      expect(find.textContaining('FOCUS'), findsWidgets);
+      expect(find.textContaining('Ready in Opening Hand'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('BattleScreen enables horizontal column repositioning (left/right nudge arrows and tap-to-swap)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final allies = StarterBrigades.createAshLegionPlayerSquad();
+      final enemies = StarterBrigades.createCryptStalkersEnemySquad();
+
+      final tickManager = InitiativeTickManager(
+        initialAllies: allies,
+        initialEnemies: enemies,
+      );
+      addTearDown(tickManager.dispose);
+
+      final commandService = GeneralCommandService(
+        tickManager: tickManager,
+        generalType: GeneralType.vladislav,
+      );
+      addTearDown(commandService.dispose);
+
+      final combatService = CombatResolutionService(tickManager: tickManager);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BattleScreen(
+            tickManager: tickManager,
+            commandService: commandService,
+            combatService: combatService,
+            startInPreBattleSetup: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Initially unit 0 is Vladislav at Col 0
+      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[0].columnIndex, equals(0));
+      final unit1Id = tickManager.allies[1].id;
+
+      // 1. Nudge right using shift_right_ash_vladislav_01
+      await tester.tap(find.byKey(const Key('shift_right_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Vladislav is now at index 1 (Column 2), and previous unit 1 is at index 0 (Column 1)
+      expect(tickManager.allies[1].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[1].columnIndex, equals(1));
+      expect(tickManager.allies[0].id, equals(unit1Id));
+      expect(tickManager.allies[0].columnIndex, equals(0));
+
+      // 2. Nudge left using shift_left_ash_vladislav_01
+      await tester.tap(find.byKey(const Key('shift_left_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Restored back to Col 0
+      expect(tickManager.allies[0].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[0].columnIndex, equals(0));
+
+      // 3. Tap-to-swap: Tap Vladislav (select), then tap unit at Col 3 (swap)
+      final unit3Id = tickManager.allies[3].id;
+      final bool vladWasFront = tickManager.allies[0].isFrontline;
+      final bool unit3WasFront = tickManager.allies[3].isFrontline;
+
+      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.tap(find.byKey(Key('unit_card_$unit3Id')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // Positions swapped, front/back lane overrides preserved!
+      expect(tickManager.allies[3].id, equals('ash_vladislav_01'));
+      expect(tickManager.allies[3].columnIndex, equals(3));
+      expect(tickManager.allies[3].isFrontline, equals(vladWasFront));
+
+      expect(tickManager.allies[0].id, equals(unit3Id));
+      expect(tickManager.allies[0].columnIndex, equals(0));
+      expect(tickManager.allies[0].isFrontline, equals(unit3WasFront));
+
+      await tester.pumpWidget(const SizedBox());
+    });
   });
 }

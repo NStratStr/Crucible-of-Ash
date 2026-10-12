@@ -120,10 +120,12 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _hasDispatchedEndOutcome = false;
   List<List<UnitEntity>>? _localEnemyWaves;
   bool _isPreBattleSetup = false;
+  String? _selectedSwapUnitId;
 
   void _commenceBattle() {
     setState(() {
       _isPreBattleSetup = false;
+      _selectedSwapUnitId = null;
       _combatLog = 'Engagement commenced! Honor through blood and steel.';
     });
     _addPop('ENGAGEMENT COMMENCED!', const Color(0xFFFFD54F), isCrit: true);
@@ -135,6 +137,115 @@ class _BattleScreenState extends State<BattleScreen> {
     } else if (_aiService.isEnemyTurn && !_isProcessingAiTurn) {
       _handleAiTurn();
     }
+  }
+
+  void _swapAlliedUnits(int indexA, int indexB) {
+    if (indexA < 0 ||
+        indexA >= widget.tickManager.allies.length ||
+        indexB < 0 ||
+        indexB >= widget.tickManager.allies.length ||
+        indexA == indexB) {
+      return;
+    }
+    final List<UnitEntity> allies = List<UnitEntity>.from(widget.tickManager.allies);
+    final unitA = allies[indexA];
+    final unitB = allies[indexB];
+
+    final FormationSlot slotA = indexA < FormationSlot.values.length
+        ? FormationSlot.values[indexA]
+        : FormationSlot.front1;
+    final FormationSlot slotB = indexB < FormationSlot.values.length
+        ? FormationSlot.values[indexB]
+        : FormationSlot.front1;
+
+    allies[indexA] = unitB.copyWith(
+      slot: slotA,
+      columnIndexOverride: indexA,
+      isFrontlineOverride: unitB.isFrontline,
+    );
+    allies[indexB] = unitA.copyWith(
+      slot: slotB,
+      columnIndexOverride: indexB,
+      isFrontlineOverride: unitA.isFrontline,
+    );
+
+    widget.tickManager.updateSquads(allies: allies);
+    setState(() {
+      _selectedSwapUnitId = null;
+      _combatLog = 'Repositioned: ${unitA.name} to Col ${indexB + 1}, ${unitB.name} to Col ${indexA + 1}.';
+    });
+    _addPop('SWAPPED COLUMNS!', const Color(0xFFFFD54F));
+  }
+
+  void _shiftAlliedUnit(int currentIndex, int direction) {
+    final targetIndex = currentIndex + direction;
+    if (targetIndex >= 0 && targetIndex < widget.tickManager.allies.length) {
+      _swapAlliedUnits(currentIndex, targetIndex);
+    }
+  }
+
+  void _showPreBattleCardInfo(GeneralOrderDefinition order) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF14141E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        side: BorderSide(color: Color(0xFFE5A93C), width: 1.5),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      order.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFE5A93C)),
+                      ),
+                      child: Text(
+                        '${order.focusCost} FOCUS',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  order.description,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '⚡ Ready in Opening Hand. Playable during combat once Focus is accumulated.',
+                  style: TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _toggleAlliedLane(String unitId) {
@@ -3295,11 +3406,24 @@ class _BattleScreenState extends State<BattleScreen> {
     final double hitRecoilY = isDamaged ? (isEnemy ? -14.0 : 14.0) : 0.0;
     final bool isCriticalHp = hpRatio < 0.25 && alive;
 
+    final int allyIndex = isEnemy ? -1 : widget.tickManager.allies.indexWhere((u) => u.id == unit.id);
+    final bool isSelectedForSwap = _isPreBattleSetup && !isEnemy && _selectedSwapUnitId == unit.id;
+
     Color borderColor = const Color(0xFF2B2B36);
     double borderWidth = 1.0;
     List<BoxShadow>? shadows;
 
-    if (isDamaged) {
+    if (isSelectedForSwap) {
+      borderColor = const Color(0xFFFFD54F);
+      borderWidth = 2.5;
+      shadows = [
+        BoxShadow(
+          color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+          blurRadius: 14,
+          spreadRadius: 2.5,
+        ),
+      ];
+    } else if (isDamaged) {
       borderColor = const Color(0xFFFF1744);
       borderWidth = 2.5;
       shadows = [
@@ -3379,12 +3503,16 @@ class _BattleScreenState extends State<BattleScreen> {
     // Organic miniature outline glow around the model silhouette (only for figurines when alive)
     final bool hasModelGlow = alive &&
         unit.isFigurineCutout &&
-        (isSelectedTarget || isDamaged || isActive || isBossUnit);
+        (isSelectedForSwap || isSelectedTarget || isDamaged || isActive || isBossUnit);
     Color modelGlowColor = Colors.transparent;
     double modelGlowAlpha = 0.0;
     double modelGlowBlur = 6.0;
 
-    if (isDamaged) {
+    if (isSelectedForSwap) {
+      modelGlowColor = const Color(0xFFFFD54F);
+      modelGlowAlpha = 0.95;
+      modelGlowBlur = 8.0;
+    } else if (isDamaged) {
       modelGlowColor = const Color(0xFFFF1744);
       modelGlowAlpha = 0.95;
       modelGlowBlur = 8.0;
@@ -3421,7 +3549,18 @@ class _BattleScreenState extends State<BattleScreen> {
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_isPreBattleSetup && !isEnemy && alive) {
-          _toggleAlliedLane(unit.id);
+          if (_selectedSwapUnitId == null) {
+            setState(() {
+              _selectedSwapUnitId = unit.id;
+              _combatLog = 'Selected ${unit.name} (Col ${allyIndex + 1}). Tap another unit to swap, or use ◀ / ▶.';
+            });
+          } else if (_selectedSwapUnitId == unit.id) {
+            setState(() => _selectedSwapUnitId = null);
+          } else {
+            final indexA = widget.tickManager.allies.indexWhere((u) => u.id == _selectedSwapUnitId);
+            final indexB = allyIndex;
+            _swapAlliedUnits(indexA, indexB);
+          }
           return;
         }
         if (isEnemy && alive) {
@@ -4208,7 +4347,75 @@ class _BattleScreenState extends State<BattleScreen> {
               ),
             ),
 
-                // Fallen Overlay
+            // Pre-Battle Column Navigation Pill & Nudge Arrows
+            if (_isPreBattleSetup && !isEnemy && alive)
+              Positioned(
+                top: 2,
+                left: 2,
+                right: 2,
+                child: Container(
+                  height: 20,
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: isSelectedForSwap
+                        ? const Color(0xFFE5A93C).withValues(alpha: 0.95)
+                        : const Color(0xFF161622).withValues(alpha: 0.90),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: isSelectedForSwap ? const Color(0xFFFFD54F) : const Color(0xFF424254),
+                      width: isSelectedForSwap ? 1.5 : 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        key: Key('shift_left_${unit.id}'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: allyIndex > 0 ? () => _shiftAlliedUnit(allyIndex, -1) : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Icon(
+                            Icons.chevron_left,
+                            size: 13,
+                            color: allyIndex > 0
+                                ? (isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F))
+                                : Colors.white24,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        isSelectedForSwap ? 'SWAP' : 'COL ${allyIndex + 1}',
+                        style: TextStyle(
+                          color: isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F),
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      GestureDetector(
+                        key: Key('shift_right_${unit.id}'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: allyIndex < widget.tickManager.allies.length - 1
+                            ? () => _shiftAlliedUnit(allyIndex, 1)
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Icon(
+                            Icons.chevron_right,
+                            size: 13,
+                            color: allyIndex < widget.tickManager.allies.length - 1
+                                ? (isSelectedForSwap ? Colors.black : const Color(0xFFFFD54F))
+                                : Colors.white24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Fallen Overlay
                 if (!alive)
                   if (unit.isFigurineCutout || isBossUnit)
                     Positioned(
@@ -4372,19 +4579,25 @@ class _BattleScreenState extends State<BattleScreen> {
     final allies = widget.tickManager.allies;
     final frontlineCount = allies.where((u) => u.isFrontline).length;
     final backlineCount = allies.where((u) => u.isBackline).length;
+    final focus = widget.commandService.currentFocus;
+    final profile = widget.commandService.currentProfile;
+    final handCards = widget.commandService.hand.isNotEmpty
+        ? widget.commandService.hand
+        : profile.orders;
+    final isCompact = MediaQuery.of(context).size.height < 760;
 
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF13131A),
         border: Border(top: BorderSide(color: Color(0xFF2B2B36), width: 1.5)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Upper Info Rail: Formation Counts & Presets
           Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
+            padding: const EdgeInsets.only(bottom: 6.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -4459,6 +4672,52 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
 
+          // Opening Hand Label / Focus Header
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.style, size: 12, color: Color(0xFFFFD54F)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'OPENING HAND (${handCards.length} CARDS)',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  'STARTING FOCUS: $focus/${widget.commandService.maxFocus}',
+                  style: TextStyle(
+                    color: profile.themeColor,
+                    fontSize: 8.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Opening Hand Cards Tray
+          _buildFannedHandTray(
+            handCards: handCards,
+            focus: focus,
+            profile: profile,
+            isCompact: isCompact,
+          ),
+
+          const SizedBox(height: 6),
+
           // Lower Action Rail: Guidance Hint & COMMENCE ENGAGEMENT Button
           Row(
             children: [
@@ -4474,19 +4733,23 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.touch_app, size: 14, color: Color(0xFFFFD54F)),
+                      const Icon(Icons.swap_horiz, size: 14, color: Color(0xFFFFD54F)),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          frontlineCount == 0
-                              ? '⚠️ ALL BACKLINE: No melee shield! Enemies engage directly.'
-                              : (backlineCount == 0
-                                  ? '⚔️ ALL FRONTLINE: Maximum Stagger Resist (+10%) & Aggro absorption.'
-                                  : 'Tap any unit to switch lanes. Frontline protects Backline (-20% dmg).'),
+                          _selectedSwapUnitId != null
+                              ? 'Tap another allied unit to swap column positions, or tap ◀ / ▶.'
+                              : (frontlineCount == 0
+                                  ? '⚠️ ALL BACKLINE: No melee shield! Enemies engage directly.'
+                                  : (backlineCount == 0
+                                      ? '⚔️ ALL FRONTLINE: Maximum Stagger Resist (+10%) & Aggro absorption.'
+                                      : 'Tap ◀ / ▶ to move units left/right. Tap FRONT/REAR to toggle lane depth.')),
                           style: TextStyle(
-                            color: frontlineCount == 0
-                                ? const Color(0xFFFF8A80)
-                                : (backlineCount == 0 ? const Color(0xFFFFD54F) : Colors.white70),
+                            color: _selectedSwapUnitId != null
+                                ? const Color(0xFFFFD54F)
+                                : (frontlineCount == 0
+                                    ? const Color(0xFFFF8A80)
+                                    : (backlineCount == 0 ? const Color(0xFFFFD54F) : Colors.white70)),
                             fontSize: 8.0,
                             fontWeight: FontWeight.w600,
                           ),
@@ -4984,7 +5247,9 @@ class _BattleScreenState extends State<BattleScreen> {
                                     themeColor: profile.themeColor,
                                     width: cardWidth,
                                     height: cardHeight,
-                                    onTap: () => _dispatchOrder(order),
+                                    onTap: _isPreBattleSetup
+                                        ? () => _showPreBattleCardInfo(order)
+                                        : () => _dispatchOrder(order),
                                     onLockedTap: () {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
@@ -5050,7 +5315,7 @@ class _BattleScreenState extends State<BattleScreen> {
       height: cardH,
     );
 
-    if (!isUnlocked) {
+    if (!isUnlocked || _isPreBattleSetup) {
       return slipWidget;
     }
 
