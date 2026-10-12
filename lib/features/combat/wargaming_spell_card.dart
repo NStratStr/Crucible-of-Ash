@@ -405,17 +405,17 @@ class WargamingSpellCard extends StatelessWidget {
               Positioned(
                 left: cardW * 0.11,
                 right: cardW * 0.11,
-                top: cardH * 0.590,
-                bottom: cardH * 0.085,
+                top: cardH * 0.585,
+                bottom: cardH * 0.080,
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 5.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Text(
                       order.description,
                       style: TextStyle(
                         color: const Color(0xFFF0F0F5),
-                        fontSize: (cardW * 0.076).clamp(8.5, 12.0),
-                        height: 1.15,
+                        fontSize: (cardW * 0.080).clamp(7.0, 11.5),
+                        height: 1.12,
                         fontWeight: FontWeight.w700,
                         shadows: const [
                           Shadow(color: Colors.black, blurRadius: 2.5, offset: Offset(0.5, 0.5)),

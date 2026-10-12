@@ -126,6 +126,7 @@ class _BattleScreenState extends State<BattleScreen> {
   String? _selectedSwapUnitId;
   String? _dragHoveringSlotUnitId;
   bool _dragHoveringIsFrontline = true;
+  String? _dragHoveringSpellTargetUnitId;
   final List<GlobalKey> _alliedSlotKeys = List.generate(5, (_) => GlobalKey());
 
   void _commenceBattle() {
@@ -4502,8 +4503,25 @@ class _BattleScreenState extends State<BattleScreen> {
           }
           return isEnemy && alive;
         },
+        onMove: (details) {
+          if (_dragHoveringSpellTargetUnitId != unit.id) {
+            setState(() {
+              _dragHoveringSpellTargetUnitId = unit.id;
+            });
+          }
+        },
+        onLeave: (data) {
+          if (_dragHoveringSpellTargetUnitId == unit.id) {
+            setState(() {
+              _dragHoveringSpellTargetUnitId = null;
+            });
+          }
+        },
         onAcceptWithDetails: (details) {
           final order = details.data;
+          setState(() {
+            _dragHoveringSpellTargetUnitId = null;
+          });
           // GDD v2.7 Sec 7.3: Target Failsafe: If target dies or becomes invalid while hovering card during bullet-time,
           // the card snaps safely back to hand with 0 Focus consumed.
           final liveUnit = isEnemy
@@ -4521,39 +4539,84 @@ class _BattleScreenState extends State<BattleScreen> {
           widget.tickManager.setBulletTime(false);
         },
         builder: (context, candidateData, rejectedData) {
-          final bool isHovered = candidateData.isNotEmpty;
+          final bool isHovered = candidateData.isNotEmpty || _dragHoveringSpellTargetUnitId == unit.id;
           return Padding(
             padding: const EdgeInsets.all(4.0),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 cardWidget,
-                // Subtle organic tabletop targeting ring around unit base
-                if (isHovered)
+                // Prominent tabletop targeting aura and crosshair beacon over unit
+                if (isHovered) ...[
+                  // 1. High-contrast golden base beacon
                   Positioned(
-                    bottom: 24,
-                    left: 4,
-                    right: 4,
-                    height: 24,
+                    bottom: 22,
+                    left: 2,
+                    right: 2,
+                    height: 28,
                     child: IgnorePointer(
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: const BorderRadius.all(Radius.elliptical(50, 14)),
                           border: Border.all(
-                            color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
-                            width: 1.8,
+                            color: const Color(0xFFFFD54F),
+                            width: 2.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
-                              blurRadius: 10,
-                              spreadRadius: 1,
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                              blurRadius: 14,
+                              spreadRadius: 2,
+                            ),
+                            BoxShadow(
+                              color: const Color(0xFFFF1744).withValues(alpha: 0.5),
+                              blurRadius: 8,
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
+                  // 2. Clear floating targeting reticle & target lock badge above head
+                  Positioned(
+                    top: -12,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF140E0A).withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.6),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.gps_fixed, size: 10, color: Color(0xFFFFD54F)),
+                            const SizedBox(width: 3),
+                            Text(
+                              'TARGET LOCKED',
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           );
@@ -5119,10 +5182,10 @@ class _BattleScreenState extends State<BattleScreen> {
     // Responsive card dimensions: compact on mobile so miniatures and battlefield take center stage
     final double cardWidth = isDesktop
         ? 156.0
-        : (isMobile ? 96.0 : (isUltraCompact ? 104.0 : (isCompact ? 124.0 : 142.0)));
+        : (isMobile ? 82.0 : (isUltraCompact ? 94.0 : (isCompact ? 112.0 : 132.0)));
     final double cardHeight = isDesktop
         ? 224.0
-        : (isMobile ? 134.0 : (isUltraCompact ? 148.0 : (isCompact ? 174.0 : 202.0)));
+        : (isMobile ? 118.0 : (isUltraCompact ? 134.0 : (isCompact ? 158.0 : 188.0)));
 
     return Center(
       child: ConstrainedBox(
@@ -5134,7 +5197,7 @@ class _BattleScreenState extends State<BattleScreen> {
             // Fanned Hand of Cards (Physical Tabletop Hand Spread)
             Flexible(
               child: SizedBox(
-                height: cardHeight + (isMobile ? 14 : 26),
+                height: cardHeight + (isMobile ? 10 : 22),
                 child: Center(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -5154,9 +5217,9 @@ class _BattleScreenState extends State<BattleScreen> {
                         // Physical tabletop fan geometry: arched curve and radial rotation
                         final double centerIdx = (count - 1) / 2.0;
                         final double offsetFromCenter = index - centerIdx;
-                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * (isMobile ? 0.03 : 0.045));
-                        final double arcY = isHovered ? -16.0 : (offsetFromCenter.abs() * (isMobile ? 2.5 : 4.5));
-                        final double overlapX = index > 0 ? (isMobile ? -8.0 : (isCompact ? -12.0 : -16.0)) : 0.0;
+                        final double fanAngle = isHovered ? 0.0 : (offsetFromCenter * (isMobile ? 0.025 : 0.045));
+                        final double arcY = isHovered ? -14.0 : (offsetFromCenter.abs() * (isMobile ? 2.0 : 4.5));
+                        final double overlapX = index > 0 ? (isMobile ? -6.0 : (isCompact ? -10.0 : -14.0)) : 0.0;
 
                         return Transform.translate(
                           offset: Offset(overlapX, arcY),
@@ -5208,7 +5271,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
             SizedBox(width: isMobile ? 4 : 8),
 
-            // Under-Rail Burn Pit (48x48 tabletop brazier)
+            // Under-Rail Burn Pit (tabletop brazier)
             Padding(
               padding: EdgeInsets.only(bottom: isMobile ? 2.0 : 6.0),
               child: _buildBurnPit(profile.themeColor, isMobile: isMobile),
@@ -5251,10 +5314,17 @@ class _BattleScreenState extends State<BattleScreen> {
       return slipWidget;
     }
 
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
+    // When dragged onto the battlefield, shrink the card token significantly so the player
+    // can clearly see the battlefield and units beneath and around the spell target
+    final double feedbackW = isMobile ? 64.0 : 88.0;
+    final double feedbackH = isMobile ? 92.0 : 126.0;
+
     return Draggable<GeneralOrderDefinition>(
       data: order,
       dragAnchorStrategy: (draggable, context, position) {
-        return Offset((cardW * 0.85) / 2, (cardH * 0.85) / 2);
+        return Offset(feedbackW / 2, feedbackH / 2);
       },
       onDragStarted: () {
         widget.commandService.setBulletTime(true);
@@ -5263,22 +5333,78 @@ class _BattleScreenState extends State<BattleScreen> {
       onDragEnd: (_) {
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
+        if (_dragHoveringSpellTargetUnitId != null) {
+          setState(() => _dragHoveringSpellTargetUnitId = null);
+        }
       },
       onDraggableCanceled: (_, __) {
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
+        if (_dragHoveringSpellTargetUnitId != null) {
+          setState(() => _dragHoveringSpellTargetUnitId = null);
+        }
       },
       feedback: Material(
         color: Colors.transparent,
-        child: WargamingSpellCard(
-          order: order,
-          effectiveCost: effectiveCost,
-          canAfford: canAfford,
-          isUnlocked: isUnlocked,
-          themeColor: themeColor,
-          isCompact: false,
-          width: cardW * 0.85,
-          height: cardH * 0.85,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [
+              BoxShadow(
+                color: themeColor.withValues(alpha: 0.8),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+              const BoxShadow(
+                color: Colors.black87,
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              WargamingSpellCard(
+                order: order,
+                effectiveCost: effectiveCost,
+                canAfford: canAfford,
+                isUnlocked: isUnlocked,
+                themeColor: themeColor,
+                isCompact: false,
+                width: feedbackW,
+                height: feedbackH,
+              ),
+              // Compact targeting reticle indicator pinned to the bottom of the card
+              Positioned(
+                bottom: 2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.gps_fixed, size: 8, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 2),
+                      Text(
+                        'DROP ON TARGET',
+                        style: TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 6.0,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       childWhenDragging: Opacity(
