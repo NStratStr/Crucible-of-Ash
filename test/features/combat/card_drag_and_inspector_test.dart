@@ -204,10 +204,10 @@ void main() {
       tickManager.start();
       expect(tickManager.phase, equals(CombatPhase.ticking));
 
-      // Tap the assignment / inspector icon on miniature
-      final inspectButtonFinder = find.byIcon(Icons.assignment);
-      expect(inspectButtonFinder, findsWidgets);
-      await tester.tap(inspectButtonFinder.last);
+      // Tap or long-press on unit miniature opens character sheet inspector
+      final unitCardFinder = find.byKey(Key('unit_card_${ally.id}'));
+      expect(unitCardFinder, findsOneWidget);
+      await tester.longPress(unitCardFinder);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
