@@ -64,47 +64,28 @@ void main() {
       // 1. Verify Pre-Battle Setup UI is rendered
       expect(find.text('COMMENCE BATTLE'), findsOneWidget);
       expect(find.textContaining('PRE-BATTLE:'), findsOneWidget);
-      expect(find.text('ALL FRONT'), findsOneWidget);
-      expect(find.text('BALANCED'), findsOneWidget);
-      expect(find.text('ALL REAR'), findsOneWidget);
+      expect(find.textContaining('OPENING HAND'), findsOneWidget);
+      expect(find.textContaining('VITAE'), findsWidgets);
 
-      // Default squad has 3 frontline (slots 0, 1, 2) and 2 backline (slots 3, 4)
-      expect(find.text('🛡️ FRONT: 3'), findsOneWidget);
-      expect(find.text('🔮 REAR: 2'), findsOneWidget);
+      // Default squad has Vladislav frontline
+      expect(tickManager.allies.first.isFrontline, isTrue);
 
-      // 2. Tap 'ALL FRONT' preset -> all 5 units become frontline
-      await tester.tap(find.text('ALL FRONT'));
-      await tester.pump();
-
-      expect(find.text('🛡️ FRONT: 5'), findsOneWidget);
-      expect(find.text('🔮 REAR: 0'), findsOneWidget);
-      expect(tickManager.allies.every((u) => u.isFrontline), isTrue);
-
-      // 3. Tap 'ALL REAR' preset -> all 5 units become backline
-      await tester.tap(find.text('ALL REAR'));
-      await tester.pump();
-
-      expect(find.text('🛡️ FRONT: 0'), findsOneWidget);
-      expect(find.text('🔮 REAR: 5'), findsOneWidget);
-      expect(tickManager.allies.every((u) => u.isBackline), isTrue);
-
-      // 4. Tap 'BALANCED' preset -> restored to 3 front, 2 back
-      await tester.tap(find.text('BALANCED'));
-      await tester.pump();
-
-      expect(find.text('🛡️ FRONT: 3'), findsOneWidget);
-      expect(find.text('🔮 REAR: 2'), findsOneWidget);
-
-      // 5. Tap unit formation badge during pre-battle setup to toggle individual unit lane
+      // 2. Tap unit formation badge / sigil during pre-battle setup to toggle individual unit lane
       await tester.tap(find.byKey(const Key('unit_lane_badge_ash_vladislav_01')));
       // Allow GestureDetector double-tap disambiguation timer to resolve
       await tester.pump(const Duration(milliseconds: 400));
 
-      // Vladislav toggled to rear -> 2 front, 3 rear
-      expect(find.text('🛡️ FRONT: 2'), findsOneWidget);
-      expect(find.text('🔮 REAR: 3'), findsOneWidget);
+      // Vladislav toggled to rear
+      expect(tickManager.allies.first.isFrontline, isFalse);
+      expect(tickManager.allies.first.isBackline, isTrue);
 
-      // 6. Tap 'COMMENCE BATTLE' -> transitions to active battle and starts ticks
+      // 3. Tap unit card directly to toggle back to frontline
+      await tester.tap(find.byKey(const Key('unit_card_ash_vladislav_01')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(tickManager.allies.first.isFrontline, isTrue);
+
+      // 4. Tap 'COMMENCE BATTLE' -> transitions to active battle and starts ticks
       await tester.tap(find.text('COMMENCE BATTLE'));
       await tester.pump();
 
@@ -236,8 +217,8 @@ void main() {
       await tester.tap(find.text(firstCardName).first);
       await tester.pumpAndSettle();
 
-      // Modal bottom sheet appears with focus cost & description
-      expect(find.textContaining('FOCUS'), findsWidgets);
+      // Modal bottom sheet appears with vitae cost & description
+      expect(find.textContaining('VITAE'), findsWidgets);
       expect(find.textContaining('Ready in Opening Hand'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());

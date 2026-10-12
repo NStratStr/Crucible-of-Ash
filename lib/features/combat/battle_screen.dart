@@ -256,7 +256,7 @@ class _BattleScreenState extends State<BattleScreen> {
                         border: Border.all(color: const Color(0xFFE5A93C)),
                       ),
                       child: Text(
-                        '${order.focusCost} FOCUS',
+                        '${order.focusCost} VITAE',
                         style: const TextStyle(
                           color: Color(0xFFFFD54F),
                           fontWeight: FontWeight.bold,
@@ -273,7 +273,7 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '⚡ Ready in Opening Hand. Playable during combat once Focus is accumulated.',
+                  '⚡ Ready in Opening Hand. Playable during combat once Vitae is accumulated.',
                   style: TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic),
                 ),
               ],
@@ -2412,16 +2412,13 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool vladVanguardAura = !isEnemy && isVladCommander && (commander != null && commander.isVanguard && commander.isAlive);
     final bool vladArcanumAura = !isEnemy && isVladCommander && (commander != null && commander.isArcanum && commander.isAlive);
 
-    final int vanguardCount = units.where((u) => u.isVanguard).length;
-    final int arcanumCount = units.where((u) => u.isArcanum).length;
-
     final String rankTitle = isEnemy
-        ? (isCompact ? '⚔️ HOSTILE SQUAD ($vanguardCount FRONT • $arcanumCount REAR)' : '⚔️ HOSTILE REGIMENT: $vanguardCount FRONTLINE • $arcanumCount BACKLINE')
+        ? '⚔️ HOSTILE REGIMENT'
         : (vladVanguardAura
-            ? (isCompact ? '🛡️ ALLIED FRONT • 🩸 VAMPIRIC' : '🛡️ ALLIED REGIMENT: VAMPIRIC CONDUIT (+15% LIFESTEAL) • $vanguardCount FRONT • $arcanumCount REAR')
+            ? '🛡️ ALLIED REGIMENT: VAMPIRIC CONDUIT (+15% LIFESTEAL)'
             : (vladArcanumAura
-                ? (isCompact ? '🏹 ALLIED REAR • 🩸 CONDUIT' : '🏹 ALLIED REGIMENT: VAMPIRIC CONDUIT (-1 FOCUS BLEED) • $vanguardCount FRONT • $arcanumCount REAR')
-                : (isCompact ? '🛡️ ALLIED SQUAD ($vanguardCount FRONT • $arcanumCount REAR)' : '🛡️ ALLIED REGIMENT: $vanguardCount FRONTLINE • $arcanumCount BACKLINE')));
+                ? '🏹 ALLIED REGIMENT: VAMPIRIC CONDUIT (-1 VITAE BLEED)'
+                : '🛡️ ALLIED REGIMENT'));
 
     final Color rankColor = isEnemy ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F);
 
@@ -4507,99 +4504,22 @@ class _BattleScreenState extends State<BattleScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Upper Info Rail: Formation Counts & Presets
+          // Upper Info Rail: Hand Label & Faction Thematic Vitae Reservoir
           Padding(
-            padding: const EdgeInsets.only(bottom: 6.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Lane distribution pills
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5A93C).withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFE5A93C), width: 1.0),
-                      ),
-                      child: Text(
-                        '🛡️ FRONT: $frontlineCount',
-                        style: const TextStyle(
-                          color: Color(0xFFFFD54F),
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF80D8FF).withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF80D8FF), width: 1.0),
-                      ),
-                      child: Text(
-                        '🔮 REAR: $backlineCount',
-                        style: const TextStyle(
-                          color: Color(0xFF80D8FF),
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Tactical Presets (ALL FRONT, BALANCED, ALL REAR)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildPresetButton(
-                      label: 'ALL FRONT',
-                      isActive: frontlineCount == allies.length,
-                      onTap: () => _applyFormationPreset(allFrontline: true),
-                    ),
-                    const SizedBox(width: 4),
-                    _buildPresetButton(
-                      label: 'BALANCED',
-                      isActive: frontlineCount > 0 && backlineCount > 0,
-                      onTap: () => _applyFormationPreset(allFrontline: null),
-                    ),
-                    const SizedBox(width: 4),
-                    _buildPresetButton(
-                      label: 'ALL REAR',
-                      isActive: backlineCount == allies.length,
-                      onTap: () => _applyFormationPreset(allFrontline: false),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Opening Hand Label / Focus Header
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2.0),
+            padding: const EdgeInsets.symmetric(vertical: 3.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.style, size: 12, color: Color(0xFFFFD54F)),
+                    const Icon(Icons.style, size: 13, color: Color(0xFFFFD54F)),
                     const SizedBox(width: 4),
                     Text(
                       'OPENING HAND (${handCards.length} CARDS)',
                       style: const TextStyle(
                         color: Color(0xFFFFD54F),
-                        fontSize: 8.5,
+                        fontSize: 9.0,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
                         fontFamily: 'monospace',
@@ -4607,14 +4527,11 @@ class _BattleScreenState extends State<BattleScreen> {
                     ),
                   ],
                 ),
-                Text(
-                  'STARTING FOCUS: $focus/${widget.commandService.maxFocus}',
-                  style: TextStyle(
-                    color: profile.themeColor,
-                    fontSize: 8.0,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                  ),
+                _buildFactionVitaeOrbs(
+                  currentVitae: focus,
+                  maxVitae: widget.commandService.maxFocus,
+                  profile: profile,
+                  isCompact: isCompact,
                 ),
               ],
             ),
@@ -4925,69 +4842,27 @@ class _BattleScreenState extends State<BattleScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Focus Orbs & Spindle Label
+                // Faction Thematic Vitae Orbs & Spindle Label
                 GestureDetector(
                   onTap: _showGeneralSelectionDialog,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.0),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D0D14).withValues(alpha: 0.85),
+                      color: const Color(0xFF0D0D14).withValues(alpha: 0.90),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: profile.themeColor.withValues(alpha: 0.35),
-                        width: 0.8,
+                        color: profile.themeColor.withValues(alpha: 0.50),
+                        width: 1.0,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (int i = 0; i < maxFocus; i++)
-                          Container(
-                            margin: const EdgeInsets.only(right: 3),
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: i < focus
-                                  ? RadialGradient(
-                                      colors: [
-                                        profile.themeColor,
-                                        profile.themeColor.withValues(alpha: 0.7),
-                                      ],
-                                    )
-                                  : null,
-                              color: i < focus ? null : const Color(0xFF15151D),
-                              border: Border.all(
-                                color: i < focus ? profile.themeColor : profile.themeColor.withValues(alpha: 0.25),
-                                width: 1.0,
-                              ),
-                              boxShadow: i < focus
-                                  ? [
-                                      BoxShadow(
-                                        color: profile.themeColor.withValues(alpha: 0.5),
-                                        blurRadius: 4,
-                                        spreadRadius: 0.5,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'FOCUS $focus/$maxFocus',
-                          style: TextStyle(
-                            color: profile.themeColor,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        const Text(
-                          '(1pt/30t)',
-                          style: TextStyle(color: Colors.white38, fontSize: 7.0),
-                        ),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1)),
                       ],
+                    ),
+                    child: _buildFactionVitaeOrbs(
+                      currentVitae: focus,
+                      maxVitae: maxFocus,
+                      profile: profile,
+                      isCompact: isCompact,
                     ),
                   ),
                 ),
@@ -5143,13 +5018,13 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isDesktop = screenWidth >= 1000;
     final bool isUltraCompact = screenHeight < 620;
 
-    // Responsive card dimensions: elevated scale for readability & tactical wargaming presence
+    // Responsive card dimensions: elevated scale for maximum readability & tactile presence
     final double cardWidth = isDesktop
-        ? 132.0
-        : (isUltraCompact ? 88.0 : (isCompact ? 102.0 : 118.0));
+        ? 156.0
+        : (isUltraCompact ? 104.0 : (isCompact ? 124.0 : 142.0));
     final double cardHeight = isDesktop
-        ? 194.0
-        : (isUltraCompact ? 128.0 : (isCompact ? 148.0 : 172.0));
+        ? 224.0
+        : (isUltraCompact ? 148.0 : (isCompact ? 174.0 : 202.0));
 
     return Center(
       child: ConstrainedBox(
@@ -5322,66 +5197,83 @@ class _BattleScreenState extends State<BattleScreen> {
       onAcceptWithDetails: (details) {
         final burned = details.data;
         widget.commandService.burnCard(burned.id);
-        _addPop('BURNED', const Color(0xFFFF7043));
+        _addPop('SACRIFICED', const Color(0xFFFF7043));
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
       },
       builder: (context, candidateData, rejectedData) {
         final bool isHovered = candidateData.isNotEmpty;
         return Tooltip(
-          message: 'Burn Card (0 Focus, 6-tick CD)',
+          message: 'Ash Pyre: Drag card here to discard & draw a new card (6-tick CD)',
           child: GestureDetector(
             onTap: () {
               if (widget.commandService.hand.isNotEmpty) {
                 final burned = widget.commandService.hand.first;
                 widget.commandService.burnCard(burned.id);
-                _addPop('BURNED', const Color(0xFFFF7043));
+                _addPop('SACRIFICED', const Color(0xFFFF7043));
               }
             },
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 50,
-              height: 50,
+              duration: const Duration(milliseconds: 160),
+              width: 78,
+              height: 68,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: isHovered
-                      ? const [Color(0xFF5E1A1A), Color(0xFF380E0E)]
-                      : const [Color(0xFF261416), Color(0xFF160A0C)],
+                      ? const [Color(0xFF801515), Color(0xFF380808)]
+                      : const [Color(0xFF261214), Color(0xFF14080A)],
                 ),
                 border: Border.all(
-                  color: isHovered ? const Color(0xFFFFAB91) : const Color(0xFFFF7043).withValues(alpha: 0.75),
-                  width: isHovered ? 1.8 : 1.1,
+                  color: isHovered ? const Color(0xFFFFCC80) : const Color(0xFFFF7043).withValues(alpha: 0.8),
+                  width: isHovered ? 2.0 : 1.2,
                 ),
                 borderRadius: BorderRadius.circular(6),
                 boxShadow: [
                   BoxShadow(
                     color: isHovered
-                        ? const Color(0xFFFF7043).withValues(alpha: 0.8)
-                        : Colors.black87,
-                    blurRadius: isHovered ? 8 : 4,
-                    spreadRadius: isHovered ? 1 : 0,
+                        ? const Color(0xFFFF7043).withValues(alpha: 0.85)
+                        : const Color(0xFF000000).withValues(alpha: 0.7),
+                    blurRadius: isHovered ? 12 : 5,
+                    spreadRadius: isHovered ? 2 : 0,
                   ),
                 ],
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.local_fire_department,
                     size: 18,
                     color: isHovered ? Colors.white : const Color(0xFFFF7043),
                   ),
-                  const SizedBox(height: 2),
+                  const Text(
+                    'ASH PYRE',
+                    style: TextStyle(
+                      color: Color(0xFFFFD54F),
+                      fontSize: 7.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
                   const Text(
                     'BURN',
                     style: TextStyle(
-                      color: Color(0xFFFFAB91),
-                      fontSize: 8.0,
+                      color: Color(0xFFFF8A65),
+                      fontSize: 6.5,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      fontFamily: 'monospace',
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  Text(
+                    isHovered ? 'RELEASE' : 'DISCARD',
+                    style: TextStyle(
+                      color: isHovered ? Colors.white70 : const Color(0xFFB0BEC5),
+                      fontSize: 6.0,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -5390,6 +5282,121 @@ class _BattleScreenState extends State<BattleScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFactionVitaeOrbs({
+    required int currentVitae,
+    required int maxVitae,
+    required GeneralProfile profile,
+    bool isCompact = false,
+  }) {
+    // Faction-thematic styling for Vitae orbs
+    Color primaryColor;
+    Color glowColor;
+    Color emptyColor;
+    IconData orbIcon;
+    String factionLabel;
+
+    switch (profile.type) {
+      case GeneralType.vladislav:
+        // Crypt Stalkers / Pureblood Sanguine: Glowing Crimson Blood Ruby Orbs
+        primaryColor = const Color(0xFFE53935);
+        glowColor = const Color(0xFFFF1744);
+        emptyColor = const Color(0xFF260A0D);
+        orbIcon = Icons.water_drop;
+        factionLabel = 'VITAE';
+        break;
+      case GeneralType.valeria:
+        // Ash Legion: Sun-Forged Radiant Solar Gold Ember Orbs
+        primaryColor = const Color(0xFFFFD54F);
+        glowColor = const Color(0xFFFFB300);
+        emptyColor = const Color(0xFF261D08);
+        orbIcon = Icons.wb_sunny;
+        factionLabel = 'SOLAR VITAE';
+        break;
+      case GeneralType.malakor:
+        // Blight / Plague: Emerald Necrotic Phial Orbs
+        primaryColor = const Color(0xFF00E676);
+        glowColor = const Color(0xFF00C853);
+        emptyColor = const Color(0xFF0A2614);
+        orbIcon = Icons.bubble_chart;
+        factionLabel = 'BLIGHT VITAE';
+        break;
+      case GeneralType.morrigan:
+        // Occult Void: Astral Amethyst Chrono Spheres
+        primaryColor = const Color(0xFFE040FB);
+        glowColor = const Color(0xFFD500F9);
+        emptyColor = const Color(0xFF200A26);
+        orbIcon = Icons.auto_awesome;
+        factionLabel = 'ASTRAL VITAE';
+        break;
+    }
+
+    final double orbSize = isCompact ? 11.0 : 13.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (int i = 0; i < maxVitae; i++) ...[
+          Container(
+            width: orbSize,
+            height: orbSize,
+            margin: const EdgeInsets.only(right: 3.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: i < currentVitae
+                  ? RadialGradient(
+                      colors: [
+                        Colors.white,
+                        primaryColor,
+                        glowColor,
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    )
+                  : null,
+              color: i < currentVitae ? null : emptyColor,
+              border: Border.all(
+                color: i < currentVitae ? glowColor : glowColor.withValues(alpha: 0.35),
+                width: 1.0,
+              ),
+              boxShadow: i < currentVitae
+                  ? [
+                      BoxShadow(
+                        color: glowColor.withValues(alpha: 0.65),
+                        blurRadius: 5,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: i < currentVitae
+                ? Center(
+                    child: Icon(
+                      orbIcon,
+                      size: isCompact ? 6.5 : 8.0,
+                      color: Colors.white.withValues(alpha: 0.90),
+                    ),
+                  )
+                : null,
+          ),
+        ],
+        const SizedBox(width: 4),
+        Text(
+          '$factionLabel $currentVitae/$maxVitae',
+          style: TextStyle(
+            color: glowColor,
+            fontSize: isCompact ? 8.5 : 9.5,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'monospace',
+            letterSpacing: 0.4,
+            shadows: const [
+              Shadow(color: Colors.black, blurRadius: 3),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -5517,30 +5524,40 @@ class _BattleScreenState extends State<BattleScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 1.5),
+                const SizedBox(height: 2.0),
 
-                // Main HP Gauge Track
+                // Main HP Gauge Track (Enlarged & high-contrast bevelled track)
                 SizedBox(
-                  height: isCompact ? 6.0 : 8.0,
+                  height: isCompact ? 8.5 : 10.5,
                   child: Stack(
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E28),
-                          borderRadius: BorderRadius.circular(2.0),
-                          border: Border.all(color: Colors.white12, width: 0.5),
+                          color: const Color(0xFF101018),
+                          borderRadius: BorderRadius.circular(2.5),
+                          border: Border.all(color: Colors.white24, width: 0.8),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black, blurRadius: 2),
+                          ],
                         ),
                       ),
                       FractionallySizedBox(
                         widthFactor: clampedHp,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: hpColor,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                hpColor.withValues(alpha: 0.95),
+                                hpColor,
+                              ],
+                            ),
                             borderRadius: BorderRadius.circular(2.0),
                             boxShadow: [
                               BoxShadow(
-                                color: hpColor.withValues(alpha: 0.65),
-                                blurRadius: 3,
+                                color: hpColor.withValues(alpha: 0.70),
+                                blurRadius: 4,
                               ),
                             ],
                           ),
@@ -5560,29 +5577,36 @@ class _BattleScreenState extends State<BattleScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 1.5),
+                const SizedBox(height: 2.0),
 
                 // Sub AP / Turn Meter Track
                 SizedBox(
-                  height: isCompact ? 2.5 : 3.5,
+                  height: isCompact ? 3.5 : 4.5,
                   child: Stack(
                     children: [
                       Container(
                         decoration: BoxDecoration(
                           color: const Color(0xFF060B10),
-                          borderRadius: BorderRadius.circular(1.5),
+                          borderRadius: BorderRadius.circular(2.0),
+                          border: Border.all(color: Colors.white12, width: 0.5),
                         ),
                       ),
                       FractionallySizedBox(
                         widthFactor: clampedTm,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                            borderRadius: BorderRadius.circular(1.5),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: clampedTm >= 0.999
+                                  ? [const Color(0xFFFFE082), const Color(0xFFFFB300)]
+                                  : [const Color(0xFF80D8FF), const Color(0xFF00B0FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(2.0),
                             boxShadow: [
                               BoxShadow(
-                                color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.5),
-                                blurRadius: 2,
+                                color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
+                                blurRadius: 3,
                               ),
                             ],
                           ),
