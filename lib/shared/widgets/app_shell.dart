@@ -17,6 +17,7 @@ import '../../features/combat/post_battle_loot_dialog.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
+import '../../features/generals/grimoire_manager_dialog.dart';
 import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
 import '../../features/relics/relic_service.dart';
@@ -151,10 +152,9 @@ class _AppShellState extends State<AppShell> {
                   ? GeneralCommandService.grimoireMaxFocusCap
                   : GeneralCommandService.defaultMaxFocusCap,
               initialPhylacteryRanks: _phylacteryRanks,
+              initialCustomGrimoires: saved.customGrimoires,
             );
-            if (_activeGeneralType == GeneralType.vladislav) {
-              _commandService.initializeGrimoire();
-            }
+            _commandService.initializeGrimoire();
             _combatService = CombatResolutionService(
               tickManager: _tickManager,
               commandService: _commandService,
@@ -192,6 +192,7 @@ class _AppShellState extends State<AppShell> {
         reserveInventory: _inventory,
         relics: _relicService.allRelics,
         clearedGauntletTrials: _clearedGauntletTrials,
+        customGrimoires: _commandService.allCustomGrimoires,
         lastSavedTimestamp: DateTime.now().millisecondsSinceEpoch,
       );
       await GameStatePersistenceService.save(data);
@@ -1610,6 +1611,27 @@ class _AppShellState extends State<AppShell> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Grimoire Deck Archives',
+            icon: const Icon(Icons.auto_stories, size: 20, color: Color(0xFFBA68C8)),
+            onPressed: () {
+              GrimoireManagerDialog.show(
+                context,
+                commandService: _commandService,
+                bloodlineSigils: _bloodlineSigils,
+                onSigilsChanged: (val) {
+                  setState(() => _bloodlineSigils = val);
+                  _saveCurrentState();
+                },
+                onPhylacteryUpgraded: (genType, newRank) {
+                  setState(() {
+                    _phylacteryRanks[genType] = newRank;
+                  });
+                  _saveCurrentState();
+                },
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Deploy MVP Ash Legion (Lord Vladislav)',
             icon: const Icon(Icons.refresh, size: 20, color: Color(0xFFE5A93C)),

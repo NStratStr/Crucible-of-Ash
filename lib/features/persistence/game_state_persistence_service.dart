@@ -21,6 +21,7 @@ class GameSaveData {
   final List<UnitEntity> reserveInventory;
   final List<RelicEntity> relics;
   final Set<EndgameTrialType> clearedGauntletTrials;
+  final Map<GeneralType, List<String>> customGrimoires;
   final int lastSavedTimestamp;
 
   const GameSaveData({
@@ -37,6 +38,7 @@ class GameSaveData {
     required this.reserveInventory,
     required this.relics,
     required this.clearedGauntletTrials,
+    this.customGrimoires = const {},
     required this.lastSavedTimestamp,
   });
 
@@ -56,6 +58,7 @@ class GameSaveData {
       'reserveInventory': reserveInventory.map((u) => u.toJson()).toList(),
       'relics': relics.map((r) => r.toJson()).toList(),
       'clearedGauntletTrials': clearedGauntletTrials.map((t) => t.name).toList(),
+      'customGrimoires': customGrimoires.map((k, v) => MapEntry(k.name, v)),
       'lastSavedTimestamp': lastSavedTimestamp,
     };
   }
@@ -97,6 +100,17 @@ class GameSaveData {
       }
     }
 
+    final rawGrimoires = json['customGrimoires'] as Map<String, dynamic>? ?? {};
+    final customGrimoires = <GeneralType, List<String>>{};
+    for (final g in GeneralType.values) {
+      if (rawGrimoires.containsKey(g.name)) {
+        final list = rawGrimoires[g.name];
+        if (list is List) {
+          customGrimoires[g] = list.map((e) => e.toString()).toList();
+        }
+      }
+    }
+
     return GameSaveData(
       totalIchor: (json['totalIchor'] as num?)?.toInt() ?? 450,
       cursedOre: (json['cursedOre'] as num?)?.toInt() ?? 75,
@@ -111,6 +125,7 @@ class GameSaveData {
       reserveInventory: reserveInventory,
       relics: relics,
       clearedGauntletTrials: clearedTrials,
+      customGrimoires: customGrimoires,
       lastSavedTimestamp: (json['lastSavedTimestamp'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );

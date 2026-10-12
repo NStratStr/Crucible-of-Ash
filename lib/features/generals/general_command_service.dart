@@ -336,6 +336,8 @@ class GeneralCommandService extends ChangeNotifier {
   int _focusTickAccumulator = 0;
   bool _isBulletTimeActive = false;
 
+  final Map<GeneralType, List<String>> _customGrimoireDecks = {};
+
   final Map<GeneralType, int> _phylacteryRanks = {
     GeneralType.vladislav: 1,
     GeneralType.valeria: 1,
@@ -351,12 +353,91 @@ class GeneralCommandService extends ChangeNotifier {
     int initialFocus = 1,
     int? maxFocus,
     Map<GeneralType, int>? initialPhylacteryRanks,
+    Map<GeneralType, List<String>>? initialCustomGrimoires,
   })  : _activeGeneralType = generalType,
         _maxFocusCap = maxFocus ?? defaultMaxFocusCap,
         _currentFocus = initialFocus.clamp(0, maxFocus ?? defaultMaxFocusCap) {
     if (initialPhylacteryRanks != null) {
       _phylacteryRanks.addAll(initialPhylacteryRanks);
     }
+    if (initialCustomGrimoires != null) {
+      _customGrimoireDecks.addAll(initialCustomGrimoires);
+    }
+  }
+
+  /// All unique orders known across all generals in the game (for Grimoire management)
+  static final List<GeneralOrderDefinition> allKnownOrders = [
+    // Vladislav
+    GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'siphon_vitality'),
+    GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'sanguine_ward'),
+    GeneralProfile.getByType(GeneralType.vladislav).orders.firstWhere((o) => o.id == 'feast_of_ruin'),
+    // Valeria
+    GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'stand_resolute'),
+    GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
+    GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'smite_the_wicked'),
+    // Malakor
+    GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'corpse_burst'),
+    GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'virulent_cascade'),
+    GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'rebind_flesh'),
+    // Morrigan
+    GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'quicken'),
+    GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'unravel_hex'),
+    GeneralProfile.getByType(GeneralType.morrigan).orders.firstWhere((o) => o.id == 'echoing_hourglass'),
+    // Shared Neutral Tactics
+    GeneralProfile.rendFleshOrder,
+    GeneralProfile.ironBulwarkOrder,
+    GeneralProfile.exsanguinatingStrikeOrder,
+    GeneralProfile.sanguineRevivalOrder,
+    GeneralProfile.disruptingCleaveOrder,
+    GeneralProfile.bloodBoilOrder,
+  ];
+
+  static GeneralOrderDefinition? findOrderById(String id) {
+    return allKnownOrders.where((o) => o.id == id).firstOrNull;
+  }
+
+  /// Returns the pool of orders that a specific general is allowed to equip into their Grimoire.
+  static List<GeneralOrderDefinition> getAvailableOrderPoolForGeneral(GeneralType type) {
+    final signatureOrders = GeneralProfile.getByType(type).orders.where((o) =>
+        o.id != 'rend_flesh' &&
+        o.id != 'iron_bulwark' &&
+        o.id != 'exsanguinating_strike' &&
+        o.id != 'sanguine_revival' &&
+        o.id != 'disrupting_cleave' &&
+        o.id != 'blood_boil').toList();
+
+    return [
+      ...signatureOrders,
+      GeneralProfile.rendFleshOrder,
+      GeneralProfile.ironBulwarkOrder,
+      GeneralProfile.exsanguinatingStrikeOrder,
+      GeneralProfile.sanguineRevivalOrder,
+      GeneralProfile.disruptingCleaveOrder,
+      GeneralProfile.bloodBoilOrder,
+    ];
+  }
+
+  Map<GeneralType, List<String>> get allCustomGrimoires =>
+      Map.unmodifiable(_customGrimoireDecks.map((k, v) => MapEntry(k, List<String>.unmodifiable(v))));
+
+  List<GeneralOrderDefinition> getActiveGrimoireDeck() {
+    final customIds = _customGrimoireDecks[_activeGeneralType];
+    if (customIds != null && customIds.length == deckLimit) {
+      final List<GeneralOrderDefinition> resolved = [];
+      for (final id in customIds) {
+        final ord = findOrderById(id);
+        if (ord != null) resolved.add(ord);
+      }
+      if (resolved.length == deckLimit) {
+        return resolved;
+      }
+    }
+    return buildDefaultGrimoireForGeneral(_activeGeneralType);
+  }
+
+  void saveCustomGrimoire(GeneralType type, List<String> orderIds) {
+    _customGrimoireDecks[type] = List<String>.from(orderIds);
+    notifyListeners();
   }
 
   GeneralType get activeGeneralType => _activeGeneralType;
@@ -670,7 +751,7 @@ class GeneralCommandService extends ChangeNotifier {
     if (customDeck != null && customDeck.isNotEmpty) {
       _grimoireDeck.addAll(customDeck);
     } else {
-      _grimoireDeck.addAll(buildDefaultGrimoireForGeneral(_activeGeneralType));
+      _grimoireDeck.addAll(getActiveGrimoireDeck());
     }
 
     // Draw up to maxHandSizeForGeneral cards

@@ -38,6 +38,10 @@ void main() {
   });
 
   testWidgets('Appointing a new Commander via GeneralSelectionDialog updates brigade profile', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
     await tester.pumpWidget(const AshenCrucibleApp());
     await tester.pump();
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'general_command_service.dart';
+import 'grimoire_manager_dialog.dart';
 
 /// Modal dialog allowing the player to awaken, appoint, and anoint their General Commander.
 class GeneralSelectionDialog extends StatefulWidget {
@@ -461,6 +462,38 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
                 );
               }).toList(),
             ),
+            if (widget.commandService != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: gen.themeColor,
+                    side: BorderSide(color: gen.themeColor.withValues(alpha: 0.6)),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                  icon: const Icon(Icons.auto_stories, size: 14),
+                  label: Text(
+                    'MANAGE GRIMOIRE (${gen.name.split(' ').last})',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.6),
+                  ),
+                  onPressed: () {
+                    GrimoireManagerDialog.show(
+                      context,
+                      commandService: widget.commandService!,
+                      bloodlineSigils: widget.bloodlineSigils,
+                      onSigilsChanged: widget.onSigilsChanged,
+                      onPhylacteryUpgraded: (gType, nRank) {
+                        widget.onPhylacteryUpgraded?.call(gType, nRank);
+                        setState(() {});
+                      },
+                      onGrimoireSaved: () => setState(() {}),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
