@@ -2425,9 +2425,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isDesktop = screenWidth >= 1000;
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
 
-    final double stageMaxWidth = isDesktop ? 1220.0 : (isTablet ? 900.0 : 720.0);
-    final double bossMaxWidth = isDesktop ? 540.0 : (isTablet ? 440.0 : 360.0);
-    final double minionMaxWidth = isDesktop ? 280.0 : (isTablet ? 230.0 : 180.0);
+    final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 840.0 : 680.0);
+    final double bossMaxWidth = isDesktop ? 460.0 : (isTablet ? 380.0 : 310.0);
+    final double minionMaxWidth = isDesktop ? 190.0 : (isTablet ? 150.0 : 105.0);
 
     return Expanded(
       flex: 12,
@@ -2504,16 +2504,20 @@ class _BattleScreenState extends State<BattleScreen> {
     return Expanded(
       flex: 2,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3.0),
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: _buildUnitCard(
-              unit: unit,
-              isEnemy: true,
-              isActive: unit.id == activeUnitId,
-              isSelectedTarget: unit.id == selectedTargetId,
-              onTap: () => onSelectTarget?.call(unit.id),
+            child: Transform.scale(
+              scale: 0.90,
+              alignment: Alignment.bottomCenter,
+              child: _buildUnitCard(
+                unit: unit,
+                isEnemy: true,
+                isActive: unit.id == activeUnitId,
+                isSelectedTarget: unit.id == selectedTargetId,
+                onTap: () => onSelectTarget?.call(unit.id),
+              ),
             ),
           ),
         ),
@@ -3353,7 +3357,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop, {bool isCompact = false}) {
     if (isBossUnit) {
-      return isDesktop ? 2.50 : (isCompact ? 1.95 : 2.25);
+      return isDesktop ? 2.05 : (isCompact ? 1.70 : 1.90);
     }
     if (!unit.isFigurineCutout) {
       return 1.15;
