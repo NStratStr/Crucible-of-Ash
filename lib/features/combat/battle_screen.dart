@@ -2401,9 +2401,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isUltraCompact = screenHeight < 620;
 
     // Responsive squad cluster width tailored for commanding mobile presence & desktop wargaming scale
-    final double perUnitWidth = isDesktop ? 220.0 : (isTablet ? 170.0 : 96.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(280.0, isDesktop ? 1220.0 : (isTablet ? 740.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 230.0 : (isTablet ? 180.0 : 105.0);
+    final double perUnitWidth = isDesktop ? 230.0 : (isTablet ? 180.0 : 130.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 1280.0 : (isTablet ? 820.0 : screenWidth));
+    final double cardMaxWidth = isDesktop ? 240.0 : (isTablet ? 190.0 : 140.0);
     final double horizontalPadding = isDesktop ? 4.0 : (isTablet ? 2.5 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
@@ -2468,11 +2468,11 @@ class _BattleScreenState extends State<BattleScreen> {
                     // Calibrated carefully so back row units are never cut off by bottom bounds
                     final double depthY = isFrontline
                         ? (isEnemy
-                            ? (isCompact ? 8.0 : 12.0)
-                            : (isDesktop ? -20.0 : (isCompact ? -12.0 : -16.0)))
+                            ? (isCompact ? 6.0 : 9.0)
+                            : (isDesktop ? -18.0 : (isCompact ? -10.0 : -13.0)))
                         : (isEnemy
-                            ? (isCompact ? -6.0 : -8.0)
-                            : (isDesktop ? 12.0 : (isCompact ? 6.0 : 10.0)));
+                            ? (isCompact ? -5.0 : -7.0)
+                            : (isDesktop ? 10.0 : (isCompact ? 5.0 : 8.0)));
                     // Consistent scale: Units maintain 100% equal size regardless of lane assignment
                     const double tierScale = 1.0;
 
@@ -2537,9 +2537,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isDesktop = screenWidth >= 1000;
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
 
-    final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 840.0 : 680.0);
-    final double bossMaxWidth = isDesktop ? 460.0 : (isTablet ? 380.0 : 310.0);
-    final double minionMaxWidth = isDesktop ? 190.0 : (isTablet ? 150.0 : 105.0);
+    final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 860.0 : 720.0);
+    final double bossMaxWidth = isDesktop ? 460.0 : (isTablet ? 380.0 : 320.0);
+    final double minionMaxWidth = isDesktop ? 200.0 : (isTablet ? 160.0 : 130.0);
 
     return Expanded(
       flex: 12,
@@ -3469,14 +3469,14 @@ class _BattleScreenState extends State<BattleScreen> {
 
   double _getUnitModelScale(UnitEntity unit, bool isBossUnit, bool isDesktop, {bool isCompact = false}) {
     if (isBossUnit) {
-      return isDesktop ? 2.05 : (isCompact ? 1.70 : 1.90);
+      return isDesktop ? 2.15 : (isCompact ? 1.80 : 2.05);
     }
     if (!unit.isFigurineCutout) {
-      return 1.15;
+      return 1.25;
     }
 
     // Command presence: miniatures scale prominently to command battlefield space
-    final double baseScale = isDesktop ? 1.95 : (isCompact ? 1.65 : 1.82);
+    final double baseScale = isDesktop ? 2.10 : (isCompact ? 1.85 : 2.05);
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
