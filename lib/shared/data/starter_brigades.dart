@@ -1603,22 +1603,26 @@ class StarterBrigades {
   }
 
   /// GDD v2.6 Sec 14.1: Single 3-wave skirmish map proving initiative ticks, card drags, bullet-time, and stagger interrupts.
+  /// All waves deploy a balanced 5-unit formation so tabletop spacing, scaling, and lane depths remain 100% consistent.
   static List<List<UnitEntity>> createMvpThreeWaveSkirmish() {
     final baseCrypt = createCryptStalkersEnemySquad();
 
-    // Wave 1: 3 Vanguard thralls
+    // Wave 1: 5 Vanguard & Skirmisher Thralls (Frontline rush with rear support)
     final List<UnitEntity> wave1 = [
-      baseCrypt[0].copyWith(id: 'cs_w1_1', name: 'Rotting Husk (Vanguard)', slot: FormationSlot.front1),
-      baseCrypt[1].copyWith(id: 'cs_w1_2', name: 'Grave Ghoul (Skirmisher)', slot: FormationSlot.front2),
-      baseCrypt[2].copyWith(id: 'cs_w1_3', name: 'Blood Alchemist (Acolyte)', slot: FormationSlot.back1),
+      baseCrypt[0].copyWith(id: 'cs_w1_1', name: 'Rotting Husk (Vanguard)', slot: FormationSlot.front1, currentHp: 550, maxHp: 550),
+      baseCrypt[1].copyWith(id: 'cs_w1_2', name: 'Grave Ghoul (Skirmisher)', slot: FormationSlot.front2, currentHp: 420, maxHp: 420, attack: 110),
+      baseCrypt[1].copyWith(id: 'cs_w1_3', name: 'Grave Ghoul (Stalker)', slot: FormationSlot.front3, currentHp: 420, maxHp: 420, attack: 110),
+      baseCrypt[2].copyWith(id: 'cs_w1_4', name: 'Blood Alchemist (Acolyte)', slot: FormationSlot.back1, currentHp: 450, maxHp: 450),
+      baseCrypt[3].copyWith(id: 'cs_w1_5', name: 'Bone Archer (Scout)', slot: FormationSlot.back2, currentHp: 380, maxHp: 380),
     ];
 
-    // Wave 2: 4 Reinforced Crypt Stalkers
+    // Wave 2: 5 Reinforced Crypt Stalkers (Elite frontline with marksmen)
     final List<UnitEntity> wave2 = [
-      baseCrypt[0].copyWith(id: 'cs_w2_1', name: 'Rotting Husk (Veteran)', slot: FormationSlot.front1, currentHp: 650, maxHp: 650),
-      baseCrypt[1].copyWith(id: 'cs_w2_2', name: 'Grave Ghoul (Frenzied)', slot: FormationSlot.front2, attack: 130),
-      baseCrypt[3].copyWith(id: 'cs_w2_3', name: 'Bone Archer (Marksman)', slot: FormationSlot.back1),
-      baseCrypt[4].copyWith(id: 'cs_w2_4', name: 'Blight Necromancer (Occultist)', slot: FormationSlot.back2),
+      baseCrypt[0].copyWith(id: 'cs_w2_1', name: 'Rotting Husk (Veteran)', slot: FormationSlot.front1, currentHp: 750, maxHp: 750),
+      baseCrypt[1].copyWith(id: 'cs_w2_2', name: 'Grave Ghoul (Frenzied)', slot: FormationSlot.front2, attack: 135),
+      baseCrypt[0].copyWith(id: 'cs_w2_3', name: 'Rotting Husk (Bulwark)', slot: FormationSlot.front3, currentHp: 700, maxHp: 700),
+      baseCrypt[3].copyWith(id: 'cs_w2_4', name: 'Bone Archer (Marksman)', slot: FormationSlot.back1, attack: 140),
+      baseCrypt[4].copyWith(id: 'cs_w2_5', name: 'Blight Necromancer (Occultist)', slot: FormationSlot.back2),
     ];
 
     // Wave 3: Full 5-unit Sovereign Boss Wave

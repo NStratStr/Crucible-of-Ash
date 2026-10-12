@@ -2641,13 +2641,11 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isCompact = screenHeight < 760;
     final bool isUltraCompact = screenHeight < 620;
 
-    // Responsive squad cluster width tailored for commanding mobile presence & cohesive tabletop formation
-    // On widescreen and fullscreen displays, we cap cluster width tightly so units don't separate
-    // with huge empty chasms between columns.
-    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : (units.length <= 3 ? 120.0 : 76.0));
+    // Consistent tabletop formation: units use the exact same proportions across all skirmish fights
+    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : 76.0);
     final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 960.0 : (isTablet ? 820.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : (units.length <= 3 ? 128.0 : 92.0));
-    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : (units.length <= 3 ? 4.0 : 1.0));
+    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : 92.0);
+    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -4388,76 +4386,11 @@ class _BattleScreenState extends State<BattleScreen> {
                 ),
               ),
             ),
-
-            // Fallen Overlay
-                if (!alive)
-                  if (unit.isFigurineCutout || isBossUnit)
-                    Positioned(
-                      bottom: 12,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1A24).withValues(alpha: 0.92),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFEF5350), width: 1.2),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black87, blurRadius: 8, spreadRadius: 1),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.dangerous, size: 14, color: Color(0xFFEF5350)),
-                              SizedBox(width: 4),
-                              Text(
-                                'FALLEN',
-                                style: TextStyle(
-                                  color: Color(0xFFEF5350),
-                                  fontSize: 9.0,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.dangerous, size: 18, color: Color(0xFFEF5350)),
-                              SizedBox(height: 2),
-                              Text(
-                                'FALLEN',
-                                style: TextStyle(
-                                  color: Color(0xFFEF5350),
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-              ],
-            ),
-          ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
       if (_isPreBattleSetup && !isEnemy && alive) {
         final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
