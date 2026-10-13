@@ -24,13 +24,75 @@ class FloatingCombatText {
   final String text;
   final Color color;
   final bool isCrit;
+  final String? targetUnitId;
   final Key key = UniqueKey();
 
   FloatingCombatText({
     required this.text,
     required this.color,
     this.isCrit = false,
+    this.targetUnitId,
   });
+}
+
+class SpellCastImpactPainter extends CustomPainter {
+  final Offset center;
+  final Color color;
+  final double progress; // 0.0 to 1.0
+
+  const SpellCastImpactPainter({
+    required this.center,
+    required this.color,
+    required this.progress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.0 || progress >= 1.0) return;
+
+    final double maxRadius = 90.0;
+    final double currentRadius = 15.0 + (maxRadius - 15.0) * progress;
+    final double alpha = (1.0 - progress).clamp(0.0, 1.0);
+
+    // Shockwave ripple 1
+    final shockwavePaint = Paint()
+      ..color = color.withValues(alpha: (alpha * 0.75).clamp(0.0, 1.0))
+      ..strokeWidth = 3.5 * (1.0 - progress * 0.5)
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(center, currentRadius, shockwavePaint);
+
+    // Core arcane blast
+    final corePaint = Paint()
+      ..color = Colors.white.withValues(alpha: (alpha * 0.90).clamp(0.0, 1.0))
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(center, currentRadius * 0.65, corePaint);
+
+    // Radiating energy sparks
+    final sparkPaint = Paint()
+      ..color = color.withValues(alpha: alpha)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    final int sparkCount = 8;
+    for (int i = 0; i < sparkCount; i++) {
+      final double angle = (i * 2 * pi / sparkCount) + (progress * 0.8);
+      final double innerR = currentRadius * 0.7;
+      final double outerR = currentRadius + 14.0 * (1.0 - progress);
+      canvas.drawLine(
+        Offset(center.dx + cos(angle) * innerR, center.dy + sin(angle) * innerR),
+        Offset(center.dx + cos(angle) * outerR, center.dy + sin(angle) * outerR),
+        sparkPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant SpellCastImpactPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.center != center || oldDelegate.color != color;
+  }
 }
 
 class SiphonTetherPainter extends CustomPainter {
@@ -422,9 +484,51 @@ class _BattleScreenState extends State<BattleScreen> {
     });
   }
 
-  void _addPop(String text, Color color, {bool isCrit = false}) {
+  Offset? _spellImpactPosition;
+  Color? _spellImpactColor;
+  double _spellImpactProgress = 0.0;
+  Timer? _spellImpactTimer;
+
+  void _triggerSpellCastImpact(Offset position, Color color) {
+    _spellImpactTimer?.cancel();
+    setState(() {
+      _spellImpactPosition = position;
+      _spellImpactColor = color;
+      _spellImpactProgress = 0.05;
+    });
+
+    // 8 frame progression over ~400ms
+    int frame = 1;
+    const int totalFrames = 8;
+    _spellImpactTimer = Timer.periodic(const Duration(milliseconds: 45), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      frame++;
+      if (frame >= totalFrames) {
+        timer.cancel();
+        setState(() {
+          _spellImpactPosition = null;
+          _spellImpactColor = null;
+          _spellImpactProgress = 0.0;
+        });
+      } else {
+        setState(() {
+          _spellImpactProgress = frame / totalFrames;
+        });
+      }
+    });
+  }
+
+  void _addPop(String text, Color color, {bool isCrit = false, String? targetUnitId}) {
     if (!mounted) return;
-    final pop = FloatingCombatText(text: text, color: color, isCrit: isCrit);
+    final pop = FloatingCombatText(
+      text: text,
+      color: color,
+      isCrit: isCrit,
+      targetUnitId: targetUnitId,
+    );
     setState(() => _floatingPops.add(pop));
     final timer = Timer(const Duration(milliseconds: 1400), () {
       if (mounted) setState(() => _floatingPops.remove(pop));
@@ -597,10 +701,22 @@ class _BattleScreenState extends State<BattleScreen> {
         _lastProcessedTurnStartUnitId = active.id;
         final startRes = widget.combatService.processTurnStart(unitId: active.id);
         if (startRes.dotDamage > 0) {
-          _triggerDamagePop(damage: startRes.dotDamage, isCrit: false, isGlancing: false);
+          _triggerDamagePop(
+            damage: startRes.dotDamage,
+            isCrit: false,
+            isGlancing: false,
+            targetUnitId: active.id,
+          );
         }
         if (startRes.healAmount > 0) {
-          _triggerDamagePop(damage: 0, isCrit: false, isGlancing: false, heal: startRes.healAmount);
+          _triggerDamagePop(
+            damage: 0,
+            isCrit: false,
+            isGlancing: false,
+            heal: startRes.healAmount,
+            targetUnitId: active.id,
+            sourceUnitId: active.id,
+          );
         }
         if (startRes.isDefeated) {
           _combatLog = startRes.message ?? '${active.name} succumbed to internal rot!';
@@ -666,6 +782,8 @@ class _BattleScreenState extends State<BattleScreen> {
     required bool isCrit,
     required bool isGlancing,
     int heal = 0,
+    String? targetUnitId,
+    String? sourceUnitId,
   }) {
     if (damage > 0) {
       _triggerScreenShake(isHeavy: isCrit || damage > 300);
@@ -682,7 +800,12 @@ class _BattleScreenState extends State<BattleScreen> {
           ? const Color(0xFFFFD54F)
           : (isGlancing ? Colors.white60 : const Color(0xFFEF5350));
 
-      final pop = FloatingCombatText(text: text, color: color, isCrit: isCrit);
+      final pop = FloatingCombatText(
+        text: text,
+        color: color,
+        isCrit: isCrit,
+        targetUnitId: targetUnitId,
+      );
       setState(() => _floatingPops.add(pop));
 
       final timer = Timer(const Duration(milliseconds: 1400), () {
@@ -695,6 +818,7 @@ class _BattleScreenState extends State<BattleScreen> {
       final healPop = FloatingCombatText(
         text: '+$heal HP',
         color: const Color(0xFF81C784),
+        targetUnitId: sourceUnitId ?? targetUnitId,
       );
       setState(() => _floatingPops.add(healPop));
 
@@ -738,6 +862,8 @@ class _BattleScreenState extends State<BattleScreen> {
             isCrit: result.isCritical,
             isGlancing: result.isGlancing,
             heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
+            targetUnitId: result.target.id,
+            sourceUnitId: result.attacker.id,
           );
 
           setState(() {
@@ -878,6 +1004,8 @@ class _BattleScreenState extends State<BattleScreen> {
         isCrit: result.isCritical,
         isGlancing: result.isGlancing,
         heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
+        targetUnitId: result.target.id,
+        sourceUnitId: result.attacker.id,
       );
 
       if (skill.isLimitBurst) {
@@ -973,33 +1101,36 @@ class _BattleScreenState extends State<BattleScreen> {
         switch (widget.commandService.activeGeneralType) {
           case GeneralType.vladislav:
             if (order.id == 'siphon_vitality') {
-              if (_selectedEnemyId == null) {
+              final target = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.where((e) => e.isAlive).firstOrNull?.id;
+              if (target == null) {
                 throw StateError('Select an enemy to siphon.');
               }
-              res = widget.commandService.executeSiphonVitality(_selectedEnemyId!);
+              res = widget.commandService.executeSiphonVitality(target);
             } else if (order.id == 'sanguine_ward') {
               res = widget.commandService.executeSanguineWard();
             } else {
-              if (_selectedEnemyId == null) {
+              final target = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.where((e) => e.isAlive).firstOrNull?.id;
+              if (target == null) {
                 throw StateError('Select an enemy to execute.');
               }
-              res = widget.commandService.executeFeastOfRuin(_selectedEnemyId!);
+              res = widget.commandService.executeFeastOfRuin(target);
             }
             break;
         case GeneralType.valeria:
           if (order.id == 'stand_resolute') {
-            final firstAliveAlly = widget.tickManager.allies.firstWhere(
+            final target = targetUnitId ?? widget.tickManager.allies.firstWhere(
               (a) => a.isAlive,
               orElse: () => throw StateError('No living ally to fortify.'),
-            );
-            res = widget.commandService.executeStandResolute(firstAliveAlly.id);
+            ).id;
+            res = widget.commandService.executeStandResolute(target);
           } else if (order.id == 'retributive_stride') {
             res = widget.commandService.executeRetributiveStride();
           } else {
-            if (_selectedEnemyId == null) {
+            final target = targetUnitId ?? _selectedEnemyId ?? widget.tickManager.enemies.where((e) => e.isAlive).firstOrNull?.id;
+            if (target == null) {
               throw StateError('Select an enemy to smite.');
             }
-            res = widget.commandService.executeSmiteTheWicked(_selectedEnemyId!);
+            res = widget.commandService.executeSmiteTheWicked(target);
           }
           break;
         case GeneralType.malakor:
@@ -1015,11 +1146,11 @@ class _BattleScreenState extends State<BattleScreen> {
           if (order.id == 'quicken') {
             final livingAllies = widget.tickManager.allies.where((a) => a.isAlive).toList();
             if (livingAllies.isEmpty) throw StateError('No living allies.');
-            final target = livingAllies.firstWhere(
+            final target = targetUnitId ?? livingAllies.firstWhere(
               (a) => a.turnMeter < 90,
               orElse: () => livingAllies.first,
-            );
-            res = widget.commandService.executeQuicken(target.id);
+            ).id;
+            res = widget.commandService.executeQuicken(target);
           } else if (order.id == 'unravel_hex') {
             res = widget.commandService.executeUnravelHex();
           } else {
@@ -1043,6 +1174,19 @@ class _BattleScreenState extends State<BattleScreen> {
         _screenFlashColorOverride = profile.themeColor;
       });
 
+      // Trigger prominent Battlefield Spell Cast Impact VFX at target's position
+      if (targetUnitId != null) {
+        final targetKey = _unitCardKeys[targetUnitId];
+        final targetCtx = targetKey?.currentContext;
+        if (targetCtx != null) {
+          final box = targetCtx.findRenderObject() as RenderBox?;
+          if (box != null && box.hasSize) {
+            final center = box.localToGlobal(box.size.center(Offset.zero));
+            _triggerSpellCastImpact(center, profile.themeColor);
+          }
+        }
+      }
+
       // Audio & Haptic Punch on Release: Heavy screen shake + haptic thud + hit-stop
       _triggerScreenShake(isHeavy: true);
       HapticFeedback.heavyImpact();
@@ -1054,7 +1198,7 @@ class _BattleScreenState extends State<BattleScreen> {
       if (hasNearImminentEnemy &&
           (order.id == 'sanguine_ward' || order.id == 'iron_bulwark' || order.id == 'stand_resolute' || order.id == 'disrupting_cleave')) {
         widget.commandService.grantFocus(1);
-        _addPop('⚡ PERFECT TIMING! +1 VITAE REBATE ⚡', const Color(0xFFFFD54F), isCrit: true);
+        _addPop('⚡ PERFECT TIMING! +1 VITAE REBATE ⚡', const Color(0xFFFFD54F), isCrit: true, targetUnitId: targetUnitId);
       }
 
       // Spawn floating pops based on delta between pre- and post-order stats
@@ -1062,23 +1206,23 @@ class _BattleScreenState extends State<BattleScreen> {
         final oldE = oldEnemies.where((e) => e.id == newE.id).firstOrNull;
         if (oldE != null) {
           if (oldE.isAlive && !newE.isAlive) {
-            _addPop('☠ EXECUTED', const Color(0xFFFF5252), isCrit: true);
+            _addPop('☠ EXECUTED', const Color(0xFFFF5252), isCrit: true, targetUnitId: newE.id);
           } else if (oldE.currentHp > newE.currentHp) {
             final diff = oldE.currentHp - newE.currentHp;
             if (order.id == 'siphon_vitality') {
-              _addPop('-$diff DRAIN', const Color(0xFFFF1744), isCrit: true);
+              _addPop('-$diff DRAIN', const Color(0xFFFF1744), isCrit: true, targetUnitId: newE.id);
             } else {
-              _addPop('-$diff', const Color(0xFFEF5350), isCrit: true);
+              _addPop('-$diff', const Color(0xFFEF5350), isCrit: true, targetUnitId: newE.id);
             }
           }
           if (oldE.turnMeter > newE.turnMeter && (oldE.turnMeter - newE.turnMeter) >= 20) {
             final tmDiff = (oldE.turnMeter - newE.turnMeter).round();
-            _addPop('-$tmDiff% TM STAGGER', const Color(0xFFFF9100), isCrit: true);
+            _addPop('-$tmDiff% TM STAGGER', const Color(0xFFFF9100), isCrit: true, targetUnitId: newE.id);
           }
           final oldBleeds = oldE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
           final newBleeds = newE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
           if (newBleeds > oldBleeds) {
-            _addPop('+BLEED (${newBleeds}x)', const Color(0xFFD32F2F));
+            _addPop('+BLEED (${newBleeds}x)', const Color(0xFFD32F2F), targetUnitId: newE.id);
           }
         }
       }
@@ -1087,16 +1231,16 @@ class _BattleScreenState extends State<BattleScreen> {
         final oldA = oldAllies.where((a) => a.id == newA.id).firstOrNull;
         if (oldA != null) {
           if (!oldA.isAlive && newA.isAlive) {
-            _addPop('RESURRECTED', const Color(0xFF81C784), isCrit: true);
+            _addPop('RESURRECTED', const Color(0xFF81C784), isCrit: true, targetUnitId: newA.id);
           } else if (newA.currentHp > oldA.currentHp) {
             final diff = newA.currentHp - oldA.currentHp;
-            _addPop('+$diff HP', const Color(0xFF81C784), isCrit: true);
+            _addPop('+$diff HP', const Color(0xFF81C784), isCrit: true, targetUnitId: newA.id);
           }
           if (newA.turnMeter > oldA.turnMeter && (newA.turnMeter - oldA.turnMeter) >= 25) {
-            _addPop('+TM SURGE', const Color(0xFF00E5FF));
+            _addPop('+TM SURGE', const Color(0xFF00E5FF), targetUnitId: newA.id);
           }
           if (newA.defense > oldA.defense) {
-            _addPop('+ARMOR WARD', const Color(0xFFFFD54F), isCrit: true);
+            _addPop('+ARMOR WARD', const Color(0xFFFFD54F), isCrit: true, targetUnitId: newA.id);
           }
         }
       }
@@ -1710,39 +1854,81 @@ class _BattleScreenState extends State<BattleScreen> {
                   ],
                 ),
               ),
-            // Floating Combat Text Overlay
-            Positioned(
-              top: 70,
-              right: 24,
-              child: IgnorePointer(
-                child: Column(
-                  children: _floatingPops.map((pop) {
-                    return AnimatedOpacity(
-                      duration: const Duration(milliseconds: 300),
-                      opacity: 1.0,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: pop.color.withValues(alpha: 0.6)),
-                        ),
-                        child: Text(
-                          pop.text,
-                          style: TextStyle(
-                            color: pop.color,
-                            fontWeight: FontWeight.bold,
-                            fontSize: pop.isCrit ? 14 : 12,
-                            fontFamily: 'monospace',
+            // Floating Combat Text Overlay: Positioned directly over target units or falling back to top right
+            ..._floatingPops.map((pop) {
+              if (pop.targetUnitId != null) {
+                final targetKey = _unitCardKeys[pop.targetUnitId!];
+                final targetCtx = targetKey?.currentContext;
+                if (targetCtx != null) {
+                  final box = targetCtx.findRenderObject() as RenderBox?;
+                  if (box != null && box.hasSize) {
+                    final targetPos = box.localToGlobal(Offset.zero);
+                    return Positioned(
+                      left: targetPos.dx,
+                      top: (targetPos.dy - 26).clamp(10.0, double.infinity),
+                      width: box.size.width,
+                      child: IgnorePointer(
+                        child: Center(
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 300),
+                            opacity: 1.0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: pop.color.withValues(alpha: 0.8), width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: pop.color.withValues(alpha: 0.4),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                pop.text,
+                                style: TextStyle(
+                                  color: pop.color,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: pop.isCrit ? 13 : 11,
+                                  fontFamily: 'monospace',
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     );
-                  }).toList(),
+                  }
+                }
+              }
+              // Global announcement or fallback pop (e.g. Wave start, Sacrificed)
+              return Positioned(
+                top: 70,
+                right: 24,
+                child: IgnorePointer(
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: pop.color.withValues(alpha: 0.6)),
+                    ),
+                    child: Text(
+                      pop.text,
+                      style: TextStyle(
+                        color: pop.color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: pop.isCrit ? 14 : 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            }),
             // Commander Focus Order Cut-In Banner
             if (_activeOrderBanner != null)
               Positioned(
@@ -1887,6 +2073,19 @@ class _BattleScreenState extends State<BattleScreen> {
                 }
                 return const SizedBox.shrink();
               }),
+            // High-Impact Spell Cast Battlefield Shockwave VFX
+            if (_spellImpactPosition != null && _spellImpactColor != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: SpellCastImpactPainter(
+                      center: _spellImpactPosition!,
+                      color: _spellImpactColor!,
+                      progress: _spellImpactProgress,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2808,10 +3007,10 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isUltraCompact = screenHeight < 620;
 
     // Consistent tabletop formation: units use the exact same proportions across all skirmish fights
-    final double perUnitWidth = isDesktop ? 190.0 : (isTablet ? 160.0 : 76.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 960.0 : (isTablet ? 820.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 200.0 : (isTablet ? 170.0 : 92.0);
-    final double horizontalPadding = isDesktop ? 3.5 : (isTablet ? 2.5 : 1.0);
+    final double perUnitWidth = isDesktop ? 135.0 : (isTablet ? 125.0 : 76.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 750.0 : (isTablet ? 680.0 : screenWidth));
+    final double cardMaxWidth = isDesktop ? 140.0 : (isTablet ? 130.0 : 92.0);
+    final double horizontalPadding = isDesktop ? 2.5 : (isTablet ? 2.0 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -2945,9 +3144,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
     final bool isMobile = screenWidth < 600;
 
-    final double stageMaxWidth = isDesktop ? 1100.0 : (isTablet ? 860.0 : 720.0);
-    final double bossMaxWidth = isDesktop ? 500.0 : (isTablet ? 420.0 : 360.0);
-    final double minionMaxWidth = isDesktop ? 160.0 : (isTablet ? 130.0 : 105.0);
+    final double stageMaxWidth = isDesktop ? 880.0 : (isTablet ? 760.0 : 640.0);
+    final double bossMaxWidth = isDesktop ? 360.0 : (isTablet ? 320.0 : 280.0);
+    final double minionMaxWidth = isDesktop ? 135.0 : (isTablet ? 120.0 : 100.0);
 
     return Expanded(
       flex: isMobile ? 15 : 13,
@@ -3886,9 +4085,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isMobile = screenWidth < 600;
     if (isBossUnit) {
       // Boss units are colossal centerpiece titans. On mobile portrait and desktop alike,
-      // they should command huge visual authority across their pedestal.
-      final double bossHeightFactor = (screenHeight / 800.0).clamp(0.90, 1.30);
-      final double baseBossScale = isDesktop ? 2.65 : (isMobile ? 2.85 : 2.50);
+      // they should command authority across their pedestal without overpowering the view.
+      final double bossHeightFactor = (screenHeight / 800.0).clamp(0.90, 1.15);
+      final double baseBossScale = isDesktop ? 1.85 : (isMobile ? 2.30 : 2.05);
       return baseBossScale * bossHeightFactor;
     }
     if (!unit.isFigurineCutout) {
@@ -3900,10 +4099,12 @@ class _BattleScreenState extends State<BattleScreen> {
     // ensuring figurines maintain consistent eye level and physical presence across
     // mobile portrait, desktop window, and 16:9 fullscreen without ballooning or shrinking into specks.
     final double aspectRatio = screenWidth / (screenHeight > 0 ? screenHeight : 1.0);
-    final double heightFactor = (screenHeight / 800.0).clamp(0.85, 1.25);
-    final double aspectClamp = aspectRatio > 1.6 ? 0.92 : 1.0;
+    final double heightFactor = (screenHeight / 800.0).clamp(0.85, 1.10);
+    final double aspectClamp = aspectRatio > 1.6 ? 0.90 : 1.0;
 
-    final double baseScale = (isDesktop ? 2.10 : (isMobile ? 2.20 : (isCompact ? 1.90 : 2.05))) * heightFactor * aspectClamp;
+    // Desktop: 1.45 maintains crisp miniature proportions without towering into the Ashen Front.
+    // Mobile: 2.15 ensures clear visibility in single-column vertical space.
+    final double baseScale = (isDesktop ? 1.45 : (isMobile ? 2.15 : (isCompact ? 1.70 : 1.85))) * heightFactor * aspectClamp;
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
@@ -4828,7 +5029,11 @@ class _BattleScreenState extends State<BattleScreen> {
           if (order.id == 'sanguine_revival') {
             return !isEnemy && !alive;
           }
-          if (order.id == 'blood_boil' || order.id == 'iron_bulwark' || order.id == 'stand_resolute') {
+          if (order.id == 'blood_boil' ||
+              order.id == 'iron_bulwark' ||
+              order.id == 'stand_resolute' ||
+              order.id == 'sanguine_ward' ||
+              order.id == 'quicken') {
             return !isEnemy && alive;
           }
           return isEnemy && alive;
@@ -5826,20 +6031,20 @@ class _BattleScreenState extends State<BattleScreen> {
                     ),
                   ),
                   const Text(
-                    '+1 VITAE',
+                    'BURN',
                     style: TextStyle(
-                      color: Color(0xFFFFD54F),
+                      color: Color(0xFFFFAB91),
                       fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
                     ),
                   ),
                   Text(
-                    isHovered ? 'SACRIFICE' : 'BURN SLIP',
+                    isHovered ? 'SACRIFICE' : '+1 VITAE',
                     style: TextStyle(
-                      color: isHovered ? Colors.white : const Color(0xFFB0BEC5),
+                      color: isHovered ? Colors.white : const Color(0xFFFFD54F),
                       fontSize: 6.0,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
