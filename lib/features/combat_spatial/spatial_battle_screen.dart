@@ -359,95 +359,106 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       builder: (context, candidateData, rejectedData) {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
-        return GestureDetector(
-          onTap: () {
-            if (isPlayerSquad) {
-              if (occupant != null) {
-                setState(() => _selectedUnitId = occupant.id);
-              } else if (_selectedUnitId != null) {
-                // Click to move selected unit to this empty cell
-                _engine.movePlayerUnit(_selectedUnitId!, col, row);
-                setState(() => _selectedUnitId = null);
-              }
-            } else if (occupant != null) {
-              // Target enemy with dragged card
-              if (_draggedCard != null) {
-                _engine.castCard(_draggedCard!.id, targetUnit: occupant);
-                setState(() => _draggedCard = null);
-              }
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isTelegraphed
-                    ? [
-                        const Color(0xFF4A1016),
-                        const Color(0xFF2B0A0E),
-                      ]
-                    : (isDropCandidate
-                        ? [
-                            const Color(0xFF00363A),
-                            const Color(0xFF001F24),
-                          ]
-                        : (isPlayerSquad
-                            ? [
-                                const Color(0xFF1A1F2C),
-                                const Color(0xFF10131B),
-                              ]
-                            : [
-                                const Color(0xFF26191C),
-                                const Color(0xFF150D0F),
-                              ])),
-              ),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isTelegraphed
-                    ? const Color(0xFFFF1744)
-                    : (isSelected
-                        ? const Color(0xFFFFD54F)
-                        : (isDropCandidate
-                            ? const Color(0xFF00E5FF)
-                            : (isPlayerSquad ? const Color(0xFF38455E) : const Color(0xFF58363F)))),
-                width: isTelegraphed || isSelected || isDropCandidate ? 2.0 : 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isTelegraphed
-                      ? const Color(0xFFFF1744).withValues(alpha: 0.45)
-                      : (isDropCandidate
-                          ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
-                          : Colors.black54),
-                  blurRadius: isTelegraphed || isDropCandidate ? 8 : 3,
-                  offset: const Offset(0, 1.5),
-                ),
-              ],
+        return Container(
+          margin: const EdgeInsets.all(2.5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isTelegraphed
+                  ? [
+                      const Color(0xFF4A1016),
+                      const Color(0xFF2B0A0E),
+                    ]
+                  : (isDropCandidate
+                      ? [
+                          const Color(0xFF00363A),
+                          const Color(0xFF001F24),
+                        ]
+                      : (isPlayerSquad
+                          ? [
+                              const Color(0xFF1A1F2C),
+                              const Color(0xFF10131B),
+                            ]
+                          : [
+                              const Color(0xFF26191C),
+                              const Color(0xFF150D0F),
+                            ])),
             ),
-            child: Stack(
-              children: [
-                // Coordinate Watermark
-                Positioned(
-                  top: 2,
-                  left: 3,
-                  child: Text(
-                    'C${col + 1} R$row',
-                    style: TextStyle(
-                      fontSize: 8,
-                      color: isTelegraphed ? const Color(0xFFFF8A80) : Colors.white24,
-                      fontFamily: 'monospace',
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isTelegraphed
+                  ? const Color(0xFFFF1744)
+                  : (isSelected
+                      ? const Color(0xFFFFD54F)
+                      : (isDropCandidate
+                          ? const Color(0xFF00E5FF)
+                          : (isPlayerSquad ? const Color(0xFF38455E) : const Color(0xFF58363F)))),
+              width: isTelegraphed || isSelected || isDropCandidate ? 2.0 : 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isTelegraphed
+                    ? const Color(0xFFFF1744).withValues(alpha: 0.45)
+                    : (isDropCandidate
+                        ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
+                        : Colors.black54),
+                blurRadius: isTelegraphed || isDropCandidate ? 8 : 3,
+                offset: const Offset(0, 1.5),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Coordinate Watermark & Cell Tap Handler for Empty Cells
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () {
+                    if (isPlayerSquad && occupant == null && _selectedUnitId != null) {
+                      _engine.movePlayerUnit(_selectedUnitId!, col, row);
+                      setState(() => _selectedUnitId = null);
+                    }
+                  },
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2, left: 3),
+                      child: Text(
+                        'C${col + 1} R$row',
+                        style: TextStyle(
+                          fontSize: 8,
+                          color: isTelegraphed ? const Color(0xFFFF8A80) : Colors.white24,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
                     ),
                   ),
                 ),
+              ),
 
-                // Occupant Miniature
-                if (occupant != null)
-                  Center(
+              // Occupant Miniature
+              if (occupant != null)
+                Center(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (isPlayerSquad) {
+                        setState(() {
+                          _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
+                        });
+                      } else {
+                        // Cast active dragged card or target enemy
+                        if (_draggedCard != null) {
+                          _engine.castCard(_draggedCard!.id, targetUnit: occupant);
+                          setState(() => _draggedCard = null);
+                        }
+                      }
+                    },
                     child: isPlayerSquad
-                        ? Draggable<String>(
+                        ? LongPressDraggable<String>(
                             data: occupant.id,
+                            maxSimultaneousDrags: 1,
                             onDragStarted: () {
                               _engine.setBulletTime(true);
                             },
@@ -466,16 +477,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           )
                         : _buildUnitMiniatureWidget(occupant),
                   ),
+                ),
 
-                // Threat Marker for Cleave telegraph
-                if (isTelegraphed)
-                  const Positioned(
-                    bottom: 2,
-                    right: 3,
-                    child: Icon(Icons.close, color: Color(0xFFFF5252), size: 14),
-                  ),
-              ],
-            ),
+              // Threat Marker for Cleave telegraph
+              if (isTelegraphed)
+                const Positioned(
+                  bottom: 2,
+                  right: 3,
+                  child: Icon(Icons.close, color: Color(0xFFFF5252), size: 14),
+                ),
+            ],
           ),
         );
       },

@@ -20,7 +20,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   final List<SpatialCombatCard> burnPit = [];
 
   int currentTick = 0;
-  bool isRunning = false;
+  bool isRunning = true;
   double simulationSpeed = 1.0;
   bool isBulletTime = false;
 
