@@ -176,6 +176,20 @@ class LimitBurstBannerData {
   });
 }
 
+class ActiveSkillCutInBannerData {
+  final UnitEntity caster;
+  final SkillEntity skill;
+  final String targetName;
+  final bool isFriendlySkill;
+
+  const ActiveSkillCutInBannerData({
+    required this.caster,
+    required this.skill,
+    required this.targetName,
+    this.isFriendlySkill = false,
+  });
+}
+
 /// Greyscale color filter matrix that preserves 100% of alpha transparency,
 /// avoiding the solid-grey bleed bug caused by [BlendMode.saturation] on transparent PNG canvases.
 const ColorFilter kAlphaSafeGreyscaleFilter = ColorFilter.matrix(<double>[
@@ -462,6 +476,7 @@ class _BattleScreenState extends State<BattleScreen> {
   Color? _screenFlashColorOverride;
   GeneralOrderBannerData? _activeOrderBanner;
   LimitBurstBannerData? _activeLimitBurstBanner;
+  ActiveSkillCutInBannerData? _activeSkillBanner;
   int? _hoveredCardIndex;
   Offset _screenShake = Offset.zero;
   Timer? _shakeTimer;
@@ -835,7 +850,7 @@ class _BattleScreenState extends State<BattleScreen> {
     _aiTurnTimer?.cancel();
 
     final double bulletMult = (widget.tickManager.isBulletTime || widget.commandService.isBulletTimeActive) ? 0.30 : 1.0;
-    final int aiDelay = ((400 / widget.tickManager.speedMultiplier) / bulletMult).round();
+    final int aiDelay = ((350 / widget.tickManager.speedMultiplier) / bulletMult).round();
 
     _aiTurnTimer = Timer(Duration(milliseconds: aiDelay), () {
       if (!mounted) return;
@@ -846,58 +861,113 @@ class _BattleScreenState extends State<BattleScreen> {
           return;
         }
 
-        final result = _aiService.executeEnemyTurn();
+        // Execute enemy turn with autoResume: false to pause the tick engine during full visual resolution
+        final result = _aiService.executeEnemyTurn(autoResume: false);
 
         if (result != null) {
           widget.commandService.registerCombatDamage(result.damageDealt);
 
+          final readySkill = _aiService.predictNextSkill(result.attacker) ??
+              result.attacker.resolvedSkills.first;
+          final bool isFriendlySkill = result.healAmount > 0 ||
+              readySkill.targetType == SkillTargetType.allAllies ||
+              readySkill.targetType == SkillTargetType.singleAlly ||
+              readySkill.targetType == SkillTargetType.lowestHpAlly;
+
+          final String visualTargetId = isFriendlySkill
+              ? (readySkill.targetType == SkillTargetType.allAllies ? 'team_enemies' : result.target.id)
+              : (readySkill.targetType == SkillTargetType.allEnemies ? 'team_allies_damaged' : result.target.id);
+
+          // Step 1: Show Cut-in Banner and trigger caster lunge/charge animation
+          setState(() {
+            _activeSkillBanner = ActiveSkillCutInBannerData(
+              caster: result.attacker,
+              skill: readySkill,
+              targetName: isFriendlySkill && readySkill.targetType == SkillTargetType.allAllies
+                  ? 'Allied Vanguard & Rank'
+                  : (readySkill.targetType == SkillTargetType.allEnemies ? 'Entire Allied Squad' : result.target.name),
+              isFriendlySkill: isFriendlySkill,
+            );
+          });
+
           _triggerAttackAnimation(
             result.attacker.id,
-            result.target.id,
-            vfx: _resolveCombatVfx(result.attacker, isCrit: result.isCritical),
+            visualTargetId,
+            vfx: _resolveCombatVfx(result.attacker, skill: readySkill, isCrit: result.isCritical),
           );
 
-          _triggerDamagePop(
-            damage: result.damageDealt,
-            isCrit: result.isCritical,
-            isGlancing: result.isGlancing,
-            heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
-            targetUnitId: result.target.id,
-            sourceUnitId: result.attacker.id,
-          );
+          // Step 2: Impact phase at mid-point of animation
+          final double speedMult = widget.tickManager.speedMultiplier;
+          final int impactDelayMs = (400 / speedMult).round().clamp(250, 800);
 
-          setState(() {
-            final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
-            final critText = result.isCritical ? ' [CRIT!]' : '';
-            final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
-            _combatLog =
-                '${result.attacker.name} attacked ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
-            if (result.targetDefeated) {
-              _combatLog += ' ${result.target.name} fell in combat!';
+          Timer(Duration(milliseconds: impactDelayMs), () {
+            if (!mounted) return;
+            _triggerDamagePop(
+              damage: result.damageDealt,
+              isCrit: result.isCritical,
+              isGlancing: result.isGlancing,
+              heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
+              targetUnitId: result.target.id,
+              sourceUnitId: result.attacker.id,
+            );
+
+            setState(() {
+              final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
+              final critText = result.isCritical ? ' [CRIT!]' : '';
+              final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
+              _combatLog =
+                  '${result.attacker.name} used ${readySkill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
+              if (result.targetDefeated) {
+                _combatLog += ' ${result.target.name} fell in combat!';
+              }
+            });
+            if (result.isGuarded) {
+              _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
             }
           });
-          if (result.isGuarded) {
-            _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
+
+          // Step 3: Complete skill resolution, clear banner, and unpause/resume tick engine
+          final int fullSeqMs = ((1150 / speedMult) / bulletMult).round().clamp(650, 2400);
+          Timer(Duration(milliseconds: fullSeqMs), () {
+            if (mounted) {
+              setState(() {
+                _activeSkillBanner = null;
+                _isProcessingAiTurn = false;
+              });
+
+              // Check if battle already ended or advance
+              if (widget.tickManager.phase != CombatPhase.battleEnded) {
+                if (widget.tickManager.allies.every((u) => !u.isAlive)) {
+                  _hasDispatchedEndOutcome = true;
+                  widget.onDefeat?.call();
+                } else if (_aiService.isEnemyTurn) {
+                  _handleAiTurn();
+                } else if (_autoBattle && _isPlayerTurnNow) {
+                  _handleAutoPlayerTurn();
+                } else {
+                  widget.tickManager.start();
+                }
+              }
+            }
+          });
+        } else {
+          _isProcessingAiTurn = false;
+          if (widget.tickManager.phase != CombatPhase.battleEnded) {
+            widget.tickManager.start();
           }
         }
       } catch (e) {
         if (mounted) {
-          setState(() => _combatLog = 'Enemy action paused: $e');
-        }
-      }
-
-      // Tactical Breathing Window: Keep _isProcessingAiTurn active until the attack animation finishes + a 400ms recovery gap
-      final int turnPacingMs = ((1250 / widget.tickManager.speedMultiplier) / bulletMult).round().clamp(600, 4200);
-      Timer(Duration(milliseconds: turnPacingMs), () {
-        if (mounted) {
-          _isProcessingAiTurn = false;
-          if (_aiService.isEnemyTurn) {
-            _handleAiTurn();
-          } else if (_autoBattle && _isPlayerTurnNow) {
-            _handleAutoPlayerTurn();
+          setState(() {
+            _combatLog = 'Enemy action paused: $e';
+            _isProcessingAiTurn = false;
+            _activeSkillBanner = null;
+          });
+          if (widget.tickManager.phase != CombatPhase.battleEnded) {
+            widget.tickManager.start();
           }
         }
-      });
+      }
     });
   }
 
@@ -978,34 +1048,41 @@ class _BattleScreenState extends State<BattleScreen> {
     }
 
     try {
-      final result = widget.combatService.executeSkill(skill: skill, targetUnitId: targetId);
+      // Execute skill with autoResumeTickEngine: false so the engine pauses until full animation resolution
+      final result = widget.combatService.executeSkill(
+        skill: skill,
+        targetUnitId: targetId,
+        autoResumeTickEngine: false,
+      );
 
       widget.commandService.registerCombatDamage(result.damageDealt);
+      _isProcessingAiTurn = true;
+
+      final bool isFriendlySkill = result.healAmount > 0 ||
+          skill.targetType == SkillTargetType.allAllies ||
+          skill.targetType == SkillTargetType.singleAlly ||
+          skill.targetType == SkillTargetType.lowestHpAlly;
+
+      final String visualTargetId = isFriendlySkill
+          ? (skill.targetType == SkillTargetType.allAllies ? 'team_allies' : result.target.id)
+          : (skill.targetType == SkillTargetType.allEnemies ? 'team_enemies' : result.target.id);
+
+      // Step 1: Show Cut-in Banner and trigger caster lunge/charge animation
+      setState(() {
+        _activeSkillBanner = ActiveSkillCutInBannerData(
+          caster: result.attacker,
+          skill: skill,
+          targetName: isFriendlySkill && skill.targetType == SkillTargetType.allAllies
+              ? 'Entire Vanguard & Squad'
+              : (skill.targetType == SkillTargetType.allEnemies ? 'All Hostile Ranks' : result.target.name),
+          isFriendlySkill: isFriendlySkill,
+        );
+      });
 
       _triggerAttackAnimation(
         result.attacker.id,
-        result.target.id,
+        visualTargetId,
         vfx: _resolveCombatVfx(result.attacker, skill: skill, isCrit: result.isCritical),
-      );
-
-      _isProcessingAiTurn = true;
-      final int playerAnimDuration = (1100 / widget.tickManager.speedMultiplier).round().clamp(600, 2500);
-      Timer(Duration(milliseconds: playerAnimDuration), () {
-        if (mounted) {
-          _isProcessingAiTurn = false;
-          if (_aiService.isEnemyTurn) {
-            _handleAiTurn();
-          }
-        }
-      });
-
-      _triggerDamagePop(
-        damage: result.damageDealt,
-        isCrit: result.isCritical,
-        isGlancing: result.isGlancing,
-        heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
-        targetUnitId: result.target.id,
-        sourceUnitId: result.attacker.id,
       );
 
       if (skill.isLimitBurst) {
@@ -1027,29 +1104,82 @@ class _BattleScreenState extends State<BattleScreen> {
         _popTimers.add(bannerTimer);
       }
 
-      setState(() {
-        final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
-        final critText = result.isCritical ? ' [CRIT!]' : '';
-        final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
-        _combatLog =
-            '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
-        if (result.targetDefeated) {
-          _combatLog += ' ${result.target.name} was eradicated!';
+      // Step 2: Mid-point impact pop for damage/heal/shield numbers
+      final double speedMult = widget.tickManager.speedMultiplier;
+      final int impactDelayMs = (400 / speedMult).round().clamp(250, 800);
+
+      Timer(Duration(milliseconds: impactDelayMs), () {
+        if (!mounted) return;
+        _triggerDamagePop(
+          damage: result.damageDealt,
+          isCrit: result.isCritical,
+          isGlancing: result.isGlancing,
+          heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
+          targetUnitId: result.target.id,
+          sourceUnitId: result.attacker.id,
+        );
+
+        setState(() {
+          final glanceText = result.isGlancing ? ' [GLANCING BLOW -30% DMG]' : '';
+          final critText = result.isCritical ? ' [CRIT!]' : '';
+          final guardedText = result.isGuarded ? ' [GUARDED -20%]' : '';
+          _combatLog =
+              '${result.attacker.name} invoked ${skill.name} on ${result.target.name} for ${result.damageDealt} DMG$critText$glanceText$guardedText.';
+          if (result.targetDefeated) {
+            _combatLog += ' ${result.target.name} was eradicated!';
+          }
+        });
+
+        if (result.isGuarded) {
+          _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
         }
       });
 
-      if (result.isGuarded) {
-        _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
-      }
+      // Step 3: Complete skill resolution, clear cut-in banner, and unpause/resume combat tick engine
+      final int playerAnimDuration = (1150 / speedMult).round().clamp(650, 2400);
+      Timer(Duration(milliseconds: playerAnimDuration), () {
+        if (mounted) {
+          setState(() {
+            _activeSkillBanner = null;
+            _isProcessingAiTurn = false;
+          });
 
-      if (widget.tickManager.enemies.every((u) => !u.isAlive) && !_hasDispatchedEndOutcome) {
-        _hasDispatchedEndOutcome = true;
-        widget.onVictory?.call();
-      }
+          if (widget.tickManager.enemies.every((u) => !u.isAlive) && !_hasDispatchedEndOutcome) {
+            final waves = widget.enemyWaves ?? _localEnemyWaves;
+            if (waves != null && _currentWaveIndex < waves.length - 1) {
+              _currentWaveIndex++;
+              final nextWave = waves[_currentWaveIndex];
+              widget.tickManager.advanceWave(nextWave);
+              final optimalNewTarget = _aiService.selectTargetEnemy();
+              _selectedEnemyId = optimalNewTarget?.id ?? nextWave.firstWhere((e) => e.isAlive).id;
+              _addPop('WAVE ${_currentWaveIndex + 1} ENGAGED!', const Color(0xFFFFD54F), isCrit: true);
+              _combatLog = '[REINFORCEMENTS] Wave ${_currentWaveIndex + 1} of ${waves.length} enters the arena!';
+              setState(() {});
+              widget.tickManager.start();
+            } else {
+              _hasDispatchedEndOutcome = true;
+              widget.onVictory?.call();
+            }
+          } else if (widget.tickManager.phase != CombatPhase.battleEnded) {
+            if (_aiService.isEnemyTurn) {
+              _handleAiTurn();
+            } else if (_autoBattle && _isPlayerTurnNow) {
+              _handleAutoPlayerTurn();
+            } else {
+              widget.tickManager.start();
+            }
+          }
+        }
+      });
     } catch (e) {
       setState(() {
         _combatLog = 'Action failed: $e';
+        _isProcessingAiTurn = false;
+        _activeSkillBanner = null;
       });
+      if (widget.tickManager.phase != CombatPhase.battleEnded) {
+        widget.tickManager.start();
+      }
     }
   }
 
@@ -1911,6 +2041,14 @@ class _BattleScreenState extends State<BattleScreen> {
                 right: 16,
                 child: _buildLimitBurstBanner(_activeLimitBurstBanner!),
               ),
+            // High-Impact Tactical Skill Invocation Cut-In Banner
+            if (_activeSkillBanner != null)
+              Positioned(
+                top: 75,
+                left: 16,
+                right: 16,
+                child: _buildActiveSkillCutInBanner(_activeSkillBanner!),
+              ),
             // Tactical Chrono-Dilation Bullet-Time Overlay
             if (widget.tickManager.isBulletTime || widget.commandService.isBulletTimeActive) ...[
               Positioned.fill(
@@ -2229,6 +2367,130 @@ class _BattleScreenState extends State<BattleScreen> {
                 Text(
                   'Cataclysmic strike unleashed upon ${banner.targetName}!',
                   style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveSkillCutInBanner(ActiveSkillCutInBannerData banner) {
+    final caster = banner.caster;
+    final skill = banner.skill;
+    final isFriendly = banner.isFriendlySkill;
+    final Color primaryColor = isFriendly
+        ? const Color(0xFF81C784)
+        : (caster.isBoss ? const Color(0xFFFF5252) : const Color(0xFFFFD54F));
+    final Color bgColor = isFriendly
+        ? const Color(0xFF0E2214)
+        : (caster.isBoss ? const Color(0xFF2B0E11) : const Color(0xFF1B1812));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: primaryColor, width: 1.8),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withValues(alpha: 0.45),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+          const BoxShadow(
+            color: Colors.black87,
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: primaryColor.withValues(alpha: 0.2),
+              border: Border.all(color: primaryColor, width: 1.5),
+            ),
+            child: Icon(
+              isFriendly ? Icons.shield_outlined : (skill.isLimitBurst ? Icons.flash_on : Icons.auto_awesome),
+              color: primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      isFriendly ? 'SUPPORT / SQUAD ORDER' : (caster.isBoss ? 'TITANIC INTENT UNLEASHED' : 'SKILL INVOCATION'),
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10.5,
+                        letterSpacing: 1.1,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: primaryColor, width: 0.8),
+                      ),
+                      child: Text(
+                        '${caster.name.toUpperCase()} (LV.${caster.level})',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      skill.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12.5,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    if (skill.damageCoefficient > 0) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '(${skill.damageCoefficient}x DMG)',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  isFriendly
+                      ? 'Bestowed upon ${banner.targetName}!'
+                      : (skill.description.isNotEmpty ? skill.description : 'Targeting ${banner.targetName}!'),
+                  style: const TextStyle(color: Colors.white70, fontSize: 9.5),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -4552,6 +4814,40 @@ class _BattleScreenState extends State<BattleScreen> {
                 if (unit.archetype == Archetype.marksman)
                   _buildMarksmanAimFlare(),
               ],
+
+              // Team-Wide Squad Buff / Fortify Aura
+              if (_damagedUnitId == 'team_allies' && !isEnemy && alive)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        width: 85,
+                        height: 85,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFF81C784).withValues(alpha: 0.65),
+                              const Color(0xFFFFD54F).withValues(alpha: 0.35),
+                              Colors.transparent,
+                            ],
+                          ),
+                          border: Border.all(color: const Color(0xFF81C784), width: 1.5),
+                        ),
+                        child: const Icon(Icons.shield, color: Color(0xFF81C784), size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Team-Wide Hostile Cleave / AoE Eradication Blast
+              if ((_damagedUnitId == 'team_enemies' && isEnemy && alive) ||
+                  (_damagedUnitId == 'team_allies_damaged' && !isEnemy && alive))
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: _buildTargetStrikeVfx(_screenFlashType ?? 'slash', isBossUnit),
+                  ),
+                ),
 
               // LAYER 2.8: Bottom Readability Gradient (only for classic cards)
               if (!unit.isFigurineCutout)
