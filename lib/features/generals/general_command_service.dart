@@ -1229,9 +1229,19 @@ class GeneralCommandService extends ChangeNotifier {
     }).toList();
 
     final int defenseBuffPerUnit = max(5, (((totalSacrificedHp * 2.0) * potencyMultiplier) / allies.length).round());
+    final int shieldBuffPerUnit = max(20, (totalSacrificedHp * 1.5 * potencyMultiplier / allies.length).round());
     allies = allies.map((unit) {
       if (!unit.isAlive) return unit;
-      return unit.copyWith(defense: unit.defense + defenseBuffPerUnit);
+      final List<StatusEffect> updatedEffects = List.of(unit.activeEffects);
+      updatedEffects.add(StatusEffect(
+        type: StatusEffectType.shield,
+        durationTurns: 3,
+        value: shieldBuffPerUnit,
+      ));
+      return unit.copyWith(
+        defense: unit.defense + defenseBuffPerUnit,
+        activeEffects: updatedEffects,
+      );
     }).toList();
 
     final List<UnitEntity> enemies = List.of(tickManager.enemies);

@@ -1502,6 +1502,20 @@ class _BattleScreenState extends State<BattleScreen> {
                           color: hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
                         ),
                       ),
+                      // Grand Boss Active Shield: Proportional crisp white overlay
+                      if (boss.maxHp > 0 && boss.shieldPoints > 0)
+                        FractionallySizedBox(
+                          widthFactor: (boss.shieldPoints / boss.maxHp).clamp(0.0, 1.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.88),
+                              border: Border.all(color: Colors.white, width: 1.0),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.white38, blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1854,56 +1868,8 @@ class _BattleScreenState extends State<BattleScreen> {
                   ],
                 ),
               ),
-            // Floating Combat Text Overlay: Positioned directly over target units or falling back to top right
-            ..._floatingPops.map((pop) {
-              if (pop.targetUnitId != null) {
-                final targetKey = _unitCardKeys[pop.targetUnitId!];
-                final targetCtx = targetKey?.currentContext;
-                if (targetCtx != null) {
-                  final box = targetCtx.findRenderObject() as RenderBox?;
-                  if (box != null && box.hasSize) {
-                    final targetPos = box.localToGlobal(Offset.zero);
-                    return Positioned(
-                      left: targetPos.dx,
-                      top: (targetPos.dy - 26).clamp(10.0, double.infinity),
-                      width: box.size.width,
-                      child: IgnorePointer(
-                        child: Center(
-                          child: AnimatedOpacity(
-                            duration: const Duration(milliseconds: 300),
-                            opacity: 1.0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: pop.color.withValues(alpha: 0.8), width: 1.2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: pop.color.withValues(alpha: 0.4),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                pop.text,
-                                style: TextStyle(
-                                  color: pop.color,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: pop.isCrit ? 13 : 11,
-                                  fontFamily: 'monospace',
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                }
-              }
-              // Global announcement or fallback pop (e.g. Wave start, Sacrificed)
+            // Global Combat Text Overlay: Positioned in top-right for announcements (e.g. Wave start, Sacrificed)
+            ..._floatingPops.where((pop) => pop.targetUnitId == null).map((pop) {
               return Positioned(
                 top: 70,
                 right: 24,
@@ -3007,10 +2973,10 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isUltraCompact = screenHeight < 620;
 
     // Consistent tabletop formation: units use the exact same proportions across all skirmish fights
-    final double perUnitWidth = isDesktop ? 135.0 : (isTablet ? 125.0 : 76.0);
-    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 750.0 : (isTablet ? 680.0 : screenWidth));
-    final double cardMaxWidth = isDesktop ? 140.0 : (isTablet ? 130.0 : 92.0);
-    final double horizontalPadding = isDesktop ? 2.5 : (isTablet ? 2.0 : 1.0);
+    final double perUnitWidth = isDesktop ? 160.0 : (isTablet ? 135.0 : 76.0);
+    final double maxClusterWidth = (units.length * perUnitWidth).clamp(320.0, isDesktop ? 860.0 : (isTablet ? 720.0 : screenWidth));
+    final double cardMaxWidth = isDesktop ? 165.0 : (isTablet ? 140.0 : 92.0);
+    final double horizontalPadding = isDesktop ? 3.0 : (isTablet ? 2.0 : 1.0);
 
     // GDD v2.8 Sec 3.4 & 3.5: Leadership Aura checks for Lord Vladislav
     final commander = widget.tickManager.allies.where((u) => u.isCommander).firstOrNull;
@@ -3144,14 +3110,14 @@ class _BattleScreenState extends State<BattleScreen> {
     final bool isTablet = screenWidth >= 600 && screenWidth < 1000;
     final bool isMobile = screenWidth < 600;
 
-    final double stageMaxWidth = isDesktop ? 880.0 : (isTablet ? 760.0 : 640.0);
-    final double bossMaxWidth = isDesktop ? 360.0 : (isTablet ? 320.0 : 280.0);
-    final double minionMaxWidth = isDesktop ? 135.0 : (isTablet ? 120.0 : 100.0);
+    final double stageMaxWidth = isDesktop ? 960.0 : (isTablet ? 800.0 : 640.0);
+    final double bossMaxWidth = isDesktop ? 400.0 : (isTablet ? 340.0 : 280.0);
+    final double minionMaxWidth = isDesktop ? 145.0 : (isTablet ? 125.0 : 100.0);
 
     return Expanded(
       flex: isMobile ? 15 : 13,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 4.0),
+        padding: const EdgeInsets.only(top: 14.0, bottom: 4.0),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: stageMaxWidth),
@@ -4102,9 +4068,9 @@ class _BattleScreenState extends State<BattleScreen> {
     final double heightFactor = (screenHeight / 800.0).clamp(0.85, 1.10);
     final double aspectClamp = aspectRatio > 1.6 ? 0.90 : 1.0;
 
-    // Desktop: 1.45 maintains crisp miniature proportions without towering into the Ashen Front.
+    // Desktop: 1.75 maintains solid, commanding tabletop figurine presence without towering into the Ashen Front.
     // Mobile: 2.15 ensures clear visibility in single-column vertical space.
-    final double baseScale = (isDesktop ? 1.45 : (isMobile ? 2.15 : (isCompact ? 1.70 : 1.85))) * heightFactor * aspectClamp;
+    final double baseScale = (isDesktop ? 1.75 : (isMobile ? 2.15 : (isCompact ? 1.70 : 1.85))) * heightFactor * aspectClamp;
 
     // Tabletop Miniature Equalization:
     // Standing humanoid poses (Footman, Marksman, Cleric): ~627px height -> scale 1.0
@@ -4402,7 +4368,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
               // LAYER 1: Open Character Miniature & 3D Faction Ground Plinth
               Positioned(
-                top: isBossUnit ? (isCompact ? -6 : -14) : (unit.isFigurineCutout ? (isCompact ? -2 : -4) : 0),
+                top: isBossUnit ? (isCompact ? 4.0 : 10.0) : (unit.isFigurineCutout ? (isCompact ? -2 : -4) : 0),
                 bottom: hudHeight + 2.0,
                 left: 1,
                 right: 1,
@@ -5157,6 +5123,42 @@ class _BattleScreenState extends State<BattleScreen> {
                     ),
                   ),
                 ],
+                // 3. Floating Combat Pops anchored 100% directly over this unit's head
+                ..._floatingPops.where((p) => p.targetUnitId == unit.id).map((pop) {
+                  return Positioned(
+                    top: isBossUnit ? -34 : -24,
+                    left: 0,
+                    right: 0,
+                    child: IgnorePointer(
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.90),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: pop.color.withValues(alpha: 0.9), width: 1.2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: pop.color.withValues(alpha: 0.5),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            pop.text,
+                            style: TextStyle(
+                              color: pop.color,
+                              fontWeight: FontWeight.w900,
+                              fontSize: pop.isCrit ? 13 : 11,
+                              fontFamily: 'monospace',
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ],
             ),
           );
@@ -6353,27 +6355,33 @@ class _BattleScreenState extends State<BattleScreen> {
                           ),
                         ),
                       ),
-                      // Ghost Shield Overlay Preview (semi-transparent golden/cyan buffer)
+                      // Ghost Shield Overlay Preview (clean proportional semi-transparent white buffer)
                       if (ghostShieldRatio > 0)
                         FractionallySizedBox(
                           widthFactor: projectedShield,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFF80D8FF).withValues(alpha: 0.65),
+                              color: Colors.white.withValues(alpha: 0.50),
                               borderRadius: BorderRadius.circular(2.0),
-                              border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                              border: Border.all(color: Colors.white70, width: 1.0),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.white24, blurRadius: 4),
+                              ],
                             ),
                           ),
                         ),
-                      // Actual Active Shield
+                      // Actual Active Shield: Proportional crisp white overlay over the health bar
                       if (shieldIntegrity > 0)
                         FractionallySizedBox(
                           widthFactor: shieldIntegrity,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFD54F).withValues(alpha: 0.90),
+                              color: Colors.white.withValues(alpha: 0.88),
                               borderRadius: BorderRadius.circular(2.0),
-                              border: Border.all(color: Colors.white, width: 0.8),
+                              border: Border.all(color: Colors.white, width: 1.0),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.white38, blurRadius: 4),
+                              ],
                             ),
                           ),
                         ),
