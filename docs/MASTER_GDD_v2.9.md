@@ -1,19 +1,20 @@
 # CRUCIBLE OF ASH: MINIATURE BATTLER
-## Master Game Design Document v2.9 (Asymmetric Rule-Breaking & Discrete Formation Specification)
+## Master Game Design Document v3.0 (Living Mineral Wargaming & Kinetic Combat Calibration)
 
 **Engine / Runtime:** Fixed 30 Hz Deterministic Simulation Loop (Dart) decoupled from Flutter / Impeller presentation  
-**Target Viewports:** Responsive 9:16 Mobile Portrait primary (390×844 logical px); 16:9 Landscape adaptable  
-**Aesthetic Metaphor:** Dark Fantasy / Living Mineral Tabletop Miniature Wargame on physicalized kinetic plinths  
+**Target Viewports:** Adaptive Multi-Form Factor (Mobile Portrait 390×844 logical px; Desktop Window 1280×900; 16:9 Landscape)  
+**Aesthetic Metaphor:** Dark Fantasy / Living Mineral Tabletop Miniature Wargame on kinetic 3D plinths  
 
 ---
 
 ## 1. Executive Summary & Core Pillars
-*Crucible of Ash: Miniature Battler* is a tactical roguelite battler combining deterministic spatial simulation, deep pre-battle sequence planning, and real-time alchemical card intervention.
+*Crucible of Ash: Miniature Battler* is a tactical dark fantasy tabletop battler combining deterministic spatial simulation, deep pre-battle sequence planning, and high-impact real-time alchemical card intervention.
 
 - **The Arch-Sculptor & Living Mineral:** The player is an off-board alchemist commanding mineral constructs animated by pressurized Vitae and anchored to earth by kinetic plinth grounding seals.
 - **Rule-Breaking Asymmetry (MtG Design Philosophy):** Baseline game rules (Focus pool, starting budget, fill rates, deck capacity, hand size) serve merely as defaults. Individual Commanders, Factions, and Cards explicitly bend, break, or invert these rules to create wildly distinct strategic identities.
 - **Deterministic Column & Row Spatial Geometry:** Pre-battle placement across a 5-column, 2-row plane dictates combat flow. Targeting, synergy buffs, and guard mechanics resolve with mathematical predictability.
-- **Pure Strategic Agency (Zero Quick-Time Events):** Combat outcomes depend strictly on preparation, composition, speed-tuning, and tactical card timing—without reflex-based tap or swipe prompts.
+- **High-Impact Tactical Feedback Loop:** Real-time 30% tactical bullet-time enables precision decision-making. Ghost HP slices, proportional white shield overlays, intent interruption cues, and energy tethers make every action legible before execution.
+- **Decoupled Asset Architecture:** Clean, transparent character cutouts are rendered dynamically with procedural matrix transforms, hit-stops, directional strike VFX, and canvas shockwaves—eliminating the need for separate effect layers baked into sprite files.
 - **Low-Inflation Progression (Classic WoW Ethos):** Numbers remain compressed and human-readable. Upgrades, socketed chisels, and Crucible fusions yield tangible, calculated advantages rather than exponential power creep.
 
 ---
@@ -190,3 +191,29 @@ Every major boss operates as a unique tactical puzzle rather than a generic HP-s
 
 ### 7.3 Player Time Respect: Instant Extraction
 Achieving a 3-star Flawless Clear (no casualties) on any resource crypt permanently unlocks **Instant Sweep / Extraction**, letting players bypass daily resource grinding and focus playtime on unsolved roguelite descents and trials.
+
+---
+
+## 8. Presentation Engine & Decoupled Asset Pipeline (v3.0)
+
+### 8.1 The Layered Miniature Pipeline (Do We Need an Effects File?)
+**Engineering Principle:** **No separate sprite effects file is required for unit animation.** 
+The visual presentation cleanly decouples character cutouts from dynamic effects:
+
+1. **Layer 1A — Kinetic 3D Plinth Canvas:** 
+   - Faction ground contact shadow and glowing circular rim seals painted procedurally using `RadialGradient` and custom oval contact ellipses.
+2. **Layer 1B — Clean Transparent Character PNG:**
+   - Single isolated character miniature cutout with transparent background.
+   - Animated procedurally via Flutter matrix transforms (`Matrix4.translationValues` for lunges and hit recoils, `rotateZ` for attack tilts, and `scale` for impact punch).
+   - Dynamic `ColorFilter` applications flash the model red on hits (`0xFFFF1744`) or apply alpha-safe desaturation when incapacitated (`kAlphaSafeGreyscaleFilter`).
+3. **Layer 2 — Procedural Directional Strike VFX:**
+   - Slash trails, piercing arrows, crushing hammer arcs, and arcane sigils are drawn dynamically over the unit using vector geometry and radial gradients (`_buildTargetStrikeVfx`).
+4. **Layer 3 — Tactical Inlaid HUD:**
+   - Archetype gems, proportional health bars, and crisp white shield overlays (`Colors.white.withValues(alpha: 0.88)`).
+5. **Layer 4 — Localized Floating Combat Text:**
+   - Damage, healing, and shield numbers float directly above each unit's local card stack (`top: -24px` for units, `-34px` for titans).
+
+### 8.2 Production Guidelines for Asset Generation (Gemini Prompts)
+- **Unit Characters:** 1024×1024 PNG with transparent alpha background. Clean contours, grounded poses with feet aligned to the lower margin. **Never bake static fire, slash trails, or blood splatters into the character PNG.**
+- **Tactical Tuning Slips (Cards):** 600×900 vertical slate/metal cards showing alchemical rites in high contrast.
+- **Battlefield Sceneries:** 1920×1080 / 1080×1920 JPGs with atmospheric depth and darker lower halves to maintain combat readability.
