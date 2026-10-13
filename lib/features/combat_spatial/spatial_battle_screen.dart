@@ -28,6 +28,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _selectedUnitId;
   SpatialCombatCard? _draggedCard;
 
+  // Visual Combat Feedback State
+  String? _attackingUnitId;
+  String? _damagedUnitId;
+  String? _activeSkillName;
+  String? _activeSkillCasterName;
+  bool _isPlayerSkillBanner = false;
+  final Map<String, String> _unitFloatingPops = {};
+  final List<Timer> _animTimers = [];
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +46,52 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _onEngineUpdate() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+
+    // Check if a new combat action event was dispatched
+    final event = _engine.activeActionEvent;
+    if (event != null && event.attackerId != _attackingUnitId) {
+      _triggerVisualCombatSequence(event);
+    }
+
+    setState(() {});
+  }
+
+  void _triggerVisualCombatSequence(SpatialActionEvent event) {
+    setState(() {
+      _attackingUnitId = event.attackerId;
+      _damagedUnitId = event.targetId;
+      _activeSkillName = event.skillName;
+      _activeSkillCasterName = event.attackerName;
+      _isPlayerSkillBanner = event.isPlayerAttacker;
+      _unitFloatingPops[event.targetId] = '-${event.damage} DMG';
+      if (event.bleedStacks > 0) {
+        _unitFloatingPops[event.targetId] = '-${event.damage} DMG (🩸+${event.bleedStacks})';
+      }
+    });
+
+    // Reset visual lunge & floating pops after 650ms
+    final t1 = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) {
+        setState(() {
+          _attackingUnitId = null;
+          _damagedUnitId = null;
+          _unitFloatingPops.remove(event.targetId);
+        });
+      }
+    });
+    _animTimers.add(t1);
+
+    // Dismiss banner after 1200ms
+    final t2 = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() {
+          _activeSkillName = null;
+        });
+        _engine.clearActiveAction();
+      }
+    });
+    _animTimers.add(t2);
   }
 
   void _startLoop() {
@@ -55,6 +109,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   @override
   void dispose() {
     _loopTimer?.cancel();
+    for (final t in _animTimers) {
+      t.cancel();
+    }
+    _animTimers.clear();
     _engine.removeListener(_onEngineUpdate);
     super.dispose();
   }
@@ -151,6 +209,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           children: [
             // Top HUD: Status Banner, Focus Bar & Boss Telemetry
             _buildTopStatusRibbon(gorgoroth),
+
+            // Live Skill Invocation Banner
+            if (_activeSkillName != null)
+              _buildSkillCutInBanner(),
 
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
@@ -493,189 +555,286 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+  Widget _buildSkillCutInBanner() {
+    final Color themeColor = _isPlayerSkillBanner ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141E).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: themeColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: themeColor.withValues(alpha: 0.4),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _isPlayerSkillBanner ? Icons.auto_awesome : Icons.warning_rounded,
+            color: themeColor,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _activeSkillCasterName?.toUpperCase() ?? 'CONSTRUCT',
+            style: TextStyle(
+              color: themeColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 10,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text('•', style: TextStyle(color: Colors.white38)),
+          const SizedBox(width: 6),
+          Text(
+            _activeSkillName?.toUpperCase() ?? 'ATTACK',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUnitMiniatureWidget(CombatUnitState unit, {bool isDragging = false, bool isSelected = false}) {
     final bool isBoss = unit.footprint == UnitFootprint.horizontal1x2;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
 
-    return SizedBox(
-      width: isDragging ? 80 : double.infinity,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Tabletop 3D Plinth Base (Elliptical Ground Pedestal)
-          Positioned(
-            bottom: 12,
-            left: 4,
-            right: 4,
-            child: Center(
-              child: Container(
-                width: isBoss ? 110 : 54,
-                height: 14,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.elliptical(50, 12)),
-                  gradient: RadialGradient(
-                    colors: [
-                      factionColor.withValues(alpha: isSelected ? 0.6 : 0.35),
-                      Colors.black87,
-                      Colors.transparent,
+    final bool isAttacking = _attackingUnitId == unit.id;
+    final bool isDamaged = _damagedUnitId == unit.id;
+    final String? floatingPop = _unitFloatingPops[unit.id];
+
+    // Lunge forward across clash line during attack
+    final double lungeY = isAttacking ? (unit.isPlayer ? -16.0 : 16.0) : 0.0;
+    final double hitShakeX = isDamaged ? 4.0 : 0.0;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutBack,
+      transform: Matrix4.translationValues(hitShakeX, lungeY, 0),
+      child: SizedBox(
+        width: isDragging ? 80 : double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // 1. Tabletop 3D Plinth Base (Elliptical Ground Pedestal)
+            Positioned(
+              bottom: 12,
+              left: 4,
+              right: 4,
+              child: Center(
+                child: Container(
+                  width: isBoss ? 110 : 54,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.all(Radius.elliptical(50, 12)),
+                    gradient: RadialGradient(
+                      colors: [
+                        factionColor.withValues(alpha: isSelected || isAttacking ? 0.75 : 0.35),
+                        Colors.black87,
+                        Colors.transparent,
+                      ],
+                    ),
+                    border: Border.all(
+                      color: isSelected || isAttacking ? factionColor : factionColor.withValues(alpha: 0.5),
+                      width: isSelected || isAttacking ? 1.8 : 0.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
+                        blurRadius: isSelected || isAttacking ? 10 : 4,
+                      ),
                     ],
                   ),
-                  border: Border.all(
-                    color: isSelected ? factionColor : factionColor.withValues(alpha: 0.5),
-                    width: isSelected ? 1.5 : 0.8,
+                ),
+              ),
+            ),
+
+            // 2. Character Model Miniature Cutout
+            Positioned(
+              bottom: 14,
+              top: 2,
+              left: 2,
+              right: 2,
+              child: Center(
+                child: ColorFiltered(
+                  colorFilter: isDamaged
+                      ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
+                      : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                  child: Image.asset(
+                    unit.assetPath,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      unit.isPlayer ? Icons.shield : Icons.dangerous,
+                      color: factionColor,
+                      size: isBoss ? 36 : 24,
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: factionColor.withValues(alpha: isSelected ? 0.5 : 0.2),
-                      blurRadius: isSelected ? 8 : 4,
-                    ),
-                  ],
                 ),
               ),
             ),
-          ),
 
-          // 2. Character Model Miniature Cutout
-          Positioned(
-            bottom: 14,
-            top: 2,
-            left: 2,
-            right: 2,
-            child: Center(
-              child: Image.asset(
-                unit.assetPath,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (context, error, stackTrace) => Icon(
-                  unit.isPlayer ? Icons.shield : Icons.dangerous,
-                  color: factionColor,
-                  size: isBoss ? 36 : 24,
-                ),
-              ),
-            ),
-          ),
-
-          // 3. Name, Badges & Slag Carapace Overlays
-          Positioned(
-            top: 1,
-            left: 2,
-            right: 2,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (unit.isSlagCarapaceActive)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 1),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF221115),
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
-                    ),
-                    child: const Text(
-                      'CARAPACE -50%',
-                      style: TextStyle(
-                        fontSize: 6.5,
-                        color: Color(0xFFFFD54F),
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+            // 3. Name, Badges & Slag Carapace Overlays
+            Positioned(
+              top: 1,
+              left: 2,
+              right: 2,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (unit.isSlagCarapaceActive)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF221115),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
                       ),
-                    ),
-                  ),
-                if (unit.bleedStacks > 0)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 1),
-                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFB71C1C),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: Text(
-                      '🩸 ${unit.bleedStacks}x BLEED',
-                      style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (unit.isDisplacementImmune)
-                      const Icon(Icons.anchor, size: 9, color: Color(0xFFFFD54F)),
-                    const SizedBox(width: 1),
-                    Flexible(
-                      child: Text(
-                        unit.name,
+                      child: const Text(
+                        'CARAPACE -50%',
                         style: TextStyle(
-                          fontSize: isBoss ? 8.5 : 7.5,
+                          fontSize: 6.5,
+                          color: Color(0xFFFFD54F),
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          shadows: const [
-                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 1)),
-                          ],
+                          letterSpacing: 0.5,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  if (unit.bleedStacks > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB71C1C),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Text(
+                        '🩸 ${unit.bleedStacks}x BLEED',
+                        style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (unit.isDisplacementImmune)
+                        const Icon(Icons.anchor, size: 9, color: Color(0xFFFFD54F)),
+                      const SizedBox(width: 1),
+                      Flexible(
+                        child: Text(
+                          unit.name,
+                          style: TextStyle(
+                            fontSize: isBoss ? 8.5 : 7.5,
+                            fontWeight: FontWeight.bold,
+                            color: isAttacking ? const Color(0xFFFFD54F) : Colors.white,
+                            shadows: const [
+                              Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 1)),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // 4. Bottom Tactical HUD: HP & AP Turn Meters
-          Positioned(
-            bottom: 0,
-            left: 3,
-            right: 3,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // HP Bar
-                Container(
-                  height: 3.5,
+            // 4. Floating Damage / Effect Pop Text
+            if (floatingPop != null)
+              Positioned(
+                top: -8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: Colors.white24, width: 0.4),
+                    color: Colors.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black, blurRadius: 6),
+                    ],
                   ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: hpRatio,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: unit.isPlayer ? const Color(0xFF81C784) : const Color(0xFFE53935),
-                        borderRadius: BorderRadius.circular(1.5),
-                      ),
+                  child: Text(
+                    floatingPop,
+                    style: const TextStyle(
+                      color: Color(0xFFFF5252),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
-                const SizedBox(height: 1),
-                // AP Turn Meter
-                Container(
-                  height: 2.5,
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: apRatio,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD54F),
-                        borderRadius: BorderRadius.circular(1),
+              ),
+
+            // 5. Bottom Tactical HUD: HP & AP Turn Meters
+            Positioned(
+              bottom: 0,
+              left: 3,
+              right: 3,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // HP Bar
+                  Container(
+                    height: 3.5,
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(color: Colors.white24, width: 0.4),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: hpRatio,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: unit.isPlayer ? const Color(0xFF81C784) : const Color(0xFFE53935),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 1),
+                  // AP Turn Meter
+                  Container(
+                    height: 2.5,
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(1.5),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: apRatio,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD54F),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -27,9 +27,20 @@ class SpatialCombatEngine extends ChangeNotifier {
   // Recent Event Logs & Popups
   final List<String> combatLogs = [];
   String? lastBannerMessage;
+  SpatialActionEvent? activeActionEvent;
 
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
+  }
+
+  void dispatchAction(SpatialActionEvent event) {
+    activeActionEvent = event;
+    notifyListeners();
+  }
+
+  void clearActiveAction() {
+    activeActionEvent = null;
+    notifyListeners();
   }
 
   /// Sets up Encounter 4: "The Sunder at Ashen Gate" per GDD v3.2 Spec
@@ -347,6 +358,18 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
         addLog('${unit.name} strikes ${target.name} for $dmg DMG ($target.hp/${target.maxHp} HP).');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Pyre Skewer',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: false,
+          pattern: TargetPattern.piercingColumnSkewer,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'sanguine_blade') {
       // Sanguine Blade: Sits in Col 4 Midline. Direct facing Col 4 is empty; cascades to adjacent Col 3 (Gorgoroth)
@@ -356,6 +379,19 @@ class SpatialCombatEngine extends ChangeNotifier {
         final dmg = target.takeDamage(unit.attack);
         target.bleedStacks += 2;
         addLog('${unit.name} executes Flensing Thrust on ${target.name} for $dmg DMG & 2 BLEED stacks!');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Flensing Thrust',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          bleedStacks: 2,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.reachMidToFront,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'cinder_witch') {
       // Cinder Witch: Launches flame bolt down Col 2
@@ -363,6 +399,18 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
         addLog('${unit.name} casts Cinder Orb on ${target.name} for $dmg DMG.');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Cinder Orb',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: false,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'lady_valeria') {
       // Valeria basic attack down facing column
@@ -370,18 +418,54 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
         addLog('${unit.name} slashes ${target.name} for $dmg DMG.');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Sunbrand Slash',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'iron_footman') {
       final target = _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: false);
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
         addLog('${unit.name} bashes ${target.name} for $dmg DMG.');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Shield Bash',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'sun_smith') {
       final target = enemyUnits.where((u) => u.isAlive).firstOrNull;
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
         addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Sun-Bolt Volley',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (unit.id == 'gorgoroth_boss') {
       // Regular attack if not channeling
@@ -391,6 +475,18 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (target != null) {
           final dmg = target.takeDamage(unit.attack);
           addLog('${unit.name} crushes ${target.name} for $dmg DMG.');
+          dispatchAction(SpatialActionEvent(
+            id: 'act_${currentTick}_${unit.id}',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Titanic Crush',
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isPlayerAttacker: false,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
         }
       }
     }

@@ -19,6 +19,41 @@ enum TargetPattern {
   flankShadowLeap,
 }
 
+/// Visual combat action event dispatched by the simulation engine
+class SpatialActionEvent {
+  final String id;
+  final String attackerId;
+  final String attackerName;
+  final String skillName;
+  final String targetId;
+  final String targetName;
+  final int damage;
+  final bool isCrit;
+  final bool isHeal;
+  final int bleedStacks;
+  final bool isPlayerAttacker;
+  final TargetPattern pattern;
+  final List<GridNode> affectedNodes;
+  final int timestampMs;
+
+  const SpatialActionEvent({
+    required this.id,
+    required this.attackerId,
+    required this.attackerName,
+    required this.skillName,
+    required this.targetId,
+    required this.targetName,
+    required this.damage,
+    this.isCrit = false,
+    this.isHeal = false,
+    this.bleedStacks = 0,
+    required this.isPlayerAttacker,
+    this.pattern = TargetPattern.singleTarget,
+    this.affectedNodes = const [],
+    required this.timestampMs,
+  });
+}
+
 /// Dynamic grid node representation on the 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column (0..4) plane
 class GridNode {
   final int column; // 0 to 4
