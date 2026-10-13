@@ -208,6 +208,7 @@ class BattleScreen extends StatefulWidget {
   final ValueChanged<int>? onSigilsChanged;
   final VoidCallback? onResetEncounter;
   final VoidCallback? onDeployMvpSkirmish;
+  final VoidCallback? onOpenSpatialCombat;
   final VoidCallback? onVictory;
   final VoidCallback? onDefeat;
   final List<List<UnitEntity>>? enemyWaves;
@@ -227,6 +228,7 @@ class BattleScreen extends StatefulWidget {
     this.onPhylacteryUpgraded,
     this.onResetEncounter,
     this.onDeployMvpSkirmish,
+    this.onOpenSpatialCombat,
     this.onVictory,
     this.onDefeat,
     this.enemyWaves,
@@ -2609,6 +2611,43 @@ class _BattleScreenState extends State<BattleScreen> {
                       ),
                     ),
                   ),
+
+                  if (widget.onOpenSpatialCombat != null) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: widget.onOpenSpatialCombat,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.grid_on_rounded, color: Color(0xFF00E5FF), size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'SPATIAL v3.2',
+                              style: TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 9.0,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
 
                 SizedBox(width: isMobile ? 4 : 6),

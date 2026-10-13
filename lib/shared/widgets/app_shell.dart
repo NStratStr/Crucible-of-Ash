@@ -14,6 +14,7 @@ import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/combat/post_battle_loot_dialog.dart';
+import '../../features/combat_spatial/spatial_battle_screen.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
@@ -57,6 +58,7 @@ class _AppShellState extends State<AppShell> {
   int _maxUnlockedChapter = 1;
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
+  bool _isSpatialCombatActive = false;
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
@@ -1440,32 +1442,41 @@ class _AppShellState extends State<AppShell> {
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
                     }),
                   ),
-                  // Tab 1: Tactical Arena
-                  BattleScreen(
-                    key: ValueKey(_tickManager),
-                    tickManager: _tickManager,
-                    combatService: _combatService,
-                    commandService: _commandService,
-                    relicService: _relicService,
-                    bloodlineSigils: _bloodlineSigils,
-                    enemyWaves: _activeEnemyWaves,
-                    initialAutoBattle: widget.enableAutoBattle,
-                    startInPreBattleSetup: true,
-                    onSigilsChanged: (val) {
-                      setState(() => _bloodlineSigils = val);
-                      _saveCurrentState();
-                    },
-                    onPhylacteryUpgraded: (genType, newRank) {
-                      setState(() {
-                        _phylacteryRanks[genType] = newRank;
-                      });
-                      _saveCurrentState();
-                    },
-                    onResetEncounter: () => setState(_resetEncounter),
-                    onDeployMvpSkirmish: _launchMvpThreeWaveSkirmish,
-                    onVictory: _onCombatVictory,
-                    onDefeat: _onCombatDefeat,
-                  ),
+                  // Tab 1: Tactical Arena (Standard or Spatial v3.2 Mode)
+                  _isSpatialCombatActive
+                      ? SpatialBattleScreen(
+                          onBackToStandardCombat: () {
+                            setState(() => _isSpatialCombatActive = false);
+                          },
+                        )
+                      : BattleScreen(
+                          key: ValueKey(_tickManager),
+                          tickManager: _tickManager,
+                          combatService: _combatService,
+                          commandService: _commandService,
+                          relicService: _relicService,
+                          bloodlineSigils: _bloodlineSigils,
+                          enemyWaves: _activeEnemyWaves,
+                          initialAutoBattle: widget.enableAutoBattle,
+                          startInPreBattleSetup: true,
+                          onSigilsChanged: (val) {
+                            setState(() => _bloodlineSigils = val);
+                            _saveCurrentState();
+                          },
+                          onPhylacteryUpgraded: (genType, newRank) {
+                            setState(() {
+                              _phylacteryRanks[genType] = newRank;
+                            });
+                            _saveCurrentState();
+                          },
+                          onResetEncounter: () => setState(_resetEncounter),
+                          onDeployMvpSkirmish: _launchMvpThreeWaveSkirmish,
+                          onOpenSpatialCombat: () {
+                            setState(() => _isSpatialCombatActive = true);
+                          },
+                          onVictory: _onCombatVictory,
+                          onDefeat: _onCombatDefeat,
+                        ),
                   // Tab 2: Crucible Altar
                   CrucibleScreen(
                     availableInventory: allPlayerUnits,
