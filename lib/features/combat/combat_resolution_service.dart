@@ -450,6 +450,10 @@ class CombatResolutionService {
       updatedEnemies = updatedFriendly;
     }
 
+    if (attackerIsAlly) {
+      commandService?.registerMicroVitae(0.25);
+    }
+
     tickManager.consumeTurn(
       retainedOverflow: false,
       updatedAllies: updatedAllies,
@@ -850,6 +854,13 @@ class CombatResolutionService {
           return e.copyWith(activeEffects: effects);
         }).toList();
       }
+    }
+
+    if (attackerIsAlly) {
+      commandService?.registerMicroVitae(0.25);
+    } else {
+      // Friendly unit mitigated a hostile blow
+      commandService?.registerMicroVitae(0.15);
     }
 
     tickManager.consumeTurn(

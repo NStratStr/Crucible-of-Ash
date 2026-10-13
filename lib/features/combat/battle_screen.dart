@@ -33,6 +33,57 @@ class FloatingCombatText {
   });
 }
 
+class SiphonTetherPainter extends CustomPainter {
+  final Offset start;
+  final Offset end;
+  final Color color;
+
+  const SiphonTetherPainter({
+    required this.start,
+    required this.end,
+    this.color = const Color(0xFFFF1744),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.55)
+      ..strokeWidth = 6.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+    final corePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(start.dx, start.dy)
+      ..quadraticBezierTo(
+        (start.dx + end.dx) / 2 + 15,
+        (start.dy + end.dy) / 2 - 25,
+        end.dx,
+        end.dy,
+      );
+
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, corePaint);
+
+    // Glowing energy nodes at both endpoints
+    canvas.drawCircle(start, 5.0, Paint()..color = color);
+    canvas.drawCircle(start, 2.5, Paint()..color = Colors.white);
+    canvas.drawCircle(end, 5.0, Paint()..color = const Color(0xFF00E676));
+    canvas.drawCircle(end, 2.5, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant SiphonTetherPainter oldDelegate) {
+    return oldDelegate.start != start || oldDelegate.end != end || oldDelegate.color != color;
+  }
+}
+
 class GeneralOrderBannerData {
   final String generalName;
   final String orderName;
@@ -127,6 +178,8 @@ class _BattleScreenState extends State<BattleScreen> {
   String? _dragHoveringSlotUnitId;
   bool _dragHoveringIsFrontline = true;
   String? _dragHoveringSpellTargetUnitId;
+  GeneralOrderDefinition? _dragHoveringSpellOrder;
+  final Map<String, GlobalKey> _unitCardKeys = {};
   final List<GlobalKey> _alliedSlotKeys = List.generate(5, (_) => GlobalKey());
 
   void _commenceBattle() {
@@ -990,20 +1043,37 @@ class _BattleScreenState extends State<BattleScreen> {
         _screenFlashColorOverride = profile.themeColor;
       });
 
+      // Audio & Haptic Punch on Release: Heavy screen shake + haptic thud + hit-stop
+      _triggerScreenShake(isHeavy: true);
+      HapticFeedback.heavyImpact();
+
+      // On-Tempo Vitae Rebate:
+      // If a defensive/ward/interrupt spell is cast within the final 0.5s of enemy intent (TM >= 85%),
+      // grant an immediate +1 Vitae "PERFECT BLOCK" rebate!
+      final hasNearImminentEnemy = widget.tickManager.enemies.any((e) => e.isAlive && e.turnMeter >= 85.0);
+      if (hasNearImminentEnemy &&
+          (order.id == 'sanguine_ward' || order.id == 'iron_bulwark' || order.id == 'stand_resolute' || order.id == 'disrupting_cleave')) {
+        widget.commandService.grantFocus(1);
+        _addPop('⚡ PERFECT TIMING! +1 VITAE REBATE ⚡', const Color(0xFFFFD54F), isCrit: true);
+      }
+
       // Spawn floating pops based on delta between pre- and post-order stats
       for (final newE in widget.tickManager.enemies) {
         final oldE = oldEnemies.where((e) => e.id == newE.id).firstOrNull;
         if (oldE != null) {
           if (oldE.isAlive && !newE.isAlive) {
-            _addPop('EXECUTED', const Color(0xFFFF5252), isCrit: true);
+            _addPop('☠ EXECUTED', const Color(0xFFFF5252), isCrit: true);
           } else if (oldE.currentHp > newE.currentHp) {
             final diff = oldE.currentHp - newE.currentHp;
-            _addPop('-$diff', const Color(0xFFEF5350));
+            if (order.id == 'siphon_vitality') {
+              _addPop('-$diff DRAIN', const Color(0xFFFF1744), isCrit: true);
+            } else {
+              _addPop('-$diff', const Color(0xFFEF5350), isCrit: true);
+            }
           }
           if (oldE.turnMeter > newE.turnMeter && (oldE.turnMeter - newE.turnMeter) >= 20) {
             final tmDiff = (oldE.turnMeter - newE.turnMeter).round();
             _addPop('-$tmDiff% TM STAGGER', const Color(0xFFFF9100), isCrit: true);
-            _triggerScreenShake(isHeavy: true);
           }
           final oldBleeds = oldE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
           final newBleeds = newE.activeEffects.where((e) => e.type == StatusEffectType.bleed).length;
@@ -1020,13 +1090,13 @@ class _BattleScreenState extends State<BattleScreen> {
             _addPop('RESURRECTED', const Color(0xFF81C784), isCrit: true);
           } else if (newA.currentHp > oldA.currentHp) {
             final diff = newA.currentHp - oldA.currentHp;
-            _addPop('+$diff HP', const Color(0xFF81C784));
+            _addPop('+$diff HP', const Color(0xFF81C784), isCrit: true);
           }
           if (newA.turnMeter > oldA.turnMeter && (newA.turnMeter - oldA.turnMeter) >= 25) {
             _addPop('+TM SURGE', const Color(0xFF00E5FF));
           }
           if (newA.defense > oldA.defense) {
-            _addPop('+ARMOR', const Color(0xFF42A5F5));
+            _addPop('+ARMOR WARD', const Color(0xFFFFD54F), isCrit: true);
           }
         }
       }
@@ -1239,17 +1309,60 @@ class _BattleScreenState extends State<BattleScreen> {
               ],
             ),
             const SizedBox(height: 3),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: hpRatio,
-                minHeight: 7.0,
-                backgroundColor: const Color(0xFF2A2A38),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
+            Builder(builder: (ctx) {
+              final bool isHoveredBoss = _dragHoveringSpellTargetUnitId == boss.id;
+              final activeSpell = isHoveredBoss ? _dragHoveringSpellOrder : null;
+              double ghostDamageRatio = 0.0;
+              if (activeSpell != null) {
+                if (activeSpell.id == 'siphon_vitality') {
+                  ghostDamageRatio = 0.15;
+                } else if (activeSpell.id == 'rend_flesh') {
+                  ghostDamageRatio = 0.20;
+                } else if (activeSpell.id == 'exsanguinating_strike') {
+                  ghostDamageRatio = boss.currentHp <= (boss.maxHp * 0.25) ? 1.0 : 0.35;
+                } else if (activeSpell.id == 'feast_of_ruin') {
+                  ghostDamageRatio = boss.currentHp <= (boss.maxHp * 0.20) ? 1.0 : 0.25;
+                } else if (activeSpell.id == 'disrupting_cleave') {
+                  ghostDamageRatio = 0.18;
+                } else if (activeSpell.id == 'smite_the_wicked') {
+                  ghostDamageRatio = 0.30;
+                }
+              }
+
+              final double postDmgRatio = (hpRatio - ghostDamageRatio).clamp(0.0, 1.0);
+
+              return SizedBox(
+                height: 8.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: Stack(
+                    children: [
+                      Container(color: const Color(0xFF2A2A38)),
+                      // Ghost Damage Slice (flashing amber/red)
+                      if (ghostDamageRatio > 0)
+                        FractionallySizedBox(
+                          widthFactor: hpRatio,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFB300).withValues(alpha: 0.90),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0xFFFF9100), blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      // Actual HP bar
+                      FractionallySizedBox(
+                        widthFactor: ghostDamageRatio > 0 ? postDmgRatio : hpRatio,
+                        child: Container(
+                          color: hpRatio > 0.4 ? const Color(0xFFC62828) : const Color(0xFFFF1744),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            }),
             const SizedBox(height: 2),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1333,6 +1446,28 @@ class _BattleScreenState extends State<BattleScreen> {
                                       color: Color(0xFFFF8A80),
                                       fontSize: 7.0,
                                       fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                                if (_dragHoveringSpellTargetUnitId == boss.id &&
+                                    (_dragHoveringSpellOrder?.id == 'disrupting_cleave' || _dragHoveringSpellOrder?.id == 'feast_of_ruin')) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF1744),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.cancel, size: 8, color: Colors.white),
+                                        SizedBox(width: 2),
+                                        Text(
+                                          'INTERRUPT',
+                                          style: TextStyle(color: Colors.white, fontSize: 6.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -1721,6 +1856,37 @@ class _BattleScreenState extends State<BattleScreen> {
                   ),
                 ),
               ),
+            // Glowing Siphon Vitality Tether Line (Connecting targeted enemy to frontline ally recipient)
+            if (_dragHoveringSpellOrder?.id == 'siphon_vitality' && _dragHoveringSpellTargetUnitId != null)
+              Builder(builder: (ctx) {
+                final targetKey = _unitCardKeys[_dragHoveringSpellTargetUnitId!];
+                final targetContext = targetKey?.currentContext;
+                final recipientAlly = widget.tickManager.allies.where((u) => u.isAlive && u.isVanguard).firstOrNull ??
+                    widget.tickManager.allies.where((u) => u.isAlive).firstOrNull;
+                final recipientKey = recipientAlly != null ? _unitCardKeys[recipientAlly.id] : null;
+                final recipientContext = recipientKey?.currentContext;
+
+                if (targetContext != null && recipientContext != null) {
+                  final targetBox = targetContext.findRenderObject() as RenderBox?;
+                  final recipientBox = recipientContext.findRenderObject() as RenderBox?;
+                  if (targetBox != null && recipientBox != null && targetBox.hasSize && recipientBox.hasSize) {
+                    final targetGlobal = targetBox.localToGlobal(targetBox.size.center(Offset.zero));
+                    final recipientGlobal = recipientBox.localToGlobal(recipientBox.size.center(Offset.zero));
+                    return Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: SiphonTetherPainter(
+                            start: targetGlobal,
+                            end: recipientGlobal,
+                            color: const Color(0xFFFF1744),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                }
+                return const SizedBox.shrink();
+              }),
           ],
         ),
       ),
@@ -4294,6 +4460,28 @@ class _BattleScreenState extends State<BattleScreen> {
                                       letterSpacing: 0.4,
                                     ),
                                   ),
+                                  if (_dragHoveringSpellTargetUnitId == unit.id &&
+                                      (_dragHoveringSpellOrder?.id == 'disrupting_cleave' || _dragHoveringSpellOrder?.id == 'feast_of_ruin')) ...[
+                                    const SizedBox(width: 3),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF1744),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.cancel, size: 7, color: Colors.white),
+                                          SizedBox(width: 1.5),
+                                          Text(
+                                            'INTERRUPT',
+                                            style: TextStyle(color: Colors.white, fontSize: 5.5, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -4335,13 +4523,47 @@ class _BattleScreenState extends State<BattleScreen> {
                       if (!isBossUnit && alive)
                         Padding(
                           padding: EdgeInsets.only(bottom: isCompact ? 1.5 : 2.5),
-                          child: _buildUnitStatusMeter(
-                            unit: unit,
-                            hpRatio: hpRatio,
-                            tmRatio: tmRatio,
-                            isDamaged: isDamaged,
-                            isCompact: isCompact,
-                          ),
+                          child: Builder(builder: (ctx) {
+                            final bool isHoveredTarget = _dragHoveringSpellTargetUnitId == unit.id;
+                            final activeSpell = isHoveredTarget ? _dragHoveringSpellOrder : null;
+                            double ghostDamageRatio = 0.0;
+                            double ghostShieldRatio = 0.0;
+
+                            if (activeSpell != null) {
+                              if (isEnemy) {
+                                if (activeSpell.id == 'siphon_vitality') {
+                                  ghostDamageRatio = 0.15;
+                                } else if (activeSpell.id == 'rend_flesh') {
+                                  ghostDamageRatio = 0.20;
+                                } else if (activeSpell.id == 'exsanguinating_strike') {
+                                  ghostDamageRatio = unit.currentHp <= (unit.maxHp * 0.25) ? 1.0 : 0.35;
+                                } else if (activeSpell.id == 'feast_of_ruin') {
+                                  ghostDamageRatio = unit.currentHp <= (unit.maxHp * 0.20) ? 1.0 : 0.25;
+                                } else if (activeSpell.id == 'disrupting_cleave') {
+                                  ghostDamageRatio = 0.18;
+                                } else if (activeSpell.id == 'smite_the_wicked') {
+                                  ghostDamageRatio = 0.30;
+                                }
+                              } else {
+                                // Friendly projections
+                                if (activeSpell.id == 'sanguine_ward') {
+                                  ghostShieldRatio = 0.30;
+                                } else if (activeSpell.id == 'iron_bulwark' || activeSpell.id == 'stand_resolute') {
+                                  ghostShieldRatio = 0.25;
+                                }
+                              }
+                            }
+
+                            return _buildUnitStatusMeter(
+                              unit: unit,
+                              hpRatio: hpRatio,
+                              tmRatio: tmRatio,
+                              isDamaged: isDamaged,
+                              isCompact: isCompact,
+                              ghostDamageRatio: ghostDamageRatio,
+                              ghostShieldRatio: ghostShieldRatio,
+                            );
+                          }),
                         ),
 
                       // Live Battle Subtle Target Pip (Only during active combat when selected)
@@ -4612,9 +4834,11 @@ class _BattleScreenState extends State<BattleScreen> {
           return isEnemy && alive;
         },
         onMove: (details) {
-          if (_dragHoveringSpellTargetUnitId != unit.id) {
+          final order = details.data;
+          if (_dragHoveringSpellTargetUnitId != unit.id || _dragHoveringSpellOrder?.id != order.id) {
             setState(() {
               _dragHoveringSpellTargetUnitId = unit.id;
+              _dragHoveringSpellOrder = order;
             });
           }
         },
@@ -4622,6 +4846,7 @@ class _BattleScreenState extends State<BattleScreen> {
           if (_dragHoveringSpellTargetUnitId == unit.id) {
             setState(() {
               _dragHoveringSpellTargetUnitId = null;
+              _dragHoveringSpellOrder = null;
             });
           }
         },
@@ -4629,6 +4854,7 @@ class _BattleScreenState extends State<BattleScreen> {
           final order = details.data;
           setState(() {
             _dragHoveringSpellTargetUnitId = null;
+            _dragHoveringSpellOrder = null;
           });
           // GDD v2.7 Sec 7.3: Target Failsafe: If target dies or becomes invalid while hovering card during bullet-time,
           // the card snaps safely back to hand with 0 Focus consumed.
@@ -4648,7 +4874,8 @@ class _BattleScreenState extends State<BattleScreen> {
         },
         builder: (context, candidateData, rejectedData) {
           final bool isHovered = candidateData.isNotEmpty || _dragHoveringSpellTargetUnitId == unit.id;
-          return Padding(
+          return Container(
+            key: _unitCardKeys.putIfAbsent(unit.id, () => GlobalKey()),
             padding: const EdgeInsets.all(4.0),
             child: Stack(
               clipBehavior: Clip.none,
@@ -5442,15 +5669,21 @@ class _BattleScreenState extends State<BattleScreen> {
       onDragEnd: (_) {
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
-        if (_dragHoveringSpellTargetUnitId != null) {
-          setState(() => _dragHoveringSpellTargetUnitId = null);
+        if (_dragHoveringSpellTargetUnitId != null || _dragHoveringSpellOrder != null) {
+          setState(() {
+            _dragHoveringSpellTargetUnitId = null;
+            _dragHoveringSpellOrder = null;
+          });
         }
       },
       onDraggableCanceled: (_, __) {
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
-        if (_dragHoveringSpellTargetUnitId != null) {
-          setState(() => _dragHoveringSpellTargetUnitId = null);
+        if (_dragHoveringSpellTargetUnitId != null || _dragHoveringSpellOrder != null) {
+          setState(() {
+            _dragHoveringSpellTargetUnitId = null;
+            _dragHoveringSpellOrder = null;
+          });
         }
       },
       feedback: Material(
@@ -5530,20 +5763,20 @@ class _BattleScreenState extends State<BattleScreen> {
       onAcceptWithDetails: (details) {
         final burned = details.data;
         widget.commandService.burnCard(burned.id);
-        _addPop('SACRIFICED', const Color(0xFFFF7043));
+        _addPop('SACRIFICED: +1 VITAE', const Color(0xFFFF7043), isCrit: true);
         widget.commandService.setBulletTime(false);
         widget.tickManager.setBulletTime(false);
       },
       builder: (context, candidateData, rejectedData) {
         final bool isHovered = candidateData.isNotEmpty;
         return Tooltip(
-          message: 'Ash Pyre: Drag card here to discard & draw a new card (6-tick CD)',
+          message: 'Ash Pyre: Drag card here to sacrifice for +1 Emergency Vitae (8-tick replacement CD)',
           child: GestureDetector(
             onTap: () {
               if (widget.commandService.hand.isNotEmpty) {
                 final burned = widget.commandService.hand.first;
                 widget.commandService.burnCard(burned.id);
-                _addPop('SACRIFICED', const Color(0xFFFF7043));
+                _addPop('SACRIFICED: +1 VITAE', const Color(0xFFFF7043), isCrit: true);
               }
             },
             child: AnimatedContainer(
@@ -5593,18 +5826,18 @@ class _BattleScreenState extends State<BattleScreen> {
                     ),
                   ),
                   const Text(
-                    'BURN',
+                    '+1 VITAE',
                     style: TextStyle(
-                      color: Color(0xFFFF8A65),
+                      color: Color(0xFFFFD54F),
                       fontSize: 6.5,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: 0.4,
                     ),
                   ),
                   Text(
-                    isHovered ? 'RELEASE' : 'DISCARD',
+                    isHovered ? 'SACRIFICE' : 'BURN SLIP',
                     style: TextStyle(
-                      color: isHovered ? Colors.white70 : const Color(0xFFB0BEC5),
+                      color: isHovered ? Colors.white : const Color(0xFFB0BEC5),
                       fontSize: 6.0,
                       fontWeight: FontWeight.w600,
                     ),
@@ -5739,6 +5972,8 @@ class _BattleScreenState extends State<BattleScreen> {
     required double tmRatio,
     required bool isDamaged,
     bool isCompact = false,
+    double ghostDamageRatio = 0.0,
+    double ghostShieldRatio = 0.0,
   }) {
     Color hpColor = const Color(0xFF00E676); // High-contrast emerald
     if (hpRatio < 0.20) {
@@ -5754,6 +5989,8 @@ class _BattleScreenState extends State<BattleScreen> {
     final double clampedTm = tmRatio.clamp(0.0, 1.0);
     final double shieldIntegrity = unit.maxHp > 0 ? (unit.shieldPoints / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final Color sigilColor = _archetypeColor(unit.archetype);
+    final double postGhostHp = (clampedHp - ghostDamageRatio).clamp(0.0, 1.0);
+    final double projectedShield = (shieldIntegrity + ghostShieldRatio).clamp(0.0, 1.0);
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -5874,8 +6111,23 @@ class _BattleScreenState extends State<BattleScreen> {
                           ],
                         ),
                       ),
+                      // Ghost Damage Preview Slice (Flashing Amber/Red behind current HP)
+                      if (ghostDamageRatio > 0)
+                        FractionallySizedBox(
+                          widthFactor: clampedHp,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFB300).withValues(alpha: 0.90),
+                              borderRadius: BorderRadius.circular(2.0),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0xFFFF9100), blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      // Actual HP bar (shrinks to postGhostHp during ghost preview)
                       FractionallySizedBox(
-                        widthFactor: clampedHp,
+                        widthFactor: ghostDamageRatio > 0 ? postGhostHp : clampedHp,
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -5896,6 +6148,19 @@ class _BattleScreenState extends State<BattleScreen> {
                           ),
                         ),
                       ),
+                      // Ghost Shield Overlay Preview (semi-transparent golden/cyan buffer)
+                      if (ghostShieldRatio > 0)
+                        FractionallySizedBox(
+                          widthFactor: projectedShield,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF80D8FF).withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(2.0),
+                              border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                            ),
+                          ),
+                        ),
+                      // Actual Active Shield
                       if (shieldIntegrity > 0)
                         FractionallySizedBox(
                           widthFactor: shieldIntegrity,

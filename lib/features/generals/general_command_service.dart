@@ -621,6 +621,14 @@ class GeneralCommandService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// GDD Feedback Loop: Awards micro-vitae (0.25 Focus charge progress) whenever
+  /// a friendly unit completes an action, deals damage, or mitigates a hit.
+  void registerMicroVitae([double amount = 0.25]) {
+    if (_currentFocus >= _maxFocusCap) return;
+    final int progressEquivalent = (focusChargeThreshold * amount).round();
+    registerCombatDamage(progressEquivalent);
+  }
+
   void _validateOrderUnlocked(String orderId) {
     final order = currentProfile.orders.firstWhere(
       (o) => o.id == orderId,
@@ -778,13 +786,14 @@ class GeneralCommandService extends ChangeNotifier {
   }
 
   /// Discards a card from hand to the Burn Pit (costs 0 Focus),
-  /// triggering a 6-tick safety cooldown before drawing a replacement.
+  /// granting +1 instant Vitae (emergency sacrifice) while triggering an 8-tick cooldown before drawing a replacement.
   void burnCard(String cardId) {
     final int handIdx = _hand.indexWhere((c) => c.id == cardId);
     if (handIdx == -1) return;
     final card = _hand.removeAt(handIdx);
     _discardPile.add(card);
-    _burnCooldownTicks = 6;
+    _burnCooldownTicks = 8;
+    grantFocus(1);
     notifyListeners();
   }
 
