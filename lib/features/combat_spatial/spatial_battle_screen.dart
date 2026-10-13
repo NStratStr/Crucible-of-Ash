@@ -378,13 +378,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             }
           },
           child: Container(
-            margin: const EdgeInsets.all(2),
+            margin: const EdgeInsets.all(2.5),
             decoration: BoxDecoration(
-              color: isTelegraphed
-                  ? const Color(0xFFFF1744).withValues(alpha: 0.35)
-                  : (isDropCandidate
-                      ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
-                      : (isPlayerSquad ? const Color(0xFF141824) : const Color(0xFF221418))),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isTelegraphed
+                    ? [
+                        const Color(0xFF4A1016),
+                        const Color(0xFF2B0A0E),
+                      ]
+                    : (isDropCandidate
+                        ? [
+                            const Color(0xFF00363A),
+                            const Color(0xFF001F24),
+                          ]
+                        : (isPlayerSquad
+                            ? [
+                                const Color(0xFF1A1F2C),
+                                const Color(0xFF10131B),
+                              ]
+                            : [
+                                const Color(0xFF26191C),
+                                const Color(0xFF150D0F),
+                              ])),
+              ),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: isTelegraphed
@@ -393,18 +411,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ? const Color(0xFFFFD54F)
                         : (isDropCandidate
                             ? const Color(0xFF00E5FF)
-                            : (isPlayerSquad ? const Color(0xFF2B3850) : const Color(0xFF482B32)))),
-                width: isTelegraphed || isSelected || isDropCandidate ? 2.0 : 1.0,
+                            : (isPlayerSquad ? const Color(0xFF38455E) : const Color(0xFF58363F)))),
+                width: isTelegraphed || isSelected || isDropCandidate ? 2.0 : 1.2,
               ),
-              boxShadow: isTelegraphed
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFFFF1744).withValues(alpha: 0.5),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      )
-                    ]
-                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isTelegraphed
+                      ? const Color(0xFFFF1744).withValues(alpha: 0.45)
+                      : (isDropCandidate
+                          ? const Color(0xFF00E5FF).withValues(alpha: 0.3)
+                          : Colors.black54),
+                  blurRadius: isTelegraphed || isDropCandidate ? 8 : 3,
+                  offset: const Offset(0, 1.5),
+                ),
+              ],
             ),
             child: Stack(
               children: [
@@ -466,103 +486,183 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isBoss = unit.footprint == UnitFootprint.horizontal1x2;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
+    final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
 
-    return Container(
-      width: isDragging ? 70 : double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
+    return SizedBox(
+      width: isDragging ? 80 : double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
-          // Name & Mass Icon
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (unit.isDisplacementImmune)
-                const Icon(Icons.anchor, size: 10, color: Color(0xFFFFD54F)),
-              const SizedBox(width: 2),
-              Flexible(
-                child: Text(
-                  unit.name,
-                  style: TextStyle(
-                    fontSize: isBoss ? 9.5 : 8.5,
-                    fontWeight: FontWeight.bold,
-                    color: unit.isPlayer ? const Color(0xFFE0E0E0) : const Color(0xFFFF8A80),
+          // 1. Tabletop 3D Plinth Base (Elliptical Ground Pedestal)
+          Positioned(
+            bottom: 12,
+            left: 4,
+            right: 4,
+            child: Center(
+              child: Container(
+                width: isBoss ? 110 : 54,
+                height: 14,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.elliptical(50, 12)),
+                  gradient: RadialGradient(
+                    colors: [
+                      factionColor.withValues(alpha: isSelected ? 0.6 : 0.35),
+                      Colors.black87,
+                      Colors.transparent,
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-            ],
-          ),
-
-          // Slag Carapace Shield Indicator
-          if (unit.isSlagCarapaceActive)
-            Container(
-              margin: const EdgeInsets.only(top: 1, bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
-              ),
-              child: const Text(
-                'SLAG CARAPACE (-50%)',
-                style: TextStyle(fontSize: 6.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
-              ),
-            ),
-
-          // Bleed Stacks Badge
-          if (unit.bleedStacks > 0)
-            Container(
-              margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD32F2F).withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: Text(
-                '🩸 ${unit.bleedStacks}x BLEED',
-                style: const TextStyle(fontSize: 6.5, color: Color(0xFFFF8A80), fontWeight: FontWeight.bold),
-              ),
-            ),
-
-          // HP Meter
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: Container(
-              height: 4,
-              color: Colors.black54,
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: hpRatio,
-                child: Container(
-                  color: unit.isPlayer ? const Color(0xFF81C784) : const Color(0xFFE53935),
+                  border: Border.all(
+                    color: isSelected ? factionColor : factionColor.withValues(alpha: 0.5),
+                    width: isSelected ? 1.5 : 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: factionColor.withValues(alpha: isSelected ? 0.5 : 0.2),
+                      blurRadius: isSelected ? 8 : 4,
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 2),
 
-          // Turn Meter (AP Progress)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: Container(
-              height: 2.5,
-              color: Colors.black54,
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: apRatio,
-                child: Container(
-                  color: const Color(0xFFFFD54F),
+          // 2. Character Model Miniature Cutout
+          Positioned(
+            bottom: 14,
+            top: 2,
+            left: 2,
+            right: 2,
+            child: Center(
+              child: Image.asset(
+                unit.assetPath,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  unit.isPlayer ? Icons.shield : Icons.dangerous,
+                  color: factionColor,
+                  size: isBoss ? 36 : 24,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 1),
-          Text(
-            '${unit.hp}/${unit.maxHp} • ${unit.armor} ARM',
-            style: const TextStyle(fontSize: 7.5, color: Colors.white70),
+
+          // 3. Name, Badges & Slag Carapace Overlays
+          Positioned(
+            top: 1,
+            left: 2,
+            right: 2,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (unit.isSlagCarapaceActive)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF221115),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                    ),
+                    child: const Text(
+                      'CARAPACE -50%',
+                      style: TextStyle(
+                        fontSize: 6.5,
+                        color: Color(0xFFFFD54F),
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                if (unit.bleedStacks > 0)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB71C1C),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Text(
+                      '🩸 ${unit.bleedStacks}x BLEED',
+                      style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (unit.isDisplacementImmune)
+                      const Icon(Icons.anchor, size: 9, color: Color(0xFFFFD54F)),
+                    const SizedBox(width: 1),
+                    Flexible(
+                      child: Text(
+                        unit.name,
+                        style: TextStyle(
+                          fontSize: isBoss ? 8.5 : 7.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 1)),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 4. Bottom Tactical HUD: HP & AP Turn Meters
+          Positioned(
+            bottom: 0,
+            left: 3,
+            right: 3,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // HP Bar
+                Container(
+                  height: 3.5,
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: Colors.white24, width: 0.4),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: hpRatio,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: unit.isPlayer ? const Color(0xFF81C784) : const Color(0xFFE53935),
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 1),
+                // AP Turn Meter
+                Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: apRatio,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD54F),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
