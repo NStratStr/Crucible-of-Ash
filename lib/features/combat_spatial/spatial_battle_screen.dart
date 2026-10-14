@@ -940,66 +940,64 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 3. Name, Badges & Slag Carapace Overlays
+            // 3. Status Badges & Selected Unit Indicator
             Positioned(
-              top: isBoss ? -30 : -22,
+              top: isBoss ? -22 : -16,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (unit.isSlagCarapaceActive)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 1.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF221115),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
                       ),
                       child: const Text(
-                        'CARAPACE -50%',
+                        'CARAPACE',
                         style: TextStyle(
-                          fontSize: 7.5,
+                          fontSize: 6.5,
                           color: Color(0xFFFFD54F),
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.4,
                         ),
                       ),
                     ),
                   if (unit.bleedStacks > 0)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 1.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB71C1C),
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        '🩸 ${unit.bleedStacks}x BLEED',
-                        style: const TextStyle(fontSize: 7.0, color: Colors.white, fontWeight: FontWeight.bold),
+                        '🩸${unit.bleedStacks}',
+                        style: const TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (unit.isDisplacementImmune)
-                        const Icon(Icons.anchor, size: 10, color: Color(0xFFFFD54F)),
-                      const SizedBox(width: 2),
-                      Text(
-                        unit.name,
-                        style: TextStyle(
-                          fontSize: isBoss ? 9.5 : 8.5,
+                  // Only show name when unit is selected to keep screen uncluttered
+                  if (isSelected)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                      ),
+                      child: Text(
+                        unit.name.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 7.5,
                           fontWeight: FontWeight.bold,
-                          color: isAttacking ? const Color(0xFFFFD54F) : Colors.white,
-                          shadows: const [
-                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 1)),
-                          ],
+                          color: Color(0xFFFFD54F),
+                          letterSpacing: 0.5,
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
@@ -1007,7 +1005,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // 4. Floating Damage / Effect Pop Text
             if (floatingPop != null)
               Positioned(
-                top: isBoss ? -38 : -30,
+                top: isBoss ? -34 : -26,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -1037,21 +1035,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
 
-            // 5. Bottom Tactical HUD: HP (with white shield overlay) & AP Turn Meters
+            // 5. Sleek Compact Tactical Health & AP Meters
             Positioned(
-              bottom: 0,
+              bottom: 2,
               child: SizedBox(
-                width: isBoss ? bossSpanWidth - 24 : tileWidth - 14,
+                width: isBoss ? 56.0 : 36.0,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // HP & Armor Bar
+                    // Sleek 2.5px HP & Armor Bar
                     Container(
-                      height: 4.5,
+                      height: 2.5,
                       decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: Colors.white24, width: 0.4),
+                        color: Colors.black.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(1.5),
+                        border: Border.all(color: Colors.white12, width: 0.3),
                       ),
                       child: Stack(
                         children: [
@@ -1061,8 +1059,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             widthFactor: hpRatio,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: unit.isPlayer ? const Color(0xFF81C784) : const Color(0xFFE53935),
-                                borderRadius: BorderRadius.circular(1.5),
+                                color: unit.isPlayer ? const Color(0xFF4CAF50) : const Color(0xFFE53935),
+                                borderRadius: BorderRadius.circular(1),
                               ),
                             ),
                           ),
@@ -1073,9 +1071,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  borderRadius: BorderRadius.circular(1.5),
-                                  border: Border.all(color: const Color(0xFF00E5FF), width: 0.5),
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(1),
+                                  border: Border.all(color: const Color(0xFF00E5FF), width: 0.4),
                                 ),
                               ),
                             ),
@@ -1083,20 +1081,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                     const SizedBox(height: 1),
-                    // AP Turn Meter
+                    // AP Turn Meter (1.5px)
                     Container(
-                      height: 2.5,
+                      height: 1.5,
                       decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(1.5),
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(1),
                       ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
                         widthFactor: apRatio,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFD54F),
-                            borderRadius: BorderRadius.circular(1),
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(0.5),
                           ),
                         ),
                       ),
