@@ -233,25 +233,75 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
-              child: Center(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Enemy Battlefield Grid (Rows 2 -> 1 -> 0)
-                        _buildSquadGrid(isPlayerSquad: false),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isDesktop = constraints.maxWidth >= 700;
+                  final double tileWidth = isDesktop ? 84.0 : 62.0;
+                  final double tileHeight = isDesktop ? 56.0 : 46.0;
+                  final double colGap = isDesktop ? 14.0 : 8.0;
+                  final double rowGap = isDesktop ? 22.0 : 16.0;
+                  final double boardWidth = 5 * tileWidth + 4 * colGap;
 
-                        // Central Clash Line Divider
-                        _buildClashLineDivider(),
+                  return Center(
+                    child: SingleChildScrollView(
+                      child: Container(
+                        margin: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 20.0 : 4.0,
+                          vertical: isDesktop ? 12.0 : 4.0,
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 24.0 : 6.0,
+                          vertical: isDesktop ? 16.0 : 6.0,
+                        ),
+                        decoration: isDesktop
+                            ? BoxDecoration(
+                                color: const Color(0xFF10121A),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFF282D3D),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              )
+                            : null,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Enemy Battlefield Grid (Rows 2 -> 1 -> 0)
+                            _buildSquadGrid(
+                              isPlayerSquad: false,
+                              tileWidth: tileWidth,
+                              tileHeight: tileHeight,
+                              colGap: colGap,
+                              rowGap: rowGap,
+                            ),
 
-                        // Player Battlefield Grid (Rows 0 -> 1 -> 2)
-                        _buildSquadGrid(isPlayerSquad: true),
-                      ],
+                            // Central Clash Line Divider
+                            _buildClashLineDivider(
+                              maxWidth: boardWidth,
+                              verticalMargin: isDesktop ? 18.0 : 12.0,
+                            ),
+
+                            // Player Battlefield Grid (Rows 0 -> 1 -> 2)
+                            _buildSquadGrid(
+                              isPlayerSquad: true,
+                              tileWidth: tileWidth,
+                              tileHeight: tileHeight,
+                              colGap: colGap,
+                              rowGap: rowGap,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
 
@@ -366,25 +416,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  Widget _buildClashLineDivider() {
+  Widget _buildClashLineDivider({required double maxWidth, required double verticalMargin}) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 10),
+      width: maxWidth,
+      margin: EdgeInsets.symmetric(vertical: verticalMargin),
+      padding: const EdgeInsets.symmetric(vertical: 3.5, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A24),
-        borderRadius: BorderRadius.circular(4),
+        color: const Color(0xFF161822),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD54F).withValues(alpha: 0.12),
+            blurRadius: 6,
+          ),
+        ],
       ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            '═══════════ NEUTRAL CLASH PLANE ═══════════',
+            '⚔️  NEUTRAL CLASH PLANE  ⚔️',
             style: TextStyle(
               color: Color(0xFFFFD54F),
-              fontSize: 8.5,
+              fontSize: 9,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+              letterSpacing: 1.4,
             ),
           ),
         ],
@@ -393,7 +450,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid
-  Widget _buildSquadGrid({required bool isPlayerSquad}) {
+  Widget _buildSquadGrid({
+    required bool isPlayerSquad,
+    required double tileWidth,
+    required double tileHeight,
+    required double colGap,
+    required double rowGap,
+  }) {
     // For Enemy: Render Row 2 (Back) -> Row 1 (Mid) -> Row 0 (Front closest to clash line)
     // For Player: Render Row 0 (Front closest to clash line) -> Row 1 (Mid) -> Row 2 (Back)
     final rowsOrder = isPlayerSquad ? [0, 1, 2] : [2, 1, 0];
@@ -402,11 +465,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       mainAxisSize: MainAxisSize.min,
       children: rowsOrder.map((rowIdx) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3.0),
+          padding: EdgeInsets.symmetric(vertical: rowGap / 2),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (colIdx) {
-              return _buildGridCell(colIdx, rowIdx, isPlayerSquad: isPlayerSquad);
+              return _buildGridCell(
+                colIdx,
+                rowIdx,
+                isPlayerSquad: isPlayerSquad,
+                tileWidth: tileWidth,
+                tileHeight: tileHeight,
+                colGap: colGap,
+                rowGap: rowGap,
+              );
             }),
           ),
         );
@@ -414,7 +485,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  Widget _buildGridCell(int col, int row, {required bool isPlayerSquad}) {
+  Widget _buildGridCell(
+    int col,
+    int row, {
+    required bool isPlayerSquad,
+    required double tileWidth,
+    required double tileHeight,
+    required double colGap,
+    required double rowGap,
+  }) {
     final squad = isPlayerSquad ? _engine.playerUnits : _engine.enemyUnits;
     final occupant = squad.where((u) => u.isAlive && u.occupies(col, row)).firstOrNull;
 
@@ -480,9 +559,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
         return Container(
-          width: 58,
-          height: 46,
-          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+          width: tileWidth,
+          height: tileHeight,
+          margin: EdgeInsets.symmetric(horizontal: colGap / 2),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -646,15 +725,37 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             },
                             feedback: Material(
                               color: Colors.transparent,
-                              child: _buildUnitMiniatureWidget(occupant, isDragging: true),
+                              child: _buildUnitMiniatureWidget(
+                                occupant,
+                                tileWidth: tileWidth,
+                                tileHeight: tileHeight,
+                                colGap: colGap,
+                                isDragging: true,
+                              ),
                             ),
                             childWhenDragging: Opacity(
                               opacity: 0.3,
-                              child: _buildUnitMiniatureWidget(occupant),
+                              child: _buildUnitMiniatureWidget(
+                                occupant,
+                                tileWidth: tileWidth,
+                                tileHeight: tileHeight,
+                                colGap: colGap,
+                              ),
                             ),
-                            child: _buildUnitMiniatureWidget(occupant, isSelected: isSelected),
+                            child: _buildUnitMiniatureWidget(
+                              occupant,
+                              tileWidth: tileWidth,
+                              tileHeight: tileHeight,
+                              colGap: colGap,
+                              isSelected: isSelected,
+                            ),
                           )
-                        : _buildUnitMiniatureWidget(occupant),
+                        : _buildUnitMiniatureWidget(
+                            occupant,
+                            tileWidth: tileWidth,
+                            tileHeight: tileHeight,
+                            colGap: colGap,
+                          ),
                   ),
                 ),
 
@@ -725,7 +826,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  Widget _buildUnitMiniatureWidget(CombatUnitState unit, {bool isDragging = false, bool isSelected = false}) {
+  Widget _buildUnitMiniatureWidget(
+    CombatUnitState unit, {
+    required double tileWidth,
+    required double tileHeight,
+    required double colGap,
+    bool isDragging = false,
+    bool isSelected = false,
+  }) {
     final bool isBoss = unit.footprint == UnitFootprint.horizontal1x2;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
@@ -739,18 +847,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double lungeY = isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0;
     final double hitShakeX = isDamaged ? 4.0 : 0.0;
 
-    final double baseWidth = isBoss ? 114 : 48;
-    final double baseHeight = isBoss ? 15 : 12;
-    final double modelWidth = isBoss ? 116 : 64;
-    final double modelHeight = isBoss ? 120 : 80;
+    final double bossSpanWidth = 2 * tileWidth + colGap;
+    final double baseWidth = isBoss ? bossSpanWidth - 14 : tileWidth - 10;
+    final double baseHeight = isBoss ? 16 : 12;
+    final double modelWidth = isBoss ? bossSpanWidth - 8 : tileWidth + 4;
+    final double modelHeight = isBoss
+        ? (tileHeight * 1.65).clamp(82.0, 110.0)
+        : (tileHeight * 1.35).clamp(58.0, 78.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
       transform: Matrix4.translationValues(hitShakeX, lungeY, 0),
       child: SizedBox(
-        width: isBoss ? 118 : 58,
-        height: 46,
+        width: isBoss ? bossSpanWidth : tileWidth,
+        height: tileHeight,
         child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
@@ -786,7 +897,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 2. Character Model Miniature Cutout (Rises proudly above plinth!)
             Positioned(
-              bottom: 12,
+              bottom: 11,
               child: SizedBox(
                 width: modelWidth,
                 height: modelHeight,
@@ -809,9 +920,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 3. Name, Badges & Slag Carapace Overlays
+            // 3. Name, Badges & Slag Carapace Overlays (Positioned cleanly directly above miniature)
             Positioned(
-              top: isBoss ? -96 : -58,
+              top: isBoss ? -22 : -16,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -876,7 +987,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // 4. Floating Damage / Effect Pop Text
             if (floatingPop != null)
               Positioned(
-                top: isBoss ? -120 : -78,
+                top: isBoss ? -44 : -36,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -910,7 +1021,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             Positioned(
               bottom: 0,
               child: SizedBox(
-                width: isBoss ? 105 : 44,
+                width: isBoss ? bossSpanWidth - 24 : tileWidth - 14,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
