@@ -487,6 +487,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid
+  /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid with authentic Isometric Angle Staggering
   Widget _buildSquadGrid({
     required bool isPlayerSquad,
     required double tileWidth,
@@ -525,11 +526,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           }
         }
 
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: rowGap / 2),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: cells,
+        // Isometric perspective skew: Stagger rows diagonally along the diamond vector
+        // Each step deeper into the backline shifts horizontally by tileWidth * 0.28,
+        // transforming the straight vertical stack into an angled isometric battleplane!
+        final double isometricXOffset = isPlayerSquad
+            ? (rowIdx * (tileWidth * 0.26)) // Player: Row 0 -> Row 1 (+dx) -> Row 2 (+2*dx)
+            : ((2 - rowIdx) * (tileWidth * 0.26)); // Enemy: Row 2 (+2*dx) -> Row 1 (+dx) -> Row 0 (0)
+
+        return Transform.translate(
+          offset: Offset(isometricXOffset, 0),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: rowGap / 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: cells,
+            ),
           ),
         );
       }).toList(),
