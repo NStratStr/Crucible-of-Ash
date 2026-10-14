@@ -233,75 +233,108 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final bool isDesktop = constraints.maxWidth >= 700;
-                  final double tileWidth = isDesktop ? 84.0 : 62.0;
-                  final double tileHeight = isDesktop ? 56.0 : 46.0;
-                  final double colGap = isDesktop ? 14.0 : 8.0;
-                  final double rowGap = isDesktop ? 22.0 : 16.0;
-                  final double boardWidth = 5 * tileWidth + 4 * colGap;
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Atmospheric Volcanic Chasm Arena Backdrop
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/volcanic_chasm_battlefield.jpg',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.center,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFF0D0D14),
+                      ),
+                    ),
+                  ),
 
-                  return Center(
-                    child: SingleChildScrollView(
-                      child: Container(
-                        margin: EdgeInsets.symmetric(
-                          horizontal: isDesktop ? 20.0 : 4.0,
-                          vertical: isDesktop ? 12.0 : 4.0,
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isDesktop ? 24.0 : 6.0,
-                          vertical: isDesktop ? 16.0 : 6.0,
-                        ),
-                        decoration: isDesktop
-                            ? BoxDecoration(
-                                color: const Color(0xFF10121A),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFF282D3D),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              )
-                            : null,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Enemy Battlefield Grid (Rows 2 -> 1 -> 0)
-                            _buildSquadGrid(
-                              isPlayerSquad: false,
-                              tileWidth: tileWidth,
-                              tileHeight: tileHeight,
-                              colGap: colGap,
-                              rowGap: rowGap,
-                            ),
-
-                            // Central Clash Line Divider
-                            _buildClashLineDivider(
-                              maxWidth: boardWidth,
-                              verticalMargin: isDesktop ? 18.0 : 12.0,
-                            ),
-
-                            // Player Battlefield Grid (Rows 0 -> 1 -> 2)
-                            _buildSquadGrid(
-                              isPlayerSquad: true,
-                              tileWidth: tileWidth,
-                              tileHeight: tileHeight,
-                              colGap: colGap,
-                              rowGap: rowGap,
-                            ),
+                  // Darkened Radial & Linear Atmospheric Fog Overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 0.95,
+                          colors: [
+                            const Color(0xFF0A0C14).withValues(alpha: 0.40),
+                            const Color(0xFF080910).withValues(alpha: 0.85),
+                            const Color(0xFF040508).withValues(alpha: 0.96),
                           ],
                         ),
                       ),
                     ),
-                  );
-                },
+                  ),
+
+                  // Interactive 2.5D Battlefield Arena Plane
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool isDesktop = constraints.maxWidth >= 700;
+                      final double tileWidth = isDesktop ? 96.0 : 66.0;
+                      final double tileHeight = isDesktop ? 48.0 : 34.0;
+                      final double colGap = isDesktop ? 10.0 : 6.0;
+                      final double rowGap = isDesktop ? 16.0 : 10.0;
+                      final double boardWidth = 5 * tileWidth + 4 * colGap;
+
+                      return Center(
+                        child: SingleChildScrollView(
+                          child: Container(
+                            margin: EdgeInsets.symmetric(
+                              horizontal: isDesktop ? 20.0 : 4.0,
+                              vertical: isDesktop ? 8.0 : 2.0,
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isDesktop ? 20.0 : 4.0,
+                              vertical: isDesktop ? 12.0 : 4.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0B0D14).withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFF382822).withValues(alpha: 0.6),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                  blurRadius: 24,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Enemy Battlefield Grid (Rows 2 -> 1 -> 0)
+                                _buildSquadGrid(
+                                  isPlayerSquad: false,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: colGap,
+                                  rowGap: rowGap,
+                                ),
+
+                                // Central Clash Line Divider
+                                _buildClashLineDivider(
+                                  maxWidth: boardWidth,
+                                  verticalMargin: isDesktop ? 12.0 : 8.0,
+                                ),
+
+                                // Player Battlefield Grid (Rows 0 -> 1 -> 2)
+                                _buildSquadGrid(
+                                  isPlayerSquad: true,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: colGap,
+                                  rowGap: rowGap,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
 
@@ -558,76 +591,50 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       builder: (context, candidateData, rejectedData) {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
+        final Color fillColor = isTelegraphed
+            ? const Color(0xFF4A1016)
+            : (isDropCandidate
+                ? const Color(0xFF004D40)
+                : (isReachable
+                    ? const Color(0xFF00382E)
+                    : (isBossSecondaryNode
+                        ? const Color(0xFF26191C)
+                        : (isPlayerSquad ? const Color(0xFF1E2433) : const Color(0xFF2E1C22)))));
+
+        final Color borderColor = isTelegraphed
+            ? const Color(0xFFFF1744)
+            : (isDropCandidate
+                ? const Color(0xFF00E5FF)
+                : (isReachable
+                    ? const Color(0xFF00E676)
+                    : (isSelected
+                        ? const Color(0xFFFFD54F)
+                        : (isBossSecondaryNode
+                            ? const Color(0xFF8D6E63).withValues(alpha: 0.6)
+                            : (isPlayerSquad ? const Color(0xFF4A5C80) : const Color(0xFF6E434D))))));
+
+        final bool hasGlow = isTelegraphed || isSelected || isDropCandidate || isReachable;
+        final Color glowColor = isTelegraphed
+            ? const Color(0xFFFF1744)
+            : (isReachable
+                ? const Color(0xFF00E676)
+                : (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)));
+
         return Container(
           width: tileWidth,
           height: tileHeight,
           margin: EdgeInsets.symmetric(horizontal: colGap / 2),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isTelegraphed
-                  ? [
-                      const Color(0xFF4A1016),
-                      const Color(0xFF2B0A0E),
-                    ]
-                  : (isDropCandidate
-                      ? [
-                          const Color(0xFF004D40),
-                          const Color(0xFF00251A),
-                        ]
-                      : (isReachable
-                          ? [
-                              const Color(0xFF00382E),
-                              const Color(0xFF001F19),
-                            ]
-                          : (isBossSecondaryNode
-                              ? [
-                                  const Color(0xFF26191C),
-                                  const Color(0xFF1B0E11),
-                                ]
-                              : (isPlayerSquad
-                                  ? [
-                                      const Color(0xFF1A1F2C),
-                                      const Color(0xFF10131B),
-                                    ]
-                                  : [
-                                      const Color(0xFF26191C),
-                                      const Color(0xFF150D0F),
-                                    ])))),
+          child: CustomPaint(
+            painter: IsometricDiamondTilePainter(
+              fillColor: fillColor,
+              borderColor: borderColor,
+              borderWidth: hasGlow ? 2.0 : 1.2,
+              hasGlow: hasGlow,
+              glowColor: glowColor,
             ),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isTelegraphed
-                  ? const Color(0xFFFF1744)
-                  : (isDropCandidate
-                      ? const Color(0xFF00E5FF)
-                      : (isReachable
-                          ? const Color(0xFF00E676)
-                          : (isSelected
-                              ? const Color(0xFFFFD54F)
-                              : (isBossSecondaryNode
-                                  ? const Color(0xFF795548).withValues(alpha: 0.6)
-                                  : (isPlayerSquad ? const Color(0xFF38455E) : const Color(0xFF58363F)))))),
-              width: isTelegraphed || isSelected || isDropCandidate || isReachable ? 2.0 : 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isTelegraphed
-                    ? const Color(0xFFFF1744).withValues(alpha: 0.45)
-                    : (isReachable
-                        ? const Color(0xFF00E676).withValues(alpha: 0.35)
-                        : (isDropCandidate
-                            ? const Color(0xFF00E5FF).withValues(alpha: 0.35)
-                            : Colors.black54)),
-                blurRadius: isTelegraphed || isDropCandidate || isReachable ? 8 : 3,
-                offset: const Offset(0, 1.5),
-              ),
-            ],
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
               // Coordinate Watermark & Tap Handler for Empty Cells
               Positioned.fill(
                 child: GestureDetector(
@@ -768,10 +775,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildSkillCutInBanner() {
     final Color themeColor = _isPlayerSkillBanner ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
@@ -848,12 +856,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double hitShakeX = isDamaged ? 4.0 : 0.0;
 
     final double bossSpanWidth = 2 * tileWidth + colGap;
-    final double baseWidth = isBoss ? bossSpanWidth - 14 : tileWidth - 10;
-    final double baseHeight = isBoss ? 16 : 12;
-    final double modelWidth = isBoss ? bossSpanWidth - 8 : tileWidth + 4;
+    final double baseWidth = isBoss ? bossSpanWidth - 10 : tileWidth - 8;
+    final double baseHeight = isBoss ? 16 : 11;
+    final double modelWidth = isBoss ? bossSpanWidth : tileWidth + 8;
     final double modelHeight = isBoss
-        ? (tileHeight * 1.65).clamp(82.0, 110.0)
-        : (tileHeight * 1.35).clamp(58.0, 78.0);
+        ? (tileHeight * 2.3).clamp(90.0, 130.0)
+        : (tileHeight * 1.9).clamp(68.0, 96.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -866,9 +874,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // 1. Tabletop 3D Plinth Base (Elliptical Ground Pedestal)
+            // 1. Tabletop 2.5D Contact Drop Shadow & Soft Ground Glow
             Positioned(
-              bottom: 8,
+              bottom: 4,
               child: Container(
                 width: baseWidth,
                 height: baseHeight,
@@ -876,28 +884,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, baseHeight / 2)),
                   gradient: RadialGradient(
                     colors: [
-                      factionColor.withValues(alpha: isSelected || isAttacking ? 0.85 : 0.40),
+                      factionColor.withValues(alpha: isSelected || isAttacking ? 0.75 : 0.35),
                       Colors.black87,
                       Colors.transparent,
                     ],
                   ),
-                  border: Border.all(
-                    color: isSelected || isAttacking ? factionColor : factionColor.withValues(alpha: 0.6),
-                    width: isSelected || isAttacking ? 2.0 : 1.0,
-                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: factionColor.withValues(alpha: isSelected || isAttacking ? 0.7 : 0.25),
-                      blurRadius: isSelected || isAttacking ? 10 : 4,
+                      color: factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
+                      blurRadius: isSelected || isAttacking ? 8 : 4,
                     ),
                   ],
                 ),
               ),
             ),
 
-            // 2. Character Model Miniature Cutout (Rises proudly above plinth!)
+            // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: 11,
+              bottom: 6,
               child: SizedBox(
                 width: modelWidth,
                 height: modelHeight,
@@ -1304,5 +1308,198 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         },
       ),
     );
+  }
+}
+
+/// 2.5D Isometric Diamond Tile Plinth Painter
+/// Inspired by the tactical tabletop grid presentation in The Banner Saga & Dragonheir: Silent Gods.
+class IsometricDiamondTilePainter extends CustomPainter {
+  final Color fillColor;
+  final Color borderColor;
+  final double borderWidth;
+  final bool hasGlow;
+  final Color glowColor;
+
+  const IsometricDiamondTilePainter({
+    required this.fillColor,
+    required this.borderColor,
+    this.borderWidth = 1.2,
+    this.hasGlow = false,
+    this.glowColor = const Color(0xFFFF1744),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+
+    // Contact drop shadow below diamond
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
+    final shadowPath = Path()
+      ..moveTo(w * 0.5, h * 0.08)
+      ..lineTo(w * 0.96, h * 0.54)
+      ..lineTo(w * 0.5, h)
+      ..lineTo(w * 0.04, h * 0.54)
+      ..close();
+    canvas.drawPath(shadowPath, shadowPaint);
+
+    // Glow effect (telegraphed zones, selected, or reachable moves)
+    if (hasGlow) {
+      final glowPaint = Paint()
+        ..color = glowColor.withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
+      canvas.drawPath(shadowPath, glowPaint);
+    }
+
+    // Main 2:1 Isometric Diamond Face
+    final diamondPath = Path()
+      ..moveTo(w * 0.5, 0)
+      ..lineTo(w, h * 0.5)
+      ..lineTo(w * 0.5, h)
+      ..lineTo(0, h * 0.5)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          fillColor.withValues(alpha: 0.85),
+          fillColor.withValues(alpha: 0.45),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(diamondPath, fillPaint);
+
+    // Inner bevel highlight on upper edges
+    final innerBevelPath = Path()
+      ..moveTo(0, h * 0.5)
+      ..lineTo(w * 0.5, 0)
+      ..lineTo(w, h * 0.5);
+    final bevelPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.18)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(innerBevelPath, bevelPaint);
+
+    // Diamond Perimeter Border
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..strokeWidth = borderWidth
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(diamondPath, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant IsometricDiamondTilePainter oldDelegate) {
+    return oldDelegate.fillColor != fillColor ||
+        oldDelegate.borderColor != borderColor ||
+        oldDelegate.borderWidth != borderWidth ||
+        oldDelegate.hasGlow != hasGlow ||
+        oldDelegate.glowColor != glowColor;
+  }
+}
+
+/// 2.5D Multi-Node Behemoth Double-Diamond Ground Plinth Painter
+/// Draws a continuous combined perimeter footprint across Col 1 & Col 2 (1x2 unit)
+class IsometricDoubleDiamondPainter extends CustomPainter {
+  final Color fillColor;
+  final Color borderColor;
+  final double borderWidth;
+  final bool hasGlow;
+  final Color glowColor;
+
+  const IsometricDoubleDiamondPainter({
+    required this.fillColor,
+    required this.borderColor,
+    this.borderWidth = 1.5,
+    this.hasGlow = false,
+    this.glowColor = const Color(0xFFFF1744),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+
+    // Contact drop shadow below double-diamond footprint
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.6)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    final shadowPath = Path()
+      ..moveTo(w * 0.25, h * 0.08)
+      ..lineTo(w * 0.75, h * 0.08)
+      ..lineTo(w * 0.98, h * 0.54)
+      ..lineTo(w * 0.75, h)
+      ..lineTo(w * 0.25, h)
+      ..lineTo(w * 0.02, h * 0.54)
+      ..close();
+    canvas.drawPath(shadowPath, shadowPaint);
+
+    if (hasGlow) {
+      final glowPaint = Paint()
+        ..color = glowColor.withValues(alpha: 0.4)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
+      canvas.drawPath(shadowPath, glowPaint);
+    }
+
+    // Combined 1x2 hexagonal / double-diamond perimeter footprint
+    final footPath = Path()
+      ..moveTo(w * 0.25, 0)
+      ..lineTo(w * 0.75, 0)
+      ..lineTo(w, h * 0.5)
+      ..lineTo(w * 0.75, h)
+      ..lineTo(w * 0.25, h)
+      ..lineTo(0, h * 0.5)
+      ..close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          fillColor.withValues(alpha: 0.85),
+          fillColor.withValues(alpha: 0.40),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(footPath, fillPaint);
+
+    // Bevel top highlights
+    final bevelPath = Path()
+      ..moveTo(0, h * 0.5)
+      ..lineTo(w * 0.25, 0)
+      ..lineTo(w * 0.75, 0)
+      ..lineTo(w, h * 0.5);
+    final bevelPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.22)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(bevelPath, bevelPaint);
+
+    // Center internal junction dashed hint between the 2 tiles
+    final junctionPaint = Paint()
+      ..color = borderColor.withValues(alpha: 0.35)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(w * 0.5, 0), Offset(w * 0.5, h), junctionPaint);
+
+    // Footprint perimeter outline
+    final borderPaint = Paint()
+      ..color = borderColor
+      ..strokeWidth = borderWidth
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(footPath, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant IsometricDoubleDiamondPainter oldDelegate) {
+    return oldDelegate.fillColor != fillColor ||
+        oldDelegate.borderColor != borderColor ||
+        oldDelegate.borderWidth != borderWidth ||
+        oldDelegate.hasGlow != hasGlow ||
+        oldDelegate.glowColor != glowColor;
   }
 }
