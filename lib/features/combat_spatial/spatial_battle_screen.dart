@@ -266,72 +266,48 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                  // Interactive 2.5D Battlefield Arena Plane
+                  // Interactive 2.5D Battlefield Arena Plane (Unified Isometric Board)
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
                       // In authentic 2:1 isometric projection:
-                      // Tiles connect flush when colGap is 0 and rows overlap by tileHeight/2.
-                      // For clear spacing without floating black voids, tileWidth: 90/64, tileHeight: 46/32, colGap: 2.0.
-                      final double tileWidth = isDesktop ? 96.0 : 68.0;
-                      final double tileHeight = isDesktop ? 48.0 : 34.0;
-                      final double colGap = isDesktop ? 2.0 : 1.5;
-                      final double rowGap = isDesktop ? 4.0 : 3.0;
-                      final double boardWidth = 5 * tileWidth + 4 * colGap;
+                      // tileWidth: 84 desktop / 60 mobile, tileHeight: 42 desktop / 30 mobile
+                      final double tileWidth = isDesktop ? 84.0 : 58.0;
+                      final double tileHeight = isDesktop ? 42.0 : 29.0;
 
                       return Center(
                         child: SingleChildScrollView(
-                          child: Container(
-                            margin: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 20.0 : 4.0,
-                              vertical: isDesktop ? 6.0 : 2.0,
-                            ),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 16.0 : 4.0,
-                              vertical: isDesktop ? 10.0 : 4.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0B0D14).withValues(alpha: 0.55),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: const Color(0xFF4A3528).withValues(alpha: 0.5),
-                                width: 1.2,
+                          scrollDirection: Axis.horizontal,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: Container(
+                              margin: EdgeInsets.symmetric(
+                                horizontal: isDesktop ? 20.0 : 6.0,
+                                vertical: isDesktop ? 8.0 : 4.0,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.75),
-                                  blurRadius: 28,
-                                  spreadRadius: 4,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isDesktop ? 20.0 : 10.0,
+                                vertical: isDesktop ? 16.0 : 8.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0B0D14).withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFF4A3528).withValues(alpha: 0.5),
+                                  width: 1.2,
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Enemy Battlefield Grid (Rows 2 -> 1 -> 0)
-                                _buildSquadGrid(
-                                  isPlayerSquad: false,
-                                  tileWidth: tileWidth,
-                                  tileHeight: tileHeight,
-                                  colGap: colGap,
-                                  rowGap: rowGap,
-                                ),
-
-                                // Central Clash Line Divider
-                                _buildClashLineDivider(
-                                  maxWidth: boardWidth,
-                                  verticalMargin: isDesktop ? 8.0 : 5.0,
-                                ),
-
-                                // Player Battlefield Grid (Rows 0 -> 1 -> 2)
-                                _buildSquadGrid(
-                                  isPlayerSquad: true,
-                                  tileWidth: tileWidth,
-                                  tileHeight: tileHeight,
-                                  colGap: colGap,
-                                  rowGap: rowGap,
-                                ),
-                              ],
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.8),
+                                    blurRadius: 30,
+                                    spreadRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: _buildUnifiedIsometricBattlefield(
+                                tileWidth: tileWidth,
+                                tileHeight: tileHeight,
+                              ),
                             ),
                           ),
                         ),
@@ -453,107 +429,123 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  Widget _buildClashLineDivider({required double maxWidth, required double verticalMargin}) {
-    return Container(
-      width: maxWidth * 0.92,
-      margin: EdgeInsets.symmetric(vertical: verticalMargin),
-      padding: const EdgeInsets.symmetric(vertical: 3.0, horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161822).withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.40)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '⚔️  NEUTRAL CLASH PLANE  ⚔️',
-            style: TextStyle(
-              color: Color(0xFFFFD54F),
-              fontSize: 8.5,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid with true 2:1 Isometric Half-Step Interlocking
-  Widget _buildSquadGrid({
-    required bool isPlayerSquad,
+
+  /// Builds the unified 2.5D Isometric Battlefield Board (Image 2 style)
+  /// An authentic continuous angled terrain plane where Enemy Rows and Player Rows
+  /// form a single unbroken isometric grid meeting seamlessly along the neutral clash line.
+  Widget _buildUnifiedIsometricBattlefield({
     required double tileWidth,
     required double tileHeight,
-    required double colGap,
-    required double rowGap,
   }) {
-    // For Enemy: Render Row 2 (Back) -> Row 1 (Mid) -> Row 0 (Front closest to clash line)
-    // For Player: Render Row 0 (Front closest to clash line) -> Row 1 (Mid) -> Row 2 (Back)
-    final rowsOrder = isPlayerSquad ? [0, 1, 2] : [2, 1, 0];
+    // Continuous coordinate system:
+    // Global Row Index gRow (0..6):
+    // gRow 0 = Enemy Backline (Enemy Row 2)
+    // gRow 1 = Enemy Midline (Enemy Row 1)
+    // gRow 2 = Enemy Frontline (Enemy Row 0)
+    // gRow 3 = Neutral Clash Line / Buffer
+    // gRow 4 = Player Frontline (Player Row 0)
+    // gRow 5 = Player Midline (Player Row 1)
+    // gRow 6 = Player Backline (Player Row 2)
+    const int numCols = 5;
+    const int numGRows = 7;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: rowsOrder.map((rowIdx) {
-        final List<Widget> cells = [];
-        int colIdx = 0;
-        while (colIdx < 5) {
-          cells.add(_buildGridCell(
-            colIdx,
-            rowIdx,
-            isPlayerSquad: isPlayerSquad,
-            tileWidth: tileWidth,
-            tileHeight: tileHeight,
-            colGap: colGap,
-            rowGap: rowGap,
-          ));
-          // If this cell is occupied by a multi-node horizontal 1x2 behemoth anchor,
-          // it spans 2 columns, so advance colIdx by 2 so the row width stays exactly 5 columns!
-          final squad = isPlayerSquad ? _engine.playerUnits : _engine.enemyUnits;
-          final unit = squad.where((u) => u.isAlive && u.occupies(colIdx, rowIdx)).firstOrNull;
-          if (unit != null && unit.footprint == UnitFootprint.horizontal1x2 &&
-              unit.occupiedNodes.first.column == colIdx && unit.occupiedNodes.first.row == rowIdx) {
-            colIdx += 2;
-          } else {
-            colIdx += 1;
+    // Board bounding dimensions in isometric space:
+    // Isometric formula:
+    // px = (col - gRow) * (tileWidth / 2)
+    // py = (col + gRow) * (tileHeight / 2)
+    // Range of (col - gRow): min = 0 - 6 = -6, max = 4 - 0 = +4 -> spread 10 half-widths.
+    // Center offset ensures all coordinates are >= 0 inside the canvas.
+    final double originX = (numGRows - 1) * (tileWidth * 0.5);
+    final double originY = 0.0;
+    final double boardTotalWidth = originX + (numCols - 1) * (tileWidth * 0.5) + tileWidth;
+    final double boardTotalHeight = (numCols - 1 + numGRows - 1) * (tileHeight * 0.5) + tileHeight + 20.0;
+
+    // Collect all cells to render sorted by isometric depth (gRow + col)
+    // This guarantees back-to-front painter order so foreground units/tiles draw over background.
+    final List<_IsometricCellData> allCells = [];
+
+    for (int gRow = 0; gRow < numGRows; gRow++) {
+      for (int col = 0; col < numCols; col++) {
+        final bool isClashLine = (gRow == 3);
+        final bool isPlayerSquad = (gRow > 3);
+        final int localRow = isPlayerSquad ? (gRow - 4) : (2 - gRow);
+
+        allCells.add(_IsometricCellData(
+          gRow: gRow,
+          col: col,
+          localRow: localRow,
+          isClashLine: isClashLine,
+          isPlayerSquad: isPlayerSquad,
+          depth: gRow + col,
+          screenX: originX + (col - gRow) * (tileWidth * 0.5),
+          screenY: originY + (col + gRow) * (tileHeight * 0.5),
+        ));
+      }
+    }
+
+    allCells.sort((a, b) => a.depth.compareTo(b.depth));
+
+    return SizedBox(
+      width: boardTotalWidth,
+      height: boardTotalHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: allCells.map((cell) {
+          if (cell.isClashLine) {
+            return Positioned(
+              left: cell.screenX,
+              top: cell.screenY,
+              width: tileWidth,
+              height: tileHeight,
+              child: _buildClashLineTile(cell.col, tileWidth: tileWidth, tileHeight: tileHeight),
+            );
           }
-        }
 
-        // True 2:1 Isometric Diagonal Step (like Gladius / Tactical RPG grid in Image 2):
-        // Each row offset by exactly half the diamond width (tileWidth * 0.5)
-        // and vertically nested so diamond vertices interlock flush into the V-grooves!
-        final int depthIndex = isPlayerSquad ? rowIdx : (2 - rowIdx);
-        final double isometricXOffset = depthIndex * (tileWidth * 0.5);
-        final double isometricYOffset = ((isPlayerSquad && rowIdx > 0) || (!isPlayerSquad && rowIdx < 2))
-            ? (rowIdx * -(tileHeight * 0.48))
-            : 0.0;
-
-        return Transform.translate(
-          offset: Offset(isometricXOffset, isometricYOffset),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: cells,
-          ),
-        );
-      }).toList(),
+          return Positioned(
+            left: cell.screenX,
+            top: cell.screenY,
+            width: tileWidth,
+            height: tileHeight,
+            child: _buildIsometricGridCell(
+              cell.col,
+              cell.localRow,
+              isPlayerSquad: cell.isPlayerSquad,
+              tileWidth: tileWidth,
+              tileHeight: tileHeight,
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
-  Widget _buildGridCell(
+  Widget _buildClashLineTile(int col, {required double tileWidth, required double tileHeight}) {
+    return CustomPaint(
+      painter: IsometricDiamondTilePainter(
+        fillColor: const Color(0xFF141724),
+        borderColor: const Color(0xFFFFD54F).withValues(alpha: 0.35),
+        borderWidth: 1.0,
+        hasGlow: false,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.swap_vert_rounded,
+          color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
+          size: 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIsometricGridCell(
     int col,
     int row, {
     required bool isPlayerSquad,
     required double tileWidth,
     required double tileHeight,
-    required double colGap,
-    required double rowGap,
   }) {
+    const double colGap = 0.0;
     final squad = isPlayerSquad ? _engine.playerUnits : _engine.enemyUnits;
     final occupant = squad.where((u) => u.isAlive && u.occupies(col, row)).firstOrNull;
 
@@ -1542,3 +1534,26 @@ class IsometricDoubleDiamondPainter extends CustomPainter {
         oldDelegate.glowColor != glowColor;
   }
 }
+
+class _IsometricCellData {
+  final int gRow;
+  final int col;
+  final int localRow;
+  final bool isClashLine;
+  final bool isPlayerSquad;
+  final int depth;
+  final double screenX;
+  final double screenY;
+
+  const _IsometricCellData({
+    required this.gRow,
+    required this.col,
+    required this.localRow,
+    required this.isClashLine,
+    required this.isPlayerSquad,
+    required this.depth,
+    required this.screenX,
+    required this.screenY,
+  });
+}
+
