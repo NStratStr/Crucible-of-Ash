@@ -249,17 +249,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                  // Darkened Radial & Linear Atmospheric Fog Overlay
+                  // Subtle Atmospheric Vignette Overlay
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           center: Alignment.center,
-                          radius: 0.95,
+                          radius: 1.1,
                           colors: [
-                            const Color(0xFF0A0C14).withValues(alpha: 0.40),
-                            const Color(0xFF080910).withValues(alpha: 0.85),
-                            const Color(0xFF040508).withValues(alpha: 0.96),
+                            Colors.transparent,
+                            const Color(0xFF06070B).withValues(alpha: 0.35),
+                            const Color(0xFF030406).withValues(alpha: 0.70),
                           ],
                         ),
                       ),
@@ -270,39 +270,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
-                      // In authentic 2:1 isometric projection:
-                      // tileWidth: 84 desktop / 60 mobile, tileHeight: 42 desktop / 30 mobile
-                      final double tileWidth = isDesktop ? 84.0 : 58.0;
-                      final double tileHeight = isDesktop ? 42.0 : 29.0;
+                      // Increased grid size so tiles and units fill the scene properly
+                      final double tileWidth = isDesktop ? 128.0 : 84.0;
+                      final double tileHeight = isDesktop ? 64.0 : 42.0;
 
                       return Center(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: SingleChildScrollView(
                             scrollDirection: Axis.vertical,
-                            child: Container(
-                              margin: EdgeInsets.symmetric(
-                                horizontal: isDesktop ? 20.0 : 6.0,
-                                vertical: isDesktop ? 8.0 : 4.0,
-                              ),
+                            child: Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: isDesktop ? 20.0 : 10.0,
-                                vertical: isDesktop ? 16.0 : 8.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0B0D14).withValues(alpha: 0.65),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: const Color(0xFF4A3528).withValues(alpha: 0.5),
-                                  width: 1.2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.8),
-                                    blurRadius: 30,
-                                    spreadRadius: 4,
-                                  ),
-                                ],
+                                horizontal: isDesktop ? 24.0 : 8.0,
+                                vertical: isDesktop ? 12.0 : 6.0,
                               ),
                               child: _buildUnifiedIsometricBattlefield(
                                 tileWidth: tileWidth,
@@ -523,7 +503,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   Widget _buildClashLineTile(int col, {required double tileWidth, required double tileHeight}) {
     return CustomPaint(
       painter: IsometricDiamondTilePainter(
-        fillColor: const Color(0xFF141724),
+        fillColor: const Color(0xFFFFD54F).withValues(alpha: 0.05),
         borderColor: const Color(0xFFFFD54F).withValues(alpha: 0.35),
         borderWidth: 1.0,
         hasGlow: false,
@@ -531,8 +511,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       child: Center(
         child: Icon(
           Icons.swap_vert_rounded,
-          color: const Color(0xFFFFD54F).withValues(alpha: 0.4),
-          size: 14,
+          color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
+          size: 16,
         ),
       ),
     );
@@ -611,26 +591,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
         final Color fillColor = isTelegraphed
-            ? const Color(0xFF4A1016)
+            ? const Color(0xFFFF1744).withValues(alpha: 0.35)
             : (isDropCandidate
-                ? const Color(0xFF004D40)
+                ? const Color(0xFF00E5FF).withValues(alpha: 0.28)
                 : (isReachable
-                    ? const Color(0xFF00382E)
+                    ? const Color(0xFF00E676).withValues(alpha: 0.25)
                     : (isBossSecondaryNode
-                        ? const Color(0xFF26191C)
-                        : (isPlayerSquad ? const Color(0xFF1E2433) : const Color(0xFF2E1C22)))));
+                        ? const Color(0xFFFF5252).withValues(alpha: 0.12)
+                        : (isPlayerSquad
+                            ? const Color(0xFF304FFE).withValues(alpha: 0.12)
+                            : const Color(0xFFFF1744).withValues(alpha: 0.10)))));
 
         final Color borderColor = isTelegraphed
-            ? const Color(0xFFFF1744)
+            ? const Color(0xFFFF1744).withValues(alpha: 0.90)
             : (isDropCandidate
-                ? const Color(0xFF00E5FF)
+                ? const Color(0xFF00E5FF).withValues(alpha: 0.85)
                 : (isReachable
-                    ? const Color(0xFF00E676)
+                    ? const Color(0xFF00E676).withValues(alpha: 0.85)
                     : (isSelected
                         ? const Color(0xFFFFD54F)
                         : (isBossSecondaryNode
-                            ? const Color(0xFF8D6E63).withValues(alpha: 0.6)
-                            : (isPlayerSquad ? const Color(0xFF4A5C80) : const Color(0xFF6E434D))))));
+                            ? const Color(0xFFFF8A80).withValues(alpha: 0.35)
+                            : (isPlayerSquad
+                                ? const Color(0xFF82B1FF).withValues(alpha: 0.38)
+                                : const Color(0xFFFF8A80).withValues(alpha: 0.32))))));
 
         final bool hasGlow = isTelegraphed || isSelected || isDropCandidate || isReachable;
         final Color glowColor = isTelegraphed
@@ -688,12 +672,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     child: Padding(
                       padding: const EdgeInsets.only(top: 2, left: 3),
                       child: Text(
-                        'C${col + 1} R$row',
+                        '${col + 1},$row',
                         style: TextStyle(
-                          fontSize: 7.5,
+                          fontSize: 8.0,
                           color: isTelegraphed
                               ? const Color(0xFFFF8A80)
-                              : (isReachable ? const Color(0xFF00E676) : Colors.white24),
+                              : (isReachable ? const Color(0xFF00E676) : Colors.white12),
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -887,12 +871,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double hitShakeX = isDamaged ? 4.0 : 0.0;
 
     final double bossSpanWidth = 2 * tileWidth + colGap;
-    final double baseWidth = isBoss ? bossSpanWidth - 12 : tileWidth - 10;
-    final double baseHeight = isBoss ? 15 : 10;
-    final double modelWidth = isBoss ? bossSpanWidth - 6 : tileWidth + 4;
+    final double baseWidth = isBoss ? bossSpanWidth - 16 : tileWidth - 12;
+    final double baseHeight = isBoss ? 20 : 14;
+    // Units scale dynamically with tile size for commanding visual presence
+    final double modelWidth = isBoss ? bossSpanWidth * 0.95 : tileWidth * 0.95;
     final double modelHeight = isBoss
-        ? (tileHeight * 2.1).clamp(86.0, 118.0)
-        : (tileHeight * 1.8).clamp(62.0, 88.0);
+        ? (tileHeight * 2.6).clamp(110.0, 180.0)
+        : (tileHeight * 2.2).clamp(80.0, 140.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -907,7 +892,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           children: [
             // 1. Tabletop 2.5D Contact Drop Shadow & Soft Ground Glow
             Positioned(
-              bottom: 3,
+              bottom: 4,
               child: Container(
                 width: baseWidth,
                 height: baseHeight,
@@ -932,7 +917,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: 5,
+              bottom: 6,
               child: SizedBox(
                 width: modelWidth,
                 height: modelHeight,
@@ -948,7 +933,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     errorBuilder: (context, error, stackTrace) => Icon(
                       unit.isPlayer ? Icons.shield : Icons.dangerous,
                       color: factionColor,
-                      size: isBoss ? 40 : 28,
+                      size: isBoss ? 48 : 36,
                     ),
                   ),
                 ),
@@ -957,14 +942,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 3. Name, Badges & Slag Carapace Overlays
             Positioned(
-              top: isBoss ? -20 : -14,
+              top: isBoss ? -30 : -22,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (unit.isSlagCarapaceActive)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                      margin: const EdgeInsets.only(bottom: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
                         color: const Color(0xFF221115),
                         borderRadius: BorderRadius.circular(3),
@@ -973,7 +958,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       child: const Text(
                         'CARAPACE -50%',
                         style: TextStyle(
-                          fontSize: 6.5,
+                          fontSize: 7.5,
                           color: Color(0xFFFFD54F),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
@@ -982,15 +967,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   if (unit.bleedStacks > 0)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 1),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      margin: const EdgeInsets.only(bottom: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB71C1C),
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
                         '🩸 ${unit.bleedStacks}x BLEED',
-                        style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 7.0, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   Row(
@@ -998,12 +983,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (unit.isDisplacementImmune)
-                        const Icon(Icons.anchor, size: 9, color: Color(0xFFFFD54F)),
-                      const SizedBox(width: 1),
+                        const Icon(Icons.anchor, size: 10, color: Color(0xFFFFD54F)),
+                      const SizedBox(width: 2),
                       Text(
                         unit.name,
                         style: TextStyle(
-                          fontSize: isBoss ? 8.0 : 7.0,
+                          fontSize: isBoss ? 9.5 : 8.5,
                           fontWeight: FontWeight.bold,
                           color: isAttacking ? const Color(0xFFFFD54F) : Colors.white,
                           shadows: const [
@@ -1364,26 +1349,6 @@ class IsometricDiamondTilePainter extends CustomPainter {
     final double w = size.width;
     final double h = size.height;
 
-    // Contact drop shadow below diamond
-    final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-    final shadowPath = Path()
-      ..moveTo(w * 0.5, h * 0.08)
-      ..lineTo(w * 0.96, h * 0.54)
-      ..lineTo(w * 0.5, h)
-      ..lineTo(w * 0.04, h * 0.54)
-      ..close();
-    canvas.drawPath(shadowPath, shadowPaint);
-
-    // Glow effect (telegraphed zones, selected, or reachable moves)
-    if (hasGlow) {
-      final glowPaint = Paint()
-        ..color = glowColor.withValues(alpha: 0.45)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
-      canvas.drawPath(shadowPath, glowPaint);
-    }
-
     // Main 2:1 Isometric Diamond Face
     final diamondPath = Path()
       ..moveTo(w * 0.5, 0)
@@ -1392,15 +1357,17 @@ class IsometricDiamondTilePainter extends CustomPainter {
       ..lineTo(0, h * 0.5)
       ..close();
 
+    // Glow effect (telegraphed zones, selected, or reachable moves)
+    if (hasGlow) {
+      final glowPaint = Paint()
+        ..color = glowColor.withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
+      canvas.drawPath(diamondPath, glowPaint);
+    }
+
+    // Translucent face fill preserving underlying scene
     final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          fillColor.withValues(alpha: 0.85),
-          fillColor.withValues(alpha: 0.45),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, w, h))
+      ..color = fillColor
       ..style = PaintingStyle.fill;
     canvas.drawPath(diamondPath, fillPaint);
 
@@ -1410,7 +1377,7 @@ class IsometricDiamondTilePainter extends CustomPainter {
       ..lineTo(w * 0.5, 0)
       ..lineTo(w, h * 0.5);
     final bevelPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.18)
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
     canvas.drawPath(innerBevelPath, bevelPaint);
