@@ -527,22 +527,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
         // True 2:1 Isometric Diagonal Step (like Gladius / Tactical RPG grid in Image 2):
         // Each row offset by exactly half the diamond width (tileWidth * 0.5)
-        // so diamond vertices nest flush into the adjacent row's top/bottom V-grooves!
+        // and vertically nested so diamond vertices interlock flush into the V-grooves!
         final int depthIndex = isPlayerSquad ? rowIdx : (2 - rowIdx);
         final double isometricXOffset = depthIndex * (tileWidth * 0.5);
+        final double isometricYOffset = ((isPlayerSquad && rowIdx > 0) || (!isPlayerSquad && rowIdx < 2))
+            ? (rowIdx * -(tileHeight * 0.48))
+            : 0.0;
 
         return Transform.translate(
-          offset: Offset(isometricXOffset, 0),
-          child: Container(
-            margin: EdgeInsets.only(
-              top: (isPlayerSquad && rowIdx > 0) || (!isPlayerSquad && rowIdx < 2)
-                  ? -(tileHeight * 0.48) // Interlock rows so tips touch vertex-to-vertex!
-                  : 0.0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: cells,
-            ),
+          offset: Offset(isometricXOffset, isometricYOffset),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: cells,
           ),
         );
       }).toList(),
