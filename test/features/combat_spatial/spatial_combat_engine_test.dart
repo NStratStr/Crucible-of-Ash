@@ -89,6 +89,24 @@ void main() {
       expect(cast, isTrue);
       expect(gorgoroth.isSlagCarapaceActive, isFalse);
       expect(gorgoroth.armor, lessThan(40)); // Halved to ~37
+      expect(engine.activeActionEvent, isNotNull);
+      expect(engine.activeActionEvent!.skillName, equals('Smite the Calcified'));
+    });
+
+    test('Unit movement is strictly constrained by moveRange stat', () {
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      expect(valeria.moveRange, equals(1));
+      expect(valeria.occupiedNodes.first.column, equals(1)); // Col 2, Row 0
+
+      // Rejects move exceeding range: moving from Col 2, Row 0 to Col 4, Row 2 (distance = 2)
+      final invalidMove = engine.movePlayerUnit('lady_valeria', 3, 2);
+      expect(invalidMove, isFalse);
+      expect(valeria.occupiedNodes.first.column, equals(1)); // Remained at original tile
+
+      // Accepts move within range: moving from Col 2, Row 0 to Col 1, Row 0 (distance = 1)
+      final validMove = engine.movePlayerUnit('lady_valeria', 0, 0);
+      expect(validMove, isTrue);
+      expect(valeria.occupiedNodes.first.column, equals(0));
     });
   });
 }

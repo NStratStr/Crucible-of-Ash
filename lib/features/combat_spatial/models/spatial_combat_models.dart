@@ -145,6 +145,7 @@ class CombatUnitState {
   final UnitFootprint footprint;
   final List<GridNode> occupiedNodes;
   final bool isDisplacementImmune;
+  final int moveRange;
   int currentAp; // 0 to 10,000 threshold
   int maxHp;
   int hp;
@@ -164,6 +165,7 @@ class CombatUnitState {
     required this.footprint,
     required this.occupiedNodes,
     bool? isDisplacementImmune,
+    this.moveRange = 1,
     this.currentAp = 0,
     required this.maxHp,
     required this.hp,
@@ -177,6 +179,19 @@ class CombatUnitState {
   }) : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1);
 
   bool get isAlive => hp > 0;
+
+  /// Checks if unit can move to target coordinates based on its moveRange
+  bool canMoveTo(int targetCol, int targetRow) {
+    if (isDisplacementImmune) return false;
+    if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
+    if (occupiedNodes.isEmpty) return false;
+    final anchor = occupiedNodes.first;
+    if (anchor.column == targetCol && anchor.row == targetRow) return false;
+    final colDist = (targetCol - anchor.column).abs();
+    final rowDist = (targetRow - anchor.row).abs();
+    final dist = max(colDist, rowDist);
+    return dist > 0 && dist <= moveRange;
+  }
 
   /// High-resolution miniature cutout asset path matching Dark Fantasy art roster
   String get assetPath {

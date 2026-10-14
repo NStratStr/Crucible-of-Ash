@@ -163,6 +163,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       occupiedNodes: [
         const GridNode(column: 3, row: 1, occupantUnitId: 'sanguine_blade'),
       ],
+      moveRange: 2,
       maxHp: 310,
       hp: 310,
       maxArmor: 20,
@@ -523,6 +524,12 @@ class SpatialCombatEngine extends ChangeNotifier {
       return false;
     }
 
+    // Restrict movement to unit's moveRange (e.g. 1 tile adjacent/diagonal)
+    if (!unit.canMoveTo(targetCol, targetRow)) {
+      addLog('${unit.name} cannot reach (Col ${targetCol + 1}, Row $targetRow)! Movement limit is ${unit.moveRange} tile(s).');
+      return false;
+    }
+
     // Check if target node is empty
     final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(targetCol, targetRow));
     if (isOccupied) {
@@ -576,7 +583,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     hand.remove(card);
 
     if (card.id == 'smite_the_calcified') {
-      final boss = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
+      final boss = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits.where((u) => u.isAlive).firstOrNull;
       if (boss != null) {
         final rawDmg = (74 * 2.5).round(); // 185 damage
         final dmg = boss.takeDamage(rawDmg);
@@ -589,17 +597,116 @@ class SpatialCombatEngine extends ChangeNotifier {
           boss.pendingIntent = null; // Staggers channel
           lastBannerMessage = '⚡ SLAG CARAPACE SHATTERED! ⚡';
           addLog('RESULT: Slag Carapace SHATTERS! Armor halved to ${boss.armor}. Channeled intent interrupted!');
+        } else {
+          lastBannerMessage = '⚡ SMITE THE CALCIFIED DEALS $dmg DMG!';
         }
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_smite',
+          attackerId: 'player_valeria',
+          attackerName: 'VALERIA',
+          skillName: 'Smite the Calcified',
+          targetId: boss.id,
+          targetName: boss.name,
+          damage: dmg,
+          isCrit: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     } else if (card.id == 'phalanx_intercept') {
-      final recipient = targetUnit ?? playerUnits.where((u) => u.id == 'lady_valeria').first;
+      final recipient = targetUnit ?? playerUnits.where((u) => u.isAlive && u.id == 'lady_valeria').firstOrNull ??
+          playerUnits.where((u) => u.isAlive).first;
       recipient.armor += 35;
+      lastBannerMessage = '🛡️ PHALANX INTERCEPT: +35 Armor to ${recipient.name}!';
       addLog('CAST: Phalanx Intercept fortified ${recipient.name} (+35 Armor)!');
-    } else if (card.id == 'searing_brand' || card.id == 'sun_ashlar_wrath') {
-      // Cross pattern hits
+
+      dispatchAction(SpatialActionEvent(
+        id: 'card_${currentTick}_phalanx',
+        attackerId: 'player_valeria',
+        attackerName: 'VALERIA',
+        skillName: 'Phalanx Intercept',
+        targetId: recipient.id,
+        targetName: recipient.name,
+        damage: 0,
+        isHeal: true,
+        isPlayerAttacker: true,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    } else if (card.id == 'searing_brand') {
+      final target = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits.where((u) => u.isAlive).firstOrNull;
+      if (target != null) {
+        final dmg = target.takeDamage(105);
+        lastBannerMessage = '🔥 SEARING BRAND: Radiant strike ignites ${target.name} for $dmg DMG!';
+        addLog('CAST: Searing Brand struck ${target.name} for $dmg Holy damage.');
+
+        // Splash on other alive enemies
+        for (final other in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
+          final splash = other.takeDamage(45);
+          addLog('  Splash: ${other.name} took $splash Holy damage.');
+        }
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_searing',
+          attackerId: 'sun_smith',
+          attackerName: 'SUN-SMITH',
+          skillName: 'Searing Brand',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.stAshlarCross,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'stoke_the_embers') {
+      focus = min(maxFocus, focus + 2);
+      String drawMsg = '';
+      if (drawPile.isNotEmpty) {
+        final drawn = drawPile.removeAt(0);
+        hand.add(drawn);
+        drawMsg = ' & drew ${drawn.name}';
+      }
+      lastBannerMessage = '✨ STOKE THE EMBERS: +2 Focus generated$drawMsg!';
+      addLog('CAST: Stoke the Embers restored 2 Focus$drawMsg.');
+
+      final recipient = playerUnits.where((u) => u.isAlive).first;
+      dispatchAction(SpatialActionEvent(
+        id: 'card_${currentTick}_stoke',
+        attackerId: 'sun_smith',
+        attackerName: 'SUN-SMITH',
+        skillName: 'Stoke the Embers',
+        targetId: recipient.id,
+        targetName: recipient.name,
+        damage: 0,
+        isHeal: true,
+        isPlayerAttacker: true,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    } else if (card.id == 'sun_ashlar_wrath') {
+      int totalDmg = 0;
       for (final enemy in enemyUnits.where((u) => u.isAlive)) {
-        final dmg = enemy.takeDamage(95);
+        final dmg = enemy.takeDamage(110);
+        totalDmg += dmg;
         addLog('RADIANT BURST: ${enemy.name} took $dmg Holy damage.');
+      }
+      final boss = enemyUnits.where((u) => u.isAlive).firstOrNull;
+      lastBannerMessage = '☀️ WRATH OF ASHLAR: Radiant Cross strikes all enemies for $totalDmg total DMG!';
+      if (boss != null) {
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_wrath',
+          attackerId: 'sun_smith',
+          attackerName: 'SUN-SMITH',
+          skillName: 'Wrath of Ashlar',
+          targetId: boss.id,
+          targetName: boss.name,
+          damage: 110,
+          isCrit: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.stAshlarCross,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     }
 
