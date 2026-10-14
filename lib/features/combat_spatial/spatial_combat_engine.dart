@@ -28,6 +28,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   final List<String> combatLogs = [];
   String? lastBannerMessage;
   SpatialActionEvent? activeActionEvent;
+  bool isActionPauseEnabled = false;
 
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
@@ -258,6 +259,12 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// 30 Hz Discrete Tick Execution
   void stepTick() {
+    // If a skill or attack cut-in is currently resolving on screen, pause tick progression
+    // so players and enemies have kinetic focus and readability!
+    if (isActionPauseEnabled && activeActionEvent != null) {
+      return;
+    }
+
     currentTick++;
 
     // Focus Passive Accumulation: 1 Focus every 90 ticks (3.0 seconds)
