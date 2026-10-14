@@ -15,9 +15,9 @@ void main() {
       expect(engine.playerUnits.length, equals(4));
 
       final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
-      expect(gorgoroth.footprint, equals(UnitFootprint.horizontal1x2));
+      expect(gorgoroth.footprint, equals(UnitFootprint.quadColossus2x2));
       expect(gorgoroth.isDisplacementImmune, isTrue);
-      expect(gorgoroth.occupiedNodes.length, equals(2));
+      expect(gorgoroth.occupiedNodes.length, equals(4));
       expect(gorgoroth.isSlagCarapaceActive, isTrue);
 
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');

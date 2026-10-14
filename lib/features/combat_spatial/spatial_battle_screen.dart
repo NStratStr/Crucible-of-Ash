@@ -552,6 +552,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     final bool isSelected = _selectedUnitId != null && occupant?.id == _selectedUnitId;
 
+    // Ghost / X-Ray Mode:
+    // If a unit is standing in front of another occupied unit or reachable tile along isometric depth,
+    // or if a unit behind is selected, give the foreground unit subtle ghost transparency (0.42 opacity)
+    // so background units like the ghoul are never obscured!
+    bool isOccluding = false;
+    if (occupant != null && !isSelected) {
+      if (isPlayerSquad) {
+        // Player units occlude tiles behind them in higher rows (row 1, row 2)
+        if (_selectedUnitId != null) {
+          final sel = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
+          if (sel != null && sel.occupiedNodes.isNotEmpty && sel.occupiedNodes.first.row > row && sel.occupiedNodes.first.column == col) {
+            isOccluding = true;
+          }
+        }
+      } else {
+        // Enemy units occlude tiles behind them in higher rows (row 1, row 2)
+        if (row < 2) {
+          final hasUnitBehind = _engine.enemyUnits.any((u) => u.isAlive && u.id != occupant.id && u.occupies(col, row + 1));
+          if (hasUnitBehind) {
+            isOccluding = true;
+          }
+        }
+      }
+    }
+
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
         final data = details.data;
@@ -623,30 +648,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ? const Color(0xFF00E676)
                 : (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)));
 
-        // Behemoth boss (1x2 horizontal footprint)
-        final bool isBossAnchor = occupant != null && isAnchorCell && occupant.footprint == UnitFootprint.horizontal1x2;
-        final double cellSpanWidth = isBossAnchor ? (2 * tileWidth + colGap) : tileWidth;
-
-        return Container(
-          width: cellSpanWidth,
+        return SizedBox(
+          width: tileWidth,
           height: tileHeight,
-          margin: EdgeInsets.symmetric(horizontal: colGap / 2),
           child: CustomPaint(
-            painter: isBossAnchor
-                ? IsometricDoubleDiamondPainter(
-                    fillColor: fillColor,
-                    borderColor: borderColor,
-                    borderWidth: hasGlow ? 2.2 : 1.5,
-                    hasGlow: hasGlow,
-                    glowColor: glowColor,
-                  )
-                : IsometricDiamondTilePainter(
-                    fillColor: fillColor,
-                    borderColor: borderColor,
-                    borderWidth: hasGlow ? 2.0 : 1.2,
-                    hasGlow: hasGlow,
-                    glowColor: glowColor,
-                  ),
+            painter: IsometricDiamondTilePainter(
+              fillColor: fillColor,
+              borderColor: borderColor,
+              borderWidth: hasGlow ? 2.0 : 1.1,
+              hasGlow: hasGlow,
+              glowColor: glowColor,
+            ),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -706,78 +718,90 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ),
 
-              // Secondary Behemoth Footprint Marker (Col 3 Frontline extension of Gorgoroth)
+              // Secondary Behemoth Footprint Marker (2x2 extension of Gorgoroth)
               if (isBossSecondaryNode)
                 Center(
-                  child: Icon(
-                    Icons.grid_view_rounded,
-                    color: const Color(0xFFFF5252).withValues(alpha: 0.35),
-                    size: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFFF5252).withValues(alpha: 0.12),
+                      border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.35), width: 0.8),
+                    ),
+                    child: const Icon(
+                      Icons.shield_outlined,
+                      color: Color(0xFFFF8A80),
+                      size: 14,
+                    ),
                   ),
                 ),
 
               // Occupant Miniature (Rendered only on Anchor node)
               if (occupant != null && isAnchorCell)
                 Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      if (isPlayerSquad) {
-                        setState(() {
-                          _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
-                        });
-                      } else {
-                        // Cast active dragged card or target enemy
-                        if (_draggedCard != null) {
-                          _engine.castCard(_draggedCard!.id, targetUnit: occupant);
-                          setState(() => _draggedCard = null);
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: isOccluding ? 0.38 : 1.0,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (isPlayerSquad) {
+                          setState(() {
+                            _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
+                          });
+                        } else {
+                          // Cast active dragged card or target enemy
+                          if (_draggedCard != null) {
+                            _engine.castCard(_draggedCard!.id, targetUnit: occupant);
+                            setState(() => _draggedCard = null);
+                          }
                         }
-                      }
-                    },
-                    child: isPlayerSquad
-                        ? LongPressDraggable<String>(
-                            data: 'unit:${occupant.id}',
-                            maxSimultaneousDrags: 1,
-                            onDragStarted: () {
-                              setState(() => _selectedUnitId = occupant.id);
-                              _engine.setBulletTime(true);
-                            },
-                            onDragEnd: (_) {
-                              _engine.setBulletTime(false);
-                            },
-                            feedback: Material(
-                              color: Colors.transparent,
+                      },
+                      child: isPlayerSquad
+                          ? LongPressDraggable<String>(
+                              data: 'unit:${occupant.id}',
+                              maxSimultaneousDrags: 1,
+                              onDragStarted: () {
+                                setState(() => _selectedUnitId = occupant.id);
+                                _engine.setBulletTime(true);
+                              },
+                              onDragEnd: (_) {
+                                _engine.setBulletTime(false);
+                              },
+                              feedback: Material(
+                                color: Colors.transparent,
+                                child: _buildUnitMiniatureWidget(
+                                  occupant,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: colGap,
+                                  isDragging: true,
+                                ),
+                              ),
+                              childWhenDragging: Opacity(
+                                opacity: 0.3,
+                                child: _buildUnitMiniatureWidget(
+                                  occupant,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: colGap,
+                                ),
+                              ),
                               child: _buildUnitMiniatureWidget(
                                 occupant,
                                 tileWidth: tileWidth,
                                 tileHeight: tileHeight,
                                 colGap: colGap,
-                                isDragging: true,
+                                isSelected: isSelected,
                               ),
-                            ),
-                            childWhenDragging: Opacity(
-                              opacity: 0.3,
-                              child: _buildUnitMiniatureWidget(
-                                occupant,
-                                tileWidth: tileWidth,
-                                tileHeight: tileHeight,
-                                colGap: colGap,
-                              ),
-                            ),
-                            child: _buildUnitMiniatureWidget(
+                            )
+                          : _buildUnitMiniatureWidget(
                               occupant,
                               tileWidth: tileWidth,
                               tileHeight: tileHeight,
                               colGap: colGap,
-                              isSelected: isSelected,
                             ),
-                          )
-                        : _buildUnitMiniatureWidget(
-                            occupant,
-                            tileWidth: tileWidth,
-                            tileHeight: tileHeight,
-                            colGap: colGap,
-                          ),
+                    ),
                   ),
                 ),
 
@@ -857,7 +881,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     bool isDragging = false,
     bool isSelected = false,
   }) {
-    final bool isBoss = unit.footprint == UnitFootprint.horizontal1x2;
+    final bool isBoss = unit.footprint == UnitFootprint.quadColossus2x2 || unit.footprint == UnitFootprint.horizontal1x2;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
@@ -870,14 +894,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double lungeY = isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0;
     final double hitShakeX = isDamaged ? 4.0 : 0.0;
 
-    final double bossSpanWidth = 2 * tileWidth + colGap;
-    final double baseWidth = isBoss ? bossSpanWidth - 16 : tileWidth - 12;
-    final double baseHeight = isBoss ? 20 : 14;
+    // Normalization multipliers:
+    // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
+    // transparent padding. We scale them up so their physical figure matches Valeria's scale!
+    double unitScaleMultiplier = 1.0;
+    if (unit.id == 'pyre_zealot' || unit.templateId.contains('ghoul')) {
+      unitScaleMultiplier = 1.45; // Ghoul crouches low; scale up plinth & figure
+    } else if (unit.id == 'iron_footman') {
+      unitScaleMultiplier = 1.25;
+    } else if (unit.id == 'sanguine_blade') {
+      unitScaleMultiplier = 1.35;
+    } else if (unit.id == 'sun_smith') {
+      unitScaleMultiplier = 1.20;
+    } else if (unit.id == 'cinder_witch') {
+      unitScaleMultiplier = 1.25;
+    }
+
+    final double bossSpanWidth = isBoss ? (2 * tileWidth) : tileWidth;
+    final double baseWidth = isBoss ? bossSpanWidth * 0.75 : (tileWidth - 12) * unitScaleMultiplier;
+    final double baseHeight = isBoss ? 28 : (14 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    final double modelWidth = isBoss ? bossSpanWidth * 0.95 : tileWidth * 0.95;
-    final double modelHeight = isBoss
-        ? (tileHeight * 2.6).clamp(110.0, 180.0)
-        : (tileHeight * 2.2).clamp(80.0, 140.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 0.95 * unitScaleMultiplier).clamp(60.0, 260.0);
+    final double modelHeight = (isBoss
+        ? (tileHeight * 3.6).clamp(160.0, 260.0)
+        : (tileHeight * 2.2 * unitScaleMultiplier).clamp(80.0, 160.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),

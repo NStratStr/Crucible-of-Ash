@@ -58,16 +58,18 @@ class SpatialCombatEngine extends ChangeNotifier {
     isBulletTime = false;
 
     // --- ENEMY SQUAD: PYRE SYNOD COHORT ---
-    // Gorgoroth the Flayed: 1x2 Behemoth Boss in Col 2 & 3 Frontline (Row 0)
+    // Gorgoroth the Flayed: 2x2 Quad-Colossus Behemoth Boss occupying 4 tiles (Cols 1-2, Rows 0-1)
     final gorgoroth = CombatUnitState(
       id: 'gorgoroth_boss',
       name: 'Gorgoroth the Flayed',
       templateId: 'gorgoroth_boss',
       isPlayer: false,
-      footprint: UnitFootprint.horizontal1x2,
+      footprint: UnitFootprint.quadColossus2x2,
       occupiedNodes: [
-        const GridNode(column: 1, row: 0, occupantUnitId: 'gorgoroth_boss'), // Col 2 (0-indexed col:1)
-        const GridNode(column: 2, row: 0, occupantUnitId: 'gorgoroth_boss'), // Col 3 (0-indexed col:2)
+        const GridNode(column: 1, row: 0, occupantUnitId: 'gorgoroth_boss'), // Col 2 Front (Anchor)
+        const GridNode(column: 2, row: 0, occupantUnitId: 'gorgoroth_boss'), // Col 3 Front
+        const GridNode(column: 1, row: 1, occupantUnitId: 'gorgoroth_boss'), // Col 2 Mid
+        const GridNode(column: 2, row: 1, occupantUnitId: 'gorgoroth_boss'), // Col 3 Mid
       ],
       isDisplacementImmune: true,
       maxHp: 2400,
@@ -79,7 +81,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       isSlagCarapaceActive: true,
     );
 
-    // Cinder Witch: 1x1 Arcanum in Col 2 Midline (Col index 1, Row 1)
+    // Cinder Witch: 1x1 Arcanum in Col 1 Backline (Col index 0, Row 2)
     final cinderWitch = CombatUnitState(
       id: 'cinder_witch',
       name: 'Cinder Witch',
@@ -87,7 +89,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       isPlayer: false,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 1, row: 1, occupantUnitId: 'cinder_witch'),
+        const GridNode(column: 0, row: 2, occupantUnitId: 'cinder_witch'),
       ],
       maxHp: 320,
       hp: 320,
