@@ -455,16 +455,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   Widget _buildClashLineDivider({required double maxWidth, required double verticalMargin}) {
     return Container(
-      width: maxWidth,
+      width: maxWidth * 0.92,
       margin: EdgeInsets.symmetric(vertical: verticalMargin),
-      padding: const EdgeInsets.symmetric(vertical: 3.5, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 3.0, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF161822),
+        color: const Color(0xFF161822).withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35)),
+        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.40)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFD54F).withValues(alpha: 0.12),
+            color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
             blurRadius: 6,
           ),
         ],
@@ -476,7 +476,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             '⚔️  NEUTRAL CLASH PLANE  ⚔️',
             style: TextStyle(
               color: Color(0xFFFFD54F),
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.4,
             ),
@@ -486,8 +486,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid
-  /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid with authentic Isometric Angle Staggering
+  /// Builds a 3-Row (0=Front, 1=Mid, 2=Back) x 5-Column Grid with true 2:1 Isometric Half-Step Interlocking
   Widget _buildSquadGrid({
     required bool isPlayerSquad,
     required double tileWidth,
@@ -526,17 +525,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           }
         }
 
-        // Isometric perspective skew: Stagger rows diagonally along the diamond vector
-        // Each step deeper into the backline shifts horizontally by tileWidth * 0.28,
-        // transforming the straight vertical stack into an angled isometric battleplane!
-        final double isometricXOffset = isPlayerSquad
-            ? (rowIdx * (tileWidth * 0.26)) // Player: Row 0 -> Row 1 (+dx) -> Row 2 (+2*dx)
-            : ((2 - rowIdx) * (tileWidth * 0.26)); // Enemy: Row 2 (+2*dx) -> Row 1 (+dx) -> Row 0 (0)
+        // True 2:1 Isometric Diagonal Step (like Gladius / Tactical RPG grid in Image 2):
+        // Each row offset by exactly half the diamond width (tileWidth * 0.5)
+        // so diamond vertices nest flush into the adjacent row's top/bottom V-grooves!
+        final int depthIndex = isPlayerSquad ? rowIdx : (2 - rowIdx);
+        final double isometricXOffset = depthIndex * (tileWidth * 0.5);
 
         return Transform.translate(
           offset: Offset(isometricXOffset, 0),
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: rowGap / 2),
+          child: Container(
+            margin: EdgeInsets.only(
+              top: (isPlayerSquad && rowIdx > 0) || (!isPlayerSquad && rowIdx < 2)
+                  ? -(tileHeight * 0.48) // Interlock rows so tips touch vertex-to-vertex!
+                  : 0.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: cells,
