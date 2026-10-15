@@ -97,7 +97,28 @@ void main() {
       expect(engine.activeActionEvent!.skillName, equals('Smite the Calcified'));
     });
 
-    test('Unit movement is strictly constrained by moveRange stat', () {
+    test('Pre-battle deployment phase allows free repositioning with 0 AP cost', () {
+      expect(engine.isPreBattlePhase, isTrue);
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      valeria.currentAp = 0; // 0 AP
+      // In pre-battle, can move anywhere on player squad grid for 0 AP
+      final success = engine.movePlayerUnit('lady_valeria', 3, 2);
+      expect(success, isTrue);
+      expect(valeria.occupiedNodes.first.column, equals(3));
+      expect(valeria.occupiedNodes.first.row, equals(2));
+      expect(valeria.currentAp, equals(0)); // 0 AP cost
+
+      // Projected basic attack target is resolved
+      final projected = engine.resolveProjectedTarget(valeria);
+      expect(projected, isNotNull);
+      expect(projected!.isPlayer, isFalse);
+    });
+
+    test('Unit movement is strictly constrained by moveRange stat in live combat', () {
+      engine.startBattle();
+      expect(engine.isPreBattlePhase, isFalse);
+      expect(engine.isRunning, isTrue);
+
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
       expect(valeria.moveRange, equals(1));
       expect(valeria.occupiedNodes.first.column, equals(1)); // Col 2, Row 0

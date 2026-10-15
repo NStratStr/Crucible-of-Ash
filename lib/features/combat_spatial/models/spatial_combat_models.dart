@@ -304,13 +304,14 @@ class CombatUnitState {
   bool get canAffordMovement => currentAp >= moveApCost;
 
   /// Checks if unit can move to target coordinates based on its moveRange and AP cost
-  bool canMoveTo(int targetCol, int targetRow) {
+  bool canMoveTo(int targetCol, int targetRow, {bool ignoreApCost = false}) {
     if (isDisplacementImmune) return false;
-    if (currentAp < moveApCost) return false;
+    if (!ignoreApCost && currentAp < moveApCost) return false;
     if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
     if (occupiedNodes.isEmpty) return false;
     final anchor = occupiedNodes.first;
     if (anchor.column == targetCol && anchor.row == targetRow) return false;
+    if (ignoreApCost) return true; // Free placement across squad grid in pre-battle deployment
     final colDist = (targetCol - anchor.column).abs();
     final rowDist = (targetRow - anchor.row).abs();
     final dist = max(colDist, rowDist);

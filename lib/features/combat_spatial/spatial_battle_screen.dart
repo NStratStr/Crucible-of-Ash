@@ -27,6 +27,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   late final SpatialCombatEngine _engine;
   Timer? _loopTimer;
   String? _selectedUnitId;
+  String? _draggedUnitId;
   String? _selectedCardId;
   SpatialCombatCard? _draggedCard;
   String? _selectedUltimateUnitId;
@@ -745,6 +746,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               const Spacer(),
 
+              // Pre-Battle Deployment Start Button
+              if (_engine.isPreBattlePhase)
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _engine.startBattle();
+                    });
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 16),
+                  label: const Text(
+                    'ENGAGE BATTLE',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD54F),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    elevation: 4,
+                    shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                  ),
+                ),
+
               // 3. Boss Telegraph Execution Warning Badge
               if (boss != null && boss.pendingIntent != null)
                 Container(
@@ -901,6 +928,73 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     allCells.sort((a, b) => a.depth.compareTo(b.depth));
 
+    // Dynamic Attack Trajectory Target Resolution:
+    // When a unit is picked up (dragged) or clicked (selected), compute the projected basic attack trajectory
+    final inspectedUnitId = _draggedUnitId ?? _selectedUnitId;
+    _TrajectoryData? trajectoryData;
+
+    if (inspectedUnitId != null) {
+      final unit = _engine.playerUnits.where((u) => u.id == inspectedUnitId && u.isAlive).firstOrNull;
+      if (unit != null && unit.occupiedNodes.isNotEmpty) {
+        // Determine source col and row (simulated if dragging over a valid player cell)
+        final bool isHoveringPlayerCell = (_draggedUnitId != null &&
+            _hoveredTileCol != null &&
+            _hoveredTileGRow != null &&
+            _hoveredTileGRow! > 3);
+
+        final int srcCol = isHoveringPlayerCell ? _hoveredTileCol! : unit.occupiedNodes.first.column;
+        final int srcGRow = isHoveringPlayerCell ? _hoveredTileGRow! : (4 + unit.occupiedNodes.first.row);
+        final int srcLocalRow = srcGRow - 4;
+
+        final double srcX = originX + (srcCol - srcGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        final double srcY = originY + (srcCol + srcGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        final Offset sourceOffset = Offset(srcX, srcY);
+
+        // Check if Vanguard is in Backline: converts to Braced Bulwark on allies ahead
+        if (srcLocalRow == 2 && unit.archetype == UnitArchetype.vanguardMelee) {
+          final allyAhead = _engine.playerUnits
+              .where((u) => u.isAlive && u.id != unit.id && u.occupiedNodes.any((n) => n.column == srcCol && n.row < 2))
+              .firstOrNull;
+          if (allyAhead != null && allyAhead.occupiedNodes.isNotEmpty) {
+            final allyNode = allyAhead.occupiedNodes.first;
+            final int allyGRow = 4 + allyNode.row;
+            final double tgtX = originX + (allyNode.column - allyGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+            final double tgtY = originY + (allyNode.column + allyGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+            trajectoryData = _TrajectoryData(
+              sourceOffset: sourceOffset,
+              targetOffset: Offset(tgtX, tgtY),
+              skillName: 'Braced Bulwark (+25 Armor)',
+              targetName: allyAhead.name,
+              color: const Color(0xFFFFD54F),
+            );
+          }
+        }
+
+        // Standard attack trajectory against opposing enemies
+        if (trajectoryData == null) {
+          final target = _engine.resolveProjectedTarget(unit, simulatedCol: srcCol);
+          if (target != null && target.occupiedNodes.isNotEmpty) {
+            final targetNode = target.occupiedNodes.first;
+            final int tgtCol = targetNode.column;
+            final int tgtGRow = 2 - targetNode.row;
+
+            final double tgtX = originX + (tgtCol - tgtGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+            final double tgtY = originY + (tgtCol + tgtGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+            final Offset targetOffset = Offset(tgtX, tgtY);
+
+            final skillDesc = _getUnitBasicAttackDescription(unit, srcCol, srcLocalRow);
+            trajectoryData = _TrajectoryData(
+              sourceOffset: sourceOffset,
+              targetOffset: targetOffset,
+              skillName: skillDesc,
+              targetName: target.name,
+              color: const Color(0xFF00E5FF),
+            );
+          }
+        }
+      }
+    }
+
     return SizedBox(
       width: boardTotalWidth,
       height: boardTotalHeight,
@@ -969,6 +1063,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             );
           }),
+
+          // Attack Trajectory Overlay Layer (Translucent line displayed when a unit is selected or picked up)
+          if (trajectoryData != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _AttackTrajectoryOverlayPainter(
+                    sourceOffset: trajectoryData.sourceOffset,
+                    targetOffset: trajectoryData.targetOffset,
+                    skillName: trajectoryData.skillName,
+                    targetName: trajectoryData.targetName,
+                    trajectoryColor: trajectoryData.color,
+                  ),
+                ),
+              ),
+            ),
 
           // Dynamic Kinetic Combat VFX Overlay Layer (Slashes, Beams, Shockwaves)
           if (_activeVfx.isNotEmpty)
@@ -1109,6 +1219,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return cells;
   }
 
+  /// Calculates dynamic skill description for unit basic action based on physical depth/archetype
+  String _getUnitBasicAttackDescription(CombatUnitState unit, int simulatedCol, int simulatedRow) {
+    if (unit.id == 'sanguine_blade') {
+      return 'Flensing Thrust (Crit & Bleed)';
+    }
+    if (unit.id == 'sun_smith') {
+      return simulatedRow == 2 ? 'Aetheric Piercing Beam (+1 Focus)' : 'Sun-Bolt Volley';
+    }
+    if (unit.archetype == UnitArchetype.vanguardMelee) {
+      if (simulatedRow == 0) {
+        return unit.id == 'lady_valeria' ? 'Sunbrand Slash (100% Impact)' : 'Shield Bash (100% + Stun)';
+      } else if (simulatedRow == 1) {
+        return 'Shockwave Tremor (60% Dmg + Poise)';
+      } else {
+        return 'Braced Bulwark (+25 Column Armor)';
+      }
+    }
+    return 'Basic Strike';
+  }
+
   /// Calculates predicted phantom damage or effect for a unit given the hovered spell
   String? _getPhantomUnitEffect(CombatUnitState unit, SpatialCombatCard card, int targetGRow, int targetCol) {
     if (!unit.isAlive) return null;
@@ -1198,7 +1328,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isReachable = isPlayerSquad &&
         selectedUnit != null &&
         occupant == null &&
-        selectedUnit.canMoveTo(col, row);
+        selectedUnit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
 
     final bool isSelected = _selectedUnitId != null && occupant?.id == _selectedUnitId;
 
@@ -1283,10 +1413,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           return !isPlayerSquad && occupant != null;
         } else {
           // Unit movement triage: only allow if in player squad, unoccupied, and within unit moveRange
+          if (_hoveredTileGRow != gRow || _hoveredTileCol != col) {
+            setState(() {
+              _hoveredTileGRow = gRow;
+              _hoveredTileCol = col;
+            });
+          }
           final unitId = data.replaceFirst('unit:', '');
           final unit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
           if (unit == null) return false;
-          return isPlayerSquad && occupant == null && unit.canMoveTo(col, row);
+          return isPlayerSquad && occupant == null && unit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
         }
       },
       onLeave: (_) {
@@ -1445,7 +1581,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     behavior: HitTestBehavior.translucent,
                     onTap: () {
                       if (isPlayerSquad && selectedUnit != null) {
-                        if (selectedUnit.canMoveTo(col, row)) {
+                        if (selectedUnit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase)) {
                           _engine.movePlayerUnit(selectedUnit.id, col, row);
                           setState(() => _selectedUnitId = null);
                         } else {
@@ -1543,13 +1679,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   maxSimultaneousDrags: 1,
                                   onDragStarted: () {
                                     setState(() {
+                                      _draggedUnitId = occupant.id;
                                       _selectedUnitId = occupant.id;
                                       _selectedCardId = null;
                                     });
-                                    _engine.setBulletTime(true);
+                                    if (!_engine.isPreBattlePhase) {
+                                      _engine.setBulletTime(true);
+                                    }
                                   },
                                   onDragEnd: (_) {
-                                    _engine.setBulletTime(false);
+                                    setState(() {
+                                      _draggedUnitId = null;
+                                    });
+                                    if (!_engine.isPreBattlePhase) {
+                                      _engine.setBulletTime(false);
+                                    }
                                   },
                                   feedback: Material(
                                     color: Colors.transparent,
@@ -1612,7 +1756,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     Color themeColor = const Color(0xFFFFD54F);
     IconData icon = Icons.info_outline;
 
-    if (_selectedCardId != null) {
+    if (_engine.isPreBattlePhase) {
+      if (_selectedUnitId != null) {
+        final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
+        if (unit != null) {
+          message = '🎯 PRE-BATTLE: Drag or click any glowing tile to deploy ${unit.name.toUpperCase()} • Translucent line shows basic attack target!';
+          themeColor = const Color(0xFF00E5FF);
+          icon = Icons.gps_fixed;
+        }
+      } else {
+        message = '🛡️ PRE-BATTLE DEPLOYMENT: Click or pick up a unit to inspect basic attack trajectories & deploy!';
+        themeColor = const Color(0xFFFFD54F);
+        icon = Icons.touch_app;
+      }
+    } else if (_selectedCardId != null) {
       final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
       if (card != null) {
         message = '✨ ${card.name.toUpperCase()} ARMED: Click a target node or enemy on the grid to cast!';
@@ -3057,6 +3214,212 @@ class _CombatVfxOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CombatVfxOverlayPainter oldDelegate) {
     return true;
+  }
+}
+
+class _TrajectoryData {
+  final Offset sourceOffset;
+  final Offset targetOffset;
+  final String skillName;
+  final String targetName;
+  final Color color;
+
+  const _TrajectoryData({
+    required this.sourceOffset,
+    required this.targetOffset,
+    required this.skillName,
+    required this.targetName,
+    required this.color,
+  });
+}
+
+class _AttackTrajectoryOverlayPainter extends CustomPainter {
+  final Offset sourceOffset;
+  final Offset targetOffset;
+  final String skillName;
+  final String targetName;
+  final Color trajectoryColor;
+
+  const _AttackTrajectoryOverlayPainter({
+    required this.sourceOffset,
+    required this.targetOffset,
+    required this.skillName,
+    required this.targetName,
+    this.trajectoryColor = const Color(0xFF00E5FF),
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dx = targetOffset.dx - sourceOffset.dx;
+    final dy = targetOffset.dy - sourceOffset.dy;
+    final distance = sqrt(dx * dx + dy * dy);
+    if (distance <= 0) return;
+
+    // Slight upward isometric curve
+    final controlPoint = Offset(
+      (sourceOffset.dx + targetOffset.dx) * 0.5,
+      (sourceOffset.dy + targetOffset.dy) * 0.5 - min(30.0, distance * 0.12),
+    );
+
+    // 1. Source node ring
+    final sourcePaint = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(sourceOffset, 10.0, sourcePaint);
+    canvas.drawCircle(sourceOffset, 3.5, Paint()..color = trajectoryColor.withValues(alpha: 0.9));
+
+    // 2. Translucent dashed trajectory path
+    final glowPaint = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.0
+      ..strokeCap = StrokeCap.round;
+
+    final corePaint = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+
+    final brightCorePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+
+    // Sample quadratic bezier path points for dashes
+    const int numSegments = 24;
+    for (int i = 0; i < numSegments; i += 2) {
+      final t1 = i / numSegments;
+      final t2 = (i + 1) / numSegments;
+
+      final p1 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t1);
+      final p2 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t2);
+
+      canvas.drawLine(p1, p2, glowPaint);
+      canvas.drawLine(p1, p2, corePaint);
+      canvas.drawLine(p1, p2, brightCorePaint);
+    }
+
+    // 3. Arrowhead at target
+    const double tPrev = 0.90;
+    final pPrev = _evaluateBezier(sourceOffset, controlPoint, targetOffset, tPrev);
+    final angle = atan2(targetOffset.dy - pPrev.dy, targetOffset.dx - pPrev.dx);
+    const arrowLen = 12.0;
+    const arrowAngle = pi / 5; // 36 deg
+
+    final arrowLeft = Offset(
+      targetOffset.dx - arrowLen * cos(angle - arrowAngle),
+      targetOffset.dy - arrowLen * sin(angle - arrowAngle),
+    );
+    final arrowRight = Offset(
+      targetOffset.dx - arrowLen * cos(angle + arrowAngle),
+      targetOffset.dy - arrowLen * sin(angle + arrowAngle),
+    );
+
+    final arrowPath = Path()
+      ..moveTo(arrowLeft.dx, arrowLeft.dy)
+      ..lineTo(targetOffset.dx, targetOffset.dy)
+      ..lineTo(arrowRight.dx, arrowRight.dy);
+
+    canvas.drawPath(arrowPath, glowPaint);
+    canvas.drawPath(arrowPath, corePaint);
+
+    // 4. Target reticle diamond and crosshairs
+    const double r = 16.0;
+    final reticlePath = Path()
+      ..moveTo(targetOffset.dx, targetOffset.dy - r)
+      ..lineTo(targetOffset.dx + r * 1.5, targetOffset.dy)
+      ..lineTo(targetOffset.dx, targetOffset.dy + r)
+      ..lineTo(targetOffset.dx - r * 1.5, targetOffset.dy)
+      ..close();
+
+    final reticleGlow = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.28)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.0;
+    final reticleCore = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.95)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    canvas.drawPath(reticlePath, reticleGlow);
+    canvas.drawPath(reticlePath, reticleCore);
+
+    // Crosshairs
+    final chPaint = Paint()
+      ..color = trajectoryColor.withValues(alpha: 0.9)
+      ..strokeWidth = 1.5;
+    canvas.drawLine(Offset(targetOffset.dx - r * 1.8, targetOffset.dy), Offset(targetOffset.dx - r * 1.2, targetOffset.dy), chPaint);
+    canvas.drawLine(Offset(targetOffset.dx + r * 1.2, targetOffset.dy), Offset(targetOffset.dx + r * 1.8, targetOffset.dy), chPaint);
+    canvas.drawLine(Offset(targetOffset.dx, targetOffset.dy - r * 1.4), Offset(targetOffset.dx, targetOffset.dy - r * 0.9), chPaint);
+    canvas.drawLine(Offset(targetOffset.dx, targetOffset.dy + r * 0.9), Offset(targetOffset.dx, targetOffset.dy + r * 1.4), chPaint);
+
+    // 5. Tactical Trajectory Label Pill (drawn above the target)
+    final labelCenter = Offset(
+      targetOffset.dx,
+      targetOffset.dy - r - 14.0,
+    );
+
+    final textSpan = TextSpan(
+      text: '⚔️ $skillName • TARGET: $targetName',
+      style: TextStyle(
+        color: trajectoryColor,
+        fontSize: 8.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final pillRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: labelCenter,
+        width: textPainter.width + 14.0,
+        height: 18.0,
+      ),
+      const Radius.circular(4.0),
+    );
+
+    // Pill background & border
+    canvas.drawRRect(pillRect, Paint()..color = const Color(0xEE0B0F19));
+    canvas.drawRRect(
+      pillRect,
+      Paint()
+        ..color = trajectoryColor.withValues(alpha: 0.8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+
+    textPainter.paint(
+      canvas,
+      Offset(labelCenter.dx - textPainter.width * 0.5, labelCenter.dy - textPainter.height * 0.5),
+    );
+  }
+
+  static Offset _evaluateBezier(Offset p0, Offset p1, Offset p2, double t) {
+    final double u = 1.0 - t;
+    final double tt = t * t;
+    final double uu = u * u;
+    final double ut2 = 2.0 * u * t;
+
+    return Offset(
+      uu * p0.dx + ut2 * p1.dx + tt * p2.dx,
+      uu * p0.dy + ut2 * p1.dy + tt * p2.dy,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _AttackTrajectoryOverlayPainter oldDelegate) {
+    return oldDelegate.sourceOffset != sourceOffset ||
+        oldDelegate.targetOffset != targetOffset ||
+        oldDelegate.skillName != skillName ||
+        oldDelegate.targetName != targetName ||
+        oldDelegate.trajectoryColor != trajectoryColor;
   }
 }
 

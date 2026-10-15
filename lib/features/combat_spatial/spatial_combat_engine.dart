@@ -20,7 +20,8 @@ class SpatialCombatEngine extends ChangeNotifier {
   final List<SpatialCombatCard> burnPit = [];
 
   int currentTick = 0;
-  bool isRunning = true;
+  bool isRunning = false; // Starts paused in pre-battle deployment phase
+  bool isPreBattlePhase = true; // Tactical Deployment Phase
   double simulationSpeed = 1.0;
   bool isBulletTime = false;
 
@@ -109,6 +110,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     burnPit.clear();
     combatLogs.clear();
     currentTick = 0;
+    isRunning = false;
+    isPreBattlePhase = true;
     focus = 3;
     maxFocus = 7;
     isBulletTime = false;
@@ -953,7 +956,26 @@ class SpatialCombatEngine extends ChangeNotifier {
     return squad.where((u) => u.isAlive).firstOrNull;
   }
 
-  /// Tactical Plinth Triage: Player shifts unit across nodes in bullet-time
+  /// Resolves the enemy target that a unit would strike with its basic action.
+  /// Accepts an optional [simulatedCol] to test trajectories during dragging or planning.
+  CombatUnitState? resolveProjectedTarget(CombatUnitState unit, {int? simulatedCol}) {
+    if (unit.occupiedNodes.isEmpty && simulatedCol == null) return null;
+    final col = simulatedCol ?? unit.occupiedNodes.first.column;
+    return _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
+  }
+
+  /// Starts the combat encounter, transitioning from Pre-Battle Deployment to Live 30Hz Simulation
+  void startBattle() {
+    isPreBattlePhase = false;
+    isRunning = true;
+    lastBannerMessage = '⚔️ THE SUNDER INITIATED! ENGAGE THE FOE!';
+    addLog('DEPLOYMENT CONCLUDED: Battle engaged at 30 Hz discrete simulation speed.');
+    notifyListeners();
+  }
+
+  /// Tactical Plinth Triage: Player shifts unit across nodes
+  /// In Pre-Battle Deployment Phase: 0 AP cost & anywhere on player grid (Rows 0-2, Cols 0-4)
+  /// In Live Combat: 50% AP cost & restricted to unit moveRange
   bool movePlayerUnit(String unitId, int targetCol, int targetRow) {
     final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
     if (unit == null) return false;
@@ -962,18 +984,20 @@ class SpatialCombatEngine extends ChangeNotifier {
       return false;
     }
 
-    // Check if unit has at least 50% AP (5,000 AP)
-    if (!unit.canAffordMovement) {
-      final currentApPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
-      lastBannerMessage = '⚠️ INSUFFICIENT AP: Moving costs 50% AP (${unit.name} has $currentApPct%)';
-      addLog('${unit.name} cannot move! Needs at least 50% AP (has $currentApPct%).');
-      return false;
-    }
+    if (!isPreBattlePhase) {
+      // Check if unit has at least 50% AP (5,000 AP)
+      if (!unit.canAffordMovement) {
+        final currentApPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
+        lastBannerMessage = '⚠️ INSUFFICIENT AP: Moving costs 50% AP (${unit.name} has $currentApPct%)';
+        addLog('${unit.name} cannot move! Needs at least 50% AP (has $currentApPct%).');
+        return false;
+      }
 
-    // Restrict movement to unit's moveRange (e.g. 1 tile adjacent/diagonal)
-    if (!unit.canMoveTo(targetCol, targetRow)) {
-      addLog('${unit.name} cannot reach (Col ${targetCol + 1}, Row $targetRow)! Movement limit is ${unit.moveRange} tile(s).');
-      return false;
+      // Restrict movement to unit's moveRange (e.g. 1 tile adjacent/diagonal)
+      if (!unit.canMoveTo(targetCol, targetRow)) {
+        addLog('${unit.name} cannot reach (Col ${targetCol + 1}, Row $targetRow)! Movement limit is ${unit.moveRange} tile(s).');
+        return false;
+      }
     }
 
     // Check if target node is empty
@@ -985,15 +1009,17 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     final oldCol = unit.occupiedNodes.first.column;
     final oldRow = unit.occupiedNodes.first.row;
-    final success = unit.repositionTo([GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)]);
+    final apCost = isPreBattlePhase ? 0 : CombatUnitState.moveApCost;
+    final success = unit.repositionTo([GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)], apPenalty: apCost);
     if (success) {
       if (unit.id == 'lady_valeria' && oldRow != targetRow) {
         lastBannerMessage = targetRow == 0
-            ? '🛡️ COMMANDER STANCE: BASTION OF COLD IRON (Frontline Allies +25 Armor) [-50% AP]'
-            : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated) [-50% AP]';
-        addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance! [-50% AP]');
+            ? '🛡️ COMMANDER STANCE: BASTION OF COLD IRON (Frontline Allies +25 Armor)'
+            : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated)';
+        addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance!');
       } else {
-        addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow)! [-5,000 AP / -50%]');
+        final costStr = isPreBattlePhase ? '[Pre-Battle Free Placement]' : '[-5,000 AP / -50%]';
+        addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow) $costStr.');
       }
       notifyListeners();
       return true;
