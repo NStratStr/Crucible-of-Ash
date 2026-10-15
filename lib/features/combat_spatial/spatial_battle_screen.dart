@@ -1552,12 +1552,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
         final apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
+        final posture = unit.postureLabel;
         if (unit.canAffordMovement) {
-          message = '⚔️ ${unit.name.toUpperCase()} (AP: $apPct%): Click glowing [MOVE] tile (Costs 50% AP)!';
+          message = '⚔️ ${unit.name.toUpperCase()} [$posture] (AP: $apPct%): Click glowing [MOVE] tile (Costs 50% AP)!';
           themeColor = const Color(0xFF00E676);
           icon = Icons.directions_run;
         } else {
-          message = '⚠️ ${unit.name.toUpperCase()} HAS $apPct% AP: Needs 50% AP to reposition!';
+          message = '⚠️ ${unit.name.toUpperCase()} [$posture] (AP: $apPct%): Needs 50% AP to reposition!';
           themeColor = const Color(0xFFFF9100);
           icon = Icons.hourglass_top;
         }
@@ -1888,6 +1889,38 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         style: const TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  // Always display posture pill for active units
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 1.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                    decoration: BoxDecoration(
+                      color: unit.archetype == UnitArchetype.vanguardMelee
+                          ? (unit.currentDepth == RowDepth.front
+                              ? const Color(0xFFC62828).withValues(alpha: 0.85)
+                              : (unit.currentDepth == RowDepth.mid
+                                  ? const Color(0xFFEF6C00).withValues(alpha: 0.85)
+                                  : const Color(0xFF1565C0).withValues(alpha: 0.85)))
+                          : const Color(0xFF263238).withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(
+                        color: unit.currentDepth == RowDepth.front
+                            ? const Color(0xFFFF5252)
+                            : (unit.currentDepth == RowDepth.mid ? const Color(0xFFFFB74D) : const Color(0xFF4FC3F7)),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      unit.archetype == UnitArchetype.vanguardMelee
+                          ? (unit.currentDepth == RowDepth.front ? 'BRAWL' : (unit.currentDepth == RowDepth.mid ? 'ADVANCE' : 'BRACED'))
+                          : (unit.currentDepth == RowDepth.front ? 'POINT-BLANK' : 'CASTING'),
+                      style: const TextStyle(
+                        fontSize: 6.0,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
                   // Only show name when unit is selected to keep screen uncluttered
                   if (isSelected)
                     Container(

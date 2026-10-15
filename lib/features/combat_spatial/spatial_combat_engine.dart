@@ -143,6 +143,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Cinder Witch',
       templateId: 'cinder_witch',
       isPlayer: false,
+      archetype: UnitArchetype.backlineCaster,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 0, row: 2, occupantUnitId: 'cinder_witch'),
@@ -161,6 +162,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Pyre Zealot',
       templateId: 'pyre_zealot',
       isPlayer: false,
+      archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 4, row: 0, occupantUnitId: 'pyre_zealot'),
@@ -182,6 +184,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Lady Valeria',
       templateId: 'lady_valeria',
       isPlayer: true,
+      archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 1, row: 0, occupantUnitId: 'lady_valeria'),
@@ -200,6 +203,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Iron Footman',
       templateId: 'iron_footman',
       isPlayer: true,
+      archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 3, row: 0, occupantUnitId: 'iron_footman'),
@@ -218,6 +222,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Sanguine Blade',
       templateId: 'sanguine_blade',
       isPlayer: true,
+      archetype: UnitArchetype.reachMidline,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 3, row: 1, occupantUnitId: 'sanguine_blade'),
@@ -237,6 +242,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       name: 'Sun-Smith Artificer',
       templateId: 'sun_smith',
       isPlayer: true,
+      archetype: UnitArchetype.backlineCaster,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
         const GridNode(column: 4, row: 2, occupantUnitId: 'sun_smith'),
@@ -627,67 +633,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       );
       lastBannerMessage = '⚠️ CINDER WITCH WINDS UP: CINDER ORB (2.0s)!';
       addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col 2!');
-    } else if (unit.id == 'lady_valeria') {
-      // Valeria basic attack down facing column
-      final target = _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: false);
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} slashes ${target.name} for $dmg DMG.');
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Sunbrand Slash',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: true,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
-    } else if (unit.id == 'iron_footman') {
-      final target = _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: false);
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        // Shield Bash has 25% chance to concuss/stun minor enemies (or 30 tick stun)
-        if (target.id != 'gorgoroth_boss') {
-          target.stunDuration = 30; // 1 second stun freezes AP
-          addLog('${unit.name} bashes ${target.name} for $dmg DMG & STUNS for 1s!');
-        } else {
-          addLog('${unit.name} bashes ${target.name} for $dmg DMG.');
-        }
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Shield Bash',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: true,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
-    } else if (unit.id == 'sun_smith') {
-      final target = enemyUnits.where((u) => u.isAlive).firstOrNull;
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Sun-Bolt Volley',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: true,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
+    } else if (unit.archetype == UnitArchetype.vanguardMelee) {
+      _executeVanguardAction(unit);
+    } else if (unit.archetype == UnitArchetype.backlineCaster) {
+      _executeCasterAction(unit);
     } else if (unit.id == 'gorgoroth_boss') {
       // Regular attack if not channeling
       if (unit.pendingIntent == null) {
@@ -709,6 +658,164 @@ class SpatialCombatEngine extends ChangeNotifier {
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
         }
+      }
+    }
+  }
+
+  /// Adaptive Posture System: Resolves action based on Vanguard's current physical row depth
+  void _executeVanguardAction(CombatUnitState unit) {
+    final col = unit.occupiedNodes.first.column;
+    switch (unit.currentDepth) {
+      case RowDepth.front:
+        // [ FRONT ROW ] ───► BRAWL STANCE (Default)
+        // 100% Melee Impact & Cleaves; absorbs direct hits
+        final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
+        if (target != null) {
+          final dmg = target.takeDamage(unit.attack);
+          final skillName = unit.id == 'lady_valeria' ? 'Sunbrand Slash' : 'Shield Bash';
+          if (unit.id == 'iron_footman' && target.id != 'gorgoroth_boss') {
+            target.stunDuration = 30; // 1s stun
+            addLog('${unit.name} [BRAWL STANCE] bashes ${target.name} for $dmg DMG & STUNS for 1s!');
+          } else {
+            addLog('${unit.name} [BRAWL STANCE] strikes ${target.name} for $dmg DMG (100% Impact).');
+          }
+          dispatchAction(SpatialActionEvent(
+            id: 'act_${currentTick}_${unit.id}',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: skillName,
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isPlayerAttacker: unit.isPlayer,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+        break;
+
+      case RowDepth.mid:
+        // [ MID ROW ] ───► ADVANCING / RECOVERY STRIDE
+        // Shockwave / Tremor Slam: 60% Dmg + minor stagger / 15 armor chip down column.
+        // If front tile in column is empty, unit automatically steps forward to reclaim the Frontline!
+        final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
+        final shockwaveDmg = (unit.attack * 0.60).round();
+        if (target != null) {
+          final dmg = target.takeDamage(shockwaveDmg);
+          // Apply 15 armor chip / stagger
+          target.armor = max(0, target.armor - 15);
+          addLog('${unit.name} [ADVANCING STRIDE] slams ground with Shockwave Tremor for $dmg DMG (60%) & chips 15 Armor from ${target.name}!');
+          dispatchAction(SpatialActionEvent(
+            id: 'act_${currentTick}_${unit.id}',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Shockwave Tremor',
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isPlayerAttacker: unit.isPlayer,
+            pattern: TargetPattern.piercingColumnSkewer,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+
+        // Automated Advancing Step: Reclaim Frontline (row 0) if vacant
+        final squad = unit.isPlayer ? playerUnits : enemyUnits;
+        final isFrontOccupied = squad.any((u) => u.isAlive && u.occupies(col, 0));
+        if (!isFrontOccupied) {
+          unit.occupiedNodes.clear();
+          unit.occupiedNodes.add(GridNode(column: col, row: 0, occupantUnitId: unit.id));
+          addLog('${unit.name} advances stride forward into the Frontline (Col ${col + 1}, Row 0)!');
+          lastBannerMessage = '⚔️ RECLAIMED FRONTLINE: ${unit.name} stepped up to Row 0!';
+        }
+        break;
+
+      case RowDepth.back:
+        // [ BACK ROW ] ───► OUT OF FORMATION (Braced Bulwark)
+        // 0 kinetic damage dealt to enemy.
+        // Slams shield into ground: grants temporary +25 Armor & +30 Aegis Shield to allied units
+        // ahead of it in that column (Row 0 & 1).
+        // Fills +20% Ultimate gauge.
+        final squad = unit.isPlayer ? playerUnits : enemyUnits;
+        final alliesAhead = squad.where((u) => u.isAlive && u.id != unit.id && u.occupiedNodes.any((n) => n.column == col && n.row < 2)).toList();
+        for (final ally in alliesAhead) {
+          ally.armor = min(ally.maxArmor + 35, ally.armor + 25);
+          ally.aegisShield += 30;
+          addLog('${unit.name} [BRACED BULWARK] shields ${ally.name} ahead (+25 Armor, +30 Aegis)!');
+        }
+        unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
+        addLog('${unit.name} [BRACED BULWARK] braces defense! (+20% Ultimate: ${unit.ultimateGauge}%)');
+        lastBannerMessage = '🛡️ BRACED BULWARK: ${unit.name} granted +25 Armor & +30 Aegis to column allies!';
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Braced Bulwark',
+          targetId: alliesAhead.isNotEmpty ? alliesAhead.first.id : unit.id,
+          targetName: alliesAhead.isNotEmpty ? alliesAhead.first.name : unit.name,
+          damage: 0,
+          isPlayerAttacker: unit.isPlayer,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+        break;
+    }
+  }
+
+  /// Adaptive Posture System: Resolves action for Backline Casters
+  void _executeCasterAction(CombatUnitState unit) {
+    if (unit.currentDepth == RowDepth.front) {
+      // Point-Blank Vulnerability:
+      // Basic spell becomes Panic Discharge: radial blast with high knockback pushing enemy Vanguard back
+      final enemySquad = unit.isPlayer ? enemyUnits : playerUnits;
+      final frontEnemies = enemySquad.where((u) => u.isAlive && u.occupies(unit.occupiedNodes.first.column, 0)).toList();
+      final target = frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
+      if (target != null) {
+        final dmg = (unit.attack * 1.1).round();
+        target.takeDamage(dmg);
+        // Push target back 1 row if target is displaceable and space is open
+        if (!target.isDisplacementImmune && target.occupiedNodes.isNotEmpty) {
+          final tCol = target.occupiedNodes.first.column;
+          final tRow = target.occupiedNodes.first.row;
+          if (tRow < 2 && !enemySquad.any((u) => u.isAlive && u.occupies(tCol, tRow + 1))) {
+            target.occupiedNodes.clear();
+            target.occupiedNodes.add(GridNode(column: tCol, row: tRow + 1, occupantUnitId: target.id));
+            addLog('${unit.name} [PANIC DISCHARGE] knocks ${target.name} back to Row ${tRow + 1}!');
+          }
+        }
+        addLog('${unit.name} [PANIC DISCHARGE] point-blank detonation blasts ${target.name} for $dmg DMG!');
+        lastBannerMessage = '💥 PANIC DISCHARGE: ${unit.name} blasted enemy away!';
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Panic Discharge',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: unit.isPlayer,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else {
+      // Midline / Backline (Guarded Sanctuary / Midline Channel)
+      final target = (unit.isPlayer ? enemyUnits : playerUnits).where((u) => u.isAlive).firstOrNull;
+      if (target != null) {
+        final dmg = target.takeDamage(unit.attack);
+        addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
+        dispatchAction(SpatialActionEvent(
+          id: 'act_${currentTick}_${unit.id}',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Sun-Bolt Volley',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isPlayerAttacker: unit.isPlayer,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
     }
   }

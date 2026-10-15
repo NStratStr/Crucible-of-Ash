@@ -114,5 +114,75 @@ void main() {
       expect(valeria.occupiedNodes.first.column, equals(0));
       expect(valeria.currentAp, equals(1000)); // 6000 - 5000 (50% AP cost) = 1000 AP
     });
+
+    test('Adaptive Posture System: Vanguard in Midline performs Shockwave Tremor and advances forward', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      // Shift Footman to Midline (Col 2, Row 1)
+      footman.occupiedNodes.clear();
+      footman.occupiedNodes.add(const GridNode(column: 1, row: 1, occupantUnitId: 'iron_footman'));
+      expect(footman.currentDepth, equals(RowDepth.mid));
+      expect(footman.postureLabel, contains('Advancing Stride'));
+
+      // Ensure Row 0 in Col 2 (index 1) is empty for automated advance
+      engine.playerUnits.removeWhere((u) => u.id == 'lady_valeria'); // Clear row 0 in Col 2
+
+      final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
+      final initialArmor = gorgoroth.armor;
+
+      // Give Footman 10,000 AP to trigger action
+      footman.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+
+      // Verify Shockwave dealt 60% DMG (55 * 0.60 = 33) and chipped 15 armor
+      expect(gorgoroth.armor, equals(initialArmor - 15));
+      // Verify Footman stepped forward into vacant Frontline (Row 0)
+      expect(footman.occupiedNodes.first.row, equals(0));
+      expect(footman.currentDepth, equals(RowDepth.front));
+    });
+
+    test('Adaptive Posture System: Vanguard knocked to Backline casts Braced Bulwark and fills Ultimate gauge', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+
+      // Place Valeria at Frontline Col 2 (Row 0) and Footman at Backline Col 2 (Row 2)
+      valeria.occupiedNodes.clear();
+      valeria.occupiedNodes.add(const GridNode(column: 1, row: 0, occupantUnitId: 'lady_valeria'));
+      footman.occupiedNodes.clear();
+      footman.occupiedNodes.add(const GridNode(column: 1, row: 2, occupantUnitId: 'iron_footman'));
+
+      expect(footman.currentDepth, equals(RowDepth.back));
+      expect(footman.postureLabel, contains('Braced Bulwark'));
+
+      final initialValeriaArmor = valeria.armor;
+      final initialValeriaAegis = valeria.aegisShield;
+      expect(footman.ultimateGauge, equals(0));
+
+      // Trigger Footman turn
+      footman.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+
+      // Valeria gains +25 Armor & +30 Aegis Shield
+      expect(valeria.armor, equals(initialValeriaArmor + 25));
+      expect(valeria.aegisShield, equals(initialValeriaAegis + 30));
+      // Footman gains +20% Ultimate gauge
+      expect(footman.ultimateGauge, equals(20));
+    });
+
+    test('Adaptive Posture System: Displaced Caster in Frontline fires Point-Blank Panic Discharge', () {
+      final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      // Drag Sun-Smith into Frontline (Col 2, Row 0) facing Gorgoroth
+      sunSmith.occupiedNodes.clear();
+      sunSmith.occupiedNodes.add(const GridNode(column: 1, row: 0, occupantUnitId: 'sun_smith'));
+
+      expect(sunSmith.currentDepth, equals(RowDepth.front));
+      expect(sunSmith.postureLabel, contains('Point-Blank Panic'));
+
+      sunSmith.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+
+      expect(engine.activeActionEvent, isNotNull);
+      expect(engine.activeActionEvent!.skillName, equals('Panic Discharge'));
+    });
   });
 }
+

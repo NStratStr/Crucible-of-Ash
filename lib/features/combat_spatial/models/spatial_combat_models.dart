@@ -158,6 +158,21 @@ class SpatialTelegraphIntent {
   });
 }
 
+/// Tactical Unit Archetype determining posture adaptation
+enum UnitArchetype {
+  vanguardMelee, // Melee frontline tank/brawler (Iron Footman, Valeria)
+  reachMidline,  // Flayer/spear/rogue (Sanguine Blade)
+  backlineCaster, // Mage/healer/artificer (Sun-Smith, Cinder Witch)
+  colossusBehemoth, // Multi-node boss (Gorgoroth)
+}
+
+/// Physical Row Depth relative to clash line
+enum RowDepth {
+  front, // Row 0: Direct clash
+  mid,   // Row 1: Advancing / reach depth
+  back,  // Row 2: Rearguard / distant depth
+}
+
 /// Extended Spatial Unit State for 30 Hz deterministic simulation loop
 class CombatUnitState {
   final String id;
@@ -165,6 +180,7 @@ class CombatUnitState {
   final String templateId;
   final bool isPlayer;
   final UnitFootprint footprint;
+  final UnitArchetype archetype;
   final List<GridNode> occupiedNodes;
   final bool isDisplacementImmune;
   final int moveRange;
@@ -180,6 +196,7 @@ class CombatUnitState {
   int stunDuration; // in ticks (freezes AP)
   int aegisShield; // absorbs damage before HP
   int reviveCount; // tracking Soul Fracture (-20% max HP per revive)
+  int ultimateGauge; // 0 to 100%
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
@@ -189,6 +206,7 @@ class CombatUnitState {
     required this.templateId,
     required this.isPlayer,
     required this.footprint,
+    this.archetype = UnitArchetype.vanguardMelee,
     required this.occupiedNodes,
     bool? isDisplacementImmune,
     this.moveRange = 1,
@@ -204,9 +222,43 @@ class CombatUnitState {
     this.stunDuration = 0,
     this.aegisShield = 0,
     this.reviveCount = 0,
+    this.ultimateGauge = 0,
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
   }) : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1);
+
+  /// Current physical row depth (0=front, 1=mid, 2=back)
+  RowDepth get currentDepth {
+    if (occupiedNodes.isEmpty) return RowDepth.front;
+    final row = occupiedNodes.first.row;
+    if (row == 0) return RowDepth.front;
+    if (row == 1) return RowDepth.mid;
+    return RowDepth.back;
+  }
+
+  /// Dynamic posture label based on archetype and current row depth
+  String get postureLabel {
+    if (archetype == UnitArchetype.vanguardMelee) {
+      switch (currentDepth) {
+        case RowDepth.front:
+          return 'Brawl Stance (100% Melee)';
+        case RowDepth.mid:
+          return 'Advancing Stride (Shockwave 60%)';
+        case RowDepth.back:
+          return 'Braced Bulwark (Guard +25 Armor)';
+      }
+    } else if (archetype == UnitArchetype.backlineCaster) {
+      switch (currentDepth) {
+        case RowDepth.front:
+          return 'Point-Blank Panic (Knockback Blast)';
+        case RowDepth.mid:
+          return 'Midline Channel (Standard Reach)';
+        case RowDepth.back:
+          return 'Guarded Sanctuary (+20% Defense)';
+      }
+    }
+    return 'Standard Stance';
+  }
 
   bool get isAlive => hp > 0;
   bool get isDowned => hp <= 0;
