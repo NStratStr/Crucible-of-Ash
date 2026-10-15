@@ -32,7 +32,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   int? _hoveredTileGRow;
   int? _hoveredTileCol;
 
-  // Visual Combat Feedback State
+  // Visual Combat Feedback & VFX State
   String? _lastHandledEventId;
   String? _attackingUnitId;
   String? _damagedUnitId;
@@ -41,6 +41,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   bool _isPlayerSkillBanner = false;
   final Map<String, String> _unitFloatingPops = {};
   final List<Timer> _animTimers = [];
+  final List<_CombatVfx> _activeVfx = [];
 
   @override
   void initState() {
@@ -64,8 +65,73 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     setState(() {});
   }
 
+  Offset _getUnitCenterIsometricOffset(CombatUnitState unit, {double tileWidth = 152.0, double tileHeight = 76.0}) {
+    if (unit.occupiedNodes.isEmpty) return const Offset(100, 100);
+    final anchor = unit.occupiedNodes.first;
+    final int col = anchor.column;
+    final int localRow = anchor.row;
+    final int gRow = unit.isPlayer ? (localRow + 4) : (2 - localRow);
+
+    const int numGRows = 7;
+    final double originX = (numGRows - 1) * (tileWidth * 0.5);
+    final double originY = 0.0;
+
+    final double screenX = originX + (col - gRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+    final double screenY = originY + (col + gRow) * (tileHeight * 0.5) + (tileHeight * 0.35);
+    return Offset(screenX, screenY);
+  }
+
   void _triggerVisualCombatSequence(SpatialActionEvent event) {
+    // Locate caster and target units to calculate real isometric trajectory points
+    final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
+    final caster = allUnits.where((u) => u.id == event.attackerId).firstOrNull;
+    final target = allUnits.where((u) => u.id == event.targetId).firstOrNull;
+
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final targetOffset = target != null ? _getUnitCenterIsometricOffset(target) : const Offset(280, 200);
+    final casterOffset = caster != null ? _getUnitCenterIsometricOffset(caster) : Offset(targetOffset.dx, targetOffset.dy + 80);
+
+    // Determine VFX visual flavor based on attack type & crit
+    String vfxType = 'slash';
+    Color primaryColor = const Color(0xFFFF5252);
+    Color secondaryColor = const Color(0xFFFF8A80);
+    int durationMs = 650;
+
+    if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
+      vfxType = 'shatter';
+      primaryColor = const Color(0xFFFFD54F);
+      secondaryColor = const Color(0xFF00E5FF);
+      durationMs = 800;
+    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt')) {
+      vfxType = 'beam';
+      primaryColor = event.isPlayerAttacker ? const Color(0xFFFFD54F) : const Color(0xFFFF7043);
+      secondaryColor = const Color(0xFFFFEB3B);
+      durationMs = 600;
+    } else if (event.isHeal || event.skillName.contains('Phalanx')) {
+      vfxType = 'shockwave';
+      primaryColor = const Color(0xFF00E5FF);
+      secondaryColor = const Color(0xFF80D8FF);
+      durationMs = 700;
+    } else if (event.isCrit) {
+      vfxType = 'slash';
+      primaryColor = const Color(0xFFFF1744);
+      secondaryColor = const Color(0xFFFFD54F);
+      durationMs = 750;
+    }
+
+    final newVfx = _CombatVfx(
+      id: 'vfx_${event.id}_$nowMs',
+      startOffset: casterOffset,
+      targetOffset: targetOffset,
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+      type: vfxType,
+      durationMs: durationMs,
+      createdMs: nowMs,
+    );
+
     setState(() {
+      _activeVfx.add(newVfx);
       _attackingUnitId = event.attackerId;
       _damagedUnitId = event.targetId;
       _activeSkillName = event.skillName;
@@ -89,6 +155,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         }
       }
     });
+
+    // Clean up VFX after its duration
+    final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
+      if (mounted) {
+        setState(() {
+          _activeVfx.removeWhere((v) => v.id == newVfx.id);
+        });
+      }
+    });
+    _animTimers.add(tVfx);
 
     // Reset visual lunge & floating pops after 1100ms
     final t1 = Timer(const Duration(milliseconds: 1100), () {
@@ -478,68 +554,83 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       height: boardTotalHeight,
       child: Stack(
         clipBehavior: Clip.none,
-        children: allCells.map((cell) {
-          if (cell.isClashLine) {
+        children: [
+          ...allCells.map((cell) {
+            if (cell.isClashLine) {
+              return Positioned(
+                left: cell.screenX,
+                top: cell.screenY,
+                width: tileWidth,
+                height: tileHeight,
+                child: DragTarget<String>(
+                  onWillAcceptWithDetails: (details) {
+                    if (details.data.startsWith('card:')) {
+                      if (_hoveredTileGRow != cell.gRow || _hoveredTileCol != cell.col) {
+                        setState(() {
+                          _hoveredTileGRow = cell.gRow;
+                          _hoveredTileCol = cell.col;
+                        });
+                      }
+                      return true;
+                    }
+                    return false;
+                  },
+                  onLeave: (_) {
+                    if (_hoveredTileGRow == cell.gRow && _hoveredTileCol == cell.col) {
+                      setState(() {
+                        _hoveredTileGRow = null;
+                        _hoveredTileCol = null;
+                      });
+                    }
+                  },
+                  onAcceptWithDetails: (details) {
+                    final data = details.data;
+                    if (data.startsWith('card:')) {
+                      final cardId = data.replaceFirst('card:', '');
+                      _engine.castCard(cardId, targetCol: cell.col, targetRow: 0);
+                      setState(() {
+                        _draggedCard = null;
+                        _hoveredTileGRow = null;
+                        _hoveredTileCol = null;
+                      });
+                    }
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    return _buildClashLineTile(cell.col, tileWidth: tileWidth, tileHeight: tileHeight);
+                  },
+                ),
+              );
+            }
+
             return Positioned(
               left: cell.screenX,
               top: cell.screenY,
               width: tileWidth,
               height: tileHeight,
-              child: DragTarget<String>(
-                onWillAcceptWithDetails: (details) {
-                  if (details.data.startsWith('card:')) {
-                    if (_hoveredTileGRow != cell.gRow || _hoveredTileCol != cell.col) {
-                      setState(() {
-                        _hoveredTileGRow = cell.gRow;
-                        _hoveredTileCol = cell.col;
-                      });
-                    }
-                    return true;
-                  }
-                  return false;
-                },
-                onLeave: (_) {
-                  if (_hoveredTileGRow == cell.gRow && _hoveredTileCol == cell.col) {
-                    setState(() {
-                      _hoveredTileGRow = null;
-                      _hoveredTileCol = null;
-                    });
-                  }
-                },
-                onAcceptWithDetails: (details) {
-                  final data = details.data;
-                  if (data.startsWith('card:')) {
-                    final cardId = data.replaceFirst('card:', '');
-                    _engine.castCard(cardId, targetCol: cell.col, targetRow: 0);
-                    setState(() {
-                      _draggedCard = null;
-                      _hoveredTileGRow = null;
-                      _hoveredTileCol = null;
-                    });
-                  }
-                },
-                builder: (context, candidateData, rejectedData) {
-                  return _buildClashLineTile(cell.col, tileWidth: tileWidth, tileHeight: tileHeight);
-                },
+              child: _buildIsometricGridCell(
+                cell.col,
+                cell.localRow,
+                gRow: cell.gRow,
+                isPlayerSquad: cell.isPlayerSquad,
+                tileWidth: tileWidth,
+                tileHeight: tileHeight,
               ),
             );
-          }
+          }),
 
-          return Positioned(
-            left: cell.screenX,
-            top: cell.screenY,
-            width: tileWidth,
-            height: tileHeight,
-            child: _buildIsometricGridCell(
-              cell.col,
-              cell.localRow,
-              gRow: cell.gRow,
-              isPlayerSquad: cell.isPlayerSquad,
-              tileWidth: tileWidth,
-              tileHeight: tileHeight,
+          // Dynamic Kinetic Combat VFX Overlay Layer (Slashes, Beams, Shockwaves)
+          if (_activeVfx.isNotEmpty)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _CombatVfxOverlayPainter(
+                    effects: _activeVfx,
+                    currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
+                  ),
+                ),
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
@@ -1721,11 +1812,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       return Container(
         width: 110,
         height: 78,
-        padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF2C2412)
-              : (canAfford ? const Color(0xFF1E2235) : const Color(0xFF14141A)),
+              : (canAfford ? const Color(0xFF141724) : const Color(0xFF101014)),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: borderColor,
@@ -1741,43 +1831,69 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ]
               : null,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    card.name,
-                    style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                      color: canAfford ? Colors.white : Colors.white38,
-                    ),
-                    maxLines: 1,
+            // Background Spell Art with soft gradient fade
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 52,
+              child: Opacity(
+                opacity: canAfford ? 0.35 : 0.15,
+                child: Image.asset(
+                  card.assetPath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+
+            // Card Content Overlay
+            Padding(
+              padding: const EdgeInsets.all(5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          card.name,
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: canAfford ? Colors.white : Colors.white38,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 0.6),
+                        ),
+                        child: Text(
+                          '${card.focusCost}F',
+                          style: const TextStyle(fontSize: 8, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    card.description,
+                    style: const TextStyle(fontSize: 7.5, color: Colors.white70),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${card.focusCost}F',
-                    style: const TextStyle(fontSize: 8, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              card.description,
-              style: const TextStyle(fontSize: 7.5, color: Colors.white70),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                ],
+              ),
             ),
           ],
         ),
@@ -2007,5 +2123,171 @@ class _IsometricCellData {
     required this.screenX,
     required this.screenY,
   });
+}
+
+/// Dynamic kinetic VFX effect rendered over the battlefield
+class _CombatVfx {
+  final String id;
+  final Offset startOffset;
+  final Offset targetOffset;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final String type; // 'slash', 'beam', 'shockwave', 'shatter'
+  final int durationMs;
+  final int createdMs;
+
+  const _CombatVfx({
+    required this.id,
+    required this.startOffset,
+    required this.targetOffset,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.type,
+    required this.durationMs,
+    required this.createdMs,
+  });
+}
+
+/// Custom painter for directional strike beams, slashes, and impact shockwaves
+class _CombatVfxOverlayPainter extends CustomPainter {
+  final List<_CombatVfx> effects;
+  final int currentTimestampMs;
+
+  const _CombatVfxOverlayPainter({
+    required this.effects,
+    required this.currentTimestampMs,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final vfx in effects) {
+      final elapsed = currentTimestampMs - vfx.createdMs;
+      if (elapsed < 0 || elapsed > vfx.durationMs) continue;
+      final progress = (elapsed / vfx.durationMs).clamp(0.0, 1.0);
+
+      switch (vfx.type) {
+        case 'slash':
+          _drawSlash(canvas, vfx, progress);
+          break;
+        case 'beam':
+          _drawBeam(canvas, vfx, progress);
+          break;
+        case 'shockwave':
+        case 'shatter':
+          _drawShockwave(canvas, vfx, progress);
+          break;
+      }
+    }
+  }
+
+  void _drawSlash(Canvas canvas, _CombatVfx vfx, double progress) {
+    final target = vfx.targetOffset;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+    final slashLen = 50.0 + progress * 20.0;
+
+    // Glowing impact slash arc
+    final paint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..strokeWidth = (4.0 * (1.0 - progress)).clamp(1.0, 4.0)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final p1 = Offset(target.dx - slashLen * 0.5, target.dy - slashLen * 0.4);
+    final p2 = Offset(target.dx + slashLen * 0.5, target.dy + slashLen * 0.4);
+    canvas.drawLine(p1, p2, paint);
+
+    // Cross-slash spark
+    final crossPaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha((alpha * 0.8).round())
+      ..strokeWidth = 2.0 * (1.0 - progress)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final cp1 = Offset(target.dx + slashLen * 0.35, target.dy - slashLen * 0.35);
+    final cp2 = Offset(target.dx - slashLen * 0.35, target.dy + slashLen * 0.35);
+    canvas.drawLine(cp1, cp2, crossPaint);
+
+    // Impact burst flash circle
+    if (progress < 0.4) {
+      final flashRadius = 14.0 * (progress / 0.4);
+      final flashPaint = Paint()
+        ..color = Colors.white.withAlpha(((1.0 - (progress / 0.4)) * 200).round())
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(target, flashRadius, flashPaint);
+    }
+  }
+
+  void _drawBeam(Canvas canvas, _CombatVfx vfx, double progress) {
+    final start = vfx.startOffset;
+    final target = vfx.targetOffset;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+
+    // Primary energy tracer beam
+    final beamPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..strokeWidth = (5.0 * (1.0 - progress * 0.7)).clamp(1.5, 6.0)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, target, beamPaint);
+
+    // Bright core line
+    final corePaint = Paint()
+      ..color = Colors.white.withAlpha(alpha)
+      ..strokeWidth = 2.0 * (1.0 - progress)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, target, corePaint);
+
+    // Target burst
+    final burstRadius = 18.0 * progress;
+    final burstPaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha((alpha * 0.7).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(target, burstRadius, burstPaint);
+  }
+
+  void _drawShockwave(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.targetOffset;
+    final maxRadius = vfx.type == 'shatter' ? 65.0 : 45.0;
+    final currentRadius = maxRadius * progress;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+
+    // Outer shock ring
+    final ringPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(0.8, 4.0);
+    canvas.drawCircle(center, currentRadius, ringPaint);
+
+    // Inner bright harmonic wave
+    if (progress > 0.2) {
+      final innerProgress = (progress - 0.2) / 0.8;
+      final innerAlpha = ((1.0 - innerProgress) * 200).round().clamp(0, 255);
+      final innerPaint = Paint()
+        ..color = vfx.secondaryColor.withAlpha(innerAlpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      canvas.drawCircle(center, currentRadius * 0.65, innerPaint);
+    }
+
+    // Shatter shards for critical armor crack
+    if (vfx.type == 'shatter') {
+      final shardPaint = Paint()
+        ..color = const Color(0xFFFFD54F).withAlpha(alpha)
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
+      for (int i = 0; i < 6; i++) {
+        final angle = (i * 3.14159 * 2) / 6;
+        final d1 = currentRadius * 0.7;
+        final d2 = currentRadius * 1.15;
+        final p1 = Offset(center.dx + cos(angle) * d1, center.dy + sin(angle) * d1);
+        final p2 = Offset(center.dx + cos(angle) * d2, center.dy + sin(angle) * d2);
+        canvas.drawLine(p1, p2, shardPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CombatVfxOverlayPainter oldDelegate) {
+    return true;
+  }
 }
 

@@ -109,6 +109,25 @@ class SpatialCombatCard {
     this.bleedStacks = 0,
     this.exhaustsOnCast = false,
   });
+
+  String get assetPath {
+    if (id == 'phalanx_intercept') {
+      return 'assets/images/Spells/Ash Armour.jpg';
+    }
+    if (id == 'searing_brand') {
+      return 'assets/images/Spells/Sunburst - Tier 1 Spell no text.png';
+    }
+    if (id == 'smite_the_calcified') {
+      return 'assets/images/Spells/Soul Shatter.jpg';
+    }
+    if (id == 'sun_ashlar_wrath') {
+      return 'assets/images/Spells/Sunburst - Tier 1 Spell.png';
+    }
+    if (id == 'stoke_the_embers') {
+      return 'assets/images/Spells/Attack_spell_magic_circle.png';
+    }
+    return 'assets/images/Spells/Attack_spell_magic_circle.png';
+  }
 }
 
 /// Intent Telegraph for live combat anticipation
