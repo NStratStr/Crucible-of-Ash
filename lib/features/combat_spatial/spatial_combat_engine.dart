@@ -49,6 +49,25 @@ class SpatialCombatEngine extends ChangeNotifier {
     return valeria.occupiedNodes.isNotEmpty && valeria.occupiedNodes.first.row == 0;
   }
 
+  /// GDD Section 7.3: Star Rating & Extraction
+  /// 3 Stars: Flawless Clear (0 casualties) -> Permanently unlocks Instant Sweep / Extraction
+  /// 2 Stars: Encounter Cleared with 1 casualty
+  /// 1 Star: Encounter Cleared with >= 2 casualties
+  int get casualtiesCount => playerUnits.where((u) => u.isDowned).length;
+  int get starRating {
+    if (!isVictory) return 0;
+    if (casualtiesCount == 0) return 3;
+    if (casualtiesCount == 1) return 2;
+    return 1;
+  }
+
+  bool get isFlawlessClear => isVictory && casualtiesCount == 0;
+
+  // GDD §7.1: Crypt Currencies & Reagents
+  int get rewardUnboundAsh => isVictory ? (240 + (starRating * 80)) : 45;
+  int get rewardDistilledVitae => isVictory ? (18 + (starRating * 6)) : 2;
+  String? get rewardBossReagent => isVictory ? 'Molten Brim-Slag (Tier 2 Keystone)' : null;
+
   /// GDD Section 6.3: Ashen Reckoning (Universal Soft Enrage)
   /// Skirmishes / encounters enter Reckoning at 3:00 (5,400 ticks), or demo threshold (tick 900)
   /// Modifiers during Reckoning: Damage dealt x2.0, healing received -50%

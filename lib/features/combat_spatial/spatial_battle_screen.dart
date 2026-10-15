@@ -408,9 +408,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                 Icon(
                                   _engine.isVictory ? Icons.emoji_events : Icons.heart_broken,
                                   color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
-                                  size: 44,
+                                  size: 40,
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                                 Text(
                                   _engine.isVictory ? 'THE ASHEN GATE SURPASSED' : 'RESONANCE SEVERED',
                                   style: TextStyle(
@@ -428,6 +428,78 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(fontSize: 11, color: Colors.white70),
                                 ),
+
+                                // Star Rating & Instant Sweep Unlock (GDD §7.3)
+                                if (_engine.isVictory) ...[
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: List.generate(3, (i) {
+                                      final filled = i < _engine.starRating;
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                                        child: Icon(
+                                          filled ? Icons.star : Icons.star_border,
+                                          color: filled ? const Color(0xFFFFD54F) : Colors.white24,
+                                          size: 24,
+                                        ),
+                                      );
+                                    }),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _engine.isFlawlessClear
+                                        ? '🌟 3-STAR FLAWLESS CLEAR! INSTANT EXTRACTION UNLOCKED'
+                                        : '${_engine.starRating}-STAR CLEAR (${_engine.casualtiesCount} Casualties)',
+                                    style: TextStyle(
+                                      color: _engine.isFlawlessClear ? const Color(0xFFFFE082) : Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+
+                                  // Loot & Currencies Reagents (GDD §7.1)
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0C0C14),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Unbound Ash
+                                        const Icon(Icons.blur_on, color: Color(0xFFB0BEC5), size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '+${_engine.rewardUnboundAsh} Ash',
+                                          style: const TextStyle(color: Color(0xFFECEFF1), fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        // Distilled Vitae
+                                        const Icon(Icons.opacity, color: Color(0xFFE53935), size: 14),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '+${_engine.rewardDistilledVitae} Vitae',
+                                          style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                        if (_engine.rewardBossReagent != null) ...[
+                                          const SizedBox(width: 12),
+                                          const Icon(Icons.whatshot, color: Color(0xFFFF9100), size: 14),
+                                          const SizedBox(width: 4),
+                                          const Text(
+                                            'Brim-Slag Core',
+                                            style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
                                 const SizedBox(height: 16),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
