@@ -29,6 +29,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _selectedUnitId;
   String? _selectedCardId;
   SpatialCombatCard? _draggedCard;
+  String? _selectedUltimateUnitId;
+  String? _draggedUltimateUnitId;
   int? _hoveredTileGRow;
   int? _hoveredTileCol;
 
@@ -540,6 +542,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ],
               ),
             ),
+
+            // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
+            _buildUltimatePopOutDock(),
 
             // Tactical Card Hand & Burn Pit
             _buildTacticalHandDock(),
@@ -1061,6 +1066,49 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return cells;
   }
 
+  /// Calculates affected global grid cells when an Ultimate mini-slate is dragged over targetGRow, targetCol
+  List<({int gRow, int col})> _getUltimateAffectedGridCells(String unitId, int targetGRow, int targetCol) {
+    final List<({int gRow, int col})> cells = [];
+    switch (unitId) {
+      case 'lady_valeria':
+        // Wrath of Dawnbound: Entire enemy column (gRow 0, 1, 2 at targetCol)
+        for (int gr = 0; gr <= 2; gr++) {
+          cells.add((gRow: gr, col: targetCol));
+        }
+        break;
+
+      case 'iron_footman':
+        // Unbreakable Phalanx: All Frontline ally nodes (gRow 4, all 5 cols)
+        for (int gc = 0; gc < 5; gc++) {
+          cells.add((gRow: 4, col: gc));
+        }
+        break;
+
+      case 'sanguine_blade':
+        // Crimson Evisceration: Single enemy node
+        cells.add((gRow: targetGRow, col: targetCol));
+        break;
+
+      case 'sun_smith':
+        // Solar Crucible Ignition: Cross / 2x2 target pattern
+        cells.add((gRow: targetGRow, col: targetCol));
+        const deltas = [(0, 1), (0, -1), (1, 0), (-1, 0)];
+        for (final (dRow, dCol) in deltas) {
+          final nr = targetGRow + dRow;
+          final nc = targetCol + dCol;
+          if (nr >= 0 && nr < 7 && nc >= 0 && nc < 5) {
+            cells.add((gRow: nr, col: nc));
+          }
+        }
+        break;
+
+      default:
+        cells.add((gRow: targetGRow, col: targetCol));
+        break;
+    }
+    return cells;
+  }
+
   /// Calculates predicted phantom damage or effect for a unit given the hovered spell
   String? _getPhantomUnitEffect(CombatUnitState unit, SpatialCombatCard card, int targetGRow, int targetCol) {
     if (!unit.isAlive) return null;
@@ -1154,10 +1202,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     final bool isSelected = _selectedUnitId != null && occupant?.id == _selectedUnitId;
 
-    // Tactical Spell AOE Highlight Overlay calculation (supports dragged card or selected card):
+    // Tactical Spell & Ultimate AOE Highlight Overlay calculation:
     final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
+    final activeUltimateUnitId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
     bool isSpellAoeAffected = false;
-    if (activeCard != null) {
+    if (activeUltimateUnitId != null && _hoveredTileGRow != null && _hoveredTileCol != null) {
+      final affectedList = _getUltimateAffectedGridCells(activeUltimateUnitId, _hoveredTileGRow!, _hoveredTileCol!);
+      isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
+    } else if (activeCard != null) {
       if (_hoveredTileGRow != null && _hoveredTileCol != null) {
         final affectedList = _getSpellAffectedGridCells(activeCard, _hoveredTileGRow!, _hoveredTileCol!);
         isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
@@ -1201,7 +1253,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
         final data = details.data;
-        if (data.startsWith('card:')) {
+        if (data.startsWith('ultimate:')) {
+          if (_hoveredTileGRow != gRow || _hoveredTileCol != col) {
+            setState(() {
+              _hoveredTileGRow = gRow;
+              _hoveredTileCol = col;
+            });
+          }
+          final unitId = data.replaceFirst('ultimate:', '');
+          if (unitId == 'iron_footman') return isPlayerSquad;
+          return !isPlayerSquad; // Valeria, Sanguine, Sun-Smith target enemy grid/units
+        } else if (data.startsWith('card:')) {
           if (_hoveredTileGRow != gRow || _hoveredTileCol != col) {
             setState(() {
               _hoveredTileGRow = gRow;
@@ -1237,7 +1299,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       },
       onAcceptWithDetails: (details) {
         final data = details.data;
-        if (data.startsWith('card:')) {
+        if (data.startsWith('ultimate:')) {
+          final unitId = data.replaceFirst('ultimate:', '');
+          _engine.castUltimate(unitId, targetUnit: occupant, targetCol: col, targetRow: row);
+          setState(() {
+            _draggedUltimateUnitId = null;
+            _selectedUltimateUnitId = null;
+            _hoveredTileGRow = null;
+            _hoveredTileCol = null;
+          });
+        } else if (data.startsWith('card:')) {
           final cardId = data.replaceFirst('card:', '');
           _engine.castCard(cardId, targetUnit: occupant, targetCol: col, targetRow: row);
           setState(() {
@@ -1753,6 +1824,38 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
+            // 1b. Stance Mastery Runic Plinth Aura (Tabletop visual condition cue)
+            if (unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1))
+              Positioned(
+                bottom: 3,
+                child: Container(
+                  width: baseWidth + 6,
+                  height: baseHeight + 4,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.elliptical((baseWidth + 6) / 2, (baseHeight + 4) / 2)),
+                    border: Border.all(
+                      color: unit.activeStance == StanceType.holdTheLine
+                          ? const Color(0xFFFFD54F) // Amber/Gold rune ring for Hold the Line
+                          : (unit.activeStance == StanceType.flankingMomentum
+                              ? const Color(0xFFFF1744) // Crimson trail for Flanking Momentum
+                              : const Color(0xFF00E5FF)), // Cyan star for Aetheric Alignment
+                      width: 1.8,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: unit.activeStance == StanceType.holdTheLine
+                            ? const Color(0xFFFFD54F).withValues(alpha: 0.65)
+                            : (unit.activeStance == StanceType.flankingMomentum
+                                ? const Color(0xFFFF1744).withValues(alpha: 0.65)
+                                : const Color(0xFF00E5FF).withValues(alpha: 0.65)),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
               bottom: 6,
@@ -2097,6 +2200,206 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Ultimate Burst Pop-Out Mini-Slate Dock (HUD pull-out tray)
+  Widget _buildUltimatePopOutDock() {
+    final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
+    if (livingAllies.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D0D14),
+        border: Border(top: BorderSide(color: Color(0xFF222230), width: 1.0)),
+      ),
+      child: Row(
+        children: [
+          // Crest & Label
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.bolt, color: Color(0xFFFFD54F), size: 14),
+              const SizedBox(width: 4),
+              Text(
+                'ULTIMATES',
+                style: TextStyle(
+                  fontSize: 9.0,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: livingAllies.length,
+                separatorBuilder: (context, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final unit = livingAllies[index];
+                  return _buildUltimateMiniSlate(unit);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUltimateMiniSlate(CombatUnitState unit) {
+    final isReady = unit.isUltimateReady;
+    final double gaugePct = (unit.ultimateGauge / 100.0).clamp(0.0, 1.0);
+    final isSelected = _selectedUltimateUnitId == unit.id;
+
+    final Widget slateWidget = Container(
+      width: 105,
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      decoration: BoxDecoration(
+        color: isReady
+            ? const Color(0xFF261C0E).withValues(alpha: 0.95)
+            : const Color(0xFF14141E).withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isReady
+              ? const Color(0xFFFFD54F)
+              : (isSelected ? const Color(0xFF00E5FF) : Colors.white12),
+          width: isReady ? 1.6 : 0.8,
+        ),
+        boxShadow: isReady
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          // Unit Portrait in Gothic Frame
+          Container(
+            width: 28,
+            height: 36,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: isReady ? const Color(0xFFFFD54F) : Colors.white24,
+                width: 0.8,
+              ),
+              color: Colors.black45,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Image.asset(
+                unit.assetPath,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield, color: Colors.white38, size: 16),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Info & Meter
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  unit.name.split(' ').first.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 8.0,
+                    fontWeight: FontWeight.bold,
+                    color: isReady ? const Color(0xFFFFE082) : Colors.white70,
+                    letterSpacing: 0.4,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  isReady ? 'READY! ⚡' : '${unit.ultimateGauge}%',
+                  style: TextStyle(
+                    fontSize: 7.5,
+                    fontWeight: FontWeight.w900,
+                    color: isReady ? const Color(0xFFFFD54F) : Colors.white38,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                // Progress Bar
+                Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: gaugePct,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isReady ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!isReady) {
+      return slateWidget;
+    }
+
+    // When charged, unit portrait can be dragged onto the battlefield with 30% tactical bullet-time
+    return Draggable<String>(
+      data: 'ultimate:${unit.id}',
+      onDragStarted: () {
+        setState(() {
+          _draggedUltimateUnitId = unit.id;
+          _selectedUltimateUnitId = null;
+          _selectedCardId = null;
+          _selectedUnitId = null;
+        });
+        _engine.setBulletTime(true);
+      },
+      onDragEnd: (_) {
+        setState(() {
+          _draggedUltimateUnitId = null;
+          _hoveredTileGRow = null;
+          _hoveredTileCol = null;
+        });
+        _engine.setBulletTime(false);
+      },
+      feedback: Material(
+        color: Colors.transparent,
+        child: Transform.scale(
+          scale: 1.15,
+          child: slateWidget,
+        ),
+      ),
+      child: GestureDetector(
+        onTap: () {
+          // If clicked, cast on default primary target
+          _engine.castUltimate(unit.id);
+        },
+        child: slateWidget,
       ),
     );
   }

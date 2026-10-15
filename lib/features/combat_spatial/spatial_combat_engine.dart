@@ -486,8 +486,8 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     for (final unit in readyUnits) {
       if (!unit.isAlive || unit.currentAp < tickThreshold) continue;
+      unit.currentAp -= tickThreshold; // Consume turn
       _executeUnitTurn(unit);
-      unit.currentAp %= tickThreshold; // Consume turn
     }
 
     notifyListeners();
@@ -597,18 +597,37 @@ class SpatialCombatEngine extends ChangeNotifier {
       final target = _resolveColumnTarget(unitCol: 3, targetingPlayers: false) ??
           _resolveColumnTarget(unitCol: 2, targetingPlayers: false);
       if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        target.bleedStacks += 2;
-        addLog('${unit.name} executes Flensing Thrust on ${target.name} for $dmg DMG & 2 BLEED stacks!');
+        // Flanking Momentum check: Triggered if moved this turn cycle OR target has active Bleed
+        final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0;
+        final int baseDmg = isFlankingBonus ? (unit.attack * 1.4).round() : unit.attack;
+        final dmg = target.takeDamage(baseDmg);
+        final int appliedBleed = isFlankingBonus ? 4 : 2;
+        target.bleedStacks += appliedBleed;
+
+        // Ultimate charge: +15% per basic action
+        unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+
+        if (isFlankingBonus) {
+          // Refund 3,000 AP (initiating next attack cadence 30% faster)
+          unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 3000);
+          unit.hasStanceBonusReady = false;
+          unit.movedSinceLastTurn = false;
+          addLog('${unit.name} [FLANKING MOMENTUM] crits ${target.name} for $dmg DMG & 4 BLEED stacks! Refunds +3,000 AP!');
+          lastBannerMessage = '⚡ FLANKING MOMENTUM: ${unit.name} dealt $dmg CRIT & refunded 3,000 AP!';
+        } else {
+          addLog('${unit.name} executes Flensing Thrust on ${target.name} for $dmg DMG & 2 BLEED stacks.');
+        }
+
         dispatchAction(SpatialActionEvent(
           id: 'act_${currentTick}_${unit.id}',
           attackerId: unit.id,
           attackerName: unit.name,
-          skillName: 'Flensing Thrust',
+          skillName: isFlankingBonus ? 'Flanking Evisceration' : 'Flensing Thrust',
           targetId: target.id,
           targetName: target.name,
           damage: dmg,
-          bleedStacks: 2,
+          bleedStacks: appliedBleed,
+          isCrit: isFlankingBonus,
           isPlayerAttacker: true,
           pattern: TargetPattern.reachMidToFront,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -668,17 +687,55 @@ class SpatialCombatEngine extends ChangeNotifier {
     switch (unit.currentDepth) {
       case RowDepth.front:
         // [ FRONT ROW ] ───► BRAWL STANCE (Default)
-        // 100% Melee Impact & Cleaves; absorbs direct hits
+        // Stance Mastery: "Hold the Line" (Steadfast Anchor)
+        // If unmoving for 2 consecutive cycles on Frontline:
+        // -> Gains +30% Armor (PRR) & Stagger Immunity
+        // -> Next strike becomes Earth-Shattering Bash (cleaves laterally across Row 0, resets 1,500 AP on targets)
+        if (unit.movedSinceLastTurn) {
+          unit.consecutiveTurnsStationary = 0;
+          unit.hasStanceBonusReady = false;
+          unit.movedSinceLastTurn = false;
+        } else {
+          unit.consecutiveTurnsStationary++;
+          if (unit.consecutiveTurnsStationary >= 2) {
+            unit.hasStanceBonusReady = true;
+          }
+        }
+
+        final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
         final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
         if (target != null) {
-          final dmg = target.takeDamage(unit.attack);
-          final skillName = unit.id == 'lady_valeria' ? 'Sunbrand Slash' : 'Shield Bash';
-          if (unit.id == 'iron_footman' && target.id != 'gorgoroth_boss') {
+          final int baseDmg = hasHoldTheLineBonus ? (unit.attack * 1.35).round() : unit.attack;
+          final dmg = target.takeDamage(baseDmg);
+          final skillName = hasHoldTheLineBonus
+              ? (unit.id == 'lady_valeria' ? 'Solar Sunder Cleave' : 'Earth-Shattering Bash')
+              : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : 'Shield Bash');
+
+          if (hasHoldTheLineBonus) {
+            // Earth-Shattering Bash cleaves laterally and resets 1,500 AP on targets hit
+            target.currentAp = max(0, target.currentAp - 1500);
+
+            // Lateral cleave across adjacent enemies in Row 0
+            final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+            for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1))) {
+              final cleaveDmg = neighbor.takeDamage((baseDmg * 0.60).round());
+              neighbor.currentAp = max(0, neighbor.currentAp - 1500);
+              addLog('  Lateral Cleave: ${neighbor.name} struck for $cleaveDmg DMG (-1,500 AP reset)!');
+            }
+
+            unit.hasStanceBonusReady = false; // Consumed
+            addLog('${unit.name} [HOLD THE LINE] unleashes $skillName for $dmg DMG, resetting 1,500 AP!');
+            lastBannerMessage = '🛡️ HOLD THE LINE: ${unit.name} unleashed $skillName cleaving frontline!';
+          } else if (unit.id == 'iron_footman' && target.id != 'gorgoroth_boss') {
             target.stunDuration = 30; // 1s stun
             addLog('${unit.name} [BRAWL STANCE] bashes ${target.name} for $dmg DMG & STUNS for 1s!');
           } else {
             addLog('${unit.name} [BRAWL STANCE] strikes ${target.name} for $dmg DMG (100% Impact).');
           }
+
+          // Basic attack grants +15% Ultimate gauge
+          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
             attackerId: unit.id,
@@ -687,8 +744,9 @@ class SpatialCombatEngine extends ChangeNotifier {
             targetId: target.id,
             targetName: target.name,
             damage: dmg,
+            isCrit: hasHoldTheLineBonus,
             isPlayerAttacker: unit.isPlayer,
-            pattern: TargetPattern.singleTarget,
+            pattern: hasHoldTheLineBonus ? TargetPattern.horizontalRowScythe : TargetPattern.singleTarget,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
         }
@@ -696,6 +754,10 @@ class SpatialCombatEngine extends ChangeNotifier {
 
       case RowDepth.mid:
         // [ MID ROW ] ───► ADVANCING / RECOVERY STRIDE
+        // Reset Hold the Line stationary counter
+        unit.consecutiveTurnsStationary = 0;
+        unit.hasStanceBonusReady = false;
+
         // Shockwave / Tremor Slam: 60% Dmg + minor stagger / 15 armor chip down column.
         // If front tile in column is empty, unit automatically steps forward to reclaim the Frontline!
         final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
@@ -704,6 +766,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           final dmg = target.takeDamage(shockwaveDmg);
           // Apply 15 armor chip / stagger
           target.armor = max(0, target.armor - 15);
+          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
           addLog('${unit.name} [ADVANCING STRIDE] slams ground with Shockwave Tremor for $dmg DMG (60%) & chips 15 Armor from ${target.name}!');
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
@@ -732,6 +795,9 @@ class SpatialCombatEngine extends ChangeNotifier {
 
       case RowDepth.back:
         // [ BACK ROW ] ───► OUT OF FORMATION (Braced Bulwark)
+        unit.consecutiveTurnsStationary = 0;
+        unit.hasStanceBonusReady = false;
+
         // 0 kinetic damage dealt to enemy.
         // Slams shield into ground: grants temporary +25 Armor & +30 Aegis Shield to allied units
         // ahead of it in that column (Row 0 & 1).
@@ -773,6 +839,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (target != null) {
         final dmg = (unit.attack * 1.1).round();
         target.takeDamage(dmg);
+        unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
         // Push target back 1 row if target is displaceable and space is open
         if (!target.isDisplacementImmune && target.occupiedNodes.isNotEmpty) {
           final tCol = target.occupiedNodes.first.column;
@@ -799,23 +866,67 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else {
-      // Midline / Backline (Guarded Sanctuary / Midline Channel)
-      final target = (unit.isPlayer ? enemyUnits : playerUnits).where((u) => u.isAlive).firstOrNull;
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
+      // Midline / Backline
+      // Stance Mastery: "Aetheric Alignment" (Spell Weave)
+      // When casting from Backline (Row 2):
+      // -> Strike pierces straight down column (Row 0, 1, 2)
+      // -> Generates +1 Global Focus for Gauntlet reservoir
+      final bool isAethericBonus = unit.currentDepth == RowDepth.back;
+      final targetCol = unit.occupiedNodes.first.column;
+      final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+
+      if (isAethericBonus) {
+        // Piercing strike hitting entire column
+        int hitCount = 0;
+        for (int r = 0; r <= 2; r++) {
+          final occupant = opposingSquad.where((u) => u.isAlive && u.occupies(targetCol, r)).firstOrNull;
+          if (occupant != null) {
+            final dmg = occupant.takeDamage(unit.attack);
+            hitCount++;
+            addLog('${unit.name} [AETHERIC ALIGNMENT] beam pierces ${occupant.name} for $dmg DMG (Hit #$hitCount)!');
+          }
+        }
+
+        // Generate +1 Global Focus
+        if (unit.isPlayer && focus < maxFocus) {
+          focus = min(maxFocus, focus + 1);
+          addLog('${unit.name} [AETHERIC ALIGNMENT] weaves aetheric resonance: +1 Global Focus (Pool: $focus)!');
+        }
+
+        unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
+        lastBannerMessage = '✨ AETHERIC ALIGNMENT: ${unit.name} column beam pierced enemies & granted +1 Focus!';
+
         dispatchAction(SpatialActionEvent(
           id: 'act_${currentTick}_${unit.id}',
           attackerId: unit.id,
           attackerName: unit.name,
-          skillName: 'Sun-Bolt Volley',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
+          skillName: 'Aetheric Piercing Beam',
+          targetId: opposingSquad.first.id,
+          targetName: opposingSquad.first.name,
+          damage: unit.attack,
           isPlayerAttacker: unit.isPlayer,
-          pattern: TargetPattern.singleTarget,
+          pattern: TargetPattern.piercingColumnSkewer,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
+      } else {
+        final target = opposingSquad.where((u) => u.isAlive).firstOrNull;
+        if (target != null) {
+          final dmg = target.takeDamage(unit.attack);
+          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+          addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
+          dispatchAction(SpatialActionEvent(
+            id: 'act_${currentTick}_${unit.id}',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Sun-Bolt Volley',
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isPlayerAttacker: unit.isPlayer,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
       }
     }
   }
@@ -1143,6 +1254,142 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       }
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  /// Ultimate Burst Resolution: Player manually drags charged unit mini-slate onto grid target
+  bool castUltimate(String unitId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) {
+    final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+    if (unit == null || !unit.isUltimateReady) {
+      addLog('${unit?.name ?? "Unit"} Ultimate is not fully charged!');
+      return false;
+    }
+
+    unit.ultimateGauge = 0; // Consume meter
+
+    switch (unit.id) {
+      case 'lady_valeria':
+        // Wrath of the Dawnbound: Solar pillar crashes down for 240 Radiant DMG,
+        // shatters Slag Carapace, and fortifies Frontline allies with +30 Armor
+        final col = targetCol ?? targetUnit?.occupiedNodes.firstOrNull?.column ?? 1;
+        int totalHits = 0;
+        for (int r = 0; r <= 2; r++) {
+          final enemy = enemyUnits.where((u) => u.isAlive && u.occupies(col, r)).firstOrNull;
+          if (enemy != null) {
+            enemy.isSlagCarapaceActive = false; // Shatter
+            final dmg = enemy.takeDamage(240);
+            totalHits++;
+            addLog('WRATH OF DAWNBOUND: Solar pillar smote ${enemy.name} for $dmg Radiant DMG (Carapace Shattered)!');
+          }
+        }
+        for (final ally in playerUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0))) {
+          ally.armor = min(ally.maxArmor + 40, ally.armor + 30);
+          addLog('  Dawnbound Ward: Fortified ${ally.name} with +30 Armor ($totalHits enemies smitten)!');
+        }
+        lastBannerMessage = '☀️ WRATH OF THE DAWNBOUND: Solar Pillar incinerated Col ${col + 1} & granted Frontline +30 Armor!';
+        dispatchAction(SpatialActionEvent(
+          id: 'ult_${currentTick}_valeria',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Wrath of the Dawnbound',
+          targetId: enemyUnits.first.id,
+          targetName: enemyUnits.first.name,
+          damage: 240,
+          isCrit: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.piercingColumnSkewer,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+        break;
+
+      case 'iron_footman':
+        // Unbreakable Phalanx: Slams tower shield into earth, granting +60 Aegis Barrier
+        // to all allies in Row 0 for 4s
+        final alliesInRow = playerUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
+        for (final ally in alliesInRow) {
+          ally.aegisShield += 60;
+          ally.armor = min(ally.maxArmor + 30, ally.armor + 25);
+          addLog('UNBREAKABLE PHALANX: ${ally.name} warded with +60 Aegis Barrier & +25 Armor!');
+        }
+        lastBannerMessage = '🛡️ UNBREAKABLE PHALANX: Iron Footman warded Frontline with +60 Aegis Barrier!';
+        dispatchAction(SpatialActionEvent(
+          id: 'ult_${currentTick}_footman',
+          attackerId: unit.id,
+          attackerName: unit.name,
+          skillName: 'Unbreakable Phalanx',
+          targetId: alliesInRow.isNotEmpty ? alliesInRow.first.id : unit.id,
+          targetName: alliesInRow.isNotEmpty ? alliesInRow.first.name : unit.name,
+          damage: 0,
+          isHeal: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.horizontalRowScythe,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+        break;
+
+      case 'sanguine_blade':
+        // Crimson Evisceration: Strikes target for 280 DMG + detonates all Bleed stacks
+        final target = targetUnit ??
+            enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+            enemyUnits.where((u) => u.isAlive).firstOrNull;
+        if (target != null) {
+          final int bonusBleedDmg = target.bleedStacks * 35;
+          final int totalRawDmg = 280 + bonusBleedDmg;
+          final dmg = target.takeDamage(totalRawDmg);
+          final oldBleed = target.bleedStacks;
+          target.bleedStacks = 0; // Detonated
+          addLog('CRIMSON EVISCERATION: Sanguine Blade detonated $oldBleed Bleed stacks on ${target.name} for $dmg Total DMG!');
+          lastBannerMessage = '🩸 CRIMSON EVISCERATION: $dmg DMG ($oldBleed Bleed Stacks Detonated)!';
+          dispatchAction(SpatialActionEvent(
+            id: 'ult_${currentTick}_sanguine',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Crimson Evisceration',
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isCrit: true,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+        break;
+
+      case 'sun_smith':
+        // Solar Crucible Ignition: Calls down an alchemical solar beam dealing 180 Fire DMG
+        // and igniting enemies with 90-tick (3s) Burn
+        final target = targetUnit ??
+            enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+            enemyUnits.where((u) => u.isAlive).firstOrNull;
+        if (target != null) {
+          final dmg = target.takeDamage(180);
+          target.burnDuration = max(target.burnDuration, 90);
+          addLog('SOLAR CRUCIBLE: Incinerated ${target.name} for $dmg DMG & 3s Burn hazard!');
+          for (final splash in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
+            final sDmg = splash.takeDamage(80);
+            splash.burnDuration = max(splash.burnDuration, 90);
+            addLog('  Crucible Ignition: ${splash.name} suffered $sDmg Burn damage.');
+          }
+          lastBannerMessage = '🔥 SOLAR CRUCIBLE IGNITION: Incinerated enemies for $dmg DMG & 3s Hazard!';
+          dispatchAction(SpatialActionEvent(
+            id: 'ult_${currentTick}_sunsmith',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Solar Crucible Ignition',
+            targetId: target.id,
+            targetName: target.name,
+            damage: dmg,
+            isCrit: true,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.stAshlarCross,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+        break;
     }
 
     notifyListeners();

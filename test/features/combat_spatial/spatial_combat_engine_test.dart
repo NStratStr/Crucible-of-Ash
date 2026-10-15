@@ -183,6 +183,60 @@ void main() {
       expect(engine.activeActionEvent, isNotNull);
       expect(engine.activeActionEvent!.skillName, equals('Panic Discharge'));
     });
+
+    test('Unit Combat Triad: Hold the Line triggers lateral cleave and resets enemy AP after 2 cycles stationary', () {
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      expect(valeria.activeStance, equals(StanceType.holdTheLine));
+
+      // Turn 1 stationary on Frontline
+      valeria.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+      expect(valeria.consecutiveTurnsStationary, equals(1));
+      expect(valeria.hasStanceBonusReady, isFalse);
+
+      // Turn 2 stationary on Frontline -> triggers Hold the Line
+      valeria.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+      expect(valeria.consecutiveTurnsStationary, equals(2));
+
+      final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
+      gorgoroth.currentAp = 4000;
+
+      // Turn 3: Unleashes Solar Sunder Cleave with AP reset (-1,500 AP)
+      // Note: stepTick also accumulates Gorgoroth speed (+70 AP), so net is 4000 + 70 - 1500 = 2570
+      valeria.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+      expect(gorgoroth.currentAp, equals(2570)); // 4000 + 70 speed - 1500 AP reset = 2570
+    });
+
+    test('Unit Combat Triad: Sanguine Blade Flanking Momentum grants Crit and refunds 3,000 AP on bleeding target', () {
+      final sanguine = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade');
+      final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
+      gorgoroth.bleedStacks = 2; // Target has bleed
+
+      sanguine.currentAp = SpatialCombatEngine.tickThreshold;
+      engine.stepTick();
+
+      // Flanking Momentum refunds 3,000 AP
+      expect(sanguine.currentAp, greaterThanOrEqualTo(3000));
+      expect(gorgoroth.bleedStacks, greaterThanOrEqualTo(4)); // Added 4 stacks
+    });
+
+    test('Unit Combat Triad: Manual Ultimate Burst execution consumes meter and shatters defenses', () {
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
+      expect(gorgoroth.isSlagCarapaceActive, isTrue);
+
+      valeria.ultimateGauge = 100;
+      expect(valeria.isUltimateReady, isTrue);
+
+      final castSuccess = engine.castUltimate('lady_valeria', targetCol: 1);
+      expect(castSuccess, isTrue);
+      expect(valeria.ultimateGauge, equals(0)); // Meter consumed
+      expect(gorgoroth.isSlagCarapaceActive, isFalse); // Carapace shattered by Wrath of Dawnbound
+      expect(engine.activeActionEvent?.skillName, equals('Wrath of the Dawnbound'));
+    });
   });
 }
+
 

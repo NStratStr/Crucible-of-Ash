@@ -173,6 +173,15 @@ enum RowDepth {
   back,  // Row 2: Rearguard / distant depth
 }
 
+/// Stance Mastery Types (Tabletop Positional Conditions)
+enum StanceType {
+  none,
+  holdTheLine,       // Vanguard: 2 cycles stationary in Frontline -> +30% Armor & lateral cleave
+  flankingMomentum,  // Skirmisher: reposition or hit bleeding target -> +40% Crit, 2 Bleed, 3000 AP refund
+  aethericAlignment, // Mage: safe Backline casting -> piercing column hit + 1 Global Focus
+  sanctifiedHearth,  // Support: clustered allies -> 3% HP regen aura + cleanse
+}
+
 /// Extended Spatial Unit State for 30 Hz deterministic simulation loop
 class CombatUnitState {
   final String id;
@@ -197,8 +206,15 @@ class CombatUnitState {
   int aegisShield; // absorbs damage before HP
   int reviveCount; // tracking Soul Fracture (-20% max HP per revive)
   int ultimateGauge; // 0 to 100%
+  bool get isUltimateReady => ultimateGauge >= 100;
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
+
+  // Stance Mastery parameters
+  StanceType activeStance;
+  int consecutiveTurnsStationary;
+  bool hasStanceBonusReady;
+  bool movedSinceLastTurn;
 
   CombatUnitState({
     required this.id,
@@ -225,7 +241,25 @@ class CombatUnitState {
     this.ultimateGauge = 0,
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
-  }) : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1);
+    StanceType? activeStance,
+    this.consecutiveTurnsStationary = 0,
+    this.hasStanceBonusReady = false,
+    this.movedSinceLastTurn = false,
+  })  : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
+        activeStance = activeStance ?? _defaultStanceForArchetype(archetype);
+
+  static StanceType _defaultStanceForArchetype(UnitArchetype archetype) {
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return StanceType.holdTheLine;
+      case UnitArchetype.reachMidline:
+        return StanceType.flankingMomentum;
+      case UnitArchetype.backlineCaster:
+        return StanceType.aethericAlignment;
+      case UnitArchetype.colossusBehemoth:
+        return StanceType.none;
+    }
+  }
 
   /// Current physical row depth (0=front, 1=mid, 2=back)
   RowDepth get currentDepth {
@@ -289,6 +323,13 @@ class CombatUnitState {
     occupiedNodes.clear();
     occupiedNodes.addAll(newNodes);
     currentAp -= apPenalty;
+    movedSinceLastTurn = true;
+    consecutiveTurnsStationary = 0;
+    if (activeStance == StanceType.holdTheLine) {
+      hasStanceBonusReady = false;
+    } else if (activeStance == StanceType.flankingMomentum) {
+      hasStanceBonusReady = true; // Repositioning immediately triggers Flanking Momentum!
+    }
     return true;
   }
 
@@ -316,6 +357,54 @@ class CombatUnitState {
       return 'assets/images/sun_scorched_cleric.png';
     }
     return 'assets/images/footman_base.png';
+  }
+
+  /// Ultimate Skill Display Title
+  String get ultimateTitle {
+    switch (id) {
+      case 'lady_valeria':
+        return 'Wrath of the Dawnbound';
+      case 'iron_footman':
+        return 'Unbreakable Phalanx';
+      case 'sanguine_blade':
+        return 'Crimson Evisceration';
+      case 'sun_smith':
+        return 'Solar Crucible Ignition';
+      default:
+        return 'Apex Burst';
+    }
+  }
+
+  /// Ultimate Skill Description
+  String get ultimateDescription {
+    switch (id) {
+      case 'lady_valeria':
+        return 'Calls down a solar pillar for 240 Holy DMG, shatters Carapace, and fortifies Frontline with +30 Armor.';
+      case 'iron_footman':
+        return 'Slams tower shield into earth, granting +60 Aegis Barrier & taunt redirection to all allies in row for 4s.';
+      case 'sanguine_blade':
+        return 'Strikes target for 280 DMG & detonates all active Bleed stacks into an immediate kinetic burst!';
+      case 'sun_smith':
+        return 'Calls down an alchemical solar beam dealing 180 Fire DMG and leaving a 4s burning hazard zone.';
+      default:
+        return 'Unleashes devastating unit apex power!';
+    }
+  }
+
+  /// Target Pattern for Ultimate Skill
+  TargetPattern get ultimatePattern {
+    switch (id) {
+      case 'lady_valeria':
+        return TargetPattern.piercingColumnSkewer;
+      case 'iron_footman':
+        return TargetPattern.horizontalRowScythe;
+      case 'sanguine_blade':
+        return TargetPattern.singleTarget;
+      case 'sun_smith':
+        return TargetPattern.stAshlarCross;
+      default:
+        return TargetPattern.singleTarget;
+    }
   }
 
   /// Physical Damage Reduction Ratio based on Armor
