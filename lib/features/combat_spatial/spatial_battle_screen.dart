@@ -27,6 +27,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   late final SpatialCombatEngine _engine;
   Timer? _loopTimer;
   String? _selectedUnitId;
+  String? _selectedCardId;
   SpatialCombatCard? _draggedCard;
   int? _hoveredTileGRow;
   int? _hoveredTileCol;
@@ -713,11 +714,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     final bool isSelected = _selectedUnitId != null && occupant?.id == _selectedUnitId;
 
-    // Tactical Spell AOE Highlight Overlay calculation:
+    // Tactical Spell AOE Highlight Overlay calculation (supports dragged card or selected card):
+    final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
     bool isSpellAoeAffected = false;
-    if (_draggedCard != null && _hoveredTileGRow != null && _hoveredTileCol != null) {
-      final affectedList = _getSpellAffectedGridCells(_draggedCard!, _hoveredTileGRow!, _hoveredTileCol!);
-      isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
+    if (activeCard != null) {
+      if (_hoveredTileGRow != null && _hoveredTileCol != null) {
+        final affectedList = _getSpellAffectedGridCells(activeCard, _hoveredTileGRow!, _hoveredTileCol!);
+        isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
+      } else if (_selectedCardId != null) {
+        // If card is selected by click, preview AOE if this cell is targetable
+        if (activeCard.id == 'sun_ashlar_wrath') {
+          isSpellAoeAffected = !isPlayerSquad;
+        } else if (activeCard.id == 'stoke_the_embers') {
+          isSpellAoeAffected = isPlayerSquad;
+        } else if (activeCard.id == 'phalanx_intercept') {
+          isSpellAoeAffected = isPlayerSquad && occupant != null;
+        } else {
+          isSpellAoeAffected = !isPlayerSquad && occupant != null;
+        }
+      }
     }
 
     // Ghost / X-Ray Mode:
@@ -856,59 +871,41 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-              // Coordinate Watermark & Tap Handler for Empty Cells
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () {
-                    if (isPlayerSquad && occupant == null && selectedUnit != null) {
-                      if (selectedUnit.canMoveTo(col, row)) {
-                        _engine.movePlayerUnit(selectedUnit.id, col, row);
-                        setState(() => _selectedUnitId = null);
-                      } else {
-                        setState(() {
-                          _engine.lastBannerMessage =
-                              '⚠️ ${selectedUnit.name} can only move ${selectedUnit.moveRange} tile(s)!';
-                        });
-                      }
-                    }
-                  },
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2, left: 3),
-                      child: Text(
-                        '${col + 1},$row',
-                        style: TextStyle(
-                          fontSize: 8.0,
-                          color: isTelegraphed
-                              ? const Color(0xFFFF8A80)
-                              : (isReachable ? const Color(0xFF00E676) : Colors.white12),
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Reachable Movement Indicator
+              // Reachable Movement Indicator / Move Button for Empty Cells
               if (isReachable)
                 Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.directions_run, color: Color(0xFF00E676), size: 14),
-                      Text(
-                        'MOVE',
-                        style: TextStyle(
-                          fontSize: 7,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF00E676).withValues(alpha: 0.9),
-                          letterSpacing: 0.5,
-                        ),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      _engine.movePlayerUnit(selectedUnit.id, col, row);
+                      setState(() {
+                        _selectedUnitId = null;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E676).withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF00E676), width: 1.2),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.directions_run, color: Color(0xFF00E676), size: 14),
+                          const SizedBox(width: 2),
+                          Text(
+                            'MOVE',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF00E676).withValues(alpha: 0.95),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
 
@@ -930,12 +927,57 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ),
 
-              // Occupant Miniature (Rendered only on Anchor node)
+              // Empty Tile Tap Handler (fallback when no unit on cell)
+              if (occupant == null)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      if (isPlayerSquad && selectedUnit != null) {
+                        if (selectedUnit.canMoveTo(col, row)) {
+                          _engine.movePlayerUnit(selectedUnit.id, col, row);
+                          setState(() => _selectedUnitId = null);
+                        } else {
+                          setState(() {
+                            _engine.lastBannerMessage =
+                                '⚠️ ${selectedUnit.name} can only move ${selectedUnit.moveRange} tile(s)!';
+                          });
+                        }
+                      } else if (_selectedCardId != null) {
+                        // Cast clicked card on target tile if applicable (e.g. Stoke or Ashlar)
+                        final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+                        if (card != null && (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath')) {
+                          _engine.castCard(card.id, targetCol: col, targetRow: row);
+                          setState(() => _selectedCardId = null);
+                        }
+                      }
+                    },
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2, left: 3),
+                        child: Text(
+                          '${col + 1},$row',
+                          style: TextStyle(
+                            fontSize: 8.0,
+                            color: isTelegraphed
+                                ? const Color(0xFFFF8A80)
+                                : (isReachable ? const Color(0xFF00E676) : Colors.white12),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Occupant Miniature (Rendered on Anchor node)
               if (occupant != null && isAnchorCell)
                 Builder(
                   builder: (context) {
-                    final String? phantomEffect = (_draggedCard != null && _hoveredTileGRow != null && _hoveredTileCol != null)
-                        ? _getPhantomUnitEffect(occupant, _draggedCard!, _hoveredTileGRow!, _hoveredTileCol!)
+                    final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
+                    final String? phantomEffect = (activeCard != null && (_hoveredTileGRow != null || _selectedCardId != null))
+                        ? _getPhantomUnitEffect(occupant, activeCard, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col)
                         : null;
 
                     return Center(
@@ -945,12 +987,39 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {
+                            if (_selectedCardId != null) {
+                              // Cast currently selected card onto clicked unit!
+                              final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+                              if (card != null) {
+                                if (card.id == 'phalanx_intercept' && !isPlayerSquad) {
+                                  setState(() {
+                                    _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!';
+                                  });
+                                  return;
+                                }
+                                if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && isPlayerSquad) {
+                                  setState(() {
+                                    _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!';
+                                  });
+                                  return;
+                                }
+                                _engine.castCard(card.id, targetUnit: occupant, targetCol: col, targetRow: row);
+                                setState(() {
+                                  _selectedCardId = null;
+                                  _hoveredTileGRow = null;
+                                  _hoveredTileCol = null;
+                                });
+                                return;
+                              }
+                            }
+
                             if (isPlayerSquad) {
                               setState(() {
                                 _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
+                                _selectedCardId = null; // deselect card
                               });
                             } else {
-                              // Cast active dragged card or target enemy
+                              // Clicked enemy unit
                               if (_draggedCard != null) {
                                 _engine.castCard(_draggedCard!.id, targetUnit: occupant);
                                 setState(() => _draggedCard = null);
@@ -958,11 +1027,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             }
                           },
                           child: isPlayerSquad
-                              ? LongPressDraggable<String>(
+                              ? Draggable<String>(
                                   data: 'unit:${occupant.id}',
                                   maxSimultaneousDrags: 1,
                                   onDragStarted: () {
-                                    setState(() => _selectedUnitId = occupant.id);
+                                    setState(() {
+                                      _selectedUnitId = occupant.id;
+                                      _selectedCardId = null;
+                                    });
                                     _engine.setBulletTime(true);
                                   },
                                   onDragEnd: (_) {
@@ -1480,77 +1552,117 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   final card = _engine.hand[idx];
                   final canAfford = _engine.focus >= card.focusCost;
 
-                  return Draggable<String>(
-                    data: 'card:${card.id}',
-                    onDragStarted: () {
-                      setState(() => _draggedCard = card);
-                      _engine.setBulletTime(true);
-                    },
-                    onDragEnd: (_) {
-                      setState(() {
-                        _draggedCard = null;
-                        _hoveredTileGRow = null;
-                        _hoveredTileCol = null;
-                      });
-                      _engine.setBulletTime(false);
-                    },
-                    feedback: Material(
-                      color: Colors.transparent,
-                      child: _buildCardTile(card, canAfford, isFeedback: true),
-                    ),
-                    child: GestureDetector(
-                      onTap: () {
-                        // One-tap cast on appropriate target
-                        if (!canAfford) {
-                          setState(() {
-                            _engine.lastBannerMessage =
-                                '⚠️ NEED ${card.focusCost} FOCUS (HAVE ${_engine.focus})';
-                          });
-                          return;
-                        }
-                        CombatUnitState? target;
-                        if (card.id == 'phalanx_intercept') {
-                          target = _selectedUnitId != null
-                              ? _engine.playerUnits
-                                  .where((u) => u.id == _selectedUnitId && u.isAlive)
-                                  .firstOrNull
-                              : null;
-                        }
-                        _engine.castCard(card.id, targetUnit: target);
+                    final isCardSelected = _selectedCardId == card.id;
+
+                    return Draggable<String>(
+                      data: 'card:${card.id}',
+                      onDragStarted: () {
+                        setState(() {
+                          _draggedCard = card;
+                          _selectedCardId = null;
+                        });
+                        _engine.setBulletTime(true);
                       },
-                      child: _buildCardTile(card, canAfford),
-                    ),
-                  );
-                },
+                      onDragEnd: (_) {
+                        setState(() {
+                          _draggedCard = null;
+                          _hoveredTileGRow = null;
+                          _hoveredTileCol = null;
+                        });
+                        _engine.setBulletTime(false);
+                      },
+                      feedback: Material(
+                        color: Colors.transparent,
+                        child: _buildCardTile(card, canAfford, isFeedback: true),
+                      ),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (!canAfford) {
+                            setState(() {
+                              _engine.lastBannerMessage =
+                                  '⚠️ NEED ${card.focusCost} FOCUS (HAVE ${_engine.focus})';
+                            });
+                            return;
+                          }
+
+                          // If card is non-targeted (Stoke the Embers or Wrath of Ashlar), cast immediately!
+                          if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
+                            _engine.castCard(card.id);
+                            setState(() {
+                              _selectedCardId = null;
+                            });
+                            return;
+                          }
+
+                          // If unit is already selected, cast immediately on it!
+                          if (card.id == 'phalanx_intercept') {
+                            final targetAlly = _selectedUnitId != null
+                                ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
+                                : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
+                            if (targetAlly != null) {
+                              _engine.castCard(card.id, targetUnit: targetAlly);
+                              setState(() {
+                                _selectedCardId = null;
+                              });
+                              return;
+                            }
+                          }
+
+                          // Otherwise, toggle card selection for click-to-target
+                          setState(() {
+                            if (_selectedCardId == card.id) {
+                              _selectedCardId = null;
+                            } else {
+                              _selectedCardId = card.id;
+                              _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Click an enemy unit to strike!';
+                            }
+                          });
+                        },
+                        child: _buildCardTile(card, canAfford, isSelected: isCardSelected),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardTile(SpatialCombatCard card, bool canAfford, {bool isFeedback = false}) {
-    return Container(
-      width: 110,
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: canAfford ? const Color(0xFF1E2235) : const Color(0xFF14141A),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: canAfford ? const Color(0xFF00E5FF) : Colors.white24,
-          width: 1.2,
+          ],
         ),
-        boxShadow: isFeedback
-            ? [
-                BoxShadow(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                )
-              ]
-            : null,
-      ),
+      );
+    }
+
+    Widget _buildCardTile(
+      SpatialCombatCard card,
+      bool canAfford, {
+      bool isFeedback = false,
+      bool isSelected = false,
+    }) {
+      final Color borderColor = isSelected
+          ? const Color(0xFFFFD54F)
+          : (canAfford ? const Color(0xFF00E5FF) : Colors.white24);
+
+      return Container(
+        width: 110,
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF2C2412)
+              : (canAfford ? const Color(0xFF1E2235) : const Color(0xFF14141A)),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: borderColor,
+            width: isSelected || isFeedback ? 2.0 : 1.2,
+          ),
+          boxShadow: isFeedback || isSelected
+              ? [
+                  BoxShadow(
+                    color: (isSelected ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  )
+                ]
+              : null,
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
