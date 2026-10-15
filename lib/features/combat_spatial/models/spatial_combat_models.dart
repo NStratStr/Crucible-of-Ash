@@ -120,7 +120,7 @@ class SpatialCombatCard {
     if (id == 'smite_the_calcified') {
       return 'assets/images/Spells/Soul Shatter.jpg';
     }
-    if (id == 'sun_ashlar_wrath') {
+    if (id == 'sun_ashlar_wrath' || id == 'sun_king_cataclysm') {
       return 'assets/images/Spells/Sunburst - Tier 1 Spell.png';
     }
     if (id == 'stoke_the_embers') {

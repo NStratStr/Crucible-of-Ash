@@ -33,6 +33,22 @@ class SpatialCombatEngine extends ChangeNotifier {
   bool get isVictory => enemyUnits.isNotEmpty && enemyUnits.every((u) => !u.isAlive);
   bool get isDefeat => playerUnits.isNotEmpty && playerUnits.every((u) => !u.isAlive);
 
+  /// GDD Section 4.2: Positional Commander Stance Aura for Lady Valeria
+  /// Row 0 = Frontline ("Bastion of Cold Iron": Frontline allies gain +25 Armor)
+  /// Row 1 or 2 = Rearguard ("Aegis Rearguard": Mid/Backline allies gain +20% Shield/Ward potency)
+  String get valeriaStance {
+    final valeria = playerUnits.where((u) => u.id == 'lady_valeria' && u.isAlive).firstOrNull;
+    if (valeria == null) return 'Severed Resonance';
+    final row = valeria.occupiedNodes.isNotEmpty ? valeria.occupiedNodes.first.row : 0;
+    return row == 0 ? 'Bastion of Cold Iron (Frontline)' : 'Aegis Rearguard (Backline)';
+  }
+
+  bool get isValeriaInFrontline {
+    final valeria = playerUnits.where((u) => u.id == 'lady_valeria' && u.isAlive).firstOrNull;
+    if (valeria == null) return false;
+    return valeria.occupiedNodes.isNotEmpty && valeria.occupiedNodes.first.row == 0;
+  }
+
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
   }
@@ -242,6 +258,14 @@ class SpatialCombatEngine extends ChangeNotifier {
         pattern: TargetPattern.stAshlarCross,
         damageMultiplier: 1.8,
       ),
+      const SpatialCombatCard(
+        id: 'sun_king_cataclysm',
+        name: 'Cataclysm of the Sun-King',
+        focusCost: 5,
+        description: 'APEX RITE: Unleashes solar pillar incinerating enemy column for 260 DMG & dispelling intents!',
+        pattern: TargetPattern.piercingColumnSkewer,
+        damageMultiplier: 3.2,
+      ),
     ]);
 
     addLog('Encounter Initialized: The Sunder at Ashen Gate.');
@@ -285,6 +309,17 @@ class SpatialCombatEngine extends ChangeNotifier {
           final bleedDmg = unit.bleedStacks * 18;
           unit.takeDamage(bleedDmg, ignoreArmor: true);
           addLog('${unit.name} suffers $bleedDmg Bleed damage ($unit.hp/${unit.maxHp} HP).');
+          dispatchAction(SpatialActionEvent(
+            id: 'bleed_${currentTick}_${unit.id}',
+            attackerId: 'status_bleed',
+            attackerName: 'BLEED',
+            skillName: 'Hemorrhage',
+            targetId: unit.id,
+            targetName: unit.name,
+            damage: bleedDmg,
+            isPlayerAttacker: false,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
         }
       }
     }
@@ -571,7 +606,14 @@ class SpatialCombatEngine extends ChangeNotifier {
     final oldRow = unit.occupiedNodes.first.row;
     final success = unit.repositionTo([GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)]);
     if (success) {
-      addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow)! [-2,000 AP]');
+      if (unit.id == 'lady_valeria' && oldRow != targetRow) {
+        lastBannerMessage = targetRow == 0
+            ? '🛡️ COMMANDER STANCE: BASTION OF COLD IRON (Frontline Allies +25 Armor)'
+            : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated)';
+        addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance!');
+      } else {
+        addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow)! [-2,000 AP]');
+      }
       notifyListeners();
       return true;
     }
@@ -735,6 +777,45 @@ class SpatialCombatEngine extends ChangeNotifier {
           isCrit: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.stAshlarCross,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'sun_king_cataclysm') {
+      // APEX RITE: Pierces through chosen enemy column (or boss) for 260 Holy Damage & interrupts any active telegraph!
+      final target = targetUnit ??
+          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits.where((u) => u.isAlive).firstOrNull;
+
+      if (target != null) {
+        final dmg = target.takeDamage(260);
+        // Cleanse/Interrupt Boss Intent
+        if (target.pendingIntent != null) {
+          final interruptedSkill = target.pendingIntent!.skillName;
+          target.pendingIntent = null;
+          addLog('APEX DISRUPTION: ${target.name} channel ($interruptedSkill) DISPELLED by Sun-King Cataclysm!');
+          lastBannerMessage = '☀️ APEX DISRUPTION: $interruptedSkill INTERRUPTED!';
+        } else {
+          lastBannerMessage = '☀️ APEX RITE: CATACLYSM OF THE SUN-KING DEALS $dmg DMG!';
+        }
+        addLog('APEX RITE: Cataclysm of the Sun-King incinerated ${target.name} for $dmg Holy damage!');
+
+        // Splash on other alive enemies in adjacent columns
+        for (final other in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
+          final splash = other.takeDamage(85);
+          addLog('  Solar Fallout: ${other.name} took $splash collateral Holy damage.');
+        }
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_apex_cataclysm',
+          attackerId: 'lady_valeria',
+          attackerName: 'VALERIA',
+          skillName: 'Cataclysm of the Sun-King',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          isCrit: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.piercingColumnSkewer,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }

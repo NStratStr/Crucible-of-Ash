@@ -606,6 +606,41 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+
+              // 2b. Lady Valeria Commander Stance Badge (GDD 4.2)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _engine.isValeriaInFrontline
+                      ? const Color(0xFFFFD54F).withValues(alpha: 0.15)
+                      : const Color(0xFF7C4DFF).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
+                    width: 0.9,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _engine.isValeriaInFrontline ? Icons.shield : Icons.auto_fix_high,
+                      color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
+                      size: 13,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)',
+                      style: TextStyle(
+                        color: _engine.isValeriaInFrontline ? const Color(0xFFFFE082) : const Color(0xFFD1C4E9),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 8.5,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const Spacer(),
 
               // 3. Boss Telegraph Execution Warning Badge
@@ -1995,10 +2030,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           // Otherwise, toggle card selection for click-to-target
                           setState(() {
                             if (_selectedCardId == card.id) {
+                              // Double tap on armed card auto-targets primary enemy / Gorgoroth!
+                              final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+                                  _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
+                              if (boss != null) {
+                                _engine.castCard(card.id, targetUnit: boss);
+                                _selectedCardId = null;
+                                return;
+                              }
                               _selectedCardId = null;
                             } else {
                               _selectedCardId = card.id;
-                              _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Click an enemy unit to strike!';
+                              _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Click an enemy or double-tap card to unleash!';
                             }
                           });
                         },
