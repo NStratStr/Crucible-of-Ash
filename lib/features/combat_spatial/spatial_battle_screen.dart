@@ -1720,6 +1720,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       return Container(
         width: 110,
+        height: 78,
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
           color: isSelected
@@ -1740,49 +1741,48 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ]
               : null,
         ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  card.name,
-                  style: TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.bold,
-                    color: canAfford ? Colors.white : Colors.white38,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    card.name,
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      color: canAfford ? Colors.white : Colors.white38,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(3),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    '${card.focusCost}F',
+                    style: const TextStyle(fontSize: 8, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
+                  ),
                 ),
-                child: Text(
-                  '${card.focusCost}F',
-                  style: const TextStyle(fontSize: 8, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Expanded(
-            child: Text(
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
               card.description,
               style: const TextStyle(fontSize: 7.5, color: Colors.white70),
-              maxLines: 3,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    }
 
   Widget _buildCombatLogConsole() {
     return Container(
