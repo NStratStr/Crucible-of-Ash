@@ -377,6 +377,94 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       );
                     },
                   ),
+
+                  // Victory / Defeat Tactical Overlay Banner
+                  if (_engine.isVictory || _engine.isDefeat)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        child: Center(
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF14141E),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744)).withValues(alpha: 0.4),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _engine.isVictory ? Icons.emoji_events : Icons.heart_broken,
+                                  color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                                  size: 44,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _engine.isVictory ? 'THE ASHEN GATE SURPASSED' : 'RESONANCE SEVERED',
+                                  style: TextStyle(
+                                    color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _engine.isVictory
+                                      ? 'Gorgoroth and the Synod cohort have crumbled into inert slag.'
+                                      : 'All constructs have fallen. Your neural tether dissipates into the miasma.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _engine.setupSunderAtAshenGate();
+                                        });
+                                      },
+                                      icon: const Icon(Icons.refresh, size: 16),
+                                      label: const Text('REPLAY ENCOUNTER'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF2C2216),
+                                        foregroundColor: const Color(0xFFFFD54F),
+                                        side: const BorderSide(color: Color(0xFFFFD54F)),
+                                      ),
+                                    ),
+                                    if (widget.onBackToStandardCombat != null) ...[
+                                      const SizedBox(width: 12),
+                                      OutlinedButton(
+                                        onPressed: widget.onBackToStandardCombat,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white70,
+                                          side: const BorderSide(color: Colors.white24),
+                                        ),
+                                        child: const Text('EXIT TO HUB'),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

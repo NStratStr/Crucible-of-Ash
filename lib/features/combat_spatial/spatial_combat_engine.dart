@@ -30,6 +30,9 @@ class SpatialCombatEngine extends ChangeNotifier {
   SpatialActionEvent? activeActionEvent;
   bool isActionPauseEnabled = false;
 
+  bool get isVictory => enemyUnits.isNotEmpty && enemyUnits.every((u) => !u.isAlive);
+  bool get isDefeat => playerUnits.isNotEmpty && playerUnits.every((u) => !u.isAlive);
+
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
   }
@@ -292,31 +295,29 @@ class SpatialCombatEngine extends ChangeNotifier {
       unit.currentAp += unit.speed;
     }
 
-    // Check impending Boss Intents (e.g. Gorgoroth's T-Shaped Cleave at Tick 135)
+    // Check impending Boss Intents (Gorgoroth winds up Molten Great-Cleaver on tick 135, and cycles every 160 ticks)
     final gorgoroth = enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
     if (gorgoroth != null) {
-      if (currentTick == 135 && gorgoroth.pendingIntent == null) {
-        // Wind up Apex Intent: Molten Great-Cleaver (Execution at Tick 150)
-        // Strikes primary Col 2 Frontline (col:1, row:0), Col 3 Frontline (col:2, row:0), and Col 2 Midline (col:1, row:1).
-        // Shifting laterally into Col 1 (col:0, row:0) dodges the cleave completely per Section 4.2!
+      if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && gorgoroth.pendingIntent == null) {
+        // Wind up Apex Intent: Molten Great-Cleaver (Execution 15 ticks later)
         final telegraphNodes = [
           const GridNode(column: 1, row: 0), // Front Col 2 (primary target)
           const GridNode(column: 2, row: 0), // Front Col 3 (lateral splash toward Col 3)
           const GridNode(column: 1, row: 1), // Mid Col 2 (deep shockwave)
         ];
         gorgoroth.pendingIntent = SpatialTelegraphIntent(
-          id: 'cleave_intent_1',
+          id: 'cleave_intent_$currentTick',
           skillName: 'Molten Great-Cleaver',
           pattern: TargetPattern.tShapedCleave,
           originCol: 1,
           originRow: 0,
           targetNodes: telegraphNodes,
-          triggerTick: 150,
+          triggerTick: currentTick + 15,
           totalWindupTicks: 15,
           rawDamage: 280,
         );
         lastBannerMessage = '⚠️ GORGOROTH WINDS UP: MOLTEN GREAT-CLEAVER!';
-        addLog('TELEGRAPH: Gorgoroth prepares Molten Great-Cleaver striking Col 2 T-Cleave!');
+        addLog('TELEGRAPH: Gorgoroth prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
       }
 
       // Check Intent Trigger
@@ -347,17 +348,37 @@ class SpatialCombatEngine extends ChangeNotifier {
   void _resolveGorgorothCleave(CombatUnitState boss, SpatialTelegraphIntent intent) {
     addLog('${boss.name} releases ${intent.skillName} across T-Cleave zone!');
     int hitCount = 0;
+    CombatUnitState? primaryTarget;
+    int totalDmg = 0;
+
     for (final node in intent.targetNodes) {
       final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
       if (occupant != null) {
         final dmg = occupant.takeDamage(intent.rawDamage);
+        totalDmg += dmg;
+        primaryTarget ??= occupant;
         addLog('CRITICAL HIT: ${occupant.name} struck for $dmg DMG at (Col ${node.column + 1}, Row ${node.row})!');
         hitCount++;
       }
     }
+
     if (hitCount == 0) {
       addLog('CLANG! The Great-Cleaver crashed onto barren flagstone—MISS!');
       lastBannerMessage = '🛡️ DODGE! Cleave struck empty tiles!';
+    } else if (primaryTarget != null) {
+      dispatchAction(SpatialActionEvent(
+        id: 'cleave_impact_$currentTick',
+        attackerId: boss.id,
+        attackerName: boss.name,
+        skillName: 'Molten Great-Cleaver',
+        targetId: primaryTarget.id,
+        targetName: primaryTarget.name,
+        damage: totalDmg,
+        isCrit: true,
+        isPlayerAttacker: false,
+        pattern: TargetPattern.tShapedCleave,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
     }
   }
 
