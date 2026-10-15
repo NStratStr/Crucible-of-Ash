@@ -682,7 +682,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF1744), size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        'CLEAVE IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
+                        '${boss.pendingIntent!.skillName.toUpperCase()} IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
                         style: const TextStyle(
                           color: Color(0xFFFF8A80),
                           fontSize: 9.5,
