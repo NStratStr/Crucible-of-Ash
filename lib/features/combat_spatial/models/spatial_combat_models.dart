@@ -123,6 +123,9 @@ class SpatialCombatCard {
     if (id == 'sun_ashlar_wrath' || id == 'sun_king_cataclysm') {
       return 'assets/images/Spells/Sunburst - Tier 1 Spell.png';
     }
+    if (id == 'revive_vitae') {
+      return 'assets/images/Spells/Sanguine Re-Summon.png';
+    }
     if (id == 'stoke_the_embers') {
       return 'assets/images/Spells/Attack_spell_magic_circle.png';
     }
@@ -176,6 +179,7 @@ class CombatUnitState {
   int burnDuration; // in ticks (30 ticks = 1 sec)
   int stunDuration; // in ticks (freezes AP)
   int aegisShield; // absorbs damage before HP
+  int reviveCount; // tracking Soul Fracture (-20% max HP per revive)
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
@@ -199,11 +203,13 @@ class CombatUnitState {
     this.burnDuration = 0,
     this.stunDuration = 0,
     this.aegisShield = 0,
+    this.reviveCount = 0,
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
   }) : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1);
 
   bool get isAlive => hp > 0;
+  bool get isDowned => hp <= 0;
   bool get isStunned => stunDuration > 0;
   bool get isBurning => burnDuration > 0;
 

@@ -273,6 +273,13 @@ class SpatialCombatEngine extends ChangeNotifier {
         pattern: TargetPattern.piercingColumnSkewer,
         damageMultiplier: 3.2,
       ),
+      const SpatialCombatCard(
+        id: 'revive_vitae',
+        name: 'Infused Vitae Resurgence',
+        focusCost: 3,
+        description: 'SOVEREIGN SLIP: Resurrects downed plinth with 50% HP & 6-tick invulnerability (-20% max HP Soul Fracture).',
+        pattern: TargetPattern.singleTarget,
+      ),
     ]);
 
     addLog('Encounter Initialized: The Sunder at Ashen Gate.');
@@ -303,8 +310,11 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     currentTick++;
 
-    // Focus Passive Accumulation: Lady Valeria fills 1 Focus per 40 ticks (~1.33 seconds)
-    if (currentTick % 40 == 0 && focus < maxFocus) {
+    // Focus Passive Accumulation: Lady Valeria fills 1 Focus per 40 ticks (~1.33 seconds).
+    // GDD §4.3: If Commander is in downed state ("Severed Resonance"), Focus generation is throttled by 50% (80 ticks).
+    final isCommanderDowned = playerUnits.any((u) => u.id == 'lady_valeria' && u.isDowned);
+    final focusInterval = isCommanderDowned ? 80 : 40;
+    if (currentTick % focusInterval == 0 && focus < maxFocus) {
       focus++;
       notifyListeners();
     }
@@ -859,6 +869,59 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.piercingColumnSkewer,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
+      }
+    } else if (card.id == 'revive_vitae') {
+      // SOVEREIGN SLIP: Resurrects downed unit with 50% HP, resets AP to 0, cleanses debuffs
+      // GDD §4.4: Incurs stacking -20% Max HP penalty (Soul Fracture)
+      final downedTarget = targetUnit ?? playerUnits.where((u) => u.isDowned).firstOrNull;
+      if (downedTarget != null) {
+        downedTarget.reviveCount++;
+        final double soulFracturePenalty = (1.0 - (downedTarget.reviveCount * 0.20)).clamp(0.20, 1.0);
+        downedTarget.maxHp = (downedTarget.maxHp * soulFracturePenalty).round();
+        downedTarget.hp = (downedTarget.maxHp * 0.50).round();
+        downedTarget.currentAp = 0;
+        downedTarget.bleedStacks = 0;
+        downedTarget.burnDuration = 0;
+        downedTarget.stunDuration = 0;
+        downedTarget.aegisShield = 40;
+
+        lastBannerMessage = '✨ RESURGENCE: ${downedTarget.name} REAWAKENED (${downedTarget.hp} HP)!';
+        addLog('REVIVE CAST: ${downedTarget.name} restored to life! Soul Fracture stack #${downedTarget.reviveCount} applied (-20% max HP).');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_revive',
+          attackerId: 'vital_wellspring',
+          attackerName: 'INFUSED VITAE',
+          skillName: 'Infused Vitae Resurgence',
+          targetId: downedTarget.id,
+          targetName: downedTarget.name,
+          damage: 0,
+          isHeal: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else {
+        // Fallback: If no unit is downed, grant a major +120 HP heal and +40 Shield to the lowest HP ally
+        final lowestAlly = playerUnits.where((u) => u.isAlive).toList()..sort((a, b) => a.hp.compareTo(b.hp));
+        if (lowestAlly.isNotEmpty) {
+          final target = lowestAlly.first;
+          target.hp = min(target.maxHp, target.hp + 120);
+          target.aegisShield += 40;
+          lastBannerMessage = '✨ INFUSED VITAE: +120 HP & +40 Shield to ${target.name}!';
+          addLog('CAST: Infused Vitae invigorated ${target.name} (+120 HP, +40 Shield).');
+          dispatchAction(SpatialActionEvent(
+            id: 'card_${currentTick}_vital_mend',
+            attackerId: 'vital_wellspring',
+            attackerName: 'INFUSED VITAE',
+            skillName: 'Vital Mend',
+            targetId: target.id,
+            targetName: target.name,
+            damage: 0,
+            isHeal: true,
+            isPlayerAttacker: true,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
       }
     }
 

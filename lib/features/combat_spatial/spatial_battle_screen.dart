@@ -1682,9 +1682,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 width: modelWidth,
                 height: modelHeight,
                 child: ColorFiltered(
-                  colorFilter: isDamaged
-                      ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
-                      : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                  colorFilter: unit.isDowned
+                      ? const ColorFilter.matrix(<double>[
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0, 0, 0, 0.65, 0,
+                        ])
+                      : (isDamaged
+                          ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
+                          : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                   child: Image.asset(
                     unit.assetPath,
                     fit: BoxFit.contain,
@@ -1723,6 +1730,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.4,
                         ),
+                      ),
+                    ),
+                  if (unit.isDowned)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF37474F),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: Colors.white38, width: 0.6),
+                      ),
+                      child: const Text(
+                        '🪨DOWNED PLINTH',
+                        style: TextStyle(fontSize: 6.5, color: Colors.white70, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (unit.reviveCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A148C),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Text(
+                        '💀FRACTURE x${unit.reviveCount}',
+                        style: const TextStyle(fontSize: 6.0, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold),
                       ),
                     ),
                   if (unit.bleedStacks > 0)
