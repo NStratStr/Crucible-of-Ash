@@ -173,6 +173,9 @@ class CombatUnitState {
   int attack;
   int speed;
   int bleedStacks;
+  int burnDuration; // in ticks (30 ticks = 1 sec)
+  int stunDuration; // in ticks (freezes AP)
+  int aegisShield; // absorbs damage before HP
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
@@ -193,11 +196,16 @@ class CombatUnitState {
     required this.attack,
     required this.speed,
     this.bleedStacks = 0,
+    this.burnDuration = 0,
+    this.stunDuration = 0,
+    this.aegisShield = 0,
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
   }) : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1);
 
   bool get isAlive => hp > 0;
+  bool get isStunned => stunDuration > 0;
+  bool get isBurning => burnDuration > 0;
 
   /// Checks if unit can move to target coordinates based on its moveRange
   bool canMoveTo(int targetCol, int targetRow) {
@@ -258,7 +266,7 @@ class CombatUnitState {
     return true;
   }
 
-  /// Inflicts damage taking Slag Carapace and Armor into account
+  /// Inflicts damage taking Slag Carapace, Aegis Shield, and Armor into account
   int takeDamage(int rawDamage, {bool ignoreArmor = false}) {
     double finalDmg = rawDamage.toDouble();
     if (isSlagCarapaceActive && armor > 0) {
@@ -267,7 +275,19 @@ class CombatUnitState {
     if (!ignoreArmor) {
       finalDmg *= (1.0 - physicalReductionRatio);
     }
-    final int applied = max(1, finalDmg.round());
+    int applied = max(1, finalDmg.round());
+
+    // Aegis Shield absorbs incoming damage first
+    if (aegisShield > 0) {
+      if (aegisShield >= applied) {
+        aegisShield -= applied;
+        return applied;
+      } else {
+        applied -= aegisShield;
+        aegisShield = 0;
+      }
+    }
+
     hp = max(0, hp - applied);
     return applied;
   }

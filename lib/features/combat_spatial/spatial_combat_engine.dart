@@ -49,6 +49,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     return valeria.occupiedNodes.isNotEmpty && valeria.occupiedNodes.first.row == 0;
   }
 
+  /// GDD Section 6.3: Ashen Reckoning (Universal Soft Enrage)
+  /// Skirmishes / encounters enter Reckoning at 3:00 (5,400 ticks), or demo threshold (tick 900)
+  /// Modifiers during Reckoning: Damage dealt x2.0, healing received -50%
+  static const int reckoningTickThreshold = 900; // ~30 seconds demo threshold for fast testing
+  bool get isAshenReckoning => currentTick >= reckoningTickThreshold;
+  double get reckoningDamageMultiplier => isAshenReckoning ? 2.0 : 1.0;
+
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
   }
@@ -306,7 +313,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     if (currentTick % 30 == 0) {
       for (final unit in [...playerUnits, ...enemyUnits]) {
         if (unit.isAlive && unit.bleedStacks > 0) {
-          final bleedDmg = unit.bleedStacks * 18;
+          final bleedDmg = (unit.bleedStacks * 18 * reckoningDamageMultiplier).round();
           unit.takeDamage(bleedDmg, ignoreArmor: true);
           addLog('${unit.name} suffers $bleedDmg Bleed damage ($unit.hp/${unit.maxHp} HP).');
           dispatchAction(SpatialActionEvent(
@@ -321,13 +328,39 @@ class SpatialCombatEngine extends ChangeNotifier {
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
         }
+
+        // Burn Ticks (Every 30 ticks = 1 second)
+        if (unit.isAlive && unit.burnDuration > 0) {
+          unit.burnDuration = max(0, unit.burnDuration - 30);
+          final burnDmg = (24 * reckoningDamageMultiplier).round();
+          unit.takeDamage(burnDmg, ignoreArmor: false);
+          addLog('${unit.name} burns for $burnDmg Fire damage (${unit.burnDuration ~/ 30}s remaining).');
+          dispatchAction(SpatialActionEvent(
+            id: 'burn_${currentTick}_${unit.id}',
+            attackerId: 'status_burn',
+            attackerName: 'BURNING',
+            skillName: 'Ignition',
+            targetId: unit.id,
+            targetName: unit.name,
+            damage: burnDmg,
+            isPlayerAttacker: false,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+
+        // Stun countdown
+        if (unit.isAlive && unit.stunDuration > 0) {
+          unit.stunDuration = max(0, unit.stunDuration - 30);
+        }
       }
     }
 
-    // Step AP Accumulation for all living units
+    // Step AP Accumulation for all living units (Stun freezes AP accumulation per GDD §6.1)
     final allUnits = [...enemyUnits, ...playerUnits].where((u) => u.isAlive).toList();
     for (final unit in allUnits) {
-      unit.currentAp += unit.speed;
+      if (!unit.isStunned) {
+        unit.currentAp += unit.speed;
+      }
     }
 
     // Check impending Boss Intents (Gorgoroth winds up Molten Great-Cleaver on tick 135, and cycles every 160 ticks)
@@ -460,11 +493,12 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else if (unit.id == 'cinder_witch') {
-      // Cinder Witch: Launches flame bolt down Col 2
+      // Cinder Witch: Launches flame bolt down Col 2 inflicting Burn (60 ticks = 2s)
       final target = _resolveColumnTarget(unitCol: 1, targetingPlayers: true);
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} casts Cinder Orb on ${target.name} for $dmg DMG.');
+        target.burnDuration = max(target.burnDuration, 60); // 2 seconds of Burn DoT
+        addLog('${unit.name} casts Cinder Orb on ${target.name} for $dmg DMG & applies BURNING!');
         dispatchAction(SpatialActionEvent(
           id: 'act_${currentTick}_${unit.id}',
           attackerId: unit.id,
@@ -501,7 +535,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       final target = _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: false);
       if (target != null) {
         final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} bashes ${target.name} for $dmg DMG.');
+        // Shield Bash has 25% chance to concuss/stun minor enemies (or 30 tick stun)
+        if (target.id != 'gorgoroth_boss') {
+          target.stunDuration = 30; // 1 second stun freezes AP
+          addLog('${unit.name} bashes ${target.name} for $dmg DMG & STUNS for 1s!');
+        } else {
+          addLog('${unit.name} bashes ${target.name} for $dmg DMG.');
+        }
         dispatchAction(SpatialActionEvent(
           id: 'act_${currentTick}_${unit.id}',
           attackerId: unit.id,
@@ -690,8 +730,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       final recipient = targetUnit ?? playerUnits.where((u) => u.isAlive && u.id == 'lady_valeria').firstOrNull ??
           playerUnits.where((u) => u.isAlive).first;
       recipient.armor += 35;
-      lastBannerMessage = '🛡️ PHALANX INTERCEPT: +35 Armor to ${recipient.name}!';
-      addLog('CAST: Phalanx Intercept fortified ${recipient.name} (+35 Armor)!');
+      recipient.aegisShield += 50; // Aegis Barrier absorbs 50 damage
+      lastBannerMessage = '🛡️ PHALANX INTERCEPT: +35 Armor & +50 Aegis Shield to ${recipient.name}!';
+      addLog('CAST: Phalanx Intercept fortified ${recipient.name} (+35 Armor, +50 Aegis Shield)!');
 
       dispatchAction(SpatialActionEvent(
         id: 'card_${currentTick}_phalanx',

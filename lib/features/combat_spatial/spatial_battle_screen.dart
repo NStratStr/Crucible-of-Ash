@@ -641,6 +641,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ],
                 ),
               ),
+              // 2c. Ashen Reckoning Soft Enrage Status (GDD §6.3)
+              if (_engine.isAshenReckoning)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF1744).withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFF1744)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.local_fire_department, color: Color(0xFFFF1744), size: 13),
+                      SizedBox(width: 4),
+                      Text(
+                        'ASHEN RECKONING (DMG x2.0)',
+                        style: TextStyle(
+                          color: Color(0xFFFF5252),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 8.5,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const Spacer(),
 
               // 3. Boss Telegraph Execution Warning Badge
@@ -1711,6 +1736,45 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       child: Text(
                         '🩸${unit.bleedStacks}',
                         style: const TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (unit.burnDuration > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE65100),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: const Text(
+                        '🔥BURNING',
+                        style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (unit.isStunned)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFBC02D),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: const Text(
+                        '⚡STUNNED',
+                        style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  if (unit.aegisShield > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00B0FF),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Text(
+                        '🛡️${unit.aegisShield}',
+                        style: const TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.bold),
                       ),
                     ),
                   // Only show name when unit is selected to keep screen uncluttered
