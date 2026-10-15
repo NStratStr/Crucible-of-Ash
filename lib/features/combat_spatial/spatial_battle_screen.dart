@@ -28,6 +28,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   Timer? _loopTimer;
   String? _selectedUnitId;
   SpatialCombatCard? _draggedCard;
+  int? _hoveredTileGRow;
+  int? _hoveredTileCol;
 
   // Visual Combat Feedback State
   String? _lastHandledEventId;
@@ -270,9 +272,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
-                      // Increased grid size so tiles and units fill the scene properly
-                      final double tileWidth = isDesktop ? 128.0 : 84.0;
-                      final double tileHeight = isDesktop ? 64.0 : 42.0;
+                      // Substantially scaled grid size so tiles and units fill the scene proudly
+                      final double tileWidth = isDesktop ? 152.0 : 96.0;
+                      final double tileHeight = isDesktop ? 76.0 : 48.0;
 
                       return Center(
                         child: SingleChildScrollView(
@@ -478,7 +480,43 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               top: cell.screenY,
               width: tileWidth,
               height: tileHeight,
-              child: _buildClashLineTile(cell.col, tileWidth: tileWidth, tileHeight: tileHeight),
+              child: DragTarget<String>(
+                onWillAcceptWithDetails: (details) {
+                  if (details.data.startsWith('card:')) {
+                    if (_hoveredTileGRow != cell.gRow || _hoveredTileCol != cell.col) {
+                      setState(() {
+                        _hoveredTileGRow = cell.gRow;
+                        _hoveredTileCol = cell.col;
+                      });
+                    }
+                    return true;
+                  }
+                  return false;
+                },
+                onLeave: (_) {
+                  if (_hoveredTileGRow == cell.gRow && _hoveredTileCol == cell.col) {
+                    setState(() {
+                      _hoveredTileGRow = null;
+                      _hoveredTileCol = null;
+                    });
+                  }
+                },
+                onAcceptWithDetails: (details) {
+                  final data = details.data;
+                  if (data.startsWith('card:')) {
+                    final cardId = data.replaceFirst('card:', '');
+                    _engine.castCard(cardId, targetCol: cell.col, targetRow: 0);
+                    setState(() {
+                      _draggedCard = null;
+                      _hoveredTileGRow = null;
+                      _hoveredTileCol = null;
+                    });
+                  }
+                },
+                builder: (context, candidateData, rejectedData) {
+                  return _buildClashLineTile(cell.col, tileWidth: tileWidth, tileHeight: tileHeight);
+                },
+              ),
             );
           }
 
@@ -490,6 +528,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: _buildIsometricGridCell(
               cell.col,
               cell.localRow,
+              gRow: cell.gRow,
               isPlayerSquad: cell.isPlayerSquad,
               tileWidth: tileWidth,
               tileHeight: tileHeight,
@@ -518,9 +557,131 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+  /// Calculates all global row and col coordinates affected by a spell card when hovered over targetGRow, targetCol
+  List<({int gRow, int col})> _getSpellAffectedGridCells(SpatialCombatCard card, int targetGRow, int targetCol) {
+    final List<({int gRow, int col})> cells = [];
+
+    if (card.id == 'phalanx_intercept') {
+      // Single ally target
+      cells.add((gRow: targetGRow, col: targetCol));
+    } else if (card.id == 'smite_the_calcified') {
+      // Single enemy focus blast (hits anchor and colossus footprint)
+      cells.add((gRow: targetGRow, col: targetCol));
+      // If targeting Gorgoroth, cover his entire 2x2 footprint
+      final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
+      if (boss != null) {
+        // Enemy rows: gRow 0 = Row 2, gRow 1 = Row 1, gRow 2 = Row 0
+        final int localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
+        if (targetGRow < 3 && boss.occupies(targetCol, localRow)) {
+          // Add Gorgoroth's entire footprint in global coordinates
+          // Gorgoroth occupies: col 1,2 and row 0,1 -> gRow 1,2 and col 1,2
+          for (int gr = 1; gr <= 2; gr++) {
+            for (int gc = 1; gc <= 2; gc++) {
+              if (!cells.any((c) => c.gRow == gr && c.col == gc)) {
+                cells.add((gRow: gr, col: gc));
+              }
+            }
+          }
+        }
+      }
+    } else if (card.id == 'searing_brand' || card.pattern == TargetPattern.stAshlarCross) {
+      // Cross pattern: center + top, bottom, left, right adjacent tiles
+      cells.add((gRow: targetGRow, col: targetCol));
+      // Cardinal neighbors
+      const deltas = [(0, 1), (0, -1), (1, 0), (-1, 0)];
+      for (final (dRow, dCol) in deltas) {
+        final nr = targetGRow + dRow;
+        final nc = targetCol + dCol;
+        if (nr >= 0 && nr < 7 && nc >= 0 && nc < 5) {
+          cells.add((gRow: nr, col: nc));
+        }
+      }
+    } else if (card.id == 'sun_ashlar_wrath') {
+      // Full radiant barrage across all enemy tiles (gRow 0, 1, 2)
+      for (int gr = 0; gr <= 2; gr++) {
+        for (int gc = 0; gc < 5; gc++) {
+          cells.add((gRow: gr, col: gc));
+        }
+      }
+    } else if (card.id == 'stoke_the_embers') {
+      // Buffs team focus; illuminates player side (gRow 4, 5, 6)
+      for (int gr = 4; gr <= 6; gr++) {
+        for (int gc = 0; gc < 5; gc++) {
+          cells.add((gRow: gr, col: gc));
+        }
+      }
+    } else {
+      // Default single target
+      cells.add((gRow: targetGRow, col: targetCol));
+    }
+
+    return cells;
+  }
+
+  /// Calculates predicted phantom damage or effect for a unit given the hovered spell
+  String? _getPhantomUnitEffect(CombatUnitState unit, SpatialCombatCard card, int targetGRow, int targetCol) {
+    if (!unit.isAlive) return null;
+
+    if (card.id == 'phalanx_intercept') {
+      if (unit.isPlayer) {
+        final localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
+        if (targetGRow > 3 && unit.occupies(targetCol, localRow)) {
+          return '+35 🛡️ ARMOR';
+        }
+      }
+      return null;
+    }
+
+    if (card.id == 'stoke_the_embers') {
+      if (unit.isPlayer && unit.id == 'lady_valeria') {
+        return '+2 ⚡ FOCUS';
+      }
+      return null;
+    }
+
+    // Offensive cards targeting enemies:
+    if (unit.isPlayer) return null;
+
+    final affected = _getSpellAffectedGridCells(card, targetGRow, targetCol);
+    // Check if any occupied node of this unit matches an affected cell
+    bool isUnitHit = false;
+    for (final node in unit.occupiedNodes) {
+      // Enemy unit row 0 = gRow 2, row 1 = gRow 1, row 2 = gRow 0
+      final int unitGRow = 2 - node.row;
+      if (affected.any((c) => c.gRow == unitGRow && c.col == node.column)) {
+        isUnitHit = true;
+        break;
+      }
+    }
+
+    if (!isUnitHit) return null;
+
+    if (card.id == 'smite_the_calcified') {
+      final rawDmg = (74 * 2.5).round(); // 185 damage
+      final projectedDmg = (rawDmg * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
+      if (unit.isSlagCarapaceActive) {
+        return '💥 -$projectedDmg (SHATTER!)';
+      }
+      return '💥 -$projectedDmg CRIT';
+    } else if (card.id == 'searing_brand') {
+      // Direct target takes 105, splash takes 45
+      final localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
+      final bool isDirectTarget = unit.occupies(targetCol, localRow);
+      final rawDmg = isDirectTarget ? 105 : 45;
+      final projectedDmg = (rawDmg * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
+      return isDirectTarget ? '🔥 -$projectedDmg DMG' : '⚡ -$projectedDmg SPLASH';
+    } else if (card.id == 'sun_ashlar_wrath') {
+      final projectedDmg = (110 * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
+      return '☀️ -$projectedDmg RADIANT';
+    }
+
+    return null;
+  }
+
   Widget _buildIsometricGridCell(
     int col,
     int row, {
+    required int gRow,
     required bool isPlayerSquad,
     required double tileWidth,
     required double tileHeight,
@@ -552,6 +713,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     final bool isSelected = _selectedUnitId != null && occupant?.id == _selectedUnitId;
 
+    // Tactical Spell AOE Highlight Overlay calculation:
+    bool isSpellAoeAffected = false;
+    if (_draggedCard != null && _hoveredTileGRow != null && _hoveredTileCol != null) {
+      final affectedList = _getSpellAffectedGridCells(_draggedCard!, _hoveredTileGRow!, _hoveredTileCol!);
+      isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
+    }
+
     // Ghost / X-Ray Mode:
     // If a unit is standing in front of another occupied unit or reachable tile along isometric depth,
     // or if a unit behind is selected, give the foreground unit subtle ghost transparency (0.42 opacity)
@@ -559,7 +727,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     bool isOccluding = false;
     if (occupant != null && !isSelected) {
       if (isPlayerSquad) {
-        // Player units occlude tiles behind them in higher rows (row 1, row 2)
         if (_selectedUnitId != null) {
           final sel = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
           if (sel != null && sel.occupiedNodes.isNotEmpty && sel.occupiedNodes.first.row > row && sel.occupiedNodes.first.column == col) {
@@ -567,7 +734,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           }
         }
       } else {
-        // Enemy units occlude tiles behind them in higher rows (row 1, row 2)
         if (row < 2) {
           final hasUnitBehind = _engine.enemyUnits.any((u) => u.isAlive && u.id != occupant.id && u.occupies(col, row + 1));
           if (hasUnitBehind) {
@@ -581,6 +747,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       onWillAcceptWithDetails: (details) {
         final data = details.data;
         if (data.startsWith('card:')) {
+          if (_hoveredTileGRow != gRow || _hoveredTileCol != col) {
+            setState(() {
+              _hoveredTileGRow = gRow;
+              _hoveredTileCol = col;
+            });
+          }
           final cardId = data.replaceFirst('card:', '');
           final card = _engine.hand.where((c) => c.id == cardId).firstOrNull;
           if (card == null) return false;
@@ -600,53 +772,75 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           return isPlayerSquad && occupant == null && unit.canMoveTo(col, row);
         }
       },
+      onLeave: (_) {
+        if (_hoveredTileGRow == gRow && _hoveredTileCol == col) {
+          setState(() {
+            _hoveredTileGRow = null;
+            _hoveredTileCol = null;
+          });
+        }
+      },
       onAcceptWithDetails: (details) {
         final data = details.data;
         if (data.startsWith('card:')) {
           final cardId = data.replaceFirst('card:', '');
           _engine.castCard(cardId, targetUnit: occupant, targetCol: col, targetRow: row);
-          setState(() => _draggedCard = null);
+          setState(() {
+            _draggedCard = null;
+            _hoveredTileGRow = null;
+            _hoveredTileCol = null;
+          });
         } else {
           final unitId = data.replaceFirst('unit:', '');
           _engine.movePlayerUnit(unitId, col, row);
-          setState(() => _selectedUnitId = null);
+          setState(() {
+            _selectedUnitId = null;
+            _hoveredTileGRow = null;
+            _hoveredTileCol = null;
+          });
         }
       },
       builder: (context, candidateData, rejectedData) {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
-        final Color fillColor = isTelegraphed
-            ? const Color(0xFFFF1744).withValues(alpha: 0.35)
-            : (isDropCandidate
-                ? const Color(0xFF00E5FF).withValues(alpha: 0.28)
-                : (isReachable
-                    ? const Color(0xFF00E676).withValues(alpha: 0.25)
-                    : (isBossSecondaryNode
-                        ? const Color(0xFFFF5252).withValues(alpha: 0.12)
-                        : (isPlayerSquad
-                            ? const Color(0xFF304FFE).withValues(alpha: 0.12)
-                            : const Color(0xFFFF1744).withValues(alpha: 0.10)))));
-
-        final Color borderColor = isTelegraphed
-            ? const Color(0xFFFF1744).withValues(alpha: 0.90)
-            : (isDropCandidate
-                ? const Color(0xFF00E5FF).withValues(alpha: 0.85)
-                : (isReachable
-                    ? const Color(0xFF00E676).withValues(alpha: 0.85)
-                    : (isSelected
-                        ? const Color(0xFFFFD54F)
+        final Color fillColor = isSpellAoeAffected
+            ? const Color(0xFFFFD54F).withValues(alpha: 0.28)
+            : (isTelegraphed
+                ? const Color(0xFFFF1744).withValues(alpha: 0.35)
+                : (isDropCandidate
+                    ? const Color(0xFF00E5FF).withValues(alpha: 0.28)
+                    : (isReachable
+                        ? const Color(0xFF00E676).withValues(alpha: 0.25)
                         : (isBossSecondaryNode
-                            ? const Color(0xFFFF8A80).withValues(alpha: 0.35)
+                            ? const Color(0xFFFF5252).withValues(alpha: 0.12)
                             : (isPlayerSquad
-                                ? const Color(0xFF82B1FF).withValues(alpha: 0.38)
-                                : const Color(0xFFFF8A80).withValues(alpha: 0.32))))));
+                                ? const Color(0xFF304FFE).withValues(alpha: 0.12)
+                                : const Color(0xFFFF1744).withValues(alpha: 0.10))))));
 
-        final bool hasGlow = isTelegraphed || isSelected || isDropCandidate || isReachable;
-        final Color glowColor = isTelegraphed
-            ? const Color(0xFFFF1744)
-            : (isReachable
-                ? const Color(0xFF00E676)
-                : (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)));
+        final Color borderColor = isSpellAoeAffected
+            ? const Color(0xFFFFD54F).withValues(alpha: 0.95)
+            : (isTelegraphed
+                ? const Color(0xFFFF1744).withValues(alpha: 0.90)
+                : (isDropCandidate
+                    ? const Color(0xFF00E5FF).withValues(alpha: 0.85)
+                    : (isReachable
+                        ? const Color(0xFF00E676).withValues(alpha: 0.85)
+                        : (isSelected
+                            ? const Color(0xFFFFD54F)
+                            : (isBossSecondaryNode
+                                ? const Color(0xFFFF8A80).withValues(alpha: 0.35)
+                                : (isPlayerSquad
+                                    ? const Color(0xFF82B1FF).withValues(alpha: 0.38)
+                                    : const Color(0xFFFF8A80).withValues(alpha: 0.32)))))));
+
+        final bool hasGlow = isSpellAoeAffected || isTelegraphed || isSelected || isDropCandidate || isReachable;
+        final Color glowColor = isSpellAoeAffected
+            ? const Color(0xFFFFD54F)
+            : (isTelegraphed
+                ? const Color(0xFFFF1744)
+                : (isReachable
+                    ? const Color(0xFF00E676)
+                    : (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F))));
 
         return SizedBox(
           width: tileWidth,
@@ -738,71 +932,81 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
               // Occupant Miniature (Rendered only on Anchor node)
               if (occupant != null && isAnchorCell)
-                Center(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: isOccluding ? 0.38 : 1.0,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        if (isPlayerSquad) {
-                          setState(() {
-                            _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
-                          });
-                        } else {
-                          // Cast active dragged card or target enemy
-                          if (_draggedCard != null) {
-                            _engine.castCard(_draggedCard!.id, targetUnit: occupant);
-                            setState(() => _draggedCard = null);
-                          }
-                        }
-                      },
-                      child: isPlayerSquad
-                          ? LongPressDraggable<String>(
-                              data: 'unit:${occupant.id}',
-                              maxSimultaneousDrags: 1,
-                              onDragStarted: () {
-                                setState(() => _selectedUnitId = occupant.id);
-                                _engine.setBulletTime(true);
-                              },
-                              onDragEnd: (_) {
-                                _engine.setBulletTime(false);
-                              },
-                              feedback: Material(
-                                color: Colors.transparent,
-                                child: _buildUnitMiniatureWidget(
+                Builder(
+                  builder: (context) {
+                    final String? phantomEffect = (_draggedCard != null && _hoveredTileGRow != null && _hoveredTileCol != null)
+                        ? _getPhantomUnitEffect(occupant, _draggedCard!, _hoveredTileGRow!, _hoveredTileCol!)
+                        : null;
+
+                    return Center(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 200),
+                        opacity: isOccluding ? 0.38 : 1.0,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (isPlayerSquad) {
+                              setState(() {
+                                _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
+                              });
+                            } else {
+                              // Cast active dragged card or target enemy
+                              if (_draggedCard != null) {
+                                _engine.castCard(_draggedCard!.id, targetUnit: occupant);
+                                setState(() => _draggedCard = null);
+                              }
+                            }
+                          },
+                          child: isPlayerSquad
+                              ? LongPressDraggable<String>(
+                                  data: 'unit:${occupant.id}',
+                                  maxSimultaneousDrags: 1,
+                                  onDragStarted: () {
+                                    setState(() => _selectedUnitId = occupant.id);
+                                    _engine.setBulletTime(true);
+                                  },
+                                  onDragEnd: (_) {
+                                    _engine.setBulletTime(false);
+                                  },
+                                  feedback: Material(
+                                    color: Colors.transparent,
+                                    child: _buildUnitMiniatureWidget(
+                                      occupant,
+                                      tileWidth: tileWidth,
+                                      tileHeight: tileHeight,
+                                      colGap: colGap,
+                                      isDragging: true,
+                                    ),
+                                  ),
+                                  childWhenDragging: Opacity(
+                                    opacity: 0.3,
+                                    child: _buildUnitMiniatureWidget(
+                                      occupant,
+                                      tileWidth: tileWidth,
+                                      tileHeight: tileHeight,
+                                      colGap: colGap,
+                                    ),
+                                  ),
+                                  child: _buildUnitMiniatureWidget(
+                                    occupant,
+                                    tileWidth: tileWidth,
+                                    tileHeight: tileHeight,
+                                    colGap: colGap,
+                                    isSelected: isSelected,
+                                    phantomEffect: phantomEffect,
+                                  ),
+                                )
+                              : _buildUnitMiniatureWidget(
                                   occupant,
                                   tileWidth: tileWidth,
                                   tileHeight: tileHeight,
                                   colGap: colGap,
-                                  isDragging: true,
+                                  phantomEffect: phantomEffect,
                                 ),
-                              ),
-                              childWhenDragging: Opacity(
-                                opacity: 0.3,
-                                child: _buildUnitMiniatureWidget(
-                                  occupant,
-                                  tileWidth: tileWidth,
-                                  tileHeight: tileHeight,
-                                  colGap: colGap,
-                                ),
-                              ),
-                              child: _buildUnitMiniatureWidget(
-                                occupant,
-                                tileWidth: tileWidth,
-                                tileHeight: tileHeight,
-                                colGap: colGap,
-                                isSelected: isSelected,
-                              ),
-                            )
-                          : _buildUnitMiniatureWidget(
-                              occupant,
-                              tileWidth: tileWidth,
-                              tileHeight: tileHeight,
-                              colGap: colGap,
-                            ),
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
               // Threat Marker for Cleave telegraph
@@ -880,6 +1084,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     required double colGap,
     bool isDragging = false,
     bool isSelected = false,
+    String? phantomEffect,
   }) {
     final bool isBoss = unit.footprint == UnitFootprint.quadColossus2x2 || unit.footprint == UnitFootprint.horizontal1x2;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
@@ -1042,7 +1247,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 4. Floating Damage / Effect Pop Text
+            // 4. Floating Damage / Effect Pop Text (Live execution)
             if (floatingPop != null)
               Positioned(
                 top: isBoss ? -34 : -26,
@@ -1071,6 +1276,55 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       fontSize: 10,
                       letterSpacing: 0.5,
                     ),
+                  ),
+                ),
+              ),
+
+            // 4b. Tactical Spell Drag Hover: Phantom Damage & Effect Indicator Badge
+            if (phantomEffect != null && floatingPop == null)
+              Positioned(
+                top: isBoss ? -38 : -30,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF140D04).withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: phantomEffect.contains('ARMOR')
+                          ? const Color(0xFF00E5FF)
+                          : (phantomEffect.contains('FOCUS') ? const Color(0xFFFFD54F) : const Color(0xFFFFB300)),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.45),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        phantomEffect.contains('ARMOR')
+                            ? Icons.shield
+                            : (phantomEffect.contains('FOCUS') ? Icons.bolt : Icons.flash_on),
+                        color: const Color(0xFFFFD54F),
+                        size: 11,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        phantomEffect,
+                        style: const TextStyle(
+                          color: Color(0xFFFFE082),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 9.5,
+                          letterSpacing: 0.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1233,7 +1487,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       _engine.setBulletTime(true);
                     },
                     onDragEnd: (_) {
-                      setState(() => _draggedCard = null);
+                      setState(() {
+                        _draggedCard = null;
+                        _hoveredTileGRow = null;
+                        _hoveredTileCol = null;
+                      });
                       _engine.setBulletTime(false);
                     },
                     feedback: Material(
