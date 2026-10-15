@@ -393,100 +393,227 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   Widget _buildTopStatusRibbon(CombatUnitState? boss) {
+    final double focusProgress = ((_engine.currentTick % 40) / 40.0).clamp(0.0, 1.0);
+
+    // Collect next impending turns sorted by closeness to 10,000 AP threshold
+    final allLivingUnits = [..._engine.playerUnits, ..._engine.enemyUnits].where((u) => u.isAlive).toList();
+    allLivingUnits.sort((a, b) {
+      final aTicksLeft = ((SpatialCombatEngine.tickThreshold - a.currentAp) / max(1, a.speed)).clamp(0.0, 999.0);
+      final bTicksLeft = ((SpatialCombatEngine.tickThreshold - b.currentAp) / max(1, b.speed)).clamp(0.0, 999.0);
+      return aTicksLeft.compareTo(bTicksLeft);
+    });
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: const BoxDecoration(
         color: Color(0xFF161622),
         border: Border(bottom: BorderSide(color: Color(0xFF282838), width: 1.5)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Commander Focus Bar
+          Row(
+            children: [
+              // 1. Commander Focus Crystal Bank with dynamic charge pips
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      'FOCUS ${_engine.focus}/${_engine.maxFocus}',
+                      style: const TextStyle(
+                        color: Color(0xFF00E5FF),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Visual Crystal Pips (Filled vs Empty)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(_engine.maxFocus, (index) {
+                        final isFilled = index < _engine.focus;
+                        final isCharging = index == _engine.focus;
+                        return Container(
+                          width: 8,
+                          height: 12,
+                          margin: const EdgeInsets.only(right: 3),
+                          decoration: BoxDecoration(
+                            color: isFilled
+                                ? const Color(0xFF00E5FF)
+                                : (isCharging
+                                    ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
+                                    : Colors.white10),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(
+                              color: isFilled ? const Color(0xFF80D8FF) : Colors.white24,
+                              width: 0.8,
+                            ),
+                            boxShadow: isFilled
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                                      blurRadius: 4,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: isCharging
+                              ? FractionallySizedBox(
+                                  alignment: Alignment.bottomCenter,
+                                  heightFactor: focusProgress,
+                                  child: Container(
+                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.75),
+                                  ),
+                                )
+                              : null,
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // 2. Simulation Speed & Bullet-Time Toggle
+              GestureDetector(
+                onTap: () {
+                  _engine.setBulletTime(!_engine.isBulletTime);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _engine.isBulletTime ? const Color(0xFFFF9100).withValues(alpha: 0.3) : const Color(0xFF282836),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white24,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _engine.isBulletTime ? Icons.slow_motion_video : Icons.speed,
+                        color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _engine.isBulletTime ? '30% BULLET-TIME' : '1.0X REALTIME',
+                        style: TextStyle(
+                          color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 9.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+
+              // 3. Boss Telegraph Execution Warning Badge
+              if (boss != null && boss.pendingIntent != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF1744).withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFF1744)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF1744), size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        'CLEAVE IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
+                        style: const TextStyle(
+                          color: Color(0xFFFF8A80),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 4),
+
+          // 4. Live Initiative Action Timeline (ATB Sequence Preview)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            height: 22,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+              color: const Color(0xFF0F0F16),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.white10),
             ),
             child: Row(
               children: [
-                const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'FOCUS: ${_engine.focus}/${_engine.maxFocus}',
-                  style: const TextStyle(
-                    color: Color(0xFF00E5FF),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
-                    letterSpacing: 0.8,
+                const Text(
+                  'NEXT TURN ⏱️',
+                  style: TextStyle(fontSize: 8.0, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: allLivingUnits.take(5).length,
+                    separatorBuilder: (context, _) => const Icon(Icons.chevron_right, size: 12, color: Colors.white24),
+                    itemBuilder: (context, idx) {
+                      final u = allLivingUnits[idx];
+                      final isAlly = u.isPlayer;
+                      final apPercent = ((u.currentAp / SpatialCombatEngine.tickThreshold) * 100).clamp(0, 100).toInt();
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isAlly ? const Color(0xFF1B3A24) : const Color(0xFF3E1C1D),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(
+                            color: isAlly ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              u.name.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.bold,
+                                color: isAlly ? const Color(0xFFA5D6A7) : const Color(0xFFFFCDD2),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$apPercent%',
+                              style: TextStyle(
+                                fontSize: 7.5,
+                                fontFamily: 'monospace',
+                                color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-
-          // Simulation Speed & Bullet-Time Indicator
-          GestureDetector(
-            onTap: () {
-              _engine.setBulletTime(!_engine.isBulletTime);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _engine.isBulletTime ? const Color(0xFFFF9100).withValues(alpha: 0.3) : const Color(0xFF282836),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white24,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _engine.isBulletTime ? Icons.slow_motion_video : Icons.speed,
-                    color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _engine.isBulletTime ? '30% BULLET-TIME' : '1.0X REALTIME',
-                    style: TextStyle(
-                      color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Spacer(),
-
-          // Boss Telegraph Warning
-          if (boss != null && boss.pendingIntent != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF1744).withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFFF1744)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF1744), size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    'EXECUTES IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
-                    style: const TextStyle(
-                      color: Color(0xFFFF8A80),
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );

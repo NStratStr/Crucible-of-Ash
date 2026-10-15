@@ -269,8 +269,8 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     currentTick++;
 
-    // Focus Passive Accumulation: 1 Focus every 90 ticks (3.0 seconds)
-    if (currentTick % 90 == 0 && focus < maxFocus) {
+    // Focus Passive Accumulation: Lady Valeria fills 1 Focus per 40 ticks (~1.33 seconds)
+    if (currentTick % 40 == 0 && focus < maxFocus) {
       focus++;
       notifyListeners();
     }
