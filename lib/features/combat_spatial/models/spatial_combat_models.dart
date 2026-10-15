@@ -213,9 +213,14 @@ class CombatUnitState {
   bool get isStunned => stunDuration > 0;
   bool get isBurning => burnDuration > 0;
 
-  /// Checks if unit can move to target coordinates based on its moveRange
+  /// Minimum AP requirement to reposition (50% of 10,000 threshold = 5,000 AP)
+  static const int moveApCost = 5000;
+  bool get canAffordMovement => currentAp >= moveApCost;
+
+  /// Checks if unit can move to target coordinates based on its moveRange and AP cost
   bool canMoveTo(int targetCol, int targetRow) {
     if (isDisplacementImmune) return false;
+    if (currentAp < moveApCost) return false;
     if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
     if (occupiedNodes.isEmpty) return false;
     final anchor = occupiedNodes.first;
@@ -224,6 +229,15 @@ class CombatUnitState {
     final rowDist = (targetRow - anchor.row).abs();
     final dist = max(colDist, rowDist);
     return dist > 0 && dist <= moveRange;
+  }
+
+  /// Repositions unit to new target nodes with 50% AP cost
+  bool repositionTo(List<GridNode> newNodes, {int apPenalty = moveApCost}) {
+    if (isDisplacementImmune || currentAp < apPenalty) return false;
+    occupiedNodes.clear();
+    occupiedNodes.addAll(newNodes);
+    currentAp -= apPenalty;
+    return true;
   }
 
   /// High-resolution miniature cutout asset path matching Dark Fantasy art roster
@@ -261,15 +275,6 @@ class CombatUnitState {
   /// Check if unit occupies a specific grid node
   bool occupies(int col, int row) {
     return occupiedNodes.any((n) => n.column == col && n.row == row);
-  }
-
-  /// Repositions unit to new target nodes with AP re-footing penalty
-  bool repositionTo(List<GridNode> newNodes, {int apPenalty = 2000}) {
-    if (isDisplacementImmune) return false;
-    occupiedNodes.clear();
-    occupiedNodes.addAll(newNodes);
-    currentAp = max(0, currentAp - apPenalty);
-    return true;
   }
 
   /// Inflicts damage taking Slag Carapace, Aegis Shield, and Armor into account

@@ -75,6 +75,17 @@ class SpatialCombatEngine extends ChangeNotifier {
   bool get isAshenReckoning => currentTick >= reckoningTickThreshold;
   double get reckoningDamageMultiplier => isAshenReckoning ? 2.0 : 1.0;
 
+  /// Returns all grid nodes currently telegraphed by any enemy intent
+  List<GridNode> get activeTelegraphedNodes {
+    final List<GridNode> nodes = [];
+    for (final enemy in enemyUnits) {
+      if (enemy.isAlive && enemy.pendingIntent != null) {
+        nodes.addAll(enemy.pendingIntent!.targetNodes);
+      }
+    }
+    return nodes;
+  }
+
   SpatialCombatEngine() {
     setupSunderAtAshenGate();
   }
@@ -443,10 +454,18 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
       }
 
-      // Check Intent Trigger
+      // Check Intent Trigger for Gorgoroth Apex skills
       if (gorgoroth.pendingIntent != null && currentTick >= gorgoroth.pendingIntent!.triggerTick) {
         _resolveGorgorothIntent(gorgoroth, gorgoroth.pendingIntent!);
         gorgoroth.pendingIntent = null;
+      }
+    }
+
+    // Check Intent Triggers for all enemy units (2-second / 60-tick telegraphed attacks)
+    for (final enemy in enemyUnits.where((u) => u.isAlive && u.id != 'gorgoroth_boss')) {
+      if (enemy.pendingIntent != null && currentTick >= enemy.pendingIntent!.triggerTick) {
+        _resolveEnemyTelegraphedAttack(enemy, enemy.pendingIntent!);
+        enemy.pendingIntent = null;
       }
     }
 
@@ -505,26 +524,68 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
+  void _resolveEnemyTelegraphedAttack(CombatUnitState enemy, SpatialTelegraphIntent intent) {
+    addLog('${enemy.name} fires ${intent.skillName} across telegraphed grid nodes!');
+    CombatUnitState? struckTarget;
+    int appliedDmg = 0;
+
+    for (final node in intent.targetNodes) {
+      final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
+      if (occupant != null) {
+        final dmg = occupant.takeDamage(intent.rawDamage);
+        appliedDmg += dmg;
+        struckTarget ??= occupant;
+
+        if (enemy.id == 'cinder_witch') {
+          occupant.burnDuration = max(occupant.burnDuration, 60); // 2s Burn
+        }
+
+        addLog('HIT: ${occupant.name} struck for $dmg DMG by ${intent.skillName} at (Col ${node.column + 1}, Row ${node.row})!');
+        break; // Single column or target impact
+      }
+    }
+
+    if (struckTarget == null) {
+      addLog('MISS! ${intent.skillName} struck empty flagstones—allied unit dodged in time!');
+      lastBannerMessage = '🛡️ DODGE! ${enemy.name}\'s ${intent.skillName} missed!';
+    } else {
+      dispatchAction(SpatialActionEvent(
+        id: 'act_${currentTick}_${enemy.id}',
+        attackerId: enemy.id,
+        attackerName: enemy.name,
+        skillName: intent.skillName,
+        targetId: struckTarget.id,
+        targetName: struckTarget.name,
+        damage: appliedDmg,
+        isPlayerAttacker: false,
+        pattern: intent.pattern,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    }
+  }
+
   void _executeUnitTurn(CombatUnitState unit) {
     if (unit.id == 'pyre_zealot') {
-      // Tick 80: Pyre Zealot strikes Facing Col 5. Facing player Front/Mid is empty -> Strikes Backline Sun-Smith
+      // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down Col 5
+      // Highlights target nodes with a red tinge, giving 2s to reposition (50% AP) or shield
       final target = _resolveColumnTarget(unitCol: 4, targetingPlayers: true);
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        addLog('${unit.name} strikes ${target.name} for $dmg DMG ($target.hp/${target.maxHp} HP).');
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Pyre Skewer',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: false,
-          pattern: TargetPattern.piercingColumnSkewer,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
+      final targetNode = target?.occupiedNodes.firstOrNull ?? const GridNode(column: 4, row: 0);
+      unit.pendingIntent = SpatialTelegraphIntent(
+        id: 'skewer_${currentTick}_${unit.id}',
+        skillName: 'Pyre Skewer',
+        pattern: TargetPattern.piercingColumnSkewer,
+        originCol: 4,
+        originRow: 2,
+        targetNodes: [
+          GridNode(column: 4, row: targetNode.row),
+          GridNode(column: 4, row: 0),
+        ],
+        triggerTick: currentTick + 60, // 2.0 seconds windup (60 ticks)
+        totalWindupTicks: 60,
+        rawDamage: unit.attack,
+      );
+      lastBannerMessage = '⚠️ PYRE ZEALOT WINDS UP: PYRE SKEWER (2.0s)!';
+      addLog('${unit.name} begins 2s windup for Pyre Skewer targeting Col 5!');
     } else if (unit.id == 'sanguine_blade') {
       // Sanguine Blade: Sits in Col 4 Midline. Direct facing Col 4 is empty; cascades to adjacent Col 3 (Gorgoroth)
       final target = _resolveColumnTarget(unitCol: 3, targetingPlayers: false) ??
@@ -548,25 +609,24 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else if (unit.id == 'cinder_witch') {
-      // Cinder Witch: Launches flame bolt down Col 2 inflicting Burn (60 ticks = 2s)
+      // Cinder Witch: Winds up 60-tick (2.0s) telegraphed Cinder Orb down Col 2
       final target = _resolveColumnTarget(unitCol: 1, targetingPlayers: true);
-      if (target != null) {
-        final dmg = target.takeDamage(unit.attack);
-        target.burnDuration = max(target.burnDuration, 60); // 2 seconds of Burn DoT
-        addLog('${unit.name} casts Cinder Orb on ${target.name} for $dmg DMG & applies BURNING!');
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Cinder Orb',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: false,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
+      final targetNode = target?.occupiedNodes.firstOrNull ?? const GridNode(column: 1, row: 0);
+      unit.pendingIntent = SpatialTelegraphIntent(
+        id: 'cinder_${currentTick}_${unit.id}',
+        skillName: 'Cinder Orb',
+        pattern: TargetPattern.singleTarget,
+        originCol: 1,
+        originRow: 2,
+        targetNodes: [
+          GridNode(column: 1, row: targetNode.row),
+        ],
+        triggerTick: currentTick + 60, // 2.0 seconds windup (60 ticks)
+        totalWindupTicks: 60,
+        rawDamage: unit.attack,
+      );
+      lastBannerMessage = '⚠️ CINDER WITCH WINDS UP: CINDER ORB (2.0s)!';
+      addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col 2!');
     } else if (unit.id == 'lady_valeria') {
       // Valeria basic attack down facing column
       final target = _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: false);
@@ -684,6 +744,14 @@ class SpatialCombatEngine extends ChangeNotifier {
       return false;
     }
 
+    // Check if unit has at least 50% AP (5,000 AP)
+    if (!unit.canAffordMovement) {
+      final currentApPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
+      lastBannerMessage = '⚠️ INSUFFICIENT AP: Moving costs 50% AP (${unit.name} has $currentApPct%)';
+      addLog('${unit.name} cannot move! Needs at least 50% AP (has $currentApPct%).');
+      return false;
+    }
+
     // Restrict movement to unit's moveRange (e.g. 1 tile adjacent/diagonal)
     if (!unit.canMoveTo(targetCol, targetRow)) {
       addLog('${unit.name} cannot reach (Col ${targetCol + 1}, Row $targetRow)! Movement limit is ${unit.moveRange} tile(s).');
@@ -703,11 +771,11 @@ class SpatialCombatEngine extends ChangeNotifier {
     if (success) {
       if (unit.id == 'lady_valeria' && oldRow != targetRow) {
         lastBannerMessage = targetRow == 0
-            ? '🛡️ COMMANDER STANCE: BASTION OF COLD IRON (Frontline Allies +25 Armor)'
-            : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated)';
-        addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance!');
+            ? '🛡️ COMMANDER STANCE: BASTION OF COLD IRON (Frontline Allies +25 Armor) [-50% AP]'
+            : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated) [-50% AP]';
+        addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance! [-50% AP]');
       } else {
-        addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow)! [-2,000 AP]');
+        addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow)! [-5,000 AP / -50%]');
       }
       notifyListeners();
       return true;

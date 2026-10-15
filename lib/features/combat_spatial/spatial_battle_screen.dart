@@ -1133,12 +1133,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final squad = isPlayerSquad ? _engine.playerUnits : _engine.enemyUnits;
     final occupant = squad.where((u) => u.isAlive && u.occupies(col, row)).firstOrNull;
 
-    // Check if this node is inside an enemy telegraph intent
-    final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
+    // Check if this node is inside ANY enemy telegraph intent (Gorgoroth, Pyre Zealot, Cinder Witch)
+    // Puts a light red tinge on affected grids so players can move or protect constructs
     final isTelegraphed = isPlayerSquad &&
-        boss != null &&
-        boss.pendingIntent != null &&
-        boss.pendingIntent!.targetNodes.any((n) => n.column == col && n.row == row);
+        _engine.activeTelegraphedNodes.any((n) => n.column == col && n.row == row);
 
     // Multi-node behemoth anchor check: Gorgoroth occupies 2 tiles; render model only on anchor node (col 1, row 0)
     final bool isAnchorCell = occupant == null ||
@@ -1553,9 +1551,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     } else if (_selectedUnitId != null) {
       final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
-        message = '⚔️ ${unit.name.toUpperCase()} SELECTED: Click any glowing green [MOVE] tile (range: ${unit.moveRange})!';
-        themeColor = const Color(0xFF00E676);
-        icon = Icons.directions_run;
+        final apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
+        if (unit.canAffordMovement) {
+          message = '⚔️ ${unit.name.toUpperCase()} (AP: $apPct%): Click glowing [MOVE] tile (Costs 50% AP)!';
+          themeColor = const Color(0xFF00E676);
+          icon = Icons.directions_run;
+        } else {
+          message = '⚠️ ${unit.name.toUpperCase()} HAS $apPct% AP: Needs 50% AP to reposition!';
+          themeColor = const Color(0xFFFF9100);
+          icon = Icons.hourglass_top;
+        }
       }
     }
 

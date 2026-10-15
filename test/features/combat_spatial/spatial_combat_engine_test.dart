@@ -26,13 +26,13 @@ void main() {
     });
 
     test('Tick progression executes Pyre Zealot strike on Backline Sun-Smith and Sanguine Blade bleed on Gorgoroth', () {
-      // Step until tick 85 (Zealot acts at 80, Sanguine Blade at 83)
-      while (engine.currentTick < 85) {
+      // Step until tick 145 (Zealot winds up at 80, executes at 140; Sanguine Blade hits at 83)
+      while (engine.currentTick < 145) {
         engine.stepTick();
       }
 
       final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
-      expect(sunSmith.hp, lessThan(280)); // Pyre Zealot hit
+      expect(sunSmith.hp, lessThan(280)); // Pyre Zealot 2s telegraphed hit
 
       final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
       expect(gorgoroth.bleedStacks, equals(2)); // Sanguine Blade Flensing Thrust
@@ -50,7 +50,10 @@ void main() {
       expect(gorgoroth.pendingIntent!.skillName, equals('Molten Great-Cleaver'));
 
       // Player Reposition Triage: Shift Lady Valeria from Col 2 (index 1) to Col 1 (index 0)
+      // Valeria speed = 85. At tick 135, her accumulated AP = 135 * 85 = 11,475 AP % 10000 = 1475 AP.
+      // Granting 5,000 AP so she satisfies the 50% AP movement cost
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      valeria.currentAp = 5000;
       final moved = engine.movePlayerUnit('lady_valeria', 0, 0);
       expect(moved, isTrue);
       expect(valeria.occupiedNodes.first.column, equals(0));
@@ -100,6 +103,7 @@ void main() {
       expect(valeria.occupiedNodes.first.column, equals(1)); // Col 2, Row 0
 
       // Rejects move exceeding range: moving from Col 2, Row 0 to Col 4, Row 2 (distance = 2)
+      valeria.currentAp = 6000; // Has sufficient AP (>= 5,000 / 50%)
       final invalidMove = engine.movePlayerUnit('lady_valeria', 3, 2);
       expect(invalidMove, isFalse);
       expect(valeria.occupiedNodes.first.column, equals(1)); // Remained at original tile
@@ -108,6 +112,7 @@ void main() {
       final validMove = engine.movePlayerUnit('lady_valeria', 0, 0);
       expect(validMove, isTrue);
       expect(valeria.occupiedNodes.first.column, equals(0));
+      expect(valeria.currentAp, equals(1000)); // 6000 - 5000 (50% AP cost) = 1000 AP
     });
   });
 }
