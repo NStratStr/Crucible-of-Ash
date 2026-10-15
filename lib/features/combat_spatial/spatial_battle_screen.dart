@@ -230,6 +230,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Top HUD: Status Banner, Focus Bar & Boss Telemetry
             _buildTopStatusRibbon(gorgoroth),
 
+            // Persistent Action & Tactical Instruction Banner
+            if (_engine.lastBannerMessage != null || _selectedCardId != null || _selectedUnitId != null)
+              _buildTacticalPromptBanner(),
+
             // Live Skill Invocation Banner
             if (_activeSkillName != null)
               _buildSkillCutInBanner(),
@@ -1095,6 +1099,79 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     },
   );
 }
+
+  Widget _buildTacticalPromptBanner() {
+    String message = _engine.lastBannerMessage ?? '';
+    Color themeColor = const Color(0xFFFFD54F);
+    IconData icon = Icons.info_outline;
+
+    if (_selectedCardId != null) {
+      final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+      if (card != null) {
+        message = '✨ ${card.name.toUpperCase()} ARMED: Click a target node or enemy on the grid to cast!';
+        themeColor = const Color(0xFF00E5FF);
+        icon = Icons.auto_awesome;
+      }
+    } else if (_selectedUnitId != null) {
+      final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
+      if (unit != null) {
+        message = '⚔️ ${unit.name.toUpperCase()} SELECTED: Click any glowing green [MOVE] tile (range: ${unit.moveRange})!';
+        themeColor = const Color(0xFF00E676);
+        icon = Icons.directions_run;
+      }
+    }
+
+    if (message.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101018).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: themeColor.withValues(alpha: 0.8), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: themeColor.withValues(alpha: 0.25),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: themeColor, size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: themeColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 10.5,
+                letterSpacing: 0.4,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (_selectedCardId != null || _selectedUnitId != null)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedCardId = null;
+                  _selectedUnitId = null;
+                });
+              },
+              child: const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: Icon(Icons.close, color: Colors.white70, size: 14),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSkillCutInBanner() {
     final Color themeColor = _isPlayerSkillBanner ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
