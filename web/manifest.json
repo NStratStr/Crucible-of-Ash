@@ -2,11 +2,11 @@
     "name": "ashen_crucible",
     "short_name": "ashen_crucible",
     "start_url": ".",
-    "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "display": "fullscreen",
+    "background_color": "#0D0D14",
+    "theme_color": "#0D0D14",
+    "description": "Crucible of Ash tactical dark fantasy wargame.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

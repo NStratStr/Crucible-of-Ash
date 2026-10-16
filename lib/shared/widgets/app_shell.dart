@@ -1550,8 +1550,13 @@ class _AppShellState extends State<AppShell> {
       ..._inventory,
     ];
 
+    final isCompactLandscape = MediaQuery.of(context).size.height < 550;
+    final hideBottomBar = _currentIndex == 1 && isCompactLandscape;
+
     return Scaffold(
       body: SafeArea(
+        top: !hideBottomBar,
+        bottom: !hideBottomBar,
         child: Column(
           children: [
             if (_currentIndex != 1)
@@ -1677,8 +1682,10 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+      bottomNavigationBar: hideBottomBar
+          ? null
+          : BottomNavigationBar(
+              currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF14141B),
         selectedItemColor: const Color(0xFFB3261E),

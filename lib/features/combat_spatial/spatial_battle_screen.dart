@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/utils/platform_fullscreen.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -51,6 +52,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   int? _hoveredTileGRow;
   int? _hoveredTileCol;
   bool _showAllTrajectories = false;
+  bool _isZenMode = false;
   double _tickAccumulator = 0.0;
   double _dashPhase = 0.0;
 
@@ -313,12 +315,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   @override
   Widget build(BuildContext context) {
     final gorgoroth = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss').firstOrNull;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bool isLandscapeMobile = screenHeight < 550;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D12),
       appBar: AppBar(
         backgroundColor: const Color(0xFF14141E),
         elevation: 0,
+        toolbarHeight: isLandscapeMobile ? 42 : null,
         leading: widget.onBackToStandardCombat != null
             ? IconButton(
                 icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
@@ -422,41 +427,58 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: const Text('T135', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 2),
-          // Reset
+          // Zen / HUD Collapse Toggle
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+            icon: Icon(
+              _isZenMode ? Icons.visibility_off : Icons.visibility,
+              color: _isZenMode ? const Color(0xFFFF9100) : Colors.white70,
+              size: 20,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 4),
             constraints: const BoxConstraints(),
-            tooltip: 'Reset Encounter',
+            tooltip: _isZenMode ? 'Show Tactical HUD' : 'Zen View (Max Battlefield)',
             onPressed: () {
               setState(() {
-                _selectedUnitId = null;
-                _selectedEnemyUnitId = null;
-                _draggedUnitId = null;
-                _selectedCardId = null;
-                _engine.setupSunderAtAshenGate();
+                _isZenMode = !_isZenMode;
               });
+            },
+          ),
+          const SizedBox(width: 4),
+          // Browser / Device Fullscreen Toggle
+          IconButton(
+            icon: const Icon(Icons.fullscreen, color: Color(0xFF00E5FF), size: 22),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            tooltip: 'Toggle Fullscreen Mode',
+            onPressed: () {
+              PlatformFullscreen.toggleFullscreen();
             },
           ),
           const SizedBox(width: 6),
         ],
       ),
       body: SafeArea(
+        top: !isLandscapeMobile,
+        bottom: !isLandscapeMobile,
         child: Column(
           children: [
-            // Top HUD: Status Banner, Focus Bar & Boss Telemetry
-            _buildTopStatusRibbon(gorgoroth),
+            // Top HUD: Status Banner, Focus Bar & Boss Telemetry (hidden in Zen mode)
+            if (!_isZenMode) _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
 
-            // Persistent Action & Tactical Instruction Banner
-            if (_engine.lastBannerMessage != null ||
-                _selectedCardId != null ||
-                _selectedUnitId != null ||
-                _selectedEnemyUnitId != null ||
-                _engine.isPreBattlePhase)
+            // Persistent Action & Tactical Instruction Banner (when NOT in landscape mobile or zen mode)
+            if (!_isZenMode &&
+                !isLandscapeMobile &&
+                (_engine.lastBannerMessage != null ||
+                    _selectedCardId != null ||
+                    _selectedUnitId != null ||
+                    _selectedEnemyUnitId != null ||
+                    _engine.isPreBattlePhase))
               _buildTacticalPromptBanner(),
 
-            // Selected / Dragged Unit Combat Triad Inspector Strip (Basic Posture • Stance Mastery • Ultimate)
-            if (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null)
+            // Selected / Dragged Unit Combat Triad Inspector Strip (when NOT in landscape mobile or zen mode)
+            if (!_isZenMode &&
+                !isLandscapeMobile &&
+                (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null))
               _buildUnitCombatTriadStrip(),
 
             // Live Skill Invocation Banner
@@ -506,20 +528,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final double tileWidth = isDesktop ? 190.0 : 130.0;
                       final double tileHeight = isDesktop ? 95.0 : 65.0;
 
-                      return Center(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.vertical,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: isDesktop ? 28.0 : 12.0,
-                                vertical: isDesktop ? 16.0 : 8.0,
-                              ),
-                              child: _buildUnifiedIsometricBattlefield(
-                                tileWidth: tileWidth,
-                                tileHeight: tileHeight,
-                              ),
+                      return InteractiveViewer(
+                        boundaryMargin: const EdgeInsets.all(180),
+                        minScale: 0.4,
+                        maxScale: 2.2,
+                        clipBehavior: Clip.none,
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isDesktop ? 28.0 : 12.0,
+                              vertical: isDesktop ? 16.0 : 8.0,
+                            ),
+                            child: _buildUnifiedIsometricBattlefield(
+                              tileWidth: tileWidth,
+                              tileHeight: tileHeight,
                             ),
                           ),
                         ),
@@ -530,6 +552,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   // In-Combat Ultimate Burst Dramatic Cut-In Overlay
                   if (_activeUltimateUnit != null)
                     _buildUltimateCinematicOverlay(_activeUltimateUnit!),
+
+                  // Mobile Landscape Floating Tactical Overlay (Top-Left corner)
+                  if (!_isZenMode && isLandscapeMobile && (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null))
+                    Positioned(
+                      top: 8,
+                      left: 12,
+                      right: 12,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 550),
+                          child: _buildUnitCombatTriadStrip(),
+                        ),
+                      ),
+                    ),
+
+                  // Mobile Landscape Floating Prompt (Top Center)
+                  if (!_isZenMode && isLandscapeMobile && (_selectedCardId != null || _engine.isPreBattlePhase))
+                    Positioned(
+                      top: (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null) ? 44 : 8,
+                      left: 12,
+                      right: 12,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 550),
+                          child: _buildTacticalPromptBanner(),
+                        ),
+                      ),
+                    ),
 
                   // Victory / Defeat Tactical Overlay Banner
                   if (_engine.isVictory || _engine.isDefeat)
@@ -747,20 +797,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
 
             // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
-            _buildUltimatePopOutDock(),
+            _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
 
             // Tactical Card Hand & Burn Pit
-            _buildTacticalHandDock(),
+            _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
 
-            // Live 30 Hz Combat Event Log
-            _buildCombatLogConsole(),
+            // Live 30 Hz Combat Event Log (Hidden in Zen Mode and Mobile Landscape)
+            if (!_isZenMode && !isLandscapeMobile)
+              _buildCombatLogConsole(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTopStatusRibbon(CombatUnitState? boss) {
+  Widget _buildTopStatusRibbon(CombatUnitState? boss, {bool isLandscapeMobile = false}) {
     final double focusProgress = ((_engine.currentTick % 40) / 40.0).clamp(0.0, 1.0);
 
     // Collect next impending turns sorted by closeness to 10,000 AP threshold
@@ -772,7 +823,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     });
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 2 : 5),
       decoration: const BoxDecoration(
         color: Color(0xFF161622),
         border: Border(bottom: BorderSide(color: Color(0xFF282838), width: 1.5)),
@@ -3488,12 +3539,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   /// Ultimate Burst Pop-Out Mini-Slate Dock (HUD pull-out tray)
-  Widget _buildUltimatePopOutDock() {
+  Widget _buildUltimatePopOutDock({bool isLandscapeMobile = false}) {
     final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
     if (livingAllies.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 2 : 4),
       decoration: const BoxDecoration(
         color: Color(0xFF0D0D14),
         border: Border(top: BorderSide(color: Color(0xFF222230), width: 1.0)),
@@ -3521,7 +3572,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: SizedBox(
-              height: 44,
+              height: isLandscapeMobile ? 36 : 44,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: livingAllies.length,
@@ -3703,9 +3754,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
-  Widget _buildTacticalHandDock() {
+  Widget _buildTacticalHandDock({bool isLandscapeMobile = false}) {
+    final double dockHeight = isLandscapeMobile ? 54.0 : 78.0;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: isLandscapeMobile ? 3 : 6),
       decoration: const BoxDecoration(
         color: Color(0xFF14141E),
         border: Border(top: BorderSide(color: Color(0xFF282838), width: 1.5)),
@@ -3728,8 +3781,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   }
                 },
                 child: Container(
-                  width: 72,
-                  height: 78,
+                  width: isLandscapeMobile ? 58 : 72,
+                  height: dockHeight,
                   decoration: BoxDecoration(
                     color: isHovered ? const Color(0xFFFF5252).withValues(alpha: 0.35) : const Color(0xFF221115),
                     borderRadius: BorderRadius.circular(6),
@@ -3744,21 +3797,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       Icon(
                         Icons.local_fire_department,
                         color: isHovered ? const Color(0xFFFF5252) : const Color(0xFFB3261E),
-                        size: 24,
+                        size: isLandscapeMobile ? 18 : 24,
                       ),
-                      const SizedBox(height: 2),
-                      const Text(
+                      if (!isLandscapeMobile) const SizedBox(height: 2),
+                      Text(
                         'BURN PIT',
                         style: TextStyle(
-                          fontSize: 8.5,
+                          fontSize: isLandscapeMobile ? 7.5 : 8.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFFF8A80),
+                          color: const Color(0xFFFF8A80),
                           letterSpacing: 0.6,
                         ),
                       ),
-                      const Text(
+                      Text(
                         '+1 FOCUS',
-                        style: TextStyle(fontSize: 7.5, color: Color(0xFFFFD54F)),
+                        style: TextStyle(fontSize: isLandscapeMobile ? 6.5 : 7.5, color: const Color(0xFFFFD54F)),
                       ),
                     ],
                   ),
@@ -3771,7 +3824,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // Cards in Hand
           Expanded(
             child: SizedBox(
-              height: 78,
+              height: dockHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _engine.hand.length,
