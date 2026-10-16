@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'models/spatial_combat_models.dart';
+import '../../shared/models/unit_entity.dart';
+import '../../core/combat_math.dart';
 
 /// Deterministic 30 Hz Spatial Combat Engine simulating the 3-Row x 5-Col Grid Plane
 class SpatialCombatEngine extends ChangeNotifier {
@@ -87,8 +89,245 @@ class SpatialCombatEngine extends ChangeNotifier {
     return nodes;
   }
 
-  SpatialCombatEngine() {
-    setupSunderAtAshenGate();
+  String encounterTitle;
+  String encounterDescription;
+
+  SpatialCombatEngine({
+    List<UnitEntity>? initialPlayerEntities,
+    List<UnitEntity>? initialEnemyEntities,
+    String? title,
+    String? description,
+    bool isBossEncounter = false,
+  })  : encounterTitle = title ?? 'The Sunder at Ashen Gate',
+        encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
+    if (initialEnemyEntities != null && initialEnemyEntities.isNotEmpty) {
+      setupCampaignEncounter(
+        playerEntities: initialPlayerEntities,
+        enemyEntities: initialEnemyEntities,
+        isBoss: isBossEncounter,
+        title: title,
+        description: description,
+      );
+    } else {
+      setupSunderAtAshenGate();
+    }
+  }
+
+  /// Maps an Archetype to a tactical UnitArchetype for 2.5D spatial combat
+  static UnitArchetype mapArchetypeToSpatial(Archetype arc, {bool isBoss = false}) {
+    if (isBoss) return UnitArchetype.colossusBehemoth;
+    switch (arc) {
+      case Archetype.juggernaut:
+        return UnitArchetype.vanguardMelee;
+      case Archetype.assassin:
+      case Archetype.skirmisher:
+      case Archetype.marksman:
+        return UnitArchetype.reachMidline;
+      case Archetype.occultist:
+      case Archetype.support:
+        return UnitArchetype.backlineCaster;
+    }
+  }
+
+  /// Configures a dynamic 2.5D spatial encounter from Campaign Map entities
+  void setupCampaignEncounter({
+    List<UnitEntity>? playerEntities,
+    required List<UnitEntity> enemyEntities,
+    bool isBoss = false,
+    String? title,
+    String? description,
+  }) {
+    if (title != null) encounterTitle = title;
+    if (description != null) encounterDescription = description;
+    playerUnits.clear();
+    enemyUnits.clear();
+    drawPile.clear();
+    hand.clear();
+    burnPit.clear();
+    combatLogs.clear();
+    currentTick = 0;
+    isRunning = false;
+    isPreBattlePhase = true;
+    focus = 3;
+    maxFocus = 7;
+    isBulletTime = false;
+
+    // --- POPULATE ENEMY UNITS ONTO SPATIAL GRID ---
+    // If Boss encounter, place Boss as 2x2 Colossus or central behemoth
+    if (isBoss) {
+      final bossEntity = enemyEntities.first;
+      final bossFootprint = UnitFootprint.quadColossus2x2;
+      final bossUnit = CombatUnitState(
+        id: bossEntity.id,
+        name: bossEntity.name,
+        templateId: bossEntity.speciesId,
+        isPlayer: false,
+        footprint: bossFootprint,
+        archetype: UnitArchetype.colossusBehemoth,
+        occupiedNodes: [
+          GridNode(column: 1, row: 0, occupantUnitId: bossEntity.id),
+          GridNode(column: 2, row: 0, occupantUnitId: bossEntity.id),
+          GridNode(column: 1, row: 1, occupantUnitId: bossEntity.id),
+          GridNode(column: 2, row: 1, occupantUnitId: bossEntity.id),
+        ],
+        isDisplacementImmune: true,
+        maxHp: bossEntity.maxHp,
+        hp: bossEntity.currentHp,
+        maxArmor: bossEntity.defense,
+        armor: bossEntity.defense,
+        attack: bossEntity.attack,
+        speed: bossEntity.speed,
+        isSlagCarapaceActive: true,
+        customAssetPath: bossEntity.customAvatarAsset,
+      );
+      enemyUnits.add(bossUnit);
+
+      // Add remaining minions (if any) to flanks
+      int minionIdx = 0;
+      for (int i = 1; i < enemyEntities.length; i++) {
+        final minion = enemyEntities[i];
+        final col = (minionIdx % 2 == 0) ? 0 : 4;
+        final row = (minionIdx ~/ 2 == 0) ? 0 : 2;
+        minionIdx++;
+
+        enemyUnits.add(CombatUnitState(
+          id: minion.id,
+          name: minion.name,
+          templateId: minion.speciesId,
+          isPlayer: false,
+          footprint: UnitFootprint.single1x1,
+          archetype: mapArchetypeToSpatial(minion.archetype),
+          occupiedNodes: [GridNode(column: col, row: row, occupantUnitId: minion.id)],
+          maxHp: minion.maxHp,
+          hp: minion.currentHp,
+          maxArmor: minion.defense,
+          armor: minion.defense,
+          attack: minion.attack,
+          speed: minion.speed,
+          customAssetPath: minion.customAvatarAsset,
+        ));
+      }
+    } else {
+      // Standard Skirmish / Elite: Place enemies across columns 0..4
+      for (int i = 0; i < min(5, enemyEntities.length); i++) {
+        final e = enemyEntities[i];
+        final bool isVanguard = e.isFrontlineOverride ?? (e.slot == FormationSlot.front1 || e.slot == FormationSlot.front2 || e.slot == FormationSlot.front3);
+        final int targetRow = isVanguard ? 0 : (e.archetype == Archetype.support || e.archetype == Archetype.occultist ? 2 : 1);
+        final int targetCol = (i * 2) % 5; // Stagger across columns 0, 2, 4, 1, 3
+
+        enemyUnits.add(CombatUnitState(
+          id: e.id,
+          name: e.name,
+          templateId: e.speciesId,
+          isPlayer: false,
+          footprint: UnitFootprint.single1x1,
+          archetype: mapArchetypeToSpatial(e.archetype),
+          occupiedNodes: [GridNode(column: targetCol, row: targetRow, occupantUnitId: e.id)],
+          maxHp: e.maxHp,
+          hp: e.currentHp,
+          maxArmor: e.defense,
+          armor: e.defense,
+          attack: e.attack,
+          speed: e.speed,
+          customAssetPath: e.customAvatarAsset,
+        ));
+      }
+    }
+
+    // --- POPULATE PLAYER SQUAD ONTO SPATIAL GRID ---
+    if (playerEntities != null && playerEntities.isNotEmpty) {
+      for (int i = 0; i < min(5, playerEntities.length); i++) {
+        final p = playerEntities[i];
+        final bool isFront = p.isFrontlineOverride ?? (p.slot == FormationSlot.front1 || p.slot == FormationSlot.front2 || p.slot == FormationSlot.front3);
+        final int pRow = isFront ? 0 : (p.archetype == Archetype.occultist || p.archetype == Archetype.support ? 2 : 1);
+        final int pCol = p.columnIndexOverride ?? (i % 5);
+
+        playerUnits.add(CombatUnitState(
+          id: p.id,
+          name: p.name,
+          templateId: p.speciesId,
+          isPlayer: true,
+          footprint: UnitFootprint.single1x1,
+          archetype: mapArchetypeToSpatial(p.archetype),
+          occupiedNodes: [GridNode(column: pCol, row: pRow, occupantUnitId: p.id)],
+          maxHp: p.maxHp,
+          hp: p.currentHp,
+          maxArmor: p.defense,
+          armor: p.defense,
+          attack: p.attack,
+          speed: p.speed,
+          customAssetPath: p.customAvatarAsset,
+        ));
+      }
+    } else {
+      // Default fallback player squad (Ash & Stone Order)
+      setupSunderAtAshenGate();
+      return;
+    }
+
+    // Cards Setup
+    hand.addAll([
+      const SpatialCombatCard(
+        id: 'phalanx_intercept',
+        name: 'Phalanx Intercept',
+        focusCost: 2,
+        description: 'Fortifies ally in Frontline with +35 Armor & taunt barrier.',
+        pattern: TargetPattern.singleTarget,
+      ),
+      const SpatialCombatCard(
+        id: 'searing_brand',
+        name: 'Searing Brand',
+        focusCost: 2,
+        description: 'Strikes enemy node and ignites cross pattern for 90 radiant damage.',
+        pattern: TargetPattern.stAshlarCross,
+        damageMultiplier: 1.2,
+      ),
+      const SpatialCombatCard(
+        id: 'stoke_the_embers',
+        name: 'Stoke the Embers',
+        focusCost: 1,
+        description: 'Exhaust or burn to generate immediate +1 Focus & draw sovereign cards.',
+        pattern: TargetPattern.singleTarget,
+      ),
+    ]);
+
+    drawPile.addAll([
+      const SpatialCombatCard(
+        id: 'smite_the_calcified',
+        name: 'Smite the Calcified',
+        focusCost: 4,
+        description: 'Kinetic strike (2.5x ATK). If target PRR > 40%, shatters armor by 50%!',
+        pattern: TargetPattern.singleTarget,
+        damageMultiplier: 2.5,
+        armorShredPercent: 50,
+      ),
+      const SpatialCombatCard(
+        id: 'sun_ashlar_wrath',
+        name: 'Wrath of Ashlar',
+        focusCost: 3,
+        description: 'Radiant cross beam hitting North, South, East, West.',
+        pattern: TargetPattern.stAshlarCross,
+        damageMultiplier: 1.8,
+      ),
+      const SpatialCombatCard(
+        id: 'sun_king_cataclysm',
+        name: 'Cataclysm of the Sun-King',
+        focusCost: 5,
+        description: 'APEX RITE: Unleashes solar pillar incinerating enemy column for 260 DMG & dispelling intents!',
+        pattern: TargetPattern.piercingColumnSkewer,
+        damageMultiplier: 3.2,
+      ),
+      const SpatialCombatCard(
+        id: 'revive_vitae',
+        name: 'Infused Vitae Resurgence',
+        focusCost: 3,
+        description: 'SOVEREIGN SLIP: Resurrects downed plinth with 50% HP & 6-tick invulnerability (-20% max HP Soul Fracture).',
+        pattern: TargetPattern.singleTarget,
+      ),
+    ]);
+
+    addLog('Encounter Initialized: $encounterTitle.');
+    notifyListeners();
   }
 
   void dispatchAction(SpatialActionEvent event) {

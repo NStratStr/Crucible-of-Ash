@@ -1442,11 +1442,31 @@ class _AppShellState extends State<AppShell> {
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
                     }),
                   ),
-                  // Tab 1: Tactical Arena (Standard or Spatial v3.2 Mode)
+                  // Tab 1: Tactical Arena (2.5D Spatial Node Battlefield)
                   _isSpatialCombatActive
                       ? SpatialBattleScreen(
+                          key: ValueKey('${_activeNode?.id ?? "sunder"}_${_currentChapter}_$_currentIndex'),
+                          initialPlayerUnits: _tickManager.allies,
+                          initialEnemyUnits: _tickManager.enemies,
+                          encounterTitle: _activeNode?.name ?? 'The Sunder at Ashen Gate',
+                          backdropAsset: ChapterTheme.forChapter(_currentChapter).backgroundAsset,
+                          isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
+                          onVictory: () {
+                            _onCombatVictory();
+                            setState(() {
+                              _currentIndex = 0; // Return to Campaign Map
+                            });
+                          },
+                          onDefeat: () {
+                            _onCombatDefeat();
+                            setState(() {
+                              _currentIndex = 0; // Return to Campaign Map
+                            });
+                          },
                           onBackToStandardCombat: () {
-                            setState(() => _isSpatialCombatActive = false);
+                            setState(() {
+                              _currentIndex = 0; // Return to Campaign Map
+                            });
                           },
                         )
                       : BattleScreen(

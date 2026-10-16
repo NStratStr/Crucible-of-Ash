@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/features/combat_spatial/models/spatial_combat_models.dart';
 import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dart';
+import 'package:ashen_crucible/shared/models/unit_entity.dart';
+import 'package:ashen_crucible/core/combat_math.dart';
 
 void main() {
   group('GDD v3.2 Spatial Combat Engine & Encounter Tests', () {
@@ -434,6 +436,139 @@ void main() {
       expect(footman.isVulnerable, isTrue);
       final vulnDmg = footman.takeDamage(100);
       expect(vulnDmg, equals(125)); // +25% amplified damage
+    });
+
+    test('setupCampaignEncounter correctly maps UnitEntity cohorts for Skirmish and Boss encounters', () {
+      final customEngine = SpatialCombatEngine();
+
+      final playerCohort = [
+        const UnitEntity(
+          id: 'test_player_vanguard',
+          speciesId: 'iron_legionary',
+          name: 'Front Vanguard',
+          generation: 1,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front2,
+          level: 5,
+          maxLevel: 20,
+          currentHp: 600,
+          maxHp: 600,
+          attack: 45,
+          defense: 120,
+          speed: 80,
+          nativeTraitId: 'iron_clad',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'test_player_caster',
+          speciesId: 'blood_witch',
+          name: 'Back Caster',
+          generation: 1,
+          archetype: Archetype.occultist,
+          slot: FormationSlot.back1,
+          level: 5,
+          maxLevel: 20,
+          currentHp: 320,
+          maxHp: 320,
+          attack: 75,
+          defense: 30,
+          speed: 95,
+          nativeTraitId: 'blood_boil',
+          lineageAncestors: [],
+        ),
+      ];
+
+      final skirmishEnemies = [
+        const UnitEntity(
+          id: 'enemy_ghoul',
+          speciesId: 'ash_ghoul',
+          name: 'Ash Ghoul',
+          generation: 1,
+          archetype: Archetype.assassin,
+          slot: FormationSlot.front1,
+          level: 4,
+          maxLevel: 20,
+          currentHp: 280,
+          maxHp: 280,
+          attack: 38,
+          defense: 40,
+          speed: 90,
+          nativeTraitId: 'feral',
+          lineageAncestors: [],
+        ),
+      ];
+
+      // 1. Skirmish Encounter setup
+      customEngine.setupCampaignEncounter(
+        playerEntities: playerCohort,
+        enemyEntities: skirmishEnemies,
+        isBoss: false,
+        title: 'Ashen Wastes Skirmish',
+        description: 'Vile scavengers prowl the volcanic ridge.',
+      );
+
+      expect(customEngine.encounterTitle, equals('Ashen Wastes Skirmish'));
+      expect(customEngine.playerUnits.length, equals(2));
+      expect(customEngine.enemyUnits.length, equals(1));
+      expect(customEngine.playerUnits.first.archetype, equals(UnitArchetype.vanguardMelee));
+      expect(customEngine.playerUnits.last.archetype, equals(UnitArchetype.backlineCaster));
+
+      // 2. Boss Encounter setup with 2x2 Colossus
+      final bossEnemies = [
+        const UnitEntity(
+          id: 'boss_behemoth',
+          speciesId: 'gorgoroth_titan',
+          name: 'Gorgoroth the Unbroken',
+          generation: 4,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front2,
+          level: 10,
+          maxLevel: 20,
+          currentHp: 3500,
+          maxHp: 3500,
+          attack: 95,
+          defense: 200,
+          speed: 70,
+          nativeTraitId: 'unyielding',
+          lineageAncestors: [],
+        ),
+        const UnitEntity(
+          id: 'boss_flank_minion',
+          speciesId: 'pyre_acolyte',
+          name: 'Pyre Acolyte',
+          generation: 1,
+          archetype: Archetype.support,
+          slot: FormationSlot.back2,
+          level: 8,
+          maxLevel: 20,
+          currentHp: 300,
+          maxHp: 300,
+          attack: 30,
+          defense: 25,
+          speed: 85,
+          nativeTraitId: 'pyre_aura',
+          lineageAncestors: [],
+        ),
+      ];
+
+      customEngine.setupCampaignEncounter(
+        playerEntities: playerCohort,
+        enemyEntities: bossEnemies,
+        isBoss: true,
+        title: 'Chamber of the Titan',
+      );
+
+      expect(customEngine.enemyUnits.length, equals(2));
+      final boss = customEngine.enemyUnits.firstWhere((u) => u.id == 'boss_behemoth');
+      expect(boss.footprint, equals(UnitFootprint.quadColossus2x2));
+      expect(boss.isDisplacementImmune, isTrue);
+      expect(boss.occupiedNodes.length, equals(4));
+      expect(boss.occupiedNodes.any((n) => n.column == 1 && n.row == 0), isTrue);
+      expect(boss.occupiedNodes.any((n) => n.column == 2 && n.row == 1), isTrue);
+
+      final minion = customEngine.enemyUnits.firstWhere((u) => u.id == 'boss_flank_minion');
+      expect(minion.footprint, equals(UnitFootprint.single1x1));
+      expect(minion.occupiedNodes.first.column, equals(0)); // First flank minion placed on Col 0
     });
   });
 }

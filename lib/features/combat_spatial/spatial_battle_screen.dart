@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import '../../shared/models/unit_entity.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -11,13 +12,26 @@ import 'spatial_combat_engine.dart';
 /// - Multi-Node Footprints (1x1 standard, 1x2 horizontal behemoths like Gorgoroth)
 /// - Geometric Skill Vectors & Live Telegraph Shading (T-Cleaves, Crosses, Row Scythes)
 /// - Tactical Plinth Triage: Drag-and-drop repositioning during 30% bullet-time
-/// - Live Burn Pit Card Cycling & Sunder Mechanics
 class SpatialBattleScreen extends StatefulWidget {
   final VoidCallback? onBackToStandardCombat;
+  final VoidCallback? onVictory;
+  final VoidCallback? onDefeat;
+  final List<dynamic>? initialPlayerUnits; // UnitEntity or CombatUnitState
+  final List<dynamic>? initialEnemyUnits;
+  final String? encounterTitle;
+  final String? backdropAsset;
+  final bool isBossEncounter;
 
   const SpatialBattleScreen({
     super.key,
     this.onBackToStandardCombat,
+    this.onVictory,
+    this.onDefeat,
+    this.initialPlayerUnits,
+    this.initialEnemyUnits,
+    this.encounterTitle,
+    this.backdropAsset,
+    this.isBossEncounter = false,
   });
 
   @override
@@ -58,7 +72,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   @override
   void initState() {
     super.initState();
-    _engine = SpatialCombatEngine();
+    final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
+    final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
+
+    _engine = SpatialCombatEngine(
+      initialPlayerEntities: players,
+      initialEnemyEntities: enemies,
+      title: widget.encounterTitle,
+      isBossEncounter: widget.isBossEncounter,
+    );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
     _startLoop();
@@ -296,10 +318,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'SPATIAL NODE ARENA: THE SUNDER',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                widget.encounterTitle?.toUpperCase() ?? _engine.encounterTitle.toUpperCase(),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -401,10 +423,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Atmospheric Volcanic Chasm Arena Backdrop
+                  // Atmospheric Battlefield Arena Backdrop
                   Positioned.fill(
                     child: Image.asset(
-                      'assets/images/volcanic_chasm_battlefield.jpg',
+                      widget.backdropAsset ?? 'assets/images/volcanic_chasm_battlefield.jpg',
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
                       errorBuilder: (context, error, stackTrace) => Container(
@@ -599,7 +621,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                         side: const BorderSide(color: Color(0xFFFFD54F)),
                                       ),
                                     ),
-                                    if (widget.onBackToStandardCombat != null) ...[
+                                    if (_engine.isVictory && widget.onVictory != null) ...[
+                                      const SizedBox(width: 12),
+                                      ElevatedButton(
+                                        onPressed: widget.onVictory,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF1B5E20),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('CLAIM VICTORY & ADVANCE'),
+                                      ),
+                                    ] else if (_engine.isDefeat && widget.onDefeat != null) ...[
+                                      const SizedBox(width: 12),
+                                      ElevatedButton(
+                                        onPressed: widget.onDefeat,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFB3261E),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('RETURN TO CAMP'),
+                                      ),
+                                    ] else if (widget.onBackToStandardCombat != null) ...[
                                       const SizedBox(width: 12),
                                       OutlinedButton(
                                         onPressed: widget.onBackToStandardCombat,

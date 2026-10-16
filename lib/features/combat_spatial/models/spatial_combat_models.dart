@@ -217,7 +217,7 @@ class CombatUnitState {
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
-  // Stance Mastery parameters
+  final String? customAssetPath;
   StanceType activeStance;
   int consecutiveTurnsStationary;
   bool hasStanceBonusReady;
@@ -255,6 +255,7 @@ class CombatUnitState {
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
     StanceType? activeStance,
+    this.customAssetPath,
     this.consecutiveTurnsStationary = 0,
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
@@ -369,6 +370,9 @@ class CombatUnitState {
 
   /// High-resolution miniature cutout asset path matching Dark Fantasy art roster
   String get assetPath {
+    if (customAssetPath != null && customAssetPath!.isNotEmpty) {
+      return customAssetPath!;
+    }
     if (id.contains('gorgoroth') || templateId.contains('gorgoroth')) {
       return 'assets/images/flayed_butcher.png';
     }
