@@ -1060,12 +1060,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       final target = _engine.resolveProjectedTarget(unit, simulatedCol: srcCol);
       if (target != null && target.occupiedNodes.isNotEmpty) {
-        final targetNode = target.occupiedNodes.first;
-        final int tgtCol = targetNode.column;
-        final int tgtGRow = 2 - targetNode.row;
-
-        final double tgtX = originX + (tgtCol - tgtGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-        final double tgtY = originY + (tgtCol + tgtGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        final bool isTargetBoss = target.footprint == UnitFootprint.quadColossus2x2 || target.footprint == UnitFootprint.horizontal1x2;
+        final double tgtX;
+        final double tgtY;
+        if (isTargetBoss) {
+          // Point directly to Gorgoroth's centered colossus coordinate (midCol 1.5, midGRow 1.5)
+          tgtX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
+          tgtY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
+        } else {
+          final targetNode = target.occupiedNodes.first;
+          final int tgtCol = targetNode.column;
+          final int tgtGRow = 2 - targetNode.row;
+          tgtX = originX + (tgtCol - tgtGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+          tgtY = originY + (tgtCol + tgtGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        }
         final Offset targetOffset = Offset(tgtX, tgtY);
 
         // Adaptive Posture Color & Damage Estimate
@@ -1137,12 +1145,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (_selectedEnemyUnitId != null) {
       final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
       if (enemy != null && enemy.occupiedNodes.isNotEmpty && enemy.pendingIntent == null) {
-        final eNode = enemy.occupiedNodes.first;
-        final int eGRow = 2 - eNode.row;
-        final double srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-        final double srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        final bool isEnemyBoss = enemy.footprint == UnitFootprint.quadColossus2x2 || enemy.footprint == UnitFootprint.horizontal1x2;
+        final double srcX;
+        final double srcY;
+        if (isEnemyBoss) {
+          srcX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
+          srcY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
+        } else {
+          final eNode = enemy.occupiedNodes.first;
+          final int eGRow = 2 - eNode.row;
+          srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+          srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        }
 
-        final targetAlly = _engine.resolveProjectedTarget(enemy, simulatedCol: eNode.column);
+        final targetAlly = _engine.resolveProjectedTarget(enemy, simulatedCol: enemy.occupiedNodes.first.column);
         if (targetAlly != null && targetAlly.occupiedNodes.isNotEmpty) {
           final aNode = targetAlly.occupiedNodes.first;
           final int aGRow = 4 + aNode.row;
@@ -1168,10 +1184,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     for (final enemy in _engine.enemyUnits.where((u) => u.isAlive && u.pendingIntent != null)) {
       if (enemy.occupiedNodes.isEmpty) continue;
       final intent = enemy.pendingIntent!;
-      final eNode = enemy.occupiedNodes.first;
-      final int eGRow = 2 - eNode.row;
-      final double srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-      final double srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+      final bool isEnemyBoss = enemy.footprint == UnitFootprint.quadColossus2x2 || enemy.footprint == UnitFootprint.horizontal1x2;
+      final double srcX;
+      final double srcY;
+      if (isEnemyBoss) {
+        srcX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        srcY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
+      } else {
+        final eNode = enemy.occupiedNodes.first;
+        final int eGRow = 2 - eNode.row;
+        srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+      }
       final Offset sourceOffset = Offset(srcX, srcY);
 
       final int remTicks = max(0, intent.triggerTick - _engine.currentTick);
@@ -1263,6 +1287,68 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 isPlayerSquad: cell.isPlayerSquad,
                 tileWidth: tileWidth,
                 tileHeight: tileHeight,
+              ),
+            );
+          }),
+
+          // Centered Behemoth Boss Layer (Gorgoroth 2x2 Colossus)
+          // Positions the colossus at the exact geometric midpoint of his 4 occupied nodes
+          // (Cols 1-2, Enemy Rows 0-1 / gRows 1-2), creating a symmetrical, epic tabletop presence.
+          ..._engine.enemyUnits.where((u) => u.isAlive && (u.footprint == UnitFootprint.quadColossus2x2 || u.footprint == UnitFootprint.horizontal1x2)).map((boss) {
+            final double bossSpanWidth = tileWidth * 2.2;
+            final double bossSpanHeight = tileHeight * 2.0;
+
+            // Geometric center of Col 1,2 and gRow 1,2:
+            // midCol = 1.5, midGRow = 1.5
+            final double bossMidX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
+            final double bossMidY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
+
+            final double bossScreenLeft = bossMidX - (bossSpanWidth * 0.5);
+            final double bossScreenTop = bossMidY - (tileHeight * 0.5);
+
+            final bool isSelected = _selectedEnemyUnitId == boss.id;
+
+            return Positioned(
+              left: bossScreenLeft,
+              top: bossScreenTop,
+              width: bossSpanWidth,
+              height: bossSpanHeight,
+              child: IgnorePointer(
+                ignoring: false,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (_draggedCard != null) {
+                      _engine.castCard(_draggedCard!.id, targetUnit: boss);
+                      setState(() => _draggedCard = null);
+                    } else if (_selectedCardId != null) {
+                      final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+                      if (card != null) {
+                        _engine.castCard(card.id, targetUnit: boss, targetCol: 1, targetRow: 0);
+                        setState(() {
+                          _selectedCardId = null;
+                          _hoveredTileGRow = null;
+                          _hoveredTileCol = null;
+                        });
+                      }
+                    } else {
+                      setState(() {
+                        _selectedEnemyUnitId = (_selectedEnemyUnitId == boss.id) ? null : boss.id;
+                        _selectedUnitId = null;
+                        _selectedCardId = null;
+                      });
+                    }
+                  },
+                  child: Center(
+                    child: _buildUnitMiniatureWidget(
+                      boss,
+                      tileWidth: tileWidth,
+                      tileHeight: tileHeight,
+                      colGap: 0.0,
+                      isSelected: isSelected,
+                    ),
+                  ),
+                ),
               ),
             );
           }),
@@ -1842,8 +1928,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                // Occupant Miniature (Rendered on Anchor node)
-                if (occupant != null && isAnchorCell)
+                // Occupant Miniature (Rendered on Anchor node for 1x1 units; Behemoths render centered on the board overlay)
+                if (occupant != null && isAnchorCell && occupant.footprint != UnitFootprint.quadColossus2x2 && occupant.footprint != UnitFootprint.horizontal1x2)
                   Builder(
                     builder: (context) {
                       final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
@@ -2440,9 +2526,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     // Normalization multipliers:
     // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
-    // transparent padding. We scale them up so their physical figure matches Valeria's scale!
+    // transparent padding. We scale Valeria to 0.88 so her physical figure matches the 1:1 footprint of the others!
     double unitScaleMultiplier = 1.0;
-    if (unit.id == 'pyre_zealot' || unit.templateId.contains('ghoul')) {
+    if (unit.id == 'lady_valeria') {
+      unitScaleMultiplier = 0.88; // Full-bleed canvas normalization for 1:1 tile footprint
+    } else if (unit.id == 'pyre_zealot' || unit.templateId.contains('ghoul')) {
       unitScaleMultiplier = 1.45; // Ghoul crouches low; scale up plinth & figure
     } else if (unit.id == 'iron_footman') {
       unitScaleMultiplier = 1.25;
@@ -2454,11 +2542,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       unitScaleMultiplier = 1.25;
     }
 
-    final double bossSpanWidth = isBoss ? (2 * tileWidth) : tileWidth;
-    final double baseWidth = isBoss ? bossSpanWidth * 0.75 : (tileWidth - 12) * unitScaleMultiplier;
-    final double baseHeight = isBoss ? 32 : (16 * unitScaleMultiplier);
+    final double bossSpanWidth = isBoss ? (tileWidth * 2.2) : tileWidth;
+    final double baseWidth = isBoss ? bossSpanWidth * 0.70 : (tileWidth - 12) * unitScaleMultiplier;
+    final double baseHeight = isBoss ? 44 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.25 : tileWidth * 1.05 * unitScaleMultiplier).clamp(80.0, 320.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.05 * unitScaleMultiplier).clamp(80.0, 320.0);
     final double modelHeight = (isBoss
         ? (tileHeight * 3.8).clamp(200.0, 320.0)
         : (tileHeight * 2.3 * unitScaleMultiplier).clamp(110.0, 220.0));
@@ -2469,7 +2557,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       transform: Matrix4.translationValues(hitShakeX, lungeY, 0),
       child: SizedBox(
         width: isBoss ? bossSpanWidth : tileWidth,
-        height: tileHeight,
+        height: isBoss ? (tileHeight * 2.0) : tileHeight,
         child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
