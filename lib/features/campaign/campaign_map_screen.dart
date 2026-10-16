@@ -330,70 +330,79 @@ class CampaignMapScreen extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-          final double mapWidth = constraints.maxWidth;
-          final double mapHeight = constraints.maxHeight;
-          final double maxD = nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
+                final double mapWidth = constraints.maxWidth;
+                final double mapHeight = constraints.maxHeight;
+                final double maxD = nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
 
-          return Stack(
-            children: [
-              // Thematic Chapter Background Artwork
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 0.32,
-                  child: Image.asset(
-                    theme.backgroundAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-              // Background Parchment Grid & Leylines
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _CampaignPathPainter(
-                    nodes: nodes,
-                    maxDepth: maxD,
-                    chapterTheme: theme,
-                  ),
-                ),
-              ),
-              // Node interactive badges
-              ...nodes.map((node) {
-                // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: 0.1 to 0.9)
-                final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
-                final double y = node.verticalRatio * (mapHeight - 80) + 40;
-                final double badgeWidth = node.type == CampaignNodeType.boss ? 90.0 : 76.0;
-                final double leftPos = (x - badgeWidth / 2).clamp(4.0, (mapWidth - badgeWidth - 4.0).clamp(4.0, double.infinity));
+                // Vertical bounds: provide generous top/bottom safe clearance so all badges and labels fit
+                // within the screen height without requiring scrolling
+                final double topInset = 36.0;
+                final double bottomInset = 64.0;
+                final double usableHeight = (mapHeight - topInset - bottomInset).clamp(80.0, double.infinity);
 
-                return Positioned(
-                  left: leftPos,
-                  top: y - 28,
-                  width: badgeWidth,
-                  child: _buildNodeBadge(context, node),
-                );
-              }),
-              // Endgame Gauntlet Banner Button
-              if (onOpenEndgameGauntlet != null)
-                Positioned(
-                  bottom: 12,
-                  right: 12,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.workspace_premium, size: 16),
-                    label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E1E28),
-                      foregroundColor: const Color(0xFFE5A93C),
-                      side: const BorderSide(color: Color(0xFFE5A93C), width: 1.2),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                return Stack(
+                  children: [
+                    // Thematic Chapter Background Artwork
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: 0.32,
+                        child: Image.asset(
+                          theme.backgroundAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
                     ),
-                    onPressed: onOpenEndgameGauntlet,
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    ),
+                    // Background Parchment Grid & Leylines
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _CampaignPathPainter(
+                          nodes: nodes,
+                          maxDepth: maxD,
+                          chapterTheme: theme,
+                          topInset: topInset,
+                          usableHeight: usableHeight,
+                        ),
+                      ),
+                    ),
+                    // Node interactive badges
+                    ...nodes.map((node) {
+                      // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: normalized within usable height)
+                      final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
+                      final double y = topInset + node.verticalRatio * usableHeight;
+                      final double badgeWidth = node.type == CampaignNodeType.boss ? 86.0 : 72.0;
+                      final double leftPos = (x - badgeWidth / 2).clamp(4.0, (mapWidth - badgeWidth - 4.0).clamp(4.0, double.infinity));
+                      final double badgeCenterOffset = node.type == CampaignNodeType.boss ? 28.0 : 23.0;
+
+                      return Positioned(
+                        left: leftPos,
+                        top: y - badgeCenterOffset,
+                        width: badgeWidth,
+                        child: _buildNodeBadge(context, node),
+                      );
+                    }),
+                    // Endgame Gauntlet Banner Button
+                    if (onOpenEndgameGauntlet != null)
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.workspace_premium, size: 16),
+                          label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E1E28),
+                            foregroundColor: const Color(0xFFE5A93C),
+                            side: const BorderSide(color: Color(0xFFE5A93C), width: 1.2),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onPressed: onOpenEndgameGauntlet,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
   ],
 ),
 );
@@ -1159,11 +1168,15 @@ class _CampaignPathPainter extends CustomPainter {
   final List<CampaignNode> nodes;
   final double maxDepth;
   final ChapterTheme chapterTheme;
+  final double topInset;
+  final double? usableHeight;
 
   _CampaignPathPainter({
     required this.nodes,
     this.maxDepth = 4.0,
     required this.chapterTheme,
+    this.topInset = 36.0,
+    this.usableHeight,
   });
 
   @override
@@ -1181,10 +1194,11 @@ class _CampaignPathPainter extends CustomPainter {
 
     final Map<String, Offset> nodePositions = {};
     final double safeMaxD = maxDepth > 0 ? maxDepth : 1.0;
+    final double effUsableHeight = usableHeight ?? (size.height - topInset - 64.0).clamp(80.0, double.infinity);
 
     for (final node in nodes) {
       final double x = (node.depth / safeMaxD) * (size.width - 80) + 40;
-      final double y = node.verticalRatio * (size.height - 80) + 40;
+      final double y = topInset + node.verticalRatio * effUsableHeight;
       nodePositions[node.id] = Offset(x, y);
     }
 
