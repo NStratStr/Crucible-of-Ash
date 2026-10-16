@@ -17,6 +17,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenBrigadeRoster;
   final VoidCallback onOpenAffinityCodex;
   final VoidCallback onOpenEndgameGauntlet;
+  final VoidCallback onOpenSummoning;
   final VoidCallback onOpenSettings;
 
   const HomeScreen({
@@ -34,6 +35,7 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenBrigadeRoster,
     required this.onOpenAffinityCodex,
     required this.onOpenEndgameGauntlet,
+    required this.onOpenSummoning,
     required this.onOpenSettings,
   });
 
@@ -140,43 +142,47 @@ class HomeScreen extends StatelessWidget {
       child: Row(
         children: [
           // Crest & Title
-          Row(
-            children: [
-              Image.asset(
-                'assets/images/UI/Ruby Shield Icon transparent.png',
-                width: 28,
-                height: 28,
-                errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFFD4AF37), size: 24),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    'ASHEN CRUCIBLE',
-                    style: TextStyle(
-                      color: Color(0xFFFFD54F),
-                      fontFamily: 'serif',
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.6,
-                      fontSize: 13.5,
-                    ),
+          Expanded(
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/images/UI/Ruby Shield Icon transparent.png',
+                  width: 28,
+                  height: 28,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFFD4AF37), size: 24),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'ASHEN CRUCIBLE',
+                        style: TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontFamily: 'serif',
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                          fontSize: 13.0,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'COMMAND CITADEL • CHAPTER HEADQUARTERS',
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: 8.5,
+                          letterSpacing: 0.8,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  Text(
-                    'COMMAND CITADEL • CHAPTER HEADQUARTERS',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 8.5,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-
-          const Spacer(),
 
           // Tri-Currency Display
           _buildCurrencyPill(
@@ -509,6 +515,15 @@ class HomeScreen extends StatelessWidget {
         'borderColor': const Color(0xFFFF7043),
       },
       {
+        'title': 'SUMMONING ALTAR',
+        'subtitle': 'Convoke Gen 1-3 thralls, pact rites & bloodline sigils',
+        'badge': 'SOUL RECRUIT',
+        'badgeColor': const Color(0xFFFFD54F),
+        'iconAsset': 'assets/images/UI/Flame Shield icon Transparent.png',
+        'action': onOpenSummoning,
+        'borderColor': const Color(0xFFD4AF37),
+      },
+      {
         'title': 'THE RELIC FORGE',
         'subtitle': 'Equipment crafting, sockets & runic affixes',
         'badge': 'ARSENAL ENCHANT',
@@ -687,10 +702,14 @@ class HomeScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white10),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
         children: [
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: const [
               Icon(Icons.cell_tower, color: Color(0xFF26A69A), size: 14),
               SizedBox(width: 6),

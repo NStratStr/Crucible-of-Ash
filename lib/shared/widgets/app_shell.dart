@@ -21,6 +21,8 @@ import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
 import '../../features/generals/grimoire_manager_dialog.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/summoning/summoning_screen.dart';
+import '../../features/summoning/summoning_service.dart';
 import '../../features/settings/settings_dialog.dart';
 import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
@@ -1514,10 +1516,30 @@ class _AppShellState extends State<AppShell> {
           Navigator.of(dialogCtx).pop();
           _handleOpenEndgameGauntlet();
         },
+        onOpenSummoning: () {
+          Navigator.of(dialogCtx).pop();
+          _handleOpenSummoning();
+        },
         onOpenSettings: () {
           SettingsDialog.show(dialogCtx);
         },
       ),
+    );
+  }
+
+  void _handleOpenSummoning() {
+    SummoningScreen.showAsModal(
+      context: context,
+      totalIchor: _totalIchor,
+      bloodlineSigils: _bloodlineSigils,
+      onSummonExecuted: (result) {
+        setState(() {
+          _totalIchor = max(0, _totalIchor - result.ichorSpent);
+          _bloodlineSigils = max(0, _bloodlineSigils - result.sigilsSpent);
+          _inventory = [..._inventory, ...result.summonedUnits];
+        });
+        _saveCurrentState();
+      },
     );
   }
 
