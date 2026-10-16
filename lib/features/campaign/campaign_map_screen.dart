@@ -4,6 +4,12 @@ import '../../shared/models/expedition_boon.dart';
 import 'ascension_tier_data.dart';
 import 'ascension_tier_dialog.dart';
 import 'campaign_node.dart';
+import 'linear_campaign_stage.dart';
+
+enum CampaignViewMode {
+  linearLadder,     // Linear story campaign (Stage 1-1 to 1-10)
+  catacombDelve,    // Branching roguelite dungeon delve with safe teleport extraction
+}
 
 class ChapterTheme {
   final int chapter;
@@ -81,7 +87,7 @@ class ChapterTheme {
   }
 }
 
-class CampaignMapScreen extends StatelessWidget {
+class CampaignMapScreen extends StatefulWidget {
   final List<CampaignNode> nodes;
   final ValueChanged<CampaignNode> onSelectNode;
   final int totalIchor;
@@ -98,6 +104,7 @@ class CampaignMapScreen extends StatelessWidget {
   final int maxUnlockedAscension;
   final ValueChanged<int>? onAscensionChanged;
   final Set<ExpeditionBoon> activeBoons;
+  final CampaignViewMode initialViewMode;
 
   const CampaignMapScreen({
     super.key,
@@ -117,6 +124,7 @@ class CampaignMapScreen extends StatelessWidget {
     this.maxUnlockedAscension = 0,
     this.onAscensionChanged,
     this.activeBoons = const {},
+    this.initialViewMode = CampaignViewMode.linearLadder,
   });
 
   static String chapterTitle(int ch) {
@@ -133,8 +141,22 @@ class CampaignMapScreen extends StatelessWidget {
   }
 
   @override
+  State<CampaignMapScreen> createState() => _CampaignMapScreenState();
+}
+
+class _CampaignMapScreenState extends State<CampaignMapScreen> {
+  late CampaignViewMode _viewMode;
+  int _completedLinearStages = 2; // Default starting progress on ladder
+
+  @override
+  void initState() {
+    super.initState();
+    _viewMode = widget.initialViewMode;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = ChapterTheme.forChapter(currentChapter);
+    final theme = ChapterTheme.forChapter(widget.currentChapter);
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 600;
 
@@ -142,76 +164,164 @@ class CampaignMapScreen extends StatelessWidget {
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         backgroundColor: theme.surfaceColor,
-        leading: onOpenHome != null
+        leading: widget.onOpenHome != null
             ? IconButton(
                 icon: const Icon(Icons.home, color: Color(0xFFFFD54F), size: 22),
                 tooltip: 'Citadel War Room (Home)',
-                onPressed: onOpenHome,
+                onPressed: widget.onOpenHome,
               )
             : null,
-        titleSpacing: onOpenHome != null ? 0 : 8,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (currentChapter > 1 && onChapterChanged != null)
-              IconButton(
-                icon: Icon(Icons.arrow_left, size: 18, color: theme.secondaryColor),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () => onChapterChanged!(currentChapter - 1),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+        titleSpacing: widget.onOpenHome != null ? 0 : 8,
+        title: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 160),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.currentChapter > 1 && widget.onChapterChanged != null)
+                IconButton(
+                  icon: Icon(Icons.arrow_left, size: 16, color: theme.secondaryColor),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => widget.onChapterChanged!(widget.currentChapter - 1),
+                ),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(theme.chapterIcon, size: 11, color: theme.secondaryColor),
-                      const SizedBox(width: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(theme.chapterIcon, size: 10, color: theme.secondaryColor),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              CampaignMapScreen.chapterTitle(widget.currentChapter),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                letterSpacing: 0.8,
+                                fontWeight: FontWeight.bold,
+                                fontSize: isMobile ? 9.5 : 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       Text(
-                        chapterTitle(currentChapter),
+                        theme.subtitle,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          letterSpacing: 1.0,
-                          fontWeight: FontWeight.bold,
-                          fontSize: isMobile ? 10.5 : 12,
+                          letterSpacing: 0.5,
+                          color: theme.secondaryColor.withValues(alpha: 0.75),
+                          fontSize: 7.0,
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    theme.subtitle,
-                    style: TextStyle(
-                      letterSpacing: 0.6,
-                      color: theme.secondaryColor.withValues(alpha: 0.75),
-                      fontSize: 7.5,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            if (currentChapter < maxUnlockedChapter && onChapterChanged != null)
-              IconButton(
-                icon: Icon(Icons.arrow_right, size: 18, color: theme.secondaryColor),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () => onChapterChanged!(currentChapter + 1),
-              ),
-          ],
+              if (widget.currentChapter < widget.maxUnlockedChapter && widget.onChapterChanged != null)
+                IconButton(
+                  icon: Icon(Icons.arrow_right, size: 16, color: theme.secondaryColor),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => widget.onChapterChanged!(widget.currentChapter + 1),
+                ),
+            ],
+          ),
         ),
         centerTitle: false,
         actions: [
+          // View Mode Toggle (Linear Ladder vs. Catacomb Delve)
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF14141E),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF38384E)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () => setState(() => _viewMode = CampaignViewMode.linearLadder),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _viewMode == CampaignViewMode.linearLadder ? const Color(0xFFE5A93C) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.linear_scale,
+                          size: 11,
+                          color: _viewMode == CampaignViewMode.linearLadder ? Colors.black : Colors.white60,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'CAMPAIGN',
+                          style: TextStyle(
+                            color: _viewMode == CampaignViewMode.linearLadder ? Colors.black : Colors.white60,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => setState(() => _viewMode = CampaignViewMode.catacombDelve),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _viewMode == CampaignViewMode.catacombDelve ? const Color(0xFF00E5FF) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.account_tree_outlined,
+                          size: 11,
+                          color: _viewMode == CampaignViewMode.catacombDelve ? Colors.black : const Color(0xFF00E5FF),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'DUNGEON',
+                          style: TextStyle(
+                            color: _viewMode == CampaignViewMode.catacombDelve ? Colors.black : const Color(0xFF00E5FF),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Ascension Tier Badge (A0–A10)
           GestureDetector(
             key: const ValueKey('ascension_tier_button'),
             onTap: () {
-              if (onAscensionChanged != null) {
+              if (widget.onAscensionChanged != null) {
                 AscensionTierDialog.show(
                   context: context,
-                  currentAscension: currentAscension,
-                  maxUnlockedAscension: maxUnlockedAscension,
-                  onSelectAscension: onAscensionChanged!,
+                  currentAscension: widget.currentAscension,
+                  maxUnlockedAscension: widget.maxUnlockedAscension,
+                  onSelectAscension: widget.onAscensionChanged!,
                 );
               }
             },
@@ -219,24 +329,16 @@ class CampaignMapScreen extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 3),
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                color: currentAscension > 0
+                color: widget.currentAscension > 0
                     ? const Color(0xFFB71C1C).withValues(alpha: 0.35)
                     : const Color(0xFF1E1E28),
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
-                  color: currentAscension > 0
+                  color: widget.currentAscension > 0
                       ? const Color(0xFFFF5252)
                       : const Color(0xFFE5A93C).withValues(alpha: 0.8),
                   width: 1.0,
                 ),
-                boxShadow: currentAscension > 0
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFFFF1744).withValues(alpha: 0.3),
-                          blurRadius: 4,
-                        ),
-                      ]
-                    : null,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -244,15 +346,15 @@ class CampaignMapScreen extends StatelessWidget {
                   Icon(
                     Icons.auto_graph,
                     size: 11,
-                    color: currentAscension > 0
+                    color: widget.currentAscension > 0
                         ? const Color(0xFFFF5252)
                         : const Color(0xFFFFD54F),
                   ),
                   const SizedBox(width: 3),
                   Text(
-                    'A$currentAscension',
+                    'A${widget.currentAscension}',
                     style: TextStyle(
-                      color: currentAscension > 0
+                      color: widget.currentAscension > 0
                           ? const Color(0xFFFF5252)
                           : const Color(0xFFFFD54F),
                       fontFamily: 'monospace',
@@ -265,17 +367,17 @@ class CampaignMapScreen extends StatelessWidget {
               ),
             ),
           ),
-          if (!isMobile && onLaunchMvpSkirmish != null)
+          if (!isMobile && widget.onLaunchMvpSkirmish != null)
             IconButton(
               icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 18),
               tooltip: 'MVP 3-Wave Skirmish (GDD Sec 14.1)',
-              onPressed: onLaunchMvpSkirmish,
+              onPressed: widget.onLaunchMvpSkirmish,
             ),
-          if (!isMobile && onOpenEndgameGauntlet != null)
+          if (!isMobile && widget.onOpenEndgameGauntlet != null)
             IconButton(
               icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 18),
               tooltip: 'Endgame Gauntlet',
-              onPressed: onOpenEndgameGauntlet,
+              onPressed: widget.onOpenEndgameGauntlet,
             ),
           // Tri-Currency Display
           Padding(
@@ -287,7 +389,7 @@ class CampaignMapScreen extends StatelessWidget {
                 const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 12),
                 const SizedBox(width: 2),
                 Text(
-                  '$totalIchor',
+                  '${widget.totalIchor}',
                   style: const TextStyle(
                     color: Color(0xFFEF5350),
                     fontFamily: 'monospace',
@@ -300,7 +402,7 @@ class CampaignMapScreen extends StatelessWidget {
                 const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 12),
                 const SizedBox(width: 2),
                 Text(
-                  '$cursedOre',
+                  '${widget.cursedOre}',
                   style: const TextStyle(
                     color: Color(0xFF80CBC4),
                     fontFamily: 'monospace',
@@ -321,7 +423,7 @@ class CampaignMapScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
                 Text(
-                  '$bloodlineSigils',
+                  '${widget.bloodlineSigils}',
                   style: const TextStyle(
                     color: Color(0xFFFFD54F),
                     fontFamily: 'monospace',
@@ -332,7 +434,7 @@ class CampaignMapScreen extends StatelessWidget {
               ],
             ),
           ),
-          if (onOpenSettings != null)
+          if (widget.onOpenSettings != null)
             IconButton(
               icon: Image.asset(
                 'assets/images/UI/Settings Shield Icon Transparent.png',
@@ -341,20 +443,22 @@ class CampaignMapScreen extends StatelessWidget {
                 errorBuilder: (_, __, ___) => const Icon(Icons.settings, color: Color(0xFFFFD54F), size: 18),
               ),
               tooltip: 'Settings & Telco Network',
-              onPressed: onOpenSettings,
+              onPressed: widget.onOpenSettings,
             ),
         ],
       ),
       body: Column(
         children: [
-          if (activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
-          if (onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
+          if (widget.activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
+          if (widget.onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
           Expanded(
-            child: LayoutBuilder(
+            child: _viewMode == CampaignViewMode.linearLadder
+                ? _buildLinearCampaignView(context, theme)
+                : LayoutBuilder(
               builder: (context, constraints) {
                 final double mapWidth = constraints.maxWidth;
                 final double mapHeight = constraints.maxHeight;
-                final double maxD = nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
+                final double maxD = widget.nodes.map((n) => n.depth).fold(1, (prev, elem) => elem > prev ? elem : prev).toDouble();
 
                 // Vertical bounds: provide generous top/bottom safe clearance so all badges and labels fit
                 // within the screen height without requiring scrolling
@@ -379,7 +483,7 @@ class CampaignMapScreen extends StatelessWidget {
                     Positioned.fill(
                       child: CustomPaint(
                         painter: _CampaignPathPainter(
-                          nodes: nodes,
+                          nodes: widget.nodes,
                           maxDepth: maxD,
                           chapterTheme: theme,
                           topInset: topInset,
@@ -388,7 +492,7 @@ class CampaignMapScreen extends StatelessWidget {
                       ),
                     ),
                     // Node interactive badges
-                    ...nodes.map((node) {
+                    ...widget.nodes.map((node) {
                       // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: normalized within usable height)
                       final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
                       final double y = topInset + node.verticalRatio * usableHeight;
@@ -404,7 +508,7 @@ class CampaignMapScreen extends StatelessWidget {
                       );
                     }),
                     // Endgame Gauntlet Banner Button
-                    if (onOpenEndgameGauntlet != null)
+                    if (widget.onOpenEndgameGauntlet != null)
                       Positioned(
                         bottom: 12,
                         right: 12,
@@ -417,7 +521,7 @@ class CampaignMapScreen extends StatelessWidget {
                             side: const BorderSide(color: Color(0xFFE5A93C), width: 1.2),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
-                          onPressed: onOpenEndgameGauntlet,
+                          onPressed: widget.onOpenEndgameGauntlet,
                         ),
                       ),
                   ],
@@ -425,10 +529,375 @@ class CampaignMapScreen extends StatelessWidget {
               },
             ),
           ),
-  ],
-),
-);
-}
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinearCampaignView(BuildContext context, ChapterTheme theme) {
+    final stages = LinearCampaignStage.getStagesForChapter(widget.currentChapter);
+
+    return Stack(
+      children: [
+        // Thematic Overworld Background
+        Positioned.fill(
+          child: Opacity(
+            opacity: 0.38,
+            child: Image.asset(
+              'assets/images/realm_overworld_map.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: const Color(0xFF0F0F16)),
+            ),
+          ),
+        ),
+
+        // Gradient vignettes
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xCC0E0E14),
+                Color(0x33000000),
+                Color(0xF00A0A0E),
+              ],
+              stops: [0.0, 0.45, 1.0],
+            ),
+          ),
+        ),
+
+        // Horizontal Story Progression Stage Ladder
+        SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header ribbon
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                color: Colors.black45,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.linear_scale, color: Color(0xFFE5A93C), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'CAMPAIGN STORY TRACK: ${CampaignMapScreen.chapterTitle(widget.currentChapter)}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Row(
+                      children: [
+                        Text(
+                          '$_completedLinearStages/${stages.length} CLEARED',
+                          style: const TextStyle(
+                            color: Color(0xFF81C784),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        if (widget.onOpenEndgameGauntlet != null) ...[
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.workspace_premium, size: 14),
+                            label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E1E28),
+                              foregroundColor: const Color(0xFFE5A93C),
+                              side: const BorderSide(color: Color(0xFFE5A93C), width: 1.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: widget.onOpenEndgameGauntlet,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Horizontal Stages ListView
+              Expanded(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  itemCount: stages.length,
+                  separatorBuilder: (_, __) => Center(
+                    child: Container(
+                      width: 24,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5A93C).withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  itemBuilder: (context, index) {
+                    final stage = stages[index];
+                    final isUnlocked = stage.stageNumber <= (_completedLinearStages + 1);
+                    final isCompleted = stage.stageNumber <= _completedLinearStages;
+                    final isCurrent = stage.stageNumber == (_completedLinearStages + 1);
+
+                    return _buildStageCard(context, stage, isUnlocked, isCompleted, isCurrent, theme);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStageCard(
+    BuildContext context,
+    LinearCampaignStage stage,
+    bool isUnlocked,
+    bool isCompleted,
+    bool isCurrent,
+    ChapterTheme theme,
+  ) {
+    Color borderColor = const Color(0xFF2B2B38);
+    if (stage.isBoss) {
+      borderColor = const Color(0xFFE5A93C);
+    } else if (isCurrent) {
+      borderColor = const Color(0xFFEF5350);
+    } else if (isCompleted) {
+      borderColor = const Color(0xFF4CAF50);
+    }
+
+    return Container(
+      width: 220,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141E).withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: borderColor,
+          width: isCurrent || stage.isBoss ? 2.0 : 1.0,
+        ),
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFB3261E).withValues(alpha: 0.45),
+                  blurRadius: 10,
+                  spreadRadius: 1.5,
+                ),
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Stage Thumbnail Header
+            Stack(
+              children: [
+                SizedBox(
+                  height: 85,
+                  width: double.infinity,
+                  child: Image.asset(
+                    stage.thumbnailAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E1E28)),
+                  ),
+                ),
+                Container(
+                  height: 85,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0xE614141E)],
+                    ),
+                  ),
+                ),
+                // Stage Code Badge (e.g. 1-1)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: stage.isBoss ? const Color(0xFFB3261E) : Colors.black87,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: stage.isBoss ? const Color(0xFFFFD54F) : const Color(0xFFE5A93C),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      stage.isBoss ? '👑 STAGE ${stage.stageCode}' : 'STAGE ${stage.stageCode}',
+                      style: TextStyle(
+                        color: stage.isBoss ? const Color(0xFFFFD54F) : Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 9,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+                // Status Tag (COMPLETED / ACTIVE / LOCKED)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? const Color(0xFF2E7D32)
+                          : (isCurrent ? const Color(0xFFC62828) : Colors.black54),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      isCompleted ? 'CLEARED' : (isCurrent ? 'ENGAGE' : 'LOCKED'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 8.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Stage Title & Description
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      stage.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10.5,
+                        letterSpacing: 0.8,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      stage.environmentTitle,
+                      style: TextStyle(
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                        fontSize: 8.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Flexible(
+                      child: Text(
+                        stage.description,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 8.5,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Rewards Bar & Action Button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: const Color(0xFF111118),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 11),
+                      const SizedBox(width: 2),
+                      Text(
+                        '+${stage.rewardIchor}',
+                        style: const TextStyle(color: Color(0xFFEF5350), fontSize: 9.0, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 11),
+                      const SizedBox(width: 2),
+                      Text(
+                        '+${stage.rewardOre}',
+                        style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 9.0, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isCurrent ? const Color(0xFFB3261E) : (isCompleted ? const Color(0xFF263238) : Colors.white12),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: isUnlocked
+                        ? () {
+                            // Synthesize campaign node from linear stage
+                            final node = CampaignNode(
+                              id: 'linear_${stage.stageCode}',
+                              depth: stage.stageNumber,
+                              verticalRatio: 0.5,
+                              type: stage.type,
+                              name: stage.name,
+                              description: stage.description,
+                              nextNodeIds: const [],
+                              rewardIchor: stage.rewardIchor,
+                              rewardOre: stage.rewardOre,
+                              rewardSigils: stage.rewardSigils,
+                              isCurrent: isCurrent,
+                              isReachable: isUnlocked,
+                              isVisited: isCompleted,
+                              hazard: stage.hazard,
+                              customThumbnailAsset: stage.thumbnailAsset,
+                              scoutedAffinities: stage.enemyAffinities,
+                            );
+                            widget.onSelectNode(node);
+                          }
+                        : null,
+                    child: Text(
+                      isCurrent ? 'BATTLE' : (isCompleted ? 'REPLAY' : 'LOCKED'),
+                      style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildActiveBoonsBanner() {
     return Container(
@@ -456,7 +925,7 @@ class CampaignMapScreen extends StatelessWidget {
             child: Wrap(
               spacing: 6,
               runSpacing: 4,
-              children: activeBoons.map((b) => Container(
+              children: widget.activeBoons.map((b) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: b.color.withValues(alpha: 0.2),
@@ -537,7 +1006,7 @@ class CampaignMapScreen extends StatelessWidget {
           ),
           ElevatedButton.icon(
             key: const ValueKey('launch_mvp_skirmish_button'),
-            onPressed: onLaunchMvpSkirmish,
+            onPressed: widget.onLaunchMvpSkirmish,
             icon: const Icon(Icons.sports_kabaddi, size: 14, color: Colors.black),
             label: const Text(
               'ENGAGE',
@@ -749,7 +1218,7 @@ class CampaignMapScreen extends StatelessWidget {
 
   void _showNodeEncounterDialog(BuildContext context, CampaignNode node) {
     final double dialogWidth = (MediaQuery.of(context).size.width * 0.85).clamp(320.0, 480.0);
-    final theme = ChapterTheme.forChapter(currentChapter);
+    final theme = ChapterTheme.forChapter(widget.currentChapter);
 
     showDialog(
       context: context,
@@ -822,7 +1291,7 @@ class CampaignMapScreen extends StatelessWidget {
                           children: [
                             Positioned.fill(
                               child: Image.asset(
-                                _bossImageForChapter(currentChapter),
+                                _bossImageForChapter(widget.currentChapter),
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1B1B22)),
                               ),
@@ -1112,7 +1581,7 @@ class CampaignMapScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           Navigator.pop(context);
-                          onSelectNode(node);
+                          widget.onSelectNode(node);
                         },
                         child: Text(
                           _actionLabel(node.type),

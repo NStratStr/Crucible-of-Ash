@@ -92,6 +92,7 @@ void main() {
             totalIchor: 450,
             cursedOre: 75,
             bloodlineSigils: 2,
+            initialViewMode: CampaignViewMode.catacombDelve,
           ),
         ),
       );

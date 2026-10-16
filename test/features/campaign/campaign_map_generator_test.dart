@@ -30,16 +30,17 @@ void main() {
       expect(bossNode.nextNodeIds.isEmpty, isTrue);
     });
 
-    test('Campaign includes both Rest Haven and Watchtower scouting nodes at Depth 3', () {
+    test('Campaign includes Rest Haven, Watchtower, and Runic Teleport Stone at Depth 3', () {
       final nodes = CampaignMapGenerator.generateCuratedCampaign();
       final depth3Nodes = nodes.where((n) => n.depth == 3).toList();
 
-      expect(depth3Nodes.length, equals(2));
+      expect(depth3Nodes.length, equals(3));
       expect(depth3Nodes.any((n) => n.type == CampaignNodeType.restHaven), isTrue);
       expect(depth3Nodes.any((n) => n.type == CampaignNodeType.watchtower), isTrue);
+      expect(depth3Nodes.any((n) => n.type == CampaignNodeType.teleportStone), isTrue);
 
-      // Both branch into boss
-      for (final n in depth3Nodes) {
+      // Rest Haven and Watchtower branch into boss
+      for (final n in depth3Nodes.where((n) => n.type != CampaignNodeType.teleportStone)) {
         expect(n.nextNodeIds, contains('node_4_boss'));
       }
     });

@@ -185,6 +185,34 @@ void main() {
     expect(extracted, isTrue);
     expect(continued, isFalse);
   });
+
+  testWidgets('CampaignMapScreen renders linear stage ladder and allows toggling to catacomb dungeon', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
+    await tester.pumpAndSettle();
+
+    // Verify Linear Campaign mode rendered by default
+    expect(find.text('CAMPAIGN'), findsOneWidget);
+    expect(find.text('DUNGEON'), findsOneWidget);
+    expect(find.text('STAGE 1-1'), findsOneWidget);
+    expect(find.text('ASHEN OUTPOST'), findsOneWidget);
+
+    // Toggle to DUNGEON mode
+    await tester.tap(find.text('DUNGEON'));
+    await tester.pumpAndSettle();
+
+    // Verify catacomb delve node graph rendered
+    expect(find.text('Sunken Trench'), findsWidgets);
+
+    // Toggle back to CAMPAIGN mode
+    await tester.tap(find.text('CAMPAIGN'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('STAGE 1-1'), findsOneWidget);
+  });
 }
 
 

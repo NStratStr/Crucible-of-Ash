@@ -47,6 +47,7 @@ void main() {
               nodes: updatedNodes,
               onSelectNode: (_) {},
               currentChapter: 1,
+              initialViewMode: CampaignViewMode.catacombDelve,
             ),
           ),
         ),

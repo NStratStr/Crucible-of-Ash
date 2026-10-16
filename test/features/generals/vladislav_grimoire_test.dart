@@ -35,27 +35,30 @@ void main() {
       expect(commandService.maxFocus, equals(6));
     });
 
-    test('Burn Pit discards card with 0 Focus and draws fresh card after 6-tick cooldown', () {
+    test('Burn Pit discards card with 0 Focus, grants +1 Focus, and draws fresh card after 8-tick cooldown', () {
       commandService.initializeGrimoire();
+      // Spend down to 3 focus so +1 gain does not clamp at max 6
+      commandService.executeRendFlesh(tickManager.enemies.first.id); // costs 1 -> 5
+      commandService.executeIronBulwark(tickManager.allies.first.id); // costs 2 -> 3
       final cardToBurn = commandService.hand.first;
       final initialFocus = commandService.currentFocus;
 
       commandService.burnCard(cardToBurn.id);
 
-      // Card moved to discard pile, hand reduced, 0 Focus consumed
-      expect(commandService.currentFocus, equals(initialFocus));
+      // Card moved to discard pile, hand reduced, +1 Focus granted
+      expect(commandService.currentFocus, equals(initialFocus + 1));
       expect(commandService.hand.length, equals(2));
       expect(commandService.discardPile.length, equals(1));
-      expect(commandService.burnCooldownTicks, equals(6));
+      expect(commandService.burnCooldownTicks, equals(8));
 
-      // Simulate 5 ticks -> still in cooldown
-      for (int i = 0; i < 5; i++) {
+      // Simulate 7 ticks -> still in cooldown
+      for (int i = 0; i < 7; i++) {
         commandService.onSimulationTick();
       }
       expect(commandService.burnCooldownTicks, equals(1));
       expect(commandService.hand.length, equals(2));
 
-      // 6th tick -> draws replacement card
+      // 8th tick -> draws replacement card
       commandService.onSimulationTick();
       expect(commandService.burnCooldownTicks, equals(0));
       expect(commandService.hand.length, equals(3));
@@ -68,7 +71,7 @@ void main() {
       while (commandService.grimoireDeck.isNotEmpty) {
         final card = commandService.hand.first;
         commandService.burnCard(card.id);
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 8; i++) {
           commandService.onSimulationTick();
         }
       }
@@ -79,7 +82,7 @@ void main() {
       // Burn one more card from hand: draw deck is empty, so reshuffle occurs!
       final burnedId = commandService.hand.first.id;
       commandService.burnCard(burnedId);
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 8; i++) {
         commandService.onSimulationTick();
       }
 
