@@ -89,6 +89,8 @@ class CampaignMapScreen extends StatelessWidget {
   final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
   final VoidCallback? onLaunchMvpSkirmish;
+  final VoidCallback? onOpenHome;
+  final VoidCallback? onOpenSettings;
   final int currentChapter;
   final int maxUnlockedChapter;
   final ValueChanged<int>? onChapterChanged;
@@ -106,6 +108,8 @@ class CampaignMapScreen extends StatelessWidget {
     this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
     this.onLaunchMvpSkirmish,
+    this.onOpenHome,
+    this.onOpenSettings,
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
     this.onChapterChanged,
@@ -138,7 +142,14 @@ class CampaignMapScreen extends StatelessWidget {
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         backgroundColor: theme.surfaceColor,
-        titleSpacing: 8,
+        leading: onOpenHome != null
+            ? IconButton(
+                icon: const Icon(Icons.home, color: Color(0xFFFFD54F), size: 22),
+                tooltip: 'Citadel War Room (Home)',
+                onPressed: onOpenHome,
+              )
+            : null,
+        titleSpacing: onOpenHome != null ? 0 : 8,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -321,6 +332,17 @@ class CampaignMapScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (onOpenSettings != null)
+            IconButton(
+              icon: Image.asset(
+                'assets/images/UI/Settings Shield Icon Transparent.png',
+                width: 18,
+                height: 18,
+                errorBuilder: (_, __, ___) => const Icon(Icons.settings, color: Color(0xFFFFD54F), size: 18),
+              ),
+              tooltip: 'Settings & Telco Network',
+              onPressed: onOpenSettings,
+            ),
         ],
       ),
       body: Column(

@@ -19,6 +19,8 @@ import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
 import '../../features/generals/grimoire_manager_dialog.dart';
+import '../../features/home/home_screen.dart';
+import '../../features/settings/settings_dialog.dart';
 import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
 import '../../features/relics/relic_service.dart';
@@ -1396,6 +1398,52 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _showHomeModal() {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (dialogCtx) => HomeScreen(
+        totalIchor: _totalIchor,
+        cursedOre: _cursedOre,
+        bloodlineSigils: _bloodlineSigils,
+        activeGeneral: _activeGeneralType,
+        currentChapter: _currentChapter,
+        currentAscension: _currentAscension,
+        onOpenCampaign: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 0);
+        },
+        onOpenBattleArena: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 1);
+        },
+        onOpenCrucible: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 2);
+        },
+        onOpenRelicForge: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 3);
+        },
+        onOpenBrigadeRoster: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 4);
+        },
+        onOpenAffinityCodex: () {
+          Navigator.of(dialogCtx).pop();
+          setState(() => _currentIndex = 5);
+        },
+        onOpenEndgameGauntlet: () {
+          Navigator.of(dialogCtx).pop();
+          _handleOpenEndgameGauntlet();
+        },
+        onOpenSettings: () {
+          SettingsDialog.show(dialogCtx);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allPlayerUnits = [
@@ -1437,6 +1485,8 @@ class _AppShellState extends State<AppShell> {
                       });
                       _saveCurrentState();
                     },
+                    onOpenHome: () => _showHomeModal(),
+                    onOpenSettings: () => SettingsDialog.show(context),
                     onChapterChanged: (ch) => setState(() {
                       _currentChapter = ch;
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
