@@ -56,12 +56,133 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
   late int _currentIchor;
   bool _showCharacterSheet = false;
   bool _sheetViewingBack = false;
+  String? _selectedFactionSheetKey;
 
   @override
   void initState() {
     super.initState();
     _currentUnit = widget.unit;
     _currentIchor = widget.totalIchor;
+    _selectedFactionSheetKey = _defaultFactionKeyForUnit(widget.unit);
+  }
+
+  static String _defaultFactionKeyForUnit(UnitEntity unit) {
+    final faction = unit.factionName.toLowerCase();
+    if (faction.contains('crypt')) return 'crypt_stalkers';
+    if (faction.contains('mire') || faction.contains('coven')) return 'mire_coven';
+    if (faction.contains('calx') || faction.contains('void') || faction.contains('cult')) return 'calx_order';
+    return 'ash_legion';
+  }
+
+  String _getActiveFactionKey() {
+    return _selectedFactionSheetKey ?? _defaultFactionKeyForUnit(_currentUnit);
+  }
+
+  Color _getActiveFactionColor() {
+    switch (_getActiveFactionKey()) {
+      case 'crypt_stalkers':
+        return const Color(0xFFE53935);
+      case 'mire_coven':
+        return const Color(0xFF43A047);
+      case 'calx_order':
+        return const Color(0xFF00E5FF);
+      case 'ash_legion':
+      default:
+        return const Color(0xFFE5A93C);
+    }
+  }
+
+  String _getActiveCharacterSheetAsset() {
+    final key = _getActiveFactionKey();
+    final side = _sheetViewingBack ? 'back' : 'front';
+    return 'assets/images/UI/character_sheet_${side}_$key.png';
+  }
+
+  Widget _buildFactionSheetPill(String label, String key, Color themeColor) {
+    final isSelected = _getActiveFactionKey() == key;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFactionSheetKey = key;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? themeColor.withValues(alpha: 0.25) : const Color(0xFF1E1E28),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(
+            color: isSelected ? themeColor : Colors.white24,
+            width: isSelected ? 1.4 : 0.8,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: themeColor.withValues(alpha: 0.35),
+                    blurRadius: 6,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? themeColor : Colors.white38,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: isSelected ? themeColor : Colors.white70,
+                fontSize: 9.0,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSheetStatChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              color: color,
+              fontSize: 8.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8.5,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleLevelUp({int levels = 1}) {
@@ -467,7 +588,26 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 10),
+
+                        // Faction Theme Selector Pills (Ash Legion, Crypt Stalkers, Mire Coven, Calx Order)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildFactionSheetPill('Ash Legion', 'ash_legion', const Color(0xFFE5A93C)),
+                              const SizedBox(width: 6),
+                              _buildFactionSheetPill('Crypt Stalkers', 'crypt_stalkers', const Color(0xFFE53935)),
+                              const SizedBox(width: 6),
+                              _buildFactionSheetPill('Mire Coven', 'mire_coven', const Color(0xFF43A047)),
+                              const SizedBox(width: 6),
+                              _buildFactionSheetPill('Calx Order', 'calx_order', const Color(0xFF00E5FF)),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 14),
+
                         // Character Sheet Container
                         Container(
                           constraints: const BoxConstraints(maxWidth: 420),
@@ -475,7 +615,7 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                                color: _getActiveFactionColor().withValues(alpha: 0.25),
                                 blurRadius: 16,
                                 spreadRadius: 2,
                               ),
@@ -487,10 +627,15 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.asset(
-                                  _sheetViewingBack
-                                      ? 'assets/images/UI/character_sheet_back_ash_legion.png'
-                                      : 'assets/images/UI/character_sheet_front_ash_legion.png',
+                                  _getActiveCharacterSheetAsset(),
                                   fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    height: 520,
+                                    color: const Color(0xFF161622),
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, color: Colors.white24, size: 48),
+                                    ),
+                                  ),
                                 ),
                               ),
                               // Live Unit Avatar layered on Front
@@ -508,34 +653,202 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                                     ),
                                   ),
                                 ),
-                              // Live Name Banner
+                              // Live Front Name Banner & Vitals Overlay
                               if (!_sheetViewingBack)
                                 Positioned(
-                                  bottom: 42,
+                                  bottom: 38,
+                                  left: 24,
+                                  right: 24,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.85),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: const Color(0xFFE5A93C), width: 1.2),
+                                      color: Colors.black.withValues(alpha: 0.88),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: _getActiveFactionColor(), width: 1.2),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.6),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
                                     ),
                                     child: Column(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
                                           unit.name.toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Color(0xFFFFD54F),
+                                          style: TextStyle(
+                                            color: _getActiveFactionColor(),
                                             fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight: FontWeight.w900,
                                             letterSpacing: 1.2,
                                           ),
+                                          textAlign: TextAlign.center,
                                         ),
+                                        const SizedBox(height: 2),
                                         Text(
-                                          'Lv.${unit.level} • ${unit.archetype.name.toUpperCase()}',
+                                          'Lv.${unit.level} • ${unit.archetype.name.toUpperCase()} • ${unit.factionName.toUpperCase()}',
                                           style: const TextStyle(
                                             color: Colors.white70,
                                             fontSize: 9.5,
                                             fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        // Core Stat Chips Row
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            _buildSheetStatChip('HP', '${unit.currentHp}/${unit.maxHp}', const Color(0xFFE53935)),
+                                            _buildSheetStatChip('ATK', '${unit.attack}', const Color(0xFFFFB300)),
+                                            _buildSheetStatChip('DEF', '${unit.defense}', const Color(0xFF42A5F5)),
+                                            _buildSheetStatChip('SPD', '${unit.speed}', const Color(0xFF26A69A)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                              // Live Back: Ability & Relic Inscription Overlay
+                              if (_sheetViewingBack)
+                                Positioned.fill(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: Colors.black.withValues(alpha: 0.35),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        // Header
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.8),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: _getActiveFactionColor(), width: 0.8),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                '${unit.name.toUpperCase()} ARSENAL',
+                                                style: TextStyle(
+                                                  color: _getActiveFactionColor(),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                              Text(
+                                                'SLOT: ${unit.slot.name.toUpperCase()}',
+                                                style: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 8.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+
+                                        // Skills list (compact)
+                                        Expanded(
+                                          child: ListView(
+                                            padding: EdgeInsets.zero,
+                                            children: [
+                                              ...unit.resolvedSkills.map((s) {
+                                                final bool isUlt = s.isLimitBurst;
+                                                return Container(
+                                                  margin: const EdgeInsets.only(bottom: 6),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withValues(alpha: 0.75),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(
+                                                      color: isUlt ? const Color(0xFFFFD54F) : Colors.white24,
+                                                      width: isUlt ? 1.0 : 0.6,
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            s.name.toUpperCase(),
+                                                            style: TextStyle(
+                                                              fontSize: 9.5,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: isUlt ? const Color(0xFFFFD54F) : Colors.white,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            isUlt ? '⚡ ULTIMATE' : (s.cooldownTurns > 0 ? '${s.cooldownTurns}T CD' : 'BASIC'),
+                                                            style: TextStyle(
+                                                              fontSize: 8.0,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: isUlt ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        s.description,
+                                                        style: const TextStyle(
+                                                          fontSize: 8.5,
+                                                          color: Colors.white70,
+                                                        ),
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              }),
+
+                                              // Slotted Relics
+                                              if (equippedRelics.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withValues(alpha: 0.75),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(color: const Color(0xFF81C784), width: 0.6),
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      const Text(
+                                                        'SLOTTED RELICS',
+                                                        style: TextStyle(
+                                                          color: Color(0xFF81C784),
+                                                          fontSize: 8.5,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      ...equippedRelics.map((r) => Text(
+                                                            '• ${r.slot.name.toUpperCase()}: ${r.name}',
+                                                            style: TextStyle(
+                                                              color: r.rarityColor,
+                                                              fontSize: 8.0,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          )),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ),
                                       ],
