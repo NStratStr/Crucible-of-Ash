@@ -361,19 +361,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             icon: Icon(
               _isMuted ? Icons.volume_off : Icons.volume_up,
               color: _isMuted ? Colors.white38 : const Color(0xFFFFD54F),
-              size: 22,
+              size: 20,
             ),
-            tooltip: _isMuted ? 'Unmute Ambient Sound' : 'Mute Ambient Sound',
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            tooltip: _isMuted ? 'Unmute' : 'Mute',
             onPressed: _toggleMute,
           ),
+          const SizedBox(width: 4),
           // Play / Pause Simulation
           IconButton(
             icon: Icon(
               _engine.isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill,
               color: _engine.isRunning ? const Color(0xFFFFD54F) : const Color(0xFF81C784),
-              size: 26,
+              size: 22,
             ),
-            tooltip: _engine.isRunning ? 'Pause 30Hz Simulation' : 'Run 30Hz Simulation',
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            tooltip: _engine.isRunning ? 'Pause' : 'Play',
             onPressed: () {
               setState(() {
                 if (_engine.isPreBattlePhase) {
@@ -384,10 +389,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               });
             },
           ),
+          const SizedBox(width: 4),
           // Step 1 Tick Button for Testing
           IconButton(
-            icon: const Icon(Icons.skip_next, color: Colors.white70),
-            tooltip: 'Advance 1 Tick',
+            icon: const Icon(Icons.skip_next, color: Colors.white70, size: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            tooltip: 'Step Tick',
             onPressed: () {
               if (_engine.isPreBattlePhase) {
                 _engine.isPreBattlePhase = false;
@@ -395,8 +403,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               _engine.stepTick();
             },
           ),
+          const SizedBox(width: 4),
           // Fast-Forward to Tick 135 (Telegraph moment)
           TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              minimumSize: const Size(0, 26),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             onPressed: () {
               if (_engine.isPreBattlePhase) {
                 _engine.isPreBattlePhase = false;
@@ -405,11 +419,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 _engine.stepTick();
               }
             },
-            child: const Text('TICK 135', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 11)),
+            child: const Text('T135', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold)),
           ),
+          const SizedBox(width: 2),
           // Reset
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white54),
+            icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
             tooltip: 'Reset Encounter',
             onPressed: () {
               setState(() {
@@ -421,6 +438,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               });
             },
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: SafeArea(
@@ -517,182 +535,208 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   if (_engine.isVictory || _engine.isDefeat)
                     Positioned.fill(
                       child: Container(
-                        color: Colors.black.withValues(alpha: 0.75),
+                        color: Colors.black.withValues(alpha: 0.85),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Center(
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 24),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF14141E),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (_engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744)).withValues(alpha: 0.4),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
+                          child: SingleChildScrollView(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 440),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF14141E),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744),
+                                  width: 2,
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _engine.isVictory ? Icons.emoji_events : Icons.heart_broken,
-                                  color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
-                                  size: 40,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _engine.isVictory
-                                      ? '${widget.encounterTitle ?? _engine.encounterTitle} CONQUERED'.toUpperCase()
-                                      : 'RESONANCE SEVERED',
-                                  style: TextStyle(
-                                    color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                    letterSpacing: 1.5,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF1744)).withValues(alpha: 0.4),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _engine.isVictory
-                                      ? 'The enemy regiment has collapsed into inert slag and bone.'
-                                      : 'All constructs have fallen. Your neural tether dissipates into the miasma.',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 11, color: Colors.white70),
-                                ),
-
-                                // Star Rating & Instant Sweep Unlock (GDD §7.3)
-                                if (_engine.isVictory) ...[
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: List.generate(3, (i) {
-                                      final filled = i < _engine.starRating;
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                                        child: Icon(
-                                          filled ? Icons.star : Icons.star_border,
-                                          color: filled ? const Color(0xFFFFD54F) : Colors.white24,
-                                          size: 24,
-                                        ),
-                                      );
-                                    }),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _engine.isVictory ? Icons.emoji_events : Icons.heart_broken,
+                                    color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                                    size: 36,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _engine.isVictory
+                                        ? '${widget.encounterTitle ?? _engine.encounterTitle} CONQUERED'.toUpperCase()
+                                        : 'RESONANCE SEVERED',
+                                    style: TextStyle(
+                                      color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 15,
+                                      letterSpacing: 1.2,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    _engine.isFlawlessClear
-                                        ? '🌟 3-STAR FLAWLESS CLEAR! INSTANT EXTRACTION UNLOCKED'
-                                        : '${_engine.starRating}-STAR CLEAR (${_engine.casualtiesCount} Casualties)',
-                                    style: TextStyle(
-                                      color: _engine.isFlawlessClear ? const Color(0xFFFFE082) : Colors.white70,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.8,
-                                    ),
+                                    _engine.isVictory
+                                        ? 'The enemy regiment has collapsed into inert slag and bone.'
+                                        : 'All constructs have fallen. Your neural tether dissipates into the miasma.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 10.5, color: Colors.white70),
                                   ),
 
-                                  // Loot & Currencies Reagents (GDD §7.1)
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0C0C14),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.3)),
-                                    ),
-                                    child: Row(
+                                  // Star Rating & Instant Sweep Unlock (GDD §7.3)
+                                  if (_engine.isVictory) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
                                       mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Unbound Ash
-                                        const Icon(Icons.blur_on, color: Color(0xFFB0BEC5), size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '+${_engine.rewardUnboundAsh} Ash',
-                                          style: const TextStyle(color: Color(0xFFECEFF1), fontSize: 10, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        // Distilled Vitae
-                                        const Icon(Icons.opacity, color: Color(0xFFE53935), size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '+${_engine.rewardDistilledVitae} Vitae',
-                                          style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 10, fontWeight: FontWeight.bold),
-                                        ),
-                                        if (_engine.rewardBossReagent != null) ...[
-                                          const SizedBox(width: 12),
-                                          const Icon(Icons.whatshot, color: Color(0xFFFF9100), size: 14),
-                                          const SizedBox(width: 4),
-                                          const Text(
-                                            'Brim-Slag Core',
-                                            style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold),
+                                      children: List.generate(3, (i) {
+                                        final filled = i < _engine.starRating;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                                          child: Icon(
+                                            filled ? Icons.star : Icons.star_border,
+                                            color: filled ? const Color(0xFFFFD54F) : Colors.white24,
+                                            size: 22,
                                           ),
-                                        ],
-                                      ],
+                                        );
+                                      }),
                                     ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _engine.isFlawlessClear
+                                          ? '🌟 3-STAR FLAWLESS CLEAR! INSTANT EXTRACTION UNLOCKED'
+                                          : '${_engine.starRating}-STAR CLEAR (${_engine.casualtiesCount} Casualties)',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: _engine.isFlawlessClear ? const Color(0xFFFFE082) : Colors.white70,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+
+                                    // Loot & Currencies Reagents (GDD §7.1)
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0C0C14),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.3)),
+                                      ),
+                                      child: Wrap(
+                                        spacing: 12,
+                                        runSpacing: 4,
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          // Unbound Ash
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.blur_on, color: Color(0xFFB0BEC5), size: 14),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '+${_engine.rewardUnboundAsh} Ash',
+                                                style: const TextStyle(color: Color(0xFFECEFF1), fontSize: 10, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          // Distilled Vitae
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.opacity, color: Color(0xFFE53935), size: 14),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '+${_engine.rewardDistilledVitae} Vitae',
+                                                style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 10, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          if (_engine.rewardBossReagent != null)
+                                            const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.whatshot, color: Color(0xFFFF9100), size: 14),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'Brim-Slag Core',
+                                                  style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: 14),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.center,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _engine.setupSunderAtAshenGate();
+                                          });
+                                        },
+                                        icon: const Icon(Icons.refresh, size: 14),
+                                        label: const Text('REPLAY', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFFFFD54F),
+                                          side: const BorderSide(color: Color(0xFFFFD54F)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        ),
+                                      ),
+                                      if (_engine.isVictory && widget.onVictory != null)
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.arrow_forward, size: 14, color: Colors.white),
+                                          label: const Text(
+                                            'CLAIM VICTORY & ADVANCE',
+                                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF1B5E20),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            elevation: 4,
+                                          ),
+                                          onPressed: () {
+                                            _playSfx('sfx_victory.wav');
+                                            widget.onVictory!();
+                                          },
+                                        )
+                                      else if (_engine.isDefeat && widget.onDefeat != null)
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.home, size: 14, color: Colors.white),
+                                          label: const Text('RETURN TO CAMP', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFB3261E),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          ),
+                                          onPressed: widget.onDefeat,
+                                        )
+                                      else if (widget.onBackToStandardCombat != null)
+                                        OutlinedButton(
+                                          onPressed: widget.onBackToStandardCombat,
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.white70,
+                                            side: const BorderSide(color: Colors.white24),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          ),
+                                          child: const Text('EXIT TO HUB', style: TextStyle(fontSize: 10.5)),
+                                        ),
+                                    ],
                                   ),
                                 ],
-
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ElevatedButton.icon(
-                                      onPressed: () {
-                                        setState(() {
-                                          _engine.setupSunderAtAshenGate();
-                                        });
-                                      },
-                                      icon: const Icon(Icons.refresh, size: 16),
-                                      label: const Text('REPLAY ENCOUNTER'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF2C2216),
-                                        foregroundColor: const Color(0xFFFFD54F),
-                                        side: const BorderSide(color: Color(0xFFFFD54F)),
-                                      ),
-                                    ),
-                                    if (_engine.isVictory && widget.onVictory != null) ...[
-                                      const SizedBox(width: 12),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          _playSfx('sfx_victory.wav');
-                                          widget.onVictory!();
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF1B5E20),
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        child: const Text('CLAIM VICTORY & ADVANCE'),
-                                      ),
-                                    ] else if (_engine.isDefeat && widget.onDefeat != null) ...[
-                                      const SizedBox(width: 12),
-                                      ElevatedButton(
-                                        onPressed: widget.onDefeat,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFFB3261E),
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        child: const Text('RETURN TO CAMP'),
-                                      ),
-                                    ] else if (widget.onBackToStandardCombat != null) ...[
-                                      const SizedBox(width: 12),
-                                      OutlinedButton(
-                                        onPressed: widget.onBackToStandardCombat,
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: Colors.white70,
-                                          side: const BorderSide(color: Colors.white24),
-                                        ),
-                                        child: const Text('EXIT TO HUB'),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                         ),
@@ -736,179 +780,141 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              // 1. Commander Focus Crystal Bank with dynamic charge pips
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'FOCUS ${_engine.focus}/${_engine.maxFocus}',
-                      style: const TextStyle(
-                        color: Color(0xFF00E5FF),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    // Visual Crystal Pips (Filled vs Empty)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(_engine.maxFocus, (index) {
-                        final isFilled = index < _engine.focus;
-                        final isCharging = index == _engine.focus;
-                        return Container(
-                          width: 8,
-                          height: 12,
-                          margin: const EdgeInsets.only(right: 3),
-                          decoration: BoxDecoration(
-                            color: isFilled
-                                ? const Color(0xFF00E5FF)
-                                : (isCharging
-                                    ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
-                                    : Colors.white10),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(
-                              color: isFilled ? const Color(0xFF80D8FF) : Colors.white24,
-                              width: 0.8,
-                            ),
-                            boxShadow: isFilled
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
-                                      blurRadius: 4,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: isCharging
-                              ? FractionallySizedBox(
-                                  alignment: Alignment.bottomCenter,
-                                  heightFactor: focusProgress,
-                                  child: Container(
-                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.75),
-                                  ),
-                                )
-                              : null,
-                        );
-                      }),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // 2. Simulation Speed & Bullet-Time Toggle
-              GestureDetector(
-                onTap: () {
-                  _engine.setBulletTime(!_engine.isBulletTime);
-                },
-                child: Container(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // 1. Commander Focus Crystal Bank with dynamic charge pips
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _engine.isBulletTime ? const Color(0xFFFF9100).withValues(alpha: 0.3) : const Color(0xFF282836),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white24,
-                    ),
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        _engine.isBulletTime ? Icons.slow_motion_video : Icons.speed,
-                        color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
-                        size: 14,
-                      ),
+                      const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        _engine.isBulletTime ? '30% BULLET-TIME' : '1.0X REALTIME',
-                        style: TextStyle(
-                          color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                        'FOCUS ${_engine.focus}/${_engine.maxFocus}',
+                        style: const TextStyle(
+                          color: Color(0xFF00E5FF),
                           fontWeight: FontWeight.bold,
-                          fontSize: 9.5,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Visual Crystal Pips (Filled vs Empty)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(_engine.maxFocus, (index) {
+                          final isFilled = index < _engine.focus;
+                          final isCharging = index == _engine.focus;
+                          return Container(
+                            width: 8,
+                            height: 12,
+                            margin: const EdgeInsets.only(right: 3),
+                            decoration: BoxDecoration(
+                              color: isFilled
+                                  ? const Color(0xFF00E5FF)
+                                  : (isCharging
+                                      ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
+                                      : Colors.white10),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(
+                                color: isFilled ? const Color(0xFF80D8FF) : Colors.white24,
+                                width: 0.8,
+                              ),
+                              boxShadow: isFilled
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                                        blurRadius: 4,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: isCharging
+                                ? FractionallySizedBox(
+                                    alignment: Alignment.bottomCenter,
+                                    heightFactor: focusProgress,
+                                    child: Container(
+                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.75),
+                                    ),
+                                  )
+                                : null,
+                          );
+                        }),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
 
-              // 2b. Lady Valeria Commander Stance Badge (GDD 4.2)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _engine.isValeriaInFrontline
-                      ? const Color(0xFFFFD54F).withValues(alpha: 0.15)
-                      : const Color(0xFF7C4DFF).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
-                    width: 0.9,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _engine.isValeriaInFrontline ? Icons.shield : Icons.auto_fix_high,
-                      color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
-                      size: 13,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)',
-                      style: TextStyle(
-                        color: _engine.isValeriaInFrontline ? const Color(0xFFFFE082) : const Color(0xFFD1C4E9),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 8.5,
-                        letterSpacing: 0.4,
+                // 2. Simulation Speed & Bullet-Time Toggle
+                GestureDetector(
+                  onTap: () {
+                    _engine.setBulletTime(!_engine.isBulletTime);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _engine.isBulletTime ? const Color(0xFFFF9100).withValues(alpha: 0.3) : const Color(0xFF282836),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white24,
                       ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(
+                          _engine.isBulletTime ? Icons.slow_motion_video : Icons.speed,
+                          color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _engine.isBulletTime ? '30% BULLET-TIME' : '1.0X REALTIME',
+                          style: TextStyle(
+                            color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
 
-              // 2c. Tactical Attack Trajectory Lines Overlay Toggle ("ALL VECTORS")
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _showAllTrajectories = !_showAllTrajectories;
-                  });
-                },
-                child: Container(
+                // 2b. Lady Valeria Commander Stance Badge (GDD 4.2)
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _showAllTrajectories
-                        ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
-                        : const Color(0xFF282836),
+                    color: _engine.isValeriaInFrontline
+                        ? const Color(0xFFFFD54F).withValues(alpha: 0.15)
+                        : const Color(0xFF7C4DFF).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white24,
+                      color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
+                      width: 0.9,
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        _showAllTrajectories ? Icons.visibility : Icons.visibility_outlined,
-                        color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
+                        _engine.isValeriaInFrontline ? Icons.shield : Icons.auto_fix_high,
+                        color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
                         size: 13,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _showAllTrajectories ? 'VECTORS: ON' : 'ALL VECTORS',
+                        _engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)',
                         style: TextStyle(
-                          color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
+                          color: _engine.isValeriaInFrontline ? const Color(0xFFFFE082) : const Color(0xFFD1C4E9),
                           fontWeight: FontWeight.bold,
                           fontSize: 8.5,
                           letterSpacing: 0.4,
@@ -917,85 +923,131 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ],
                   ),
                 ),
-              ),
-              // 2d. Ashen Reckoning Soft Enrage Status (GDD §6.3)
-              if (_engine.isAshenReckoning)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF1744).withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFF1744)),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.local_fire_department, color: Color(0xFFFF1744), size: 13),
-                      SizedBox(width: 4),
-                      Text(
-                        'ASHEN RECKONING (DMG x2.0)',
-                        style: TextStyle(
-                          color: Color(0xFFFF5252),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 8.5,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const Spacer(),
+                const SizedBox(width: 8),
 
-              // Pre-Battle Deployment Start Button
-              if (_engine.isPreBattlePhase)
-                ElevatedButton.icon(
-                  onPressed: () {
+                // 2c. Tactical Attack Trajectory Lines Overlay Toggle ("ALL VECTORS")
+                GestureDetector(
+                  onTap: () {
                     setState(() {
-                      _engine.startBattle();
+                      _showAllTrajectories = !_showAllTrajectories;
                     });
                   },
-                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 16),
-                  label: const Text(
-                    'ENGAGE BATTLE',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
-                      letterSpacing: 0.8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _showAllTrajectories
+                          ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
+                          : const Color(0xFF282836),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white24,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _showAllTrajectories ? Icons.visibility : Icons.visibility_outlined,
+                          color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _showAllTrajectories ? 'VECTORS: ON' : 'ALL VECTORS',
+                          style: TextStyle(
+                            color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD54F),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    elevation: 4,
-                    shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
-                  ),
                 ),
-
-              // 3. Boss Telegraph Execution Warning Badge
-              if (boss != null && boss.pendingIntent != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF1744).withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFF1744)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF1744), size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${boss.pendingIntent!.skillName.toUpperCase()} IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
-                        style: const TextStyle(
-                          color: Color(0xFFFF8A80),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
+                // 2d. Ashen Reckoning Soft Enrage Status (GDD §6.3)
+                if (_engine.isAshenReckoning) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF1744)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.local_fire_department, color: Color(0xFFFF1744), size: 13),
+                        SizedBox(width: 4),
+                        Text(
+                          'ASHEN RECKONING (DMG x2.0)',
+                          style: TextStyle(
+                            color: Color(0xFFFF5252),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 8.5,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-            ],
+                ],
+
+                const SizedBox(width: 12),
+
+                // Pre-Battle Deployment Start Button
+                if (_engine.isPreBattlePhase)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _engine.startBattle();
+                      });
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 16),
+                    label: const Text(
+                      'ENGAGE BATTLE',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD54F),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      elevation: 4,
+                      shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
+                    ),
+                  ),
+
+                // 3. Boss Telegraph Execution Warning Badge
+                if (boss != null && boss.pendingIntent != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF1744).withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF1744)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF1744), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${boss.pendingIntent!.skillName.toUpperCase()} IN ${boss.pendingIntent!.triggerTick - _engine.currentTick} TICKS',
+                          style: const TextStyle(
+                            color: Color(0xFFFF8A80),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
 
           const SizedBox(height: 4),
@@ -3547,16 +3599,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  unit.name.split(' ').first.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 8.0,
-                    fontWeight: FontWeight.bold,
-                    color: isReady ? const Color(0xFFFFE082) : Colors.white70,
-                    letterSpacing: 0.4,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        unit.name.split(' ').first.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 8.0,
+                          fontWeight: FontWeight.bold,
+                          color: isReady ? const Color(0xFFFFE082) : Colors.white70,
+                          letterSpacing: 0.4,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      'Lv.${unit.level}',
+                      style: TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFFFD54F),
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 1),
                 Text(

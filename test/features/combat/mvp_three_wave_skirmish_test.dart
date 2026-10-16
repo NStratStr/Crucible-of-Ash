@@ -14,15 +14,15 @@ void main() {
 
       expect(waves.length, equals(3));
 
-      // Wave 1: 3 units
-      expect(waves[0].length, equals(3));
+      // Wave 1: 5 units
+      expect(waves[0].length, equals(5));
       expect(waves[0][0].name, contains('Rotting Husk'));
       expect(waves[0][1].name, contains('Grave Ghoul'));
-      expect(waves[0][2].name, contains('Blood Alchemist'));
+      expect(waves[0][3].name, contains('Blood Alchemist'));
 
-      // Wave 2: 4 units
-      expect(waves[1].length, equals(4));
-      expect(waves[1][3].name, contains('Blight Necromancer'));
+      // Wave 2: 5 units
+      expect(waves[1].length, equals(5));
+      expect(waves[1][4].name, contains('Blight Necromancer'));
 
       // Wave 3: 5 units with Titanic Boss
       expect(waves[2].length, equals(5));
@@ -51,7 +51,7 @@ void main() {
       commandService.initializeGrimoire();
 
       // Start Wave 1
-      expect(tickManager.enemies.length, equals(3));
+      expect(tickManager.enemies.length, equals(5));
       expect(tickManager.tickCount, equals(0));
 
       // Advance ticks to trigger warning phase
@@ -69,7 +69,7 @@ void main() {
 
       // Advance to Wave 2 via advanceWave
       tickManager.advanceWave(waves[1]);
-      expect(tickManager.enemies.length, equals(4));
+      expect(tickManager.enemies.length, equals(5));
       // GDD Sec 13.2: Reckoning clock reset
       expect(tickManager.tickCount, equals(0));
       expect(tickManager.reckoningPhase, equals(AshenReckoningPhase.normal));

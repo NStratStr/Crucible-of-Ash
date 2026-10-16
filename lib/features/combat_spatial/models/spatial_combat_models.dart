@@ -193,6 +193,7 @@ class CombatUnitState {
   final List<GridNode> occupiedNodes;
   final bool isDisplacementImmune;
   final int moveRange;
+  final int level;
   int currentAp; // 0 to 10,000 threshold
   int maxHp;
   int hp;
@@ -233,6 +234,7 @@ class CombatUnitState {
     required this.occupiedNodes,
     bool? isDisplacementImmune,
     this.moveRange = 1,
+    this.level = 10,
     this.currentAp = 0,
     required this.maxHp,
     required this.hp,

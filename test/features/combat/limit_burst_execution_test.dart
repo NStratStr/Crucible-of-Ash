@@ -173,6 +173,7 @@ void main() {
       // Verify banner dismisses after timeout
       await tester.pump(const Duration(milliseconds: 1200));
       expect(find.text('LIMIT BURST AWAKENING'), findsNothing);
+      tickManager.pause();
     });
   });
 }

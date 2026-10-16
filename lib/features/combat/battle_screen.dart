@@ -2699,6 +2699,40 @@ class _BattleScreenState extends State<BattleScreen> {
                     ),
                     const SizedBox(width: 5),
 
+                    // Quick Hexagonal Affinity Wheel Button
+                    GestureDetector(
+                      onTap: () => _showHexWheelDialog(activeUnit?.archetype),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF232330),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF4D4D64), width: 1.1),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 1)),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.hexagon_outlined, size: 12, color: Color(0xFFD4AF37)),
+                            const SizedBox(width: 3),
+                            const Text(
+                              'WHEEL',
+                              style: TextStyle(
+                                color: Color(0xFFD4AF37),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+
                     // Sleek Collapsible Tactical Settings Popout Button
                     GestureDetector(
                       onTap: () => _showTacticalSettingsModal(context, activeUnit),
