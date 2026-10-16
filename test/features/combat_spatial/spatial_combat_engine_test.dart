@@ -292,6 +292,99 @@ void main() {
       expect(secondaryTargets, isNotEmpty);
       expect(secondaryTargets.any((t) => t.id == 'gorgoroth_boss'), isTrue);
     });
+
+    test('Inert Vessel Downed State: Unit converts to 0 HP inert vessel, AP freezes, and blocks direct walk', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      footman.currentAp = 4000;
+      footman.takeDamage(1000, ignoreArmor: true); // Lethal damage
+
+      expect(footman.hp, equals(0));
+      expect(footman.isDowned, isTrue);
+      expect(footman.currentAp, equals(0)); // AP frozen/cleared
+
+      // Moving another friendly unit directly onto an inert vessel is blocked
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      valeria.currentAp = 6000;
+      // Valeria is at (Col 1, Row 0), Footman is at (Col 3, Row 0)
+      // Moving to Footman's tile fails because tile has an Inert Vessel
+      final walkBlocked = engine.movePlayerUnit('lady_valeria', 3, 0);
+      expect(walkBlocked, isFalse);
+    });
+
+    test('Severed Resonance: Commander in Downed State throttles Focus accumulation by 50%', () {
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      // Freeze unit turns so only passive tick accumulation is tested
+      for (final u in engine.playerUnits) {
+        u.speed = 0;
+      }
+      engine.focus = 2;
+
+      // When Valeria is alive, focus generates every 40 ticks
+      while (engine.currentTick < 40) {
+        engine.stepTick();
+      }
+      expect(engine.focus, equals(3)); // 2 -> 3 at tick 40
+
+      // Now down Valeria
+      valeria.takeDamage(2000, ignoreArmor: true);
+      expect(valeria.isDowned, isTrue);
+
+      // Throttled to 80 ticks (50% slower generation)
+      // At tick 80: 80 % 80 == 0 -> generates 1 Focus (focus becomes 4)
+      while (engine.currentTick < 80) {
+        engine.stepTick();
+      }
+      expect(engine.focus, equals(4));
+
+      // At tick 120 (40 ticks later): 120 % 80 != 0 -> no focus generated! Still 4.
+      while (engine.currentTick < 120) {
+        engine.stepTick();
+      }
+      expect(engine.focus, equals(4)); // Throttled! Would have been 5 if alive.
+
+      // At tick 160 (80 ticks since tick 80): 160 % 80 == 0 -> focus becomes 5.
+      while (engine.currentTick < 160) {
+        engine.stepTick();
+      }
+      expect(engine.focus, equals(5));
+    });
+
+    test('Infused Vitae Revive Mechanics: Revives downed unit, applies Soul Fracture, and grants 6-tick invulnerability', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final originalMaxHp = footman.maxHp;
+      footman.takeDamage(1000, ignoreArmor: true); // Downed
+      expect(footman.isDowned, isTrue);
+
+      // Put Revive Vitae in hand if in drawPile
+      if (!engine.hand.any((c) => c.id == 'revive_vitae')) {
+        final reviveCard = engine.drawPile.firstWhere((c) => c.id == 'revive_vitae');
+        engine.drawPile.remove(reviveCard);
+        engine.hand.add(reviveCard);
+      }
+
+      engine.focus = 3;
+      final castSuccess = engine.castCard('revive_vitae', targetUnit: footman);
+      expect(castSuccess, isTrue);
+
+      expect(footman.isAlive, isTrue);
+      expect(footman.reviveCount, equals(1));
+      expect(footman.maxHp, equals((originalMaxHp * 0.80).round())); // -20% Soul Fracture
+      expect(footman.currentAp, equals(0));
+      expect(footman.invulnerabilityTicks, equals(6));
+      expect(footman.isInvulnerable, isTrue);
+
+      // Invulnerable unit takes 0 damage
+      final hpBefore = footman.hp;
+      footman.takeDamage(100);
+      expect(footman.hp, equals(hpBefore));
+
+      // After 6 ticks, invulnerability expires
+      for (int i = 0; i < 6; i++) {
+        engine.stepTick();
+      }
+      expect(footman.invulnerabilityTicks, equals(0));
+      expect(footman.isInvulnerable, isFalse);
+    });
   });
 }
 

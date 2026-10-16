@@ -205,6 +205,9 @@ class CombatUnitState {
   int stunDuration; // in ticks (freezes AP)
   int aegisShield; // absorbs damage before HP
   int reviveCount; // tracking Soul Fracture (-20% max HP per revive)
+  int? baseMaxHp; // original baseline Max HP prior to Soul Fractures
+  int invulnerabilityTicks; // grace window after revive (e.g., 6 ticks = 0.2s)
+  bool get isInvulnerable => invulnerabilityTicks > 0;
   int ultimateGauge; // 0 to 100%
   bool get isUltimateReady => ultimateGauge >= 100;
   bool isSlagCarapaceActive;
@@ -238,6 +241,8 @@ class CombatUnitState {
     this.stunDuration = 0,
     this.aegisShield = 0,
     this.reviveCount = 0,
+    int? baseMaxHp,
+    this.invulnerabilityTicks = 0,
     this.ultimateGauge = 0,
     this.isSlagCarapaceActive = false,
     this.pendingIntent,
@@ -245,7 +250,8 @@ class CombatUnitState {
     this.consecutiveTurnsStationary = 0,
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
-  })  : isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
+  })  : baseMaxHp = baseMaxHp ?? maxHp,
+        isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
         activeStance = activeStance ?? _defaultStanceForArchetype(archetype);
 
   static StanceType _defaultStanceForArchetype(UnitArchetype archetype) {
@@ -421,6 +427,8 @@ class CombatUnitState {
 
   /// Inflicts damage taking Slag Carapace, Aegis Shield, and Armor into account
   int takeDamage(int rawDamage, {bool ignoreArmor = false}) {
+    if (isInvulnerable || isDowned) return 0;
+
     double finalDmg = rawDamage.toDouble();
     if (isSlagCarapaceActive && armor > 0) {
       finalDmg *= 0.50; // -50% damage while Slag Carapace armor holds
@@ -442,6 +450,14 @@ class CombatUnitState {
     }
 
     hp = max(0, hp - applied);
+    if (hp == 0) {
+      // Transitioning into Downed State (Inert Vessel)
+      currentAp = 0;
+      pendingIntent = null;
+      hasStanceBonusReady = false;
+      consecutiveTurnsStationary = 0;
+      aegisShield = 0;
+    }
     return applied;
   }
 

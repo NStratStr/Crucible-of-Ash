@@ -358,6 +358,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       notifyListeners();
     }
 
+    // Process Invulnerability Window Decay (e.g. 6 ticks = 0.2s after revive)
+    for (final unit in [...playerUnits, ...enemyUnits]) {
+      if (unit.invulnerabilityTicks > 0) {
+        unit.invulnerabilityTicks--;
+      }
+    }
+
     // Bleed Ticks (Every 30 ticks = 1 second)
     if (currentTick % 30 == 0) {
       for (final unit in [...playerUnits, ...enemyUnits]) {
@@ -1072,6 +1079,14 @@ class SpatialCombatEngine extends ChangeNotifier {
       return true;
     }
 
+    // Do not allow walking onto a downed inert plinth unless revived
+    final downedOccupant = playerUnits.where((u) => u.isDowned && u.occupies(targetCol, targetRow)).firstOrNull;
+    if (downedOccupant != null) {
+      addLog('${downedOccupant.name} lies as an Inert Vessel on this tile. Cast Infused Vitae Resurgence to revive!');
+      lastBannerMessage = '🪨 INERT VESSEL: Tile is occupied by downed ${downedOccupant.name}!';
+      return false;
+    }
+
     final success = unit.repositionTo([GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)], apPenalty: apCost);
     if (success) {
       if (unit.id == 'lady_valeria' && oldRow != targetRow) {
@@ -1290,22 +1305,42 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else if (card.id == 'revive_vitae') {
-      // SOVEREIGN SLIP: Resurrects downed unit with 50% HP, resets AP to 0, cleanses debuffs
-      // GDD §4.4: Incurs stacking -20% Max HP penalty (Soul Fracture)
+      // SOVEREIGN SLIP: Resurrects downed unit (GDD §3.6 / §4.4)
+      // 1. Scales from Caster Attack (Sun-Smith = 88) + Generation bonus (G1 = +15%)
+      // 2. Incurs stacking -20% Max HP penalty (Soul Fracture) based on baseline Max HP
+      // 3. Overflow vitality converts into an Aegis Shield Ring (50% of excess)
+      // 4. Awakening State: 6-tick (0.2s) invulnerability window, cleansed debuffs, and AP reset to 0
       final downedTarget = targetUnit ?? playerUnits.where((u) => u.isDowned).firstOrNull;
       if (downedTarget != null) {
         downedTarget.reviveCount++;
+        final int baselineMax = downedTarget.baseMaxHp ?? downedTarget.maxHp;
         final double soulFracturePenalty = (1.0 - (downedTarget.reviveCount * 0.20)).clamp(0.20, 1.0);
-        downedTarget.maxHp = (downedTarget.maxHp * soulFracturePenalty).round();
-        downedTarget.hp = (downedTarget.maxHp * 0.50).round();
+        downedTarget.maxHp = max(50, (baselineMax * soulFracturePenalty).round());
+
+        // Revived vitality: (Caster ATK 88 * 2.2) * (1 + 1 * 0.15) ≈ 193.6 * 1.15 ≈ 222 HP
+        const int casterAtk = 88;
+        const double skillCoeff = 2.2;
+        const int casterGen = 1;
+        final int targetVitality = (casterAtk * skillCoeff * (1 + casterGen * 0.15)).round();
+
+        int restoredHp = targetVitality;
+        int overflowAegis = 0;
+        if (restoredHp > downedTarget.maxHp) {
+          final excess = restoredHp - downedTarget.maxHp;
+          overflowAegis = (excess * 0.50).round();
+          restoredHp = downedTarget.maxHp;
+        }
+
+        downedTarget.hp = max(1, restoredHp);
         downedTarget.currentAp = 0;
         downedTarget.bleedStacks = 0;
         downedTarget.burnDuration = 0;
         downedTarget.stunDuration = 0;
-        downedTarget.aegisShield = 40;
+        downedTarget.invulnerabilityTicks = 6; // 6-tick (0.2s) invulnerability window per GDD §3.6
+        downedTarget.aegisShield = 40 + overflowAegis; // Base 40 + 50% overflow vitality
 
-        lastBannerMessage = '✨ RESURGENCE: ${downedTarget.name} REAWAKENED (${downedTarget.hp} HP)!';
-        addLog('REVIVE CAST: ${downedTarget.name} restored to life! Soul Fracture stack #${downedTarget.reviveCount} applied (-20% max HP).');
+        lastBannerMessage = '✨ RESURGENCE: ${downedTarget.name} REAWAKENED (${downedTarget.hp}/${downedTarget.maxHp} HP + ${downedTarget.aegisShield} Aegis)!';
+        addLog('REVIVE CAST: ${downedTarget.name} awakened with ${downedTarget.hp} HP & ${downedTarget.aegisShield} Aegis! Gained 6-tick invulnerability. Soul Fracture #${downedTarget.reviveCount} applied (-20% max HP).');
 
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_revive',

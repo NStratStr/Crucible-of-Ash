@@ -2483,15 +2483,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, baseHeight / 2)),
                   gradient: RadialGradient(
-                    colors: [
-                      factionColor.withValues(alpha: isSelected || isAttacking ? 0.75 : 0.35),
-                      Colors.black87,
-                      Colors.transparent,
-                    ],
+                    colors: unit.isDowned
+                        ? [
+                            const Color(0xFF78909C).withValues(alpha: 0.50), // Cold stone inert plinth
+                            const Color(0xFF263238),
+                            Colors.transparent,
+                          ]
+                        : [
+                            factionColor.withValues(alpha: isSelected || isAttacking ? 0.75 : 0.35),
+                            Colors.black87,
+                            Colors.transparent,
+                          ],
                   ),
+                  border: unit.isDowned
+                      ? Border.all(color: const Color(0xFF90A4AE).withValues(alpha: 0.6), width: 1.0)
+                      : null,
                   boxShadow: [
                     BoxShadow(
-                      color: factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
+                      color: unit.isDowned
+                          ? const Color(0xFF37474F).withValues(alpha: 0.5)
+                          : factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
                       blurRadius: isSelected || isAttacking ? 8 : 4,
                     ),
                   ],
@@ -2500,7 +2511,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
 
             // 1b. Stance Mastery Runic Plinth Aura (Tabletop visual condition cue)
-            if (unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1))
+            if (!unit.isDowned && (unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1)))
               Positioned(
                 bottom: 3,
                 child: Container(
@@ -2540,11 +2551,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 child: ColorFiltered(
                   colorFilter: unit.isDowned
                       ? const ColorFilter.matrix(<double>[
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0.2126, 0.7152, 0.0722, 0, 0,
-                          0, 0, 0, 0.65, 0,
-                        ])
+                          0.15, 0.15, 0.15, 0, 15,
+                          0.15, 0.15, 0.15, 0, 15,
+                          0.18, 0.18, 0.18, 0, 20,
+                          0, 0, 0, 0.75, 0,
+                        ]) // GDD §3.6 / §4.3: Fully desaturated grey stone plinth
                       : (isDamaged
                           ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
                           : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
@@ -2569,6 +2580,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (unit.isInvulnerable)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF),
+                        borderRadius: BorderRadius.circular(2),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0xFF00E5FF), blurRadius: 4),
+                        ],
+                      ),
+                      child: const Text(
+                        '✨AWAKENING',
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
                   if (unit.isSlagCarapaceActive)
                     Container(
                       margin: const EdgeInsets.only(bottom: 1.0),
@@ -2593,13 +2625,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       margin: const EdgeInsets.only(bottom: 1.0),
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF37474F),
+                        color: const Color(0xFF263238),
                         borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: Colors.white38, width: 0.6),
+                        border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black54, blurRadius: 4),
+                        ],
                       ),
                       child: const Text(
-                        '🪨DOWNED PLINTH',
-                        style: TextStyle(fontSize: 6.5, color: Colors.white70, fontWeight: FontWeight.bold),
+                        '🪨 INERT VESSEL',
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          color: Color(0xFFCFD8DC),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
                   if (unit.reviveCount > 0)
@@ -2611,7 +2651,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        '💀FRACTURE x${unit.reviveCount}',
+                        '💀SOUL FRACTURE x${unit.reviveCount} (-${unit.reviveCount * 20}%)',
                         style: const TextStyle(fontSize: 6.0, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -2668,31 +2708,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                   // Always display posture pill for active units
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 1.0),
-                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                    decoration: BoxDecoration(
-                      color: unit.archetype == UnitArchetype.vanguardMelee
-                          ? (unit.currentDepth == RowDepth.front
-                              ? const Color(0xFFC62828).withValues(alpha: 0.85)
-                              : (unit.currentDepth == RowDepth.mid
-                                  ? const Color(0xFFEF6C00).withValues(alpha: 0.85)
-                                  : const Color(0xFF1565C0).withValues(alpha: 0.85)))
-                          : const Color(0xFF263238).withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(2),
-                      border: Border.all(
-                        color: unit.currentDepth == RowDepth.front
-                            ? const Color(0xFFFF5252)
-                            : (unit.currentDepth == RowDepth.mid ? const Color(0xFFFFB74D) : const Color(0xFF4FC3F7)),
-                        width: 0.5,
+                  if (unit.isAlive)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: unit.archetype == UnitArchetype.vanguardMelee
+                            ? (unit.currentDepth == RowDepth.front
+                                ? const Color(0xFFC62828).withValues(alpha: 0.85)
+                                : (unit.currentDepth == RowDepth.mid
+                                    ? const Color(0xFFEF6C00).withValues(alpha: 0.85)
+                                    : const Color(0xFF1565C0).withValues(alpha: 0.85)))
+                            : const Color(0xFF263238).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(
+                          color: unit.currentDepth == RowDepth.front
+                              ? const Color(0xFFFF5252)
+                              : (unit.currentDepth == RowDepth.mid ? const Color(0xFFFFB74D) : const Color(0xFF4FC3F7)),
+                          width: 0.5,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      unit.archetype == UnitArchetype.vanguardMelee
-                          ? (unit.currentDepth == RowDepth.front ? 'BRAWL' : (unit.currentDepth == RowDepth.mid ? 'ADVANCE' : 'BRACED'))
-                          : (unit.currentDepth == RowDepth.front ? 'POINT-BLANK' : 'CASTING'),
-                      style: const TextStyle(
-                        fontSize: 6.0,
+                      child: Text(
+                        unit.archetype == UnitArchetype.vanguardMelee
+                            ? (unit.currentDepth == RowDepth.front ? 'BRAWL' : (unit.currentDepth == RowDepth.mid ? 'ADVANCE' : 'BRACED'))
+                            : (unit.currentDepth == RowDepth.front ? 'POINT-BLANK' : 'CASTING'),
+                        style: const TextStyle(
+                          fontSize: 6.0,
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.3,
