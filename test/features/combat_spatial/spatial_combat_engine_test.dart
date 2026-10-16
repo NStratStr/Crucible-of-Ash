@@ -257,6 +257,41 @@ void main() {
       expect(gorgoroth.isSlagCarapaceActive, isFalse); // Carapace shattered by Wrath of Dawnbound
       expect(engine.activeActionEvent?.skillName, equals('Wrath of the Dawnbound'));
     });
+
+    test('Tactical Formation Swap: Swaps two friendly units for 0 AP in Pre-Battle and 50% AP in Live Combat', () {
+      expect(engine.isPreBattlePhase, isTrue);
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria'); // Col 1, Row 0
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman'); // Col 3, Row 0
+      final sanguine = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade'); // Col 3, Row 1
+
+      // Pre-Battle Swap across columns (0 AP)
+      final preBattleSwap = engine.movePlayerUnit('lady_valeria', 3, 0);
+      expect(preBattleSwap, isTrue);
+      expect(valeria.occupiedNodes.first.column, equals(3));
+      expect(footman.occupiedNodes.first.column, equals(1));
+
+      // Live Combat Swap (requires 50% AP and within moveRange = 1)
+      // Valeria is now at (Col 3, Row 0) and Sanguine Blade is at (Col 3, Row 1)
+      engine.startBattle();
+      valeria.currentAp = 6000;
+      final liveSwap = engine.movePlayerUnit('lady_valeria', 3, 1);
+      expect(liveSwap, isTrue);
+      expect(valeria.occupiedNodes.first.row, equals(1));
+      expect(sanguine.occupiedNodes.first.row, equals(0));
+      expect(valeria.currentAp, equals(1000)); // 6000 - 5000 = 1000 AP
+    });
+
+    test('Multi-Target Trajectory Projection: Resolves secondary cleave targets when Hold the Line is active', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      // Place Footman at Col 0, Row 0 (adjacent to Gorgoroth at Col 1, Row 0)
+      footman.occupiedNodes.clear();
+      footman.occupiedNodes.add(const GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'));
+      footman.consecutiveTurnsStationary = 2; // Hold the Line active!
+
+      final secondaryTargets = engine.resolveSecondaryProjectedTargets(footman);
+      expect(secondaryTargets, isNotEmpty);
+      expect(secondaryTargets.any((t) => t.id == 'gorgoroth_boss'), isTrue);
+    });
   });
 }
 

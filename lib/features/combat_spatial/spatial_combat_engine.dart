@@ -575,29 +575,32 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   void _executeUnitTurn(CombatUnitState unit) {
     if (unit.id == 'pyre_zealot') {
-      // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down Col 5
+      // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down its column
       // Highlights target nodes with a red tinge, giving 2s to reposition (50% AP) or shield
-      final target = _resolveColumnTarget(unitCol: 4, targetingPlayers: true);
-      final targetNode = target?.occupiedNodes.firstOrNull ?? const GridNode(column: 4, row: 0);
+      final zCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 4;
+      final zRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 2;
+      final target = _resolveColumnTarget(unitCol: zCol, targetingPlayers: true);
+      final targetNode = target?.occupiedNodes.firstOrNull ?? GridNode(column: zCol, row: 0);
       unit.pendingIntent = SpatialTelegraphIntent(
         id: 'skewer_${currentTick}_${unit.id}',
         skillName: 'Pyre Skewer',
         pattern: TargetPattern.piercingColumnSkewer,
-        originCol: 4,
-        originRow: 2,
+        originCol: zCol,
+        originRow: zRow,
         targetNodes: [
-          GridNode(column: 4, row: targetNode.row),
-          GridNode(column: 4, row: 0),
+          GridNode(column: zCol, row: targetNode.row),
+          if (targetNode.row != 0) GridNode(column: zCol, row: 0),
         ],
         triggerTick: currentTick + 60, // 2.0 seconds windup (60 ticks)
         totalWindupTicks: 60,
         rawDamage: unit.attack,
       );
       lastBannerMessage = '⚠️ PYRE ZEALOT WINDS UP: PYRE SKEWER (2.0s)!';
-      addLog('${unit.name} begins 2s windup for Pyre Skewer targeting Col 5!');
+      addLog('${unit.name} begins 2s windup for Pyre Skewer targeting Col ${zCol + 1}!');
     } else if (unit.id == 'sanguine_blade') {
-      // Sanguine Blade: Sits in Col 4 Midline. Direct facing Col 4 is empty; cascades to adjacent Col 3 (Gorgoroth)
-      final target = _resolveColumnTarget(unitCol: 3, targetingPlayers: false) ??
+      // Sanguine Blade: Dynamically resolves target from her current column (cascading to adjacent columns if empty)
+      final sbCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 3;
+      final target = _resolveColumnTarget(unitCol: sbCol, targetingPlayers: false) ??
           _resolveColumnTarget(unitCol: 2, targetingPlayers: false);
       if (target != null) {
         // Flanking Momentum check: Triggered if moved this turn cycle OR target has active Bleed
@@ -637,24 +640,26 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else if (unit.id == 'cinder_witch') {
-      // Cinder Witch: Winds up 60-tick (2.0s) telegraphed Cinder Orb down Col 2
-      final target = _resolveColumnTarget(unitCol: 1, targetingPlayers: true);
-      final targetNode = target?.occupiedNodes.firstOrNull ?? const GridNode(column: 1, row: 0);
+      // Cinder Witch: Winds up 60-tick (2.0s) telegraphed Cinder Orb down her column
+      final wCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 1;
+      final wRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 2;
+      final target = _resolveColumnTarget(unitCol: wCol, targetingPlayers: true);
+      final targetNode = target?.occupiedNodes.firstOrNull ?? GridNode(column: wCol, row: 0);
       unit.pendingIntent = SpatialTelegraphIntent(
         id: 'cinder_${currentTick}_${unit.id}',
         skillName: 'Cinder Orb',
         pattern: TargetPattern.singleTarget,
-        originCol: 1,
-        originRow: 2,
+        originCol: wCol,
+        originRow: wRow,
         targetNodes: [
-          GridNode(column: 1, row: targetNode.row),
+          GridNode(column: wCol, row: targetNode.row),
         ],
         triggerTick: currentTick + 60, // 2.0 seconds windup (60 ticks)
         totalWindupTicks: 60,
         rawDamage: unit.attack,
       );
       lastBannerMessage = '⚠️ CINDER WITCH WINDS UP: CINDER ORB (2.0s)!';
-      addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col 2!');
+      addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col ${wCol + 1}!');
     } else if (unit.archetype == UnitArchetype.vanguardMelee) {
       _executeVanguardAction(unit);
     } else if (unit.archetype == UnitArchetype.backlineCaster) {
@@ -964,6 +969,44 @@ class SpatialCombatEngine extends ChangeNotifier {
     return _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
   }
 
+  /// Resolves secondary targets hit by a unit's basic action (lateral cleave or column piercing).
+  List<CombatUnitState> resolveSecondaryProjectedTargets(
+    CombatUnitState unit, {
+    int? simulatedCol,
+    int? simulatedRow,
+  }) {
+    if (unit.occupiedNodes.isEmpty && simulatedCol == null) return const [];
+    final col = simulatedCol ?? unit.occupiedNodes.first.column;
+    final row = simulatedRow ?? unit.occupiedNodes.first.row;
+    final primary = resolveProjectedTarget(unit, simulatedCol: col);
+    if (primary == null) return const [];
+
+    final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+    final List<CombatUnitState> secondaries = [];
+
+    // 1. Arcanum / Mage in Backline ("Aetheric Alignment"): Pierces entire column
+    if (unit.id == 'sun_smith' && row == 2) {
+      for (final enemy in opposingSquad.where((u) => u.isAlive && u.id != primary.id)) {
+        if (enemy.occupiedNodes.any((n) => n.column == col)) {
+          secondaries.add(enemy);
+        }
+      }
+    }
+
+    // 2. Vanguard in Frontline with "Hold the Line" ready: Lateral cleave across adjacent Frontline tiles
+    if (unit.archetype == UnitArchetype.vanguardMelee &&
+        row == 0 &&
+        (unit.hasStanceBonusReady || unit.consecutiveTurnsStationary >= 1)) {
+      for (final enemy in opposingSquad.where((u) => u.isAlive && u.id != primary.id)) {
+        if (enemy.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1)) {
+          secondaries.add(enemy);
+        }
+      }
+    }
+
+    return secondaries;
+  }
+
   /// Starts the combat encounter, transitioning from Pre-Battle Deployment to Live 30Hz Simulation
   void startBattle() {
     isPreBattlePhase = false;
@@ -973,12 +1016,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tactical Plinth Triage: Player shifts unit across nodes
-  /// In Pre-Battle Deployment Phase: 0 AP cost & anywhere on player grid (Rows 0-2, Cols 0-4)
-  /// In Live Combat: 50% AP cost & restricted to unit moveRange
+  /// Tactical Plinth Triage: Player shifts or swaps unit across nodes
+  /// In Pre-Battle Deployment Phase: 0 AP cost & anywhere on player grid (Rows 0-2, Cols 0-4), supports swapping
+  /// In Live Combat: 50% AP cost & restricted to unit moveRange, supports adjacent formation swaps
   bool movePlayerUnit(String unitId, int targetCol, int targetRow) {
     final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
     if (unit == null) return false;
+    if (unit.occupies(targetCol, targetRow)) return false;
     if (unit.isDisplacementImmune) {
       addLog('${unit.name} has Mass Tenacity and cannot be shifted!');
       return false;
@@ -1000,16 +1044,34 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
 
-    // Check if target node is empty
-    final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(targetCol, targetRow));
-    if (isOccupied) {
-      addLog('Node (Col ${targetCol + 1}, Row $targetRow) is occupied!');
-      return false;
-    }
-
     final oldCol = unit.occupiedNodes.first.column;
     final oldRow = unit.occupiedNodes.first.row;
     final apCost = isPreBattlePhase ? 0 : CombatUnitState.moveApCost;
+
+    // Check if target node is occupied by another friendly unit -> Tactical Formation Swap!
+    final existingOccupant = playerUnits
+        .where((u) => u.isAlive && u.id != unit.id && u.occupies(targetCol, targetRow))
+        .firstOrNull;
+    if (existingOccupant != null) {
+      if (existingOccupant.isDisplacementImmune) {
+        addLog('${existingOccupant.name} has Mass Tenacity and cannot be swapped!');
+        return false;
+      }
+      existingOccupant.repositionTo(
+        [GridNode(column: oldCol, row: oldRow, occupantUnitId: existingOccupant.id)],
+        apPenalty: 0,
+      );
+      unit.repositionTo(
+        [GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)],
+        apPenalty: apCost,
+      );
+      final costStr = isPreBattlePhase ? '[Pre-Battle Swap]' : '[-5,000 AP / -50% Swap]';
+      lastBannerMessage = '⇄ FORMATION SWAP: ${unit.name} exchanged positions with ${existingOccupant.name} $costStr';
+      addLog('FORMATION SWAP: ${unit.name} and ${existingOccupant.name} swapped tiles $costStr.');
+      notifyListeners();
+      return true;
+    }
+
     final success = unit.repositionTo([GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)], apPenalty: apCost);
     if (success) {
       if (unit.id == 'lady_valeria' && oldRow != targetRow) {
