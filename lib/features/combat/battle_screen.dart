@@ -482,20 +482,49 @@ class _BattleScreenState extends State<BattleScreen> {
   int? _hoveredCardIndex;
   Offset _screenShake = Offset.zero;
   Timer? _shakeTimer;
+  Timer? _hitStopTimer;
 
-  void _triggerScreenShake({bool isHeavy = false}) {
+  void _triggerScreenShake({bool isHeavy = false, bool isCataclysmic = false}) {
     _shakeTimer?.cancel();
-    final double intensity = isHeavy ? 9.0 : 3.5;
-    setState(() {
-      _screenShake = Offset(
-        (intensity * (Random().nextBool() ? 1.0 : -1.0)),
-        (intensity * 0.6 * (Random().nextBool() ? 1.0 : -1.0)),
-      );
-    });
-    _shakeTimer = Timer(const Duration(milliseconds: 180), () {
-      if (mounted) {
+    _hitStopTimer?.cancel();
+
+    // Micro hit-stop freeze on impact (45ms on heavy, 75ms on cataclysmic/boss/execute)
+    if (isCataclysmic || isHeavy) {
+      final int hitStopMs = isCataclysmic ? 75 : 45;
+      final bool wasTicking = widget.tickManager.phase == CombatPhase.ticking;
+      if (wasTicking) {
+        widget.tickManager.pause();
+        _hitStopTimer = Timer(Duration(milliseconds: hitStopMs), () {
+          if (mounted && widget.tickManager.phase == CombatPhase.idle) {
+            widget.tickManager.start();
+          }
+        });
+      }
+    }
+
+    final double baseIntensity = isCataclysmic ? 14.0 : (isHeavy ? 8.5 : 3.5);
+    int frame = 0;
+    const int totalShakeFrames = 5;
+
+    // Multi-frame decaying oscillatory jolt (e.g. +14 -> -9 -> +5 -> -2 -> 0)
+    _shakeTimer = Timer.periodic(const Duration(milliseconds: 32), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      frame++;
+      if (frame >= totalShakeFrames) {
+        timer.cancel();
+        setState(() => _screenShake = Offset.zero);
+      } else {
+        final double decay = (1.0 - (frame / totalShakeFrames));
+        final double sign = (frame % 2 == 1) ? 1.0 : -1.0;
+        final double currentMagnitude = baseIntensity * decay;
         setState(() {
-          _screenShake = Offset.zero;
+          _screenShake = Offset(
+            currentMagnitude * sign,
+            currentMagnitude * 0.55 * (Random().nextBool() ? 1.0 : -1.0),
+          );
         });
       }
     });
@@ -665,6 +694,7 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void dispose() {
     _shakeTimer?.cancel();
+    _hitStopTimer?.cancel();
     _autoBattleTimer?.cancel();
     _aiTurnTimer?.cancel();
     for (final t in _popTimers) {
@@ -803,8 +833,12 @@ class _BattleScreenState extends State<BattleScreen> {
     String? sourceUnitId,
   }) {
     if (damage > 0) {
-      _triggerScreenShake(isHeavy: isCrit || damage > 300);
-      if (isCrit) {
+      final bool isCataclysmic = isCrit && damage > 250;
+      final bool isHeavy = isCrit || damage > 180;
+      _triggerScreenShake(isHeavy: isHeavy, isCataclysmic: isCataclysmic);
+      if (isCataclysmic) {
+        HapticFeedback.heavyImpact();
+      } else if (isCrit) {
         HapticFeedback.heavyImpact();
       } else if (isGlancing) {
         HapticFeedback.lightImpact();
@@ -2119,17 +2153,27 @@ class _BattleScreenState extends State<BattleScreen> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     decoration: BoxDecoration(
-                      color: (_screenFlashColorOverride ??
-                              (_screenFlashType == 'crit'
-                                  ? const Color(0xFFFFD54F)
-                                  : const Color(0xFFB3261E)))
-                          .withValues(alpha: 0.20),
+                      gradient: RadialGradient(
+                        radius: 0.95,
+                        colors: [
+                          (_screenFlashColorOverride ??
+                                  (_screenFlashType == 'crit'
+                                      ? const Color(0xFFFFD54F)
+                                      : const Color(0xFFB3261E)))
+                              .withValues(alpha: _screenFlashType == 'crit' ? 0.35 : 0.22),
+                          (_screenFlashColorOverride ??
+                                  (_screenFlashType == 'crit'
+                                      ? const Color(0xFFFF8F00)
+                                      : const Color(0xFF4A0000)))
+                              .withValues(alpha: 0.55),
+                        ],
+                      ),
                       border: Border.all(
                         color: _screenFlashColorOverride ??
                             (_screenFlashType == 'crit'
                                 ? const Color(0xFFFFD54F)
-                                : const Color(0xFFB3261E)),
-                        width: 2.5,
+                                : const Color(0xFFFF1744)),
+                        width: 3.0,
                       ),
                     ),
                     child: Center(
@@ -4487,8 +4531,9 @@ class _BattleScreenState extends State<BattleScreen> {
       }
     }
 
-    final double shakeX = isDamaged ? (isEnemy ? -12.0 : 12.0) : 0.0;
-    final double hitRecoilY = isDamaged ? (isEnemy ? -14.0 : 14.0) : 0.0;
+    final double shakeX = isDamaged ? (isEnemy ? -16.0 : 16.0) : 0.0;
+    final double hitRecoilY = isDamaged ? (isEnemy ? -22.0 : 22.0) : 0.0;
+    final double hitCompressionScale = isDamaged ? 0.93 : 1.0;
     final bool isCriticalHp = hpRatio < 0.25 && alive;
 
     final int allyIndex = isEnemy ? -1 : widget.tickManager.allies.indexWhere((u) => u.id == unit.id);
@@ -4664,12 +4709,12 @@ class _BattleScreenState extends State<BattleScreen> {
         duration: const Duration(milliseconds: 260),
         opacity: unitOpacity,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 320),
-          curve: isAttacking ? Curves.easeOutBack : Curves.easeInOutCubic,
+          duration: Duration(milliseconds: isDamaged ? 140 : 300),
+          curve: isAttacking ? Curves.easeOutBack : (isDamaged ? Curves.easeOutCubic : Curves.easeInOutCubic),
           transform: Matrix4.identity()
             ..translate(shakeX, lungeY + hitRecoilY)
             ..rotateZ(attackTilt)
-            ..scale(attackScale),
+            ..scale(attackScale * hitCompressionScale),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: unit.isFigurineCutout ? Colors.transparent : (alive ? const Color(0xFF14141A) : const Color(0xFF0E0E12)),
@@ -5494,33 +5539,58 @@ class _BattleScreenState extends State<BattleScreen> {
                 ],
                 // 3. Floating Combat Pops anchored 100% directly over this unit's head
                 ..._floatingPops.where((p) => p.targetUnitId == unit.id).map((pop) {
+                  final bool isExecute = pop.text.contains('EXECUTED') || pop.text.contains('FALLEN');
+                  final double fontSize = pop.isCrit ? 12.0 : (isExecute ? 11.0 : 10.0);
                   return Positioned(
-                    top: isBossUnit ? -34 : -24,
-                    left: 0,
-                    right: 0,
+                    top: isBossUnit ? (pop.isCrit ? -42 : -34) : (pop.isCrit ? -32 : -24),
+                    left: -50,
+                    right: -50,
                     child: IgnorePointer(
                       child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.90),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: pop.color.withValues(alpha: 0.9), width: 1.2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: pop.color.withValues(alpha: 0.5),
-                                blurRadius: 8,
+                        child: AnimatedScale(
+                          duration: const Duration(milliseconds: 180),
+                          scale: pop.isCrit ? 1.15 : 1.0,
+                          curve: Curves.elasticOut,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: pop.isCrit ? 8 : 6,
+                              vertical: pop.isCrit ? 3.0 : 2.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: pop.isCrit
+                                  ? const Color(0xFF261600).withValues(alpha: 0.95)
+                                  : Colors.black.withValues(alpha: 0.90),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: pop.color.withValues(alpha: pop.isCrit ? 1.0 : 0.85),
+                                width: pop.isCrit ? 2.0 : 1.2,
                               ),
-                            ],
-                          ),
-                          child: Text(
-                            pop.text,
-                            style: TextStyle(
-                              color: pop.color,
-                              fontWeight: FontWeight.w900,
-                              fontSize: pop.isCrit ? 13 : 11,
-                              fontFamily: 'monospace',
-                              letterSpacing: 0.5,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: pop.color.withValues(alpha: pop.isCrit ? 0.85 : 0.45),
+                                  blurRadius: pop.isCrit ? 14 : 7,
+                                  spreadRadius: pop.isCrit ? 1.5 : 0,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (pop.isCrit) ...[
+                                  const Icon(Icons.flash_on, size: 13, color: Color(0xFFFFD54F)),
+                                  const SizedBox(width: 3),
+                                ],
+                                Text(
+                                  pop.text,
+                                  style: TextStyle(
+                                    color: pop.color,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: fontSize,
+                                    fontFamily: 'monospace',
+                                    letterSpacing: pop.isCrit ? 0.8 : 0.4,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
