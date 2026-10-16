@@ -370,9 +370,9 @@ class CampaignMapScreen extends StatelessWidget {
                       // Calculate position: depth (X axis: 0 to maxD), verticalRatio (Y axis: normalized within usable height)
                       final double x = (node.depth / (maxD > 0 ? maxD : 1.0)) * (mapWidth - 80) + 40;
                       final double y = topInset + node.verticalRatio * usableHeight;
-                      final double badgeWidth = node.type == CampaignNodeType.boss ? 86.0 : 72.0;
+                      final double badgeWidth = node.type == CampaignNodeType.boss ? 76.0 : 64.0;
                       final double leftPos = (x - badgeWidth / 2).clamp(4.0, (mapWidth - badgeWidth - 4.0).clamp(4.0, double.infinity));
-                      final double badgeCenterOffset = node.type == CampaignNodeType.boss ? 28.0 : 23.0;
+                      final double badgeCenterOffset = node.type == CampaignNodeType.boss ? 24.0 : 19.0;
 
                       return Positioned(
                         left: leftPos,
@@ -558,109 +558,109 @@ class CampaignMapScreen extends StatelessWidget {
       bgColor = const Color(0xFF2A1515);
     }
 
+    final double circleSize = node.type == CampaignNodeType.boss ? 48.0 : 38.0;
+
     return GestureDetector(
       onTap: canTap ? () => _showNodeEncounterDialog(context, node) : null,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: node.type == CampaignNodeType.boss ? 56 : 46,
-            height: node.type == CampaignNodeType.boss ? 56 : 46,
-            decoration: BoxDecoration(
-              color: bgColor,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: borderColor,
-                width: (canTap || node.isCurrent) ? 2.5 : 1.2,
-              ),
-              boxShadow: canTap
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFFB3261E).withValues(alpha: 0.45),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      )
-                    ]
-                  : null,
-            ),
-            child: node.customThumbnailAsset != null && node.type != CampaignNodeType.boss
-                ? ClipOval(
-                    child: Opacity(
-                      opacity: canTap ? 0.9 : 0.4,
-                      child: Image.asset(
-                        node.customThumbnailAsset!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          icon,
-                          size: 22,
-                          color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+          // Circular node avatar with stacked hazard indicator badge
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: circleSize,
+                height: circleSize,
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: borderColor,
+                    width: (canTap || node.isCurrent) ? 2.2 : 1.2,
+                  ),
+                  boxShadow: canTap
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFFB3261E).withValues(alpha: 0.45),
+                            blurRadius: 8,
+                            spreadRadius: 1.5,
+                          )
+                        ]
+                      : null,
+                ),
+                child: node.customThumbnailAsset != null && node.type != CampaignNodeType.boss
+                    ? ClipOval(
+                        child: Opacity(
+                          opacity: canTap ? 0.95 : 0.45,
+                          child: Image.asset(
+                            node.customThumbnailAsset!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              icon,
+                              size: 18,
+                              color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+                            ),
+                          ),
                         ),
+                      )
+                    : Icon(
+                        icon,
+                        size: node.type == CampaignNodeType.boss ? 24 : 18,
+                        color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
                       ),
+              ),
+              // Corner Hazard Icon Badge overlay
+              if (node.hazard != CampaignHazardType.none && !node.isVisited)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF14141B),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: node.hazard.color, width: 1.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: node.hazard.color.withValues(alpha: 0.4),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
-                  )
-                : Icon(
-                    icon,
-                    size: node.type == CampaignNodeType.boss ? 28 : 22,
-                    color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+                    child: Icon(node.hazard.icon, color: node.hazard.color, size: 8.5),
                   ),
+                ),
+            ],
           ),
-          const SizedBox(height: 3),
-          // Environmental Hazard Badge
-          if (node.hazard != CampaignHazardType.none && !node.isVisited)
-            Container(
-              margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-              constraints: const BoxConstraints(maxWidth: 72),
-              decoration: BoxDecoration(
-                color: node.hazard.color.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: node.hazard.color, width: 0.7),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(node.hazard.icon, color: node.hazard.color, size: 8),
-                  const SizedBox(width: 2),
-                  Flexible(
-                    child: Text(
-                      node.hazard.displayName.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: node.hazard.color,
-                        fontSize: 6.0,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 2),
           // Scouted Badge
           if (node.isScouted && !node.isVisited)
             Container(
-              margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+              margin: const EdgeInsets.only(bottom: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
               decoration: BoxDecoration(
                 color: const Color(0xFF006064).withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: const Color(0xFF00E5FF), width: 0.7),
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: const Color(0xFF00E5FF), width: 0.6),
               ),
               child: const Text(
                 'SCOUTED',
                 style: TextStyle(
                   color: Color(0xFF00E5FF),
-                  fontSize: 6.5,
+                  fontSize: 6.0,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+                  letterSpacing: 0.4,
                 ),
               ),
             ),
+          // Node Title Pill
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 3.5, vertical: 0.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF14141B).withValues(alpha: 0.85),
+              color: const Color(0xFF14141B).withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(3),
             ),
             child: Text(
@@ -670,31 +670,31 @@ class CampaignMapScreen extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: canTap ? Colors.white : Colors.white38,
-                fontSize: 8,
+                fontSize: 7.5,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
           // Scouted Affinities Chips
           if (node.isScouted && !node.isVisited && node.scoutedAffinities.isNotEmpty) ...[
-            const SizedBox(height: 2),
+            const SizedBox(height: 1.5),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: node.scoutedAffinities.take(3).map((aff) {
                 final color = _affinityColor(aff);
                 return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                  padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                  margin: const EdgeInsets.symmetric(horizontal: 0.8),
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 0.5),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: color, width: 0.6),
+                    border: Border.all(color: color, width: 0.5),
                   ),
                   child: Text(
                     _affinityAbbr(aff),
                     style: TextStyle(
                       color: color,
-                      fontSize: 6,
+                      fontSize: 5.5,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
