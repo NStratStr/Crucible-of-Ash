@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 
 enum CampaignNodeType {
@@ -9,6 +9,68 @@ enum CampaignNodeType {
   crypt,       // Narrative mystery event
   watchtower,  // Scout upcoming tiers and reveal enemy affinities
   boss,        // Chapter World Titan
+}
+
+/// Environmental Hazards on Campaign Overworld Nodes (GDD §4.3)
+enum CampaignHazardType {
+  none,
+  ashenEmberStorm,  // Chapter 1: Scorching winds; non-vanguards suffer minor Burn
+  miasmaMire,       // Chapter 2: Necrotic swamp; healing reduced by 25%
+  voidDistortion,   // Chapter 3: Gravity flux; AP build rate fluctuated +/- 15%
+}
+
+extension CampaignHazardExtension on CampaignHazardType {
+  String get displayName {
+    switch (this) {
+      case CampaignHazardType.ashenEmberStorm:
+        return 'Ashen Emberstorm';
+      case CampaignHazardType.miasmaMire:
+        return 'Necrotic Miasma';
+      case CampaignHazardType.voidDistortion:
+        return 'Abyssal Void Flux';
+      case CampaignHazardType.none:
+        return 'Calm';
+    }
+  }
+
+  String get shortDescription {
+    switch (this) {
+      case CampaignHazardType.ashenEmberStorm:
+        return 'Scorching winds deal 2% Max HP burn damage to non-Vanguard units per turn.';
+      case CampaignHazardType.miasmaMire:
+        return 'Blighted vapors reduce all combat healing & shield generation by 25%.';
+      case CampaignHazardType.voidDistortion:
+        return 'Gravity flux causes turn meters & AP accumulation to fluctuate unpredictably.';
+      case CampaignHazardType.none:
+        return 'No atmospheric penalties.';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case CampaignHazardType.ashenEmberStorm:
+        return Icons.local_fire_department;
+      case CampaignHazardType.miasmaMire:
+        return Icons.science;
+      case CampaignHazardType.voidDistortion:
+        return Icons.cyclone;
+      case CampaignHazardType.none:
+        return Icons.shield;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case CampaignHazardType.ashenEmberStorm:
+        return const Color(0xFFFF5722);
+      case CampaignHazardType.miasmaMire:
+        return const Color(0xFF00E676);
+      case CampaignHazardType.voidDistortion:
+        return const Color(0xFFBA68C8);
+      case CampaignHazardType.none:
+        return Colors.white54;
+    }
+  }
 }
 
 @immutable
@@ -28,6 +90,8 @@ class CampaignNode {
   final int rewardSigils;        // Bloodline Sigils for Phylactery / Pureblood
   final bool isScouted;          // Revealed via Watchtower reconnaissance
   final List<Archetype> scoutedAffinities; // Enemy brigade roles at this node
+  final CampaignHazardType hazard;        // Atmospheric hazard modifier
+  final String? customThumbnailAsset;     // Thematic thumbnail for encounter cards
 
   const CampaignNode({
     required this.id,
@@ -45,6 +109,8 @@ class CampaignNode {
     this.rewardSigils = 0,
     this.isScouted = false,
     this.scoutedAffinities = const [],
+    this.hazard = CampaignHazardType.none,
+    this.customThumbnailAsset,
   });
 
   CampaignNode copyWith({
@@ -56,6 +122,8 @@ class CampaignNode {
     int? rewardIchor,
     int? rewardOre,
     int? rewardSigils,
+    CampaignHazardType? hazard,
+    String? customThumbnailAsset,
   }) {
     return CampaignNode(
       id: id,
@@ -73,6 +141,9 @@ class CampaignNode {
       rewardSigils: rewardSigils ?? this.rewardSigils,
       isScouted: isScouted ?? this.isScouted,
       scoutedAffinities: scoutedAffinities ?? this.scoutedAffinities,
+      hazard: hazard ?? this.hazard,
+      customThumbnailAsset: customThumbnailAsset ?? this.customThumbnailAsset,
     );
   }
 }
+

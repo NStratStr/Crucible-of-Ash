@@ -1449,7 +1449,7 @@ class _AppShellState extends State<AppShell> {
                           initialPlayerUnits: _tickManager.allies,
                           initialEnemyUnits: _tickManager.enemies,
                           encounterTitle: _activeNode?.name ?? 'The Sunder at Ashen Gate',
-                          backdropAsset: ChapterTheme.forChapter(_currentChapter).backgroundAsset,
+                          backdropAsset: _activeNode?.customThumbnailAsset ?? ChapterTheme.forChapter(_currentChapter).backgroundAsset,
                           isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
                           onVictory: () {
                             _onCombatVictory();

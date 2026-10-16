@@ -574,13 +574,60 @@ class CampaignMapScreen extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: Icon(
-              icon,
-              size: node.type == CampaignNodeType.boss ? 28 : 22,
-              color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
-            ),
+            child: node.customThumbnailAsset != null && node.type != CampaignNodeType.boss
+                ? ClipOval(
+                    child: Opacity(
+                      opacity: canTap ? 0.9 : 0.4,
+                      child: Image.asset(
+                        node.customThumbnailAsset!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          icon,
+                          size: 22,
+                          color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+                        ),
+                      ),
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    size: node.type == CampaignNodeType.boss ? 28 : 22,
+                    color: canTap ? Colors.white : (node.isVisited ? const Color(0xFF81C784) : Colors.white30),
+                  ),
           ),
           const SizedBox(height: 3),
+          // Environmental Hazard Badge
+          if (node.hazard != CampaignHazardType.none && !node.isVisited)
+            Container(
+              margin: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+              constraints: const BoxConstraints(maxWidth: 72),
+              decoration: BoxDecoration(
+                color: node.hazard.color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: node.hazard.color, width: 0.7),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(node.hazard.icon, color: node.hazard.color, size: 8),
+                  const SizedBox(width: 2),
+                  Flexible(
+                    child: Text(
+                      node.hazard.displayName.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: node.hazard.color,
+                        fontSize: 6.0,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Scouted Badge
           if (node.isScouted && !node.isVisited)
             Container(
@@ -799,11 +846,91 @@ class CampaignMapScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                  // Non-Boss Thematic Thumbnail Card
+                  if (node.type != CampaignNodeType.boss && node.customThumbnailAsset != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      height: 90,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.6), width: 1.2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.asset(
+                              node.customThumbnailAsset!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.75),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   Text(
                     node.description,
                     style: const TextStyle(color: Color(0xFFB0B0C0), fontSize: 12),
                   ),
                   const SizedBox(height: 10),
+                  // Environmental Hazard Warning Banner
+                  if (node.hazard != CampaignHazardType.none) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: node.hazard.color.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: node.hazard.color.withValues(alpha: 0.8), width: 1.2),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(node.hazard.icon, color: node.hazard.color, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'HAZARD: ${node.hazard.displayName.toUpperCase()}',
+                                  style: TextStyle(
+                                    color: node.hazard.color,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  node.hazard.shortDescription,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 8.5,
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   // Scouted Enemy Formation details
                   if (node.isScouted && node.scoutedAffinities.isNotEmpty) ...[
                     Container(

@@ -32,12 +32,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.35,
         type: CampaignNodeType.skirmish,
         name: 'Ashen Outpost',
-        description: 'Vanguard scouts defending the perimeter.',
+        description: 'Vanguard scouts defending the perimeter under scorching ember winds.',
         nextNodeIds: ['node_1_a', 'node_1_b'],
         isReachable: true,
         rewardIchor: 100,
         rewardOre: 20,
         scoutedAffinities: [Archetype.juggernaut, Archetype.marksman],
+        hazard: CampaignHazardType.ashenEmberStorm,
+        customThumbnailAsset: 'assets/images/ashen_trail_desolation.jpg',
       ),
       const CampaignNode(
         id: 'node_0_b',
@@ -45,12 +47,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.65,
         type: CampaignNodeType.skirmish,
         name: 'Sunken Trench',
-        description: 'Blighted beasts prowling through the mud.',
+        description: 'Blighted beasts prowling through the mud under ember gale gusts.',
         nextNodeIds: ['node_1_b', 'node_1_c'],
         isReachable: true,
         rewardIchor: 100,
         rewardOre: 25,
         scoutedAffinities: [Archetype.skirmisher, Archetype.occultist],
+        hazard: CampaignHazardType.ashenEmberStorm,
+        customThumbnailAsset: 'assets/images/feral_warhound.jpg',
       ),
 
       // Depth 1: Scouting & Sacrifice
@@ -60,10 +64,12 @@ class CampaignMapGenerator {
         verticalRatio: 0.20,
         type: CampaignNodeType.altar,
         name: 'Crucible Siphon Altar',
-        description: 'Ancient stone altar dripping with essence.',
+        description: 'Ancient stone altar dripping with essence, sheltered from the storm.',
         nextNodeIds: ['node_2_a'],
         rewardIchor: 200,
         rewardOre: 15,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
       ),
       const CampaignNode(
         id: 'node_1_b',
@@ -71,11 +77,12 @@ class CampaignMapGenerator {
         verticalRatio: 0.50,
         type: CampaignNodeType.skirmish,
         name: 'Fallen Caravan',
-        description: 'Ambushed scavengers guarding cursed relics.',
+        description: 'Ambushed scavengers guarding cursed relics in an ember vortex.',
         nextNodeIds: ['node_2_a', 'node_2_b'],
         rewardIchor: 150,
         rewardOre: 35,
         scoutedAffinities: [Archetype.assassin, Archetype.support],
+        hazard: CampaignHazardType.ashenEmberStorm,
       ),
       const CampaignNode(
         id: 'node_1_c',
@@ -88,6 +95,7 @@ class CampaignMapGenerator {
         rewardIchor: 250,
         rewardOre: 40,
         rewardSigils: 1,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 2: Divergence
@@ -97,12 +105,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.35,
         type: CampaignNodeType.elite,
         name: 'Abyssal Juggernaut',
-        description: 'Heavily armored titan wielding an iron slab.',
+        description: 'Heavily armored titan wielding an iron slab in the storm eye.',
         nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 350,
         rewardOre: 60,
         rewardSigils: 1,
         scoutedAffinities: [Archetype.juggernaut, Archetype.occultist],
+        hazard: CampaignHazardType.ashenEmberStorm,
+        customThumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
       ),
       const CampaignNode(
         id: 'node_2_b',
@@ -110,11 +120,12 @@ class CampaignMapGenerator {
         verticalRatio: 0.65,
         type: CampaignNodeType.skirmish,
         name: 'Ravenwood Thicket',
-        description: 'Flock of winged skirmishers swooping low.',
+        description: 'Flock of winged skirmishers swooping low amidst burning brush.',
         nextNodeIds: ['node_3_a', 'node_3_b'],
         rewardIchor: 180,
         rewardOre: 30,
         scoutedAffinities: [Archetype.skirmisher, Archetype.marksman],
+        hazard: CampaignHazardType.ashenEmberStorm,
       ),
 
       // Depth 3: Sanctuary or Scouting Spire
@@ -128,6 +139,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['node_4_boss'],
         rewardIchor: 100,
         rewardOre: 20,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/bone_campfire.jpg',
       ),
       const CampaignNode(
         id: 'node_3_b',
@@ -139,6 +152,7 @@ class CampaignMapGenerator {
         nextNodeIds: ['node_4_boss'],
         rewardIchor: 150,
         rewardOre: 50,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 4: Chapter Gatekeeper Boss
@@ -148,12 +162,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.50,
         type: CampaignNodeType.boss,
         name: 'Gorgoroth the Flayed',
-        description: 'The Chapter World Titan towering over the Ashen Rift.',
+        description: 'The Chapter World Titan towering over the Ashen Rift in a raging fire vortex.',
         nextNodeIds: [],
         rewardIchor: 800,
         rewardOre: 120,
         rewardSigils: 2,
         scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
+        hazard: CampaignHazardType.ashenEmberStorm,
+        customThumbnailAsset: 'assets/images/flayed_butcher.jpg',
       ),
     ];
   }
@@ -170,12 +186,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.35,
         type: CampaignNodeType.skirmish,
         name: 'Gate of Sunken Bones',
-        description: 'Barrow guards patrol the submerged causeway.',
+        description: 'Barrow guards patrol the submerged causeway shrouded in necrotic miasma.',
         nextNodeIds: ['ch2_1_a', 'ch2_1_b'],
         isReachable: true,
         rewardIchor: 140,
         rewardOre: 30,
         scoutedAffinities: [Archetype.occultist, Archetype.skirmisher],
+        hazard: CampaignHazardType.miasmaMire,
+        customThumbnailAsset: 'assets/images/gothic_arch_battlefield.jpg',
       ),
       const CampaignNode(
         id: 'ch2_0_b',
@@ -189,6 +207,8 @@ class CampaignMapGenerator {
         rewardIchor: 140,
         rewardOre: 35,
         scoutedAffinities: [Archetype.assassin, Archetype.support],
+        hazard: CampaignHazardType.miasmaMire,
+        customThumbnailAsset: 'assets/images/plague_occultist.jpg',
       ),
 
       // Depth 1: Ancient Altars
@@ -202,6 +222,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch2_2_a'],
         rewardIchor: 250,
         rewardOre: 25,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
       ),
       const CampaignNode(
         id: 'ch2_1_b',
@@ -214,6 +236,7 @@ class CampaignMapGenerator {
         rewardIchor: 180,
         rewardOre: 40,
         scoutedAffinities: [Archetype.juggernaut, Archetype.assassin],
+        hazard: CampaignHazardType.miasmaMire,
       ),
       const CampaignNode(
         id: 'ch2_1_c',
@@ -226,6 +249,7 @@ class CampaignMapGenerator {
         rewardIchor: 300,
         rewardOre: 50,
         rewardSigils: 1,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 2: Elite Clash
@@ -241,6 +265,8 @@ class CampaignMapGenerator {
         rewardOre: 80,
         rewardSigils: 1,
         scoutedAffinities: [Archetype.juggernaut, Archetype.marksman],
+        hazard: CampaignHazardType.miasmaMire,
+        customThumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
       ),
       const CampaignNode(
         id: 'ch2_2_b',
@@ -253,6 +279,7 @@ class CampaignMapGenerator {
         rewardIchor: 220,
         rewardOre: 45,
         scoutedAffinities: [Archetype.skirmisher, Archetype.occultist],
+        hazard: CampaignHazardType.miasmaMire,
       ),
 
       // Depth 3: Repose & Omen
@@ -266,6 +293,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch2_4_a'],
         rewardIchor: 150,
         rewardOre: 30,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/bone_campfire.jpg',
       ),
       const CampaignNode(
         id: 'ch2_3_b',
@@ -277,6 +306,7 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch2_4_a', 'ch2_4_b'],
         rewardIchor: 200,
         rewardOre: 60,
+        hazard: CampaignHazardType.none,
       ),
       const CampaignNode(
         id: 'ch2_3_c',
@@ -289,6 +319,7 @@ class CampaignMapGenerator {
         rewardIchor: 350,
         rewardOre: 50,
         rewardSigils: 1,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 4: Pre-Boss Gauntlet
@@ -304,6 +335,8 @@ class CampaignMapGenerator {
         rewardOre: 90,
         rewardSigils: 1,
         scoutedAffinities: [Archetype.occultist, Archetype.support],
+        hazard: CampaignHazardType.miasmaMire,
+        customThumbnailAsset: 'assets/images/plague_occultist.jpg',
       ),
       const CampaignNode(
         id: 'ch2_4_b',
@@ -316,6 +349,7 @@ class CampaignMapGenerator {
         rewardIchor: 260,
         rewardOre: 50,
         scoutedAffinities: [Archetype.marksman, Archetype.assassin],
+        hazard: CampaignHazardType.miasmaMire,
       ),
 
       // Depth 5: Chapter 2 Boss
@@ -331,6 +365,8 @@ class CampaignMapGenerator {
         rewardOre: 180,
         rewardSigils: 3,
         scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
+        hazard: CampaignHazardType.miasmaMire,
+        customThumbnailAsset: 'assets/images/plague_occultist.jpg',
       ),
     ];
   }
@@ -347,12 +383,14 @@ class CampaignMapGenerator {
         verticalRatio: 0.35,
         type: CampaignNodeType.skirmish,
         name: 'Brimstone Causeway',
-        description: 'Molten earth fractured by colossal footsteps.',
+        description: 'Molten earth fractured by colossal footsteps amidst void tears.',
         nextNodeIds: ['ch3_1_a', 'ch3_1_b'],
         isReachable: true,
         rewardIchor: 180,
         rewardOre: 40,
         scoutedAffinities: [Archetype.juggernaut, Archetype.support],
+        hazard: CampaignHazardType.voidDistortion,
+        customThumbnailAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
       ),
       const CampaignNode(
         id: 'ch3_0_b',
@@ -366,6 +404,8 @@ class CampaignMapGenerator {
         rewardIchor: 180,
         rewardOre: 45,
         scoutedAffinities: [Archetype.occultist, Archetype.marksman],
+        hazard: CampaignHazardType.voidDistortion,
+        customThumbnailAsset: 'assets/images/realm_overworld_map.jpg',
       ),
 
       // Depth 1: Blood Altars & Crypts
@@ -379,6 +419,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_2_a'],
         rewardIchor: 300,
         rewardOre: 35,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
       ),
       const CampaignNode(
         id: 'ch3_1_b',
@@ -391,6 +433,7 @@ class CampaignMapGenerator {
         rewardIchor: 220,
         rewardOre: 50,
         scoutedAffinities: [Archetype.assassin, Archetype.skirmisher],
+        hazard: CampaignHazardType.voidDistortion,
       ),
       const CampaignNode(
         id: 'ch3_1_c',
@@ -403,6 +446,7 @@ class CampaignMapGenerator {
         rewardIchor: 400,
         rewardOre: 60,
         rewardSigils: 2,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 2: High Threat Clashes
@@ -418,6 +462,8 @@ class CampaignMapGenerator {
         rewardOre: 100,
         rewardSigils: 2,
         scoutedAffinities: [Archetype.skirmisher, Archetype.marksman],
+        hazard: CampaignHazardType.voidDistortion,
+        customThumbnailAsset: 'assets/images/feral_warhound.jpg',
       ),
       const CampaignNode(
         id: 'ch3_2_b',
@@ -430,6 +476,7 @@ class CampaignMapGenerator {
         rewardIchor: 260,
         rewardOre: 60,
         scoutedAffinities: [Archetype.assassin, Archetype.occultist],
+        hazard: CampaignHazardType.voidDistortion,
       ),
 
       // Depth 3: Rest & Revelation
@@ -443,6 +490,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_4_a'],
         rewardIchor: 200,
         rewardOre: 40,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/bone_campfire.jpg',
       ),
       const CampaignNode(
         id: 'ch3_3_b',
@@ -454,6 +503,7 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_4_a', 'ch3_4_b'],
         rewardIchor: 250,
         rewardOre: 80,
+        hazard: CampaignHazardType.none,
       ),
       const CampaignNode(
         id: 'ch3_3_c',
@@ -466,6 +516,7 @@ class CampaignMapGenerator {
         rewardIchor: 450,
         rewardOre: 70,
         rewardSigils: 2,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 4: Eclipse Citadel
@@ -481,6 +532,8 @@ class CampaignMapGenerator {
         rewardOre: 120,
         rewardSigils: 2,
         scoutedAffinities: [Archetype.occultist, Archetype.support],
+        hazard: CampaignHazardType.voidDistortion,
+        customThumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
       ),
       const CampaignNode(
         id: 'ch3_4_b',
@@ -492,6 +545,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_5_b'],
         rewardIchor: 350,
         rewardOre: 50,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
       ),
 
       // Depth 5: Final Haven & Threshold
@@ -505,6 +560,8 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_6_boss'],
         rewardIchor: 200,
         rewardOre: 40,
+        hazard: CampaignHazardType.none,
+        customThumbnailAsset: 'assets/images/bone_campfire.jpg',
       ),
       const CampaignNode(
         id: 'ch3_5_b',
@@ -516,6 +573,7 @@ class CampaignMapGenerator {
         nextNodeIds: ['ch3_6_boss'],
         rewardIchor: 300,
         rewardOre: 90,
+        hazard: CampaignHazardType.none,
       ),
 
       // Depth 6: Pinnacle Boss
@@ -531,6 +589,8 @@ class CampaignMapGenerator {
         rewardOre: 250,
         rewardSigils: 4,
         scoutedAffinities: [Archetype.juggernaut, Archetype.skirmisher, Archetype.occultist],
+        hazard: CampaignHazardType.voidDistortion,
+        customThumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
       ),
     ];
   }
