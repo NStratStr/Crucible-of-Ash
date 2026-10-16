@@ -6861,19 +6861,38 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
                           ],
                         ),
                       ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${unit.currentHp}/${unit.maxHp} HP',
-                        style: TextStyle(
-                          color: hpColor,
-                          fontSize: isCompact ? 9.0 : 10.0,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
-                          letterSpacing: 0.2,
-                          shadows: const [
-                            Shadow(color: Colors.black, blurRadius: 3),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${unit.currentHp}/${unit.maxHp} HP',
+                            style: TextStyle(
+                              color: hpColor,
+                              fontSize: isCompact ? 9.0 : 10.0,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                              letterSpacing: 0.2,
+                              shadows: const [
+                                Shadow(color: Colors.black, blurRadius: 3),
+                              ],
+                            ),
+                          ),
+                          if (unit.shieldPoints > 0) ...[
+                            const SizedBox(width: 3),
+                            Text(
+                              '+${unit.shieldPoints}',
+                              style: TextStyle(
+                                color: const Color(0xFFE0E0E0),
+                                fontSize: isCompact ? 7.5 : 8.5,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                                shadows: const [
+                                  Shadow(color: Colors.black, blurRadius: 3),
+                                ],
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                       const SizedBox(width: 6),
                       Text(
