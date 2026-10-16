@@ -61,6 +61,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _activeSkillName;
   String? _activeSkillCasterName;
   bool _isPlayerSkillBanner = false;
+  CombatUnitState? _activeUltimateUnit; // Active Ultimate Burst Cinematic Cut-in
   final Map<String, String> _unitFloatingPops = {};
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
@@ -202,6 +203,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       createdMs: nowMs,
     );
 
+    // Check if event is a player Ultimate Burst
+    final bool isUltimate = event.id.startsWith('ult_');
+    if (isUltimate && caster != null && caster.isPlayer) {
+      _activeUltimateUnit = caster;
+      _playSfx('sfx_spell.wav');
+    }
+
     setState(() {
       _activeVfx.add(newVfx);
       _attackingUnitId = event.attackerId;
@@ -210,8 +218,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _activeSkillCasterName = event.attackerName;
       _isPlayerSkillBanner = event.isPlayerAttacker;
       if (event.isHeal) {
-        if (event.skillName == 'Phalanx Intercept') {
-          _unitFloatingPops[event.targetId] = '+35 🛡️ ARMOR';
+        if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
+          _unitFloatingPops[event.targetId] = '+60 🛡️ AEGIS';
         } else if (event.skillName == 'Stoke the Embers') {
           _unitFloatingPops[event.targetId] = '+2 ⚡ FOCUS';
         } else {
@@ -255,6 +263,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       if (mounted) {
         setState(() {
           _activeSkillName = null;
+          _activeUltimateUnit = null;
         });
         _engine.clearActiveAction();
       }
@@ -499,6 +508,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       );
                     },
                   ),
+
+                  // In-Combat Ultimate Burst Dramatic Cut-In Overlay
+                  if (_activeUltimateUnit != null)
+                    _buildUltimateCinematicOverlay(_activeUltimateUnit!),
 
                   // Victory / Defeat Tactical Overlay Banner
                   if (_engine.isVictory || _engine.isDefeat)
@@ -2638,6 +2651,220 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Dramatic In-Combat Ultimate Burst Cut-In Overlay
+  Widget _buildUltimateCinematicOverlay(CombatUnitState unit) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: true, // Visual cut-in must not swallow underlying clicks
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.0,
+              colors: [
+                const Color(0xFF2E1A0A).withValues(alpha: 0.88),
+                const Color(0xFF0F0B06).withValues(alpha: 0.94),
+                Colors.black.withValues(alpha: 0.97),
+              ],
+            ),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            alignment: Alignment.center,
+            children: [
+              // 1. Radiant Background Arcane Spell Circles
+              Center(
+                child: Opacity(
+                  opacity: 0.35,
+                  child: Image.asset(
+                    'assets/images/Spells/Support_spell_magic_circle.png',
+                    width: 380,
+                    height: 380,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+
+              // 2. High-energy Gold / Crimson Diagonal Slash Banner Backing
+              Center(
+                child: Container(
+                  height: 190,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        const Color(0xFFB8860B).withValues(alpha: 0.25),
+                        const Color(0xFFFFD54F).withValues(alpha: 0.40),
+                        const Color(0xFFB8860B).withValues(alpha: 0.25),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    border: Border.symmetric(
+                      horizontal: BorderSide(
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.75),
+                        width: 1.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Main Center Cut-In Content: Hero Portrait Miniature + Title Banner
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Hero Miniature Portrait Frame with Golden Halo
+                      Container(
+                        width: 140,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFFD54F),
+                            width: 2.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD54F).withValues(alpha: 0.6),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.9),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.asset(
+                              unit.assetPath,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                color: Color(0xFFFFD54F),
+                                size: 64,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                color: Colors.black.withValues(alpha: 0.75),
+                                child: Text(
+                                  unit.name.toUpperCase(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD54F),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 9.5,
+                                    letterSpacing: 0.8,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 24),
+
+                      // Ultimate Header & Description
+                      Flexible(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // "⚡ ULTIMATE BURST ⚡" Header Pip
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF1744).withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFFFF5252),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bolt, color: Color(0xFFFFD54F), size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'APEX ULTIMATE BURST',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFE082),
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 10,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            // Ultimate Name
+                            Text(
+                              unit.ultimateTitle.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 20,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xFFFFD54F),
+                                    blurRadius: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            // Ultimate Flavor & Tactical Effect
+                            Text(
+                              unit.ultimateDescription,
+                              style: const TextStyle(
+                                color: Color(0xFFE0E0E0),
+                                fontSize: 11.5,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
