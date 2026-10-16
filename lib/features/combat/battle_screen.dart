@@ -25,6 +25,8 @@ class FloatingCombatText {
   final Color color;
   final bool isCrit;
   final String? targetUnitId;
+  final String? subtitle;
+  final IconData? icon;
   final Key key = UniqueKey();
 
   FloatingCombatText({
@@ -32,6 +34,8 @@ class FloatingCombatText {
     required this.color,
     this.isCrit = false,
     this.targetUnitId,
+    this.subtitle,
+    this.icon,
   });
 }
 
@@ -568,13 +572,22 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
     });
   }
 
-  void _addPop(String text, Color color, {bool isCrit = false, String? targetUnitId}) {
+  void _addPop(
+    String text,
+    Color color, {
+    bool isCrit = false,
+    String? targetUnitId,
+    String? subtitle,
+    IconData? icon,
+  }) {
     if (!mounted) return;
     final pop = FloatingCombatText(
       text: text,
       color: color,
       isCrit: isCrit,
       targetUnitId: targetUnitId,
+      subtitle: subtitle,
+      icon: icon,
     );
     setState(() => _floatingPops.add(pop));
     final timer = Timer(const Duration(milliseconds: 1400), () {
@@ -839,6 +852,8 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
     int heal = 0,
     String? targetUnitId,
     String? sourceUnitId,
+    String? skillName,
+    String? statusName,
   }) {
     if (damage > 0) {
       final bool isCataclysmic = isCrit && damage > 250;
@@ -864,6 +879,8 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
         color: color,
         isCrit: isCrit,
         targetUnitId: targetUnitId,
+        subtitle: skillName,
+        icon: isCrit ? Icons.bolt_rounded : null,
       );
       setState(() => _floatingPops.add(pop));
 
@@ -871,6 +888,10 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
         if (mounted) setState(() => _floatingPops.remove(pop));
       });
       _popTimers.add(timer);
+
+      if (statusName != null && statusName.isNotEmpty) {
+        _addPop('+$statusName', const Color(0xFFFF8A80), targetUnitId: targetUnitId);
+      }
     }
 
     if (heal > 0) {
@@ -878,6 +899,8 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
         text: '+$heal HP',
         color: const Color(0xFF81C784),
         targetUnitId: sourceUnitId ?? targetUnitId,
+        subtitle: skillName != null && damage == 0 ? skillName : null,
+        icon: Icons.favorite_rounded,
       );
       setState(() => _floatingPops.add(healPop));
 
@@ -953,6 +976,8 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
               heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
               targetUnitId: result.target.id,
               sourceUnitId: result.attacker.id,
+              skillName: readySkill.name,
+              statusName: result.appliedStatusName,
             );
 
             setState(() {
@@ -1173,6 +1198,8 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
           heal: result.healAmount > 0 ? result.healAmount : result.lifestealRecovered,
           targetUnitId: result.target.id,
           sourceUnitId: result.attacker.id,
+          skillName: skill.name,
+          statusName: result.appliedStatusName,
         );
 
         setState(() {
@@ -5072,38 +5099,78 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
                           final intentSkill = _aiService.predictNextSkill(unit);
                           if (intentSkill == null) return const SizedBox.shrink();
                           final bool isLimitBurst = intentSkill.isLimitBurst;
+                          final bool isAoe = intentSkill.targetType == SkillTargetType.allAllies ||
+                              intentSkill.targetType == SkillTargetType.allEnemies;
+                          final bool isCleave = intentSkill.targetType == SkillTargetType.frontlineEnemies;
+                          final bool isSupport = intentSkill.targetType == SkillTargetType.singleAlly ||
+                              intentSkill.targetType == SkillTargetType.allAllies ||
+                              intentSkill.targetType == SkillTargetType.lowestHpAlly;
+
+                          Color intentBg = const Color(0xFF263238).withValues(alpha: 0.88);
+                          Color intentBorder = const Color(0xFFFF8A80);
+                          Color intentText = Colors.white;
+                          IconData intentIcon = Icons.gps_fixed;
+
+                          if (isLimitBurst) {
+                            intentBg = const Color(0xFF880E4F).withValues(alpha: 0.95);
+                            intentBorder = const Color(0xFFFFD54F);
+                            intentText = const Color(0xFFFFD54F);
+                            intentIcon = Icons.warning_amber_rounded;
+                          } else if (isAoe) {
+                            intentBg = const Color(0xFFB71C1C).withValues(alpha: 0.92);
+                            intentBorder = const Color(0xFFFF5252);
+                            intentIcon = Icons.all_inclusive;
+                          } else if (isSupport) {
+                            intentBg = const Color(0xFF1B5E20).withValues(alpha: 0.90);
+                            intentBorder = const Color(0xFF81C784);
+                            intentText = const Color(0xFFA5D6A7);
+                            intentIcon = Icons.add_moderator;
+                          }
+
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 1.5),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.0),
                               decoration: BoxDecoration(
-                                color: isLimitBurst
-                                    ? const Color(0xFFD50000).withValues(alpha: 0.90)
-                                    : const Color(0xFF263238).withValues(alpha: 0.85),
+                                color: intentBg,
                                 borderRadius: BorderRadius.circular(3),
                                 border: Border.all(
-                                  color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
+                                  color: intentBorder,
                                   width: isLimitBurst ? 1.2 : 0.8,
                                 ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
-                                    isLimitBurst ? Icons.warning_amber_rounded : Icons.gps_fixed,
-                                    size: 7.5,
-                                    color: isLimitBurst ? const Color(0xFFFFD54F) : const Color(0xFFFF8A80),
-                                  ),
+                                  Icon(intentIcon, size: 7.5, color: intentBorder),
                                   const SizedBox(width: 2),
                                   Text(
                                     'INTENT: ${intentSkill.name.toUpperCase()}',
                                     style: TextStyle(
-                                      color: isLimitBurst ? const Color(0xFFFFD54F) : Colors.white,
+                                      color: intentText,
                                       fontSize: 6.5,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.4,
                                     ),
                                   ),
+                                  if (isAoe || isCleave) ...[
+                                    const SizedBox(width: 3),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 0.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF1744),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: Text(
+                                        isAoe ? 'AOE' : 'FRONT',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 5.5,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                   if (_dragHoveringSpellTargetUnitId == unit.id &&
                                       (_dragHoveringSpellOrder?.id == 'disrupting_cleave' || _dragHoveringSpellOrder?.id == 'feast_of_ruin')) ...[
                                     const SizedBox(width: 3),
@@ -5636,23 +5703,44 @@ class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderSt
                                 ),
                               ],
                             ),
-                            child: Row(
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (pop.isCrit) ...[
-                                  const Icon(Icons.flash_on, size: 13, color: Color(0xFFFFD54F)),
-                                  const SizedBox(width: 3),
-                                ],
-                                Text(
-                                  pop.text,
-                                  style: TextStyle(
-                                    color: pop.color,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: fontSize,
-                                    fontFamily: 'monospace',
-                                    letterSpacing: pop.isCrit ? 0.8 : 0.4,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (pop.icon != null) ...[
+                                      Icon(pop.icon, size: pop.isCrit ? 13 : 11, color: pop.color),
+                                      const SizedBox(width: 3),
+                                    ] else if (pop.isCrit) ...[
+                                      const Icon(Icons.flash_on, size: 13, color: Color(0xFFFFD54F)),
+                                      const SizedBox(width: 3),
+                                    ],
+                                    Text(
+                                      pop.text,
+                                      style: TextStyle(
+                                        color: pop.color,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: fontSize,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: pop.isCrit ? 0.8 : 0.4,
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                if (pop.subtitle != null && pop.subtitle!.isNotEmpty) ...[
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    pop.subtitle!.toUpperCase(),
+                                    style: TextStyle(
+                                      color: pop.color.withValues(alpha: 0.85),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 6.5,
+                                      fontFamily: 'monospace',
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
