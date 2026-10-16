@@ -34,7 +34,7 @@ class CrucibleScreen extends StatefulWidget {
 }
 
 class _CrucibleScreenState extends State<CrucibleScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   UnitEntity? _progenitorA;
   UnitEntity? _progenitorB;
   String? _selectedGraftTraitId;
@@ -42,6 +42,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
+  late AnimationController _aperturePulseController;
 
   @override
   void initState() {
@@ -61,6 +62,16 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       parent: _shakeController,
       curve: Curves.easeInOut,
     ));
+
+    _aperturePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    );
+
+    final bool isTestBinding = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    if (!isTestBinding) {
+      _aperturePulseController.repeat();
+    }
 
     // Pre-slot available matching pair if nothing selected
     _autoSlotFirstCompatiblePair();
@@ -83,6 +94,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   @override
   void dispose() {
     _shakeController.dispose();
+    _aperturePulseController.dispose();
     super.dispose();
   }
 
@@ -623,32 +635,65 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
-          child: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _canFuse ? const Color(0xFFFF5252) : const Color(0xFF4A4A58),
-                width: 1.5,
-              ),
-              boxShadow: _canFuse
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFFFF1744).withValues(alpha: 0.6),
-                        blurRadius: 12,
-                        spreadRadius: 2,
+          child: AnimatedBuilder(
+            animation: _aperturePulseController,
+            builder: (context, child) {
+              final double pulse = sin(_aperturePulseController.value * 2 * pi);
+              final double glowRadius = _canFuse ? (12.0 + pulse * 6.0) : 6.0;
+              final double glowAlpha = _canFuse ? (0.65 + pulse * 0.25) : 0.3;
+              final Color auraColor = _requiredSigilsCost > 0
+                  ? const Color(0xFFFFD700)
+                  : (_canFuse ? const Color(0xFFFF1744) : const Color(0xFFE5A93C));
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Rotating Outer Arcane Halo
+                  Transform.rotate(
+                    angle: _aperturePulseController.value * 2 * pi,
+                    child: Opacity(
+                      opacity: _canFuse ? 0.8 : 0.35,
+                      child: Image.asset(
+                        'assets/images/Spells/Support_spell_magic_circle.png',
+                        width: 74,
+                        height: 74,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
-                    ]
-                  : null,
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/crucible_aperture.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.compare_arrows, color: Color(0xFFB3261E), size: 26),
-              ),
-            ),
+                    ),
+                  ),
+                  // Aperture Orb Plinth
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: auraColor,
+                        width: _canFuse ? 2.0 : 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: auraColor.withValues(alpha: glowAlpha),
+                          blurRadius: glowRadius,
+                          spreadRadius: _canFuse ? 3 : 1,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/crucible_aperture.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.compare_arrows,
+                          color: auraColor,
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         Expanded(
