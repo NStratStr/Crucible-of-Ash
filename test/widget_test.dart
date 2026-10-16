@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ashen_crucible/features/campaign/safe_teleport_modal.dart';
 import 'package:ashen_crucible/main.dart';
 
 void main() {
@@ -138,6 +139,51 @@ void main() {
     expect(find.text('Telco Low-Data Mode'), findsOneWidget);
     expect(find.text('Active Carrier Profile'), findsOneWidget);
     expect(find.text('Offline Local Storage Cache'), findsOneWidget);
+  });
+
+  testWidgets('SafeTeleportModal renders run haul and confirms extraction', (WidgetTester tester) async {
+    bool extracted = false;
+    bool continued = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => SafeTeleportModal.show(
+                ctx,
+                accumulatedIchor: 350,
+                accumulatedOre: 45,
+                accumulatedSigils: 1,
+                onConfirmExtraction: () => extracted = true,
+                onContinueDelve: () => continued = true,
+              ),
+              child: const Text('OPEN TELEPORT MODAL'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('OPEN TELEPORT MODAL'));
+    await tester.pumpAndSettle();
+
+    // Verify modal elements
+    expect(find.text('RUNIC TELEPORT CIRCLE'), findsOneWidget);
+    expect(find.text('SAFE DUNGEON EXTRACTION THRESHOLD'), findsOneWidget);
+    expect(find.text('+350'), findsOneWidget);
+    expect(find.text('+45'), findsOneWidget);
+    expect(find.text('+1'), findsOneWidget);
+    expect(find.text('EXTRACT (100% LOOT)'), findsOneWidget);
+    expect(find.text('PRESS DEEPER'), findsOneWidget);
+
+    // Tap EXTRACT
+    await tester.tap(find.text('EXTRACT (100% LOOT)'));
+    await tester.pumpAndSettle();
+
+    expect(extracted, isTrue);
+    expect(continued, isFalse);
   });
 }
 

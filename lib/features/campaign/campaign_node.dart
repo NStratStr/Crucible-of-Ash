@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 
 enum CampaignNodeType {
-  skirmish,    // Standard brigade fight
-  elite,       // Dangerous elite monster
-  altar,       // Sacrifice HP for stat buff
-  restHaven,   // Heal squad HP or upgrade relic
-  crypt,       // Narrative mystery event
-  watchtower,  // Scout upcoming tiers and reveal enemy affinities
-  boss,        // Chapter World Titan
+  skirmish,       // Standard brigade fight
+  elite,          // Dangerous elite monster
+  altar,          // Sacrifice HP for stat buff
+  restHaven,      // Heal squad HP or upgrade relic
+  crypt,          // Narrative mystery event
+  watchtower,     // Scout upcoming tiers and reveal enemy affinities
+  boss,           // Chapter World Titan
+  teleportStone,  // Safe Extraction Teleport Runestone: leave with 100% of accumulated delve loot
 }
 
 /// Environmental Hazards on Campaign Overworld Nodes (GDD §4.3)

@@ -572,6 +572,10 @@ class CampaignMapScreen extends StatelessWidget {
       borderColor = const Color(0xFF4CAF50);
       bgColor = const Color(0xFF1B5E20).withValues(alpha: 0.3);
       icon = Icons.check;
+    } else if (node.type == CampaignNodeType.teleportStone) {
+      borderColor = const Color(0xFF00E5FF);
+      bgColor = const Color(0xFF00384D);
+      icon = Icons.auto_awesome;
     } else if (node.isCurrent) {
       borderColor = const Color(0xFFE5A93C);
       bgColor = const Color(0xFFE5A93C).withValues(alpha: 0.2);
@@ -580,7 +584,7 @@ class CampaignMapScreen extends StatelessWidget {
       bgColor = const Color(0xFF2A1515);
     }
 
-    final double circleSize = node.type == CampaignNodeType.boss ? 48.0 : 38.0;
+    final double circleSize = node.type == CampaignNodeType.boss ? 48.0 : (node.type == CampaignNodeType.teleportStone ? 42.0 : 38.0);
 
     return GestureDetector(
       onTap: canTap ? () => _showNodeEncounterDialog(context, node) : null,
@@ -606,9 +610,11 @@ class CampaignMapScreen extends StatelessWidget {
                   boxShadow: canTap
                       ? [
                           BoxShadow(
-                            color: const Color(0xFFB3261E).withValues(alpha: 0.45),
-                            blurRadius: 8,
-                            spreadRadius: 1.5,
+                            color: node.type == CampaignNodeType.teleportStone
+                                ? const Color(0xFF00E5FF).withValues(alpha: 0.6)
+                                : const Color(0xFFB3261E).withValues(alpha: 0.45),
+                            blurRadius: node.type == CampaignNodeType.teleportStone ? 12 : 8,
+                            spreadRadius: node.type == CampaignNodeType.teleportStone ? 2.5 : 1.5,
                           )
                         ]
                       : null,
@@ -1014,7 +1020,33 @@ class CampaignMapScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                   ],
-                  Container(
+                  if (node.type == CampaignNodeType.teleportStone)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00384D),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF00E5FF)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.auto_awesome, color: Color(0xFF00E5FF), size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'SAFE EXTRACTION: Leave delve with 100% of accumulated loot or continue to Boss Chamber.',
+                              style: TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF14141B),
@@ -1112,6 +1144,8 @@ class CampaignMapScreen extends StatelessWidget {
         return 'PRY SARCOPHAGUS';
       case CampaignNodeType.watchtower:
         return 'SCALE OBSIDIAN SPIRE';
+      case CampaignNodeType.teleportStone:
+        return 'ACTIVATE RUNIC EXTRACTION';
     }
   }
 
@@ -1131,6 +1165,8 @@ class CampaignMapScreen extends StatelessWidget {
         return Icons.visibility;
       case CampaignNodeType.boss:
         return Icons.shield;
+      case CampaignNodeType.teleportStone:
+        return Icons.auto_awesome;
     }
   }
 

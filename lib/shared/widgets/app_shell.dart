@@ -9,6 +9,7 @@ import '../../features/campaign/campaign_node.dart';
 import '../../features/campaign/defiled_crypt_dialog.dart';
 import '../../features/campaign/endgame_gauntlet_dialog.dart';
 import '../../features/campaign/rest_haven_dialog.dart';
+import '../../features/campaign/safe_teleport_modal.dart';
 import '../../features/campaign/watchtower_dialog.dart';
 import '../../features/combat/battle_screen.dart';
 import '../../features/combat/combat_resolution_service.dart';
@@ -76,6 +77,11 @@ class _AppShellState extends State<AppShell> {
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
   bool _isInitialized = false;
   bool _isAscensionDialogOpen = false;
+
+  // Dungeon / Catacomb Delve Run Loot Sack (Risk & Reward 100% Extract vs 50% Wipe)
+  int _dungeonDelveIchor = 0;
+  int _dungeonDelveOre = 0;
+  int _dungeonDelveSigils = 0;
 
   @override
   void initState() {
@@ -462,7 +468,63 @@ class _AppShellState extends State<AppShell> {
       _handleRestHavenNode(node);
     } else if (node.type == CampaignNodeType.watchtower) {
       _handleWatchtowerNode(node);
+    } else if (node.type == CampaignNodeType.teleportStone) {
+      _handleTeleportStoneNode(node);
     }
+  }
+
+  void _handleTeleportStoneNode(CampaignNode node) {
+    SafeTeleportModal.show(
+      context,
+      accumulatedIchor: _dungeonDelveIchor,
+      accumulatedOre: _dungeonDelveOre,
+      accumulatedSigils: _dungeonDelveSigils,
+      onConfirmExtraction: () {
+        // Safe extraction with 100% of accumulated loot!
+        final ichorExtracted = _dungeonDelveIchor;
+        final oreExtracted = _dungeonDelveOre;
+        final sigilsExtracted = _dungeonDelveSigils;
+
+        setState(() {
+          _totalIchor += ichorExtracted;
+          _cursedOre += oreExtracted;
+          _bloodlineSigils += sigilsExtracted;
+
+          // Reset delve run sack
+          _dungeonDelveIchor = 0;
+          _dungeonDelveOre = 0;
+          _dungeonDelveSigils = 0;
+
+          // Heal squad upon return to Citadel
+          final healedSquad = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+          _tickManager.updateSquads(allies: healedSquad);
+
+          // Reset campaign expedition map to fresh incursion
+          _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
+          _activeNode = null;
+          _currentIndex = 0;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'DUNGEON EXTRACTED! Safely returned with 100% loot (+$ichorExtracted Ichor, +$oreExtracted Ore, +$sigilsExtracted Sigils)!',
+            ),
+            backgroundColor: const Color(0xFF00B4D8),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      },
+      onContinueDelve: () {
+        _markNodeCompleted(node.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You leave the Teleport Stone behind and press deeper toward the Boss!'),
+            backgroundColor: Color(0xFFE5A93C),
+          ),
+        );
+      },
+    );
   }
 
   void _handleRestHavenNode(CampaignNode node) {
@@ -711,6 +773,11 @@ class _AppShellState extends State<AppShell> {
       _totalIchor += reward;
       _cursedOre += oreReward;
       _bloodlineSigils += sigilsReward;
+
+      // Track accumulated loot for this delve run
+      _dungeonDelveIchor += reward;
+      _dungeonDelveOre += oreReward;
+      _dungeonDelveSigils += sigilsReward;
     });
     if (_activeNode != null) {
       _markNodeCompleted(_activeNode!.id);
@@ -956,11 +1023,19 @@ class _AppShellState extends State<AppShell> {
 
   void _onCombatDefeat() {
     _activeGauntletTrial = null;
-    final consolationAsh = max(25, ((_activeNode?.rewardIchor ?? 150) * 0.20).round());
-    final consolationXp = 50;
+    // User requested rule: On death/wipe in a delve, player recovers 50% of accumulated delve loot
+    final int consolationAsh = max(25, (_dungeonDelveIchor * 0.50).round());
+    final int consolationOre = (_dungeonDelveOre * 0.50).round();
+    final int consolationXp = 50;
     _grantBrigadeXp(consolationXp);
+
     setState(() {
       _totalIchor += consolationAsh;
+      _cursedOre += consolationOre;
+      // Reset delve sack
+      _dungeonDelveIchor = 0;
+      _dungeonDelveOre = 0;
+      _dungeonDelveSigils = 0;
     });
 
     PostBattleLootDialog.show(
@@ -968,10 +1043,12 @@ class _AppShellState extends State<AppShell> {
       rewards: CombatRewardsData(
         isVictory: false,
         rawAsh: consolationAsh,
-        emberShards: 0,
+        emberShards: consolationOre,
         cryptKeys: 0,
         xpGained: consolationXp,
-        encounterTitle: _activeNode?.name ?? 'Defeat in the Shadows',
+        encounterTitle: _activeNode?.name != null
+            ? '${_activeNode!.name} (50% Loot Salvaged)'
+            : 'Defeat in the Shadows (50% Loot Salvaged)',
       ),
       onContinue: () {
         if (!mounted) return;
