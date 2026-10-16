@@ -373,32 +373,81 @@ class CombatUnitState {
     if (customAssetPath != null && customAssetPath!.isNotEmpty) {
       return customAssetPath!;
     }
-    if (id.contains('gorgoroth') || templateId.contains('gorgoroth')) {
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('gorgoroth') || key.contains('chapter_titan') || key.contains('world_titan')) {
       return 'assets/images/flayed_butcher.png';
     }
-    if (id.contains('cinder_witch') || templateId.contains('cinder_witch')) {
+    if (key.contains('vladislav')) {
+      return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
+    }
+    if (key.contains('tombstone_sentinel') || key.contains('sentinel')) {
+      return 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png';
+    }
+    if (key.contains('ossuary_juggernaut') || key.contains('juggernaut')) {
+      return 'assets/images/Crypt Stalkers/CRY-01-VAN-G3 Ossuary Juggernaut.png';
+    }
+    if (key.contains('blood_scribe') || key.contains('scribe')) {
+      return 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png';
+    }
+    if (key.contains('sanguine_sorcerer') || key.contains('sorcerer')) {
+      return 'assets/images/Crypt Stalkers/CRY-04-MAG-G3 Sanguine Sorcerer.png';
+    }
+    if (key.contains('sanguine_archon') || key.contains('archon')) {
+      return 'assets/images/Crypt Stalkers/CRY-04-MAG-G6 Sanguine Archon.png';
+    }
+    if (key.contains('blood_alchemist') || key.contains('alchemist')) {
+      return 'assets/images/Crypt Stalkers/CRY-05-SUP-G1 Blood Alchemist.png';
+    }
+    if (key.contains('sanguine_priestess') || key.contains('priestess')) {
+      return 'assets/images/Crypt Stalkers/CRY-05-SUP-G3 Saunguine Priestess.png';
+    }
+    if (key.contains('sanguine_matron') || key.contains('matron')) {
+      return 'assets/images/Crypt Stalkers/CRY-05-SUP-G6 Saunguine Matron.png';
+    }
+    if (key.contains('sanguine_scourge') || key.contains('scourge')) {
+      return 'assets/images/Crypt Stalkers/[CRY-05-SUP-G3] Sanguine Scourge.png';
+    }
+    if (key.contains('high_inquisitor')) {
+      return 'assets/images/Crypt Stalkers/[CRY-05-SUP-G6] Sanguine High-Inquisitor.png';
+    }
+    if (key.contains('crimson_inquisitor')) {
+      return 'assets/images/crimson_inquisitor.png';
+    }
+    if (key.contains('blood_initiate')) {
       return 'assets/images/blood_initiate.png';
     }
-    if (id.contains('pyre_zealot') || templateId.contains('pyre_zealot')) {
+    if (key.contains('cinder_witch')) {
+      return 'assets/images/blood_initiate.png';
+    }
+    if (key.contains('ghoul')) {
       return 'assets/images/grave_ghoul_g1.png';
     }
-    if (id.contains('valeria') || templateId.contains('valeria')) {
+    if (key.contains('warhound') || key.contains('beast') || key.contains('crawler') || key.contains('voidfang')) {
+      return 'assets/images/feral_warhound.png';
+    }
+    if (key.contains('golem') || key.contains('magma')) {
+      return 'assets/images/magma_golem.png';
+    }
+    if (key.contains('dreadnaught') || key.contains('dreadnought')) {
+      return 'assets/images/ironclad_dreadnought.png';
+    }
+    if (key.contains('pyre_zealot')) {
+      return 'assets/images/grave_ghoul_g1.png';
+    }
+    if (key.contains('valeria')) {
       return 'assets/images/Ash Legion/lady_valeria_g1.png';
     }
-    if (id.contains('iron_footman') || templateId.contains('iron_footman')) {
+    if (key.contains('iron_footman')) {
       return 'assets/images/crimson_inquisitor.png';
     }
-    if (id.contains('sanguine_blade') || templateId.contains('sanguine_blade')) {
+    if (key.contains('sanguine_blade') || key.contains('flayer')) {
       return 'assets/images/sanguine_flayer_g3.png';
     }
-    if (id.contains('sun_smith') || templateId.contains('sun_smith')) {
+    if (key.contains('sun_smith') || key.contains('cleric')) {
       return 'assets/images/sun_scorched_cleric.png';
     }
-    if (id.contains('crimson_inquisitor')) {
-      return 'assets/images/crimson_inquisitor.png';
-    }
-    if (id.contains('blood_initiate')) {
-      return 'assets/images/blood_initiate.png';
+    if (key.contains('marksman') || key.contains('arbalest')) {
+      return 'assets/images/marksman_base.png';
     }
     return 'assets/images/footman_base.png';
   }

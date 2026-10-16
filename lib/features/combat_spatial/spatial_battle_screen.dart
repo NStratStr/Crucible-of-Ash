@@ -2616,18 +2616,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
     // transparent padding. We scale Valeria to 0.88 so her physical figure matches the 1:1 footprint of the others!
     double unitScaleMultiplier = 1.0;
-    if (unit.id == 'lady_valeria') {
+    final path = unit.assetPath.toLowerCase();
+    if (unit.id == 'lady_valeria' || path.contains('valeria')) {
       unitScaleMultiplier = 0.88; // Full-bleed canvas normalization for 1:1 tile footprint
-    } else if (unit.id == 'pyre_zealot' || unit.templateId.contains('ghoul')) {
+    } else if (path.contains('ghoul')) {
       unitScaleMultiplier = 1.45; // Ghoul crouches low; scale up plinth & figure
-    } else if (unit.id == 'iron_footman' || unit.id == 'crimson_inquisitor') {
-      unitScaleMultiplier = 1.35; // Crimson Inquisitor on tabletop plinth
-    } else if (unit.id == 'sanguine_blade') {
+    } else if (path.contains('sentinel') || path.contains('juggernaut')) {
+      unitScaleMultiplier = 1.35; // Bulky armored frontline
+    } else if (path.contains('crimson_inquisitor') || path.contains('inquisitor') || path.contains('footman')) {
+      unitScaleMultiplier = 1.35; // Tabletop knight plinths
+    } else if (path.contains('sanguine_flayer') || path.contains('blade') || path.contains('scourge')) {
       unitScaleMultiplier = 1.35;
-    } else if (unit.id == 'sun_smith') {
-      unitScaleMultiplier = 1.20;
-    } else if (unit.id == 'cinder_witch' || unit.id == 'blood_initiate') {
-      unitScaleMultiplier = 1.30; // Blood Initiate on tabletop plinth
+    } else if (path.contains('sun_smith') || path.contains('alchemist') || path.contains('scribe') || path.contains('priestess')) {
+      unitScaleMultiplier = 1.25;
+    } else if (path.contains('cinder_witch') || path.contains('blood_initiate') || path.contains('sorcerer') || path.contains('archon') || path.contains('matron')) {
+      unitScaleMultiplier = 1.30; // Tall casters
+    } else if (path.contains('warhound') || path.contains('golem')) {
+      unitScaleMultiplier = 1.30;
     }
 
     final double bossSpanWidth = isBoss ? (tileWidth * 2.2) : tileWidth;
