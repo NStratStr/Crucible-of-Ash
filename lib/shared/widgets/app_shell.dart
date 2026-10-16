@@ -1453,9 +1453,6 @@ class _AppShellState extends State<AppShell> {
                           isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
                           onVictory: () {
                             _onCombatVictory();
-                            setState(() {
-                              _currentIndex = 0; // Return to Campaign Map
-                            });
                           },
                           onDefeat: () {
                             _onCombatDefeat();

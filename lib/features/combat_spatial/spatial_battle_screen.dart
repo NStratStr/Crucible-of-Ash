@@ -515,18 +515,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  _engine.isVictory ? 'THE ASHEN GATE SURPASSED' : 'RESONANCE SEVERED',
+                                  _engine.isVictory
+                                      ? '${widget.encounterTitle ?? _engine.encounterTitle} CONQUERED'.toUpperCase()
+                                      : 'RESONANCE SEVERED',
                                   style: TextStyle(
                                     color: _engine.isVictory ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
                                     fontWeight: FontWeight.w900,
                                     fontSize: 16,
                                     letterSpacing: 1.5,
                                   ),
+                                  textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   _engine.isVictory
-                                      ? 'Gorgoroth and the Synod cohort have crumbled into inert slag.'
+                                      ? 'The enemy regiment has collapsed into inert slag and bone.'
                                       : 'All constructs have fallen. Your neural tether dissipates into the miasma.',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(fontSize: 11, color: Colors.white70),
