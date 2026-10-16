@@ -385,6 +385,56 @@ void main() {
       expect(footman.invulnerabilityTicks, equals(0));
       expect(footman.isInvulnerable, isFalse);
     });
+
+    test('Status Effect Matrix: Poison deals true damage, decays Attack and Speed by 2% per stack', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final baseAtk = footman.attack;
+      final baseSpd = footman.speed;
+
+      footman.poisonStacks = 5; // 5 stacks = 10% ATK & SPD penalty
+      expect(footman.effectiveAttack, equals((baseAtk * 0.90).round()));
+      expect(footman.effectiveSpeed, equals((baseSpd * 0.90).round()));
+
+      final hpBefore = footman.hp;
+      // Step 30 ticks (1 second) to trigger Poison DoT
+      for (int i = 0; i < 30; i++) {
+        engine.stepTick();
+      }
+      // 5 stacks * 14 = 70 true damage (ignoring armor)
+      expect(footman.hp, equals(hpBefore - 70));
+    });
+
+    test('Status Effect Matrix: Freeze pauses AP, and physical strike shatters for 15% Max HP bonus damage', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      footman.freezeDuration = 90; // 3 seconds freeze
+      expect(footman.isFrozen, isTrue);
+
+      final initialAp = footman.currentAp;
+      // Step 1 tick: AP does not accumulate while frozen
+      engine.stepTick();
+      expect(footman.currentAp, equals(initialAp));
+
+      // Physical hit shatters freeze for 15% Max HP bonus
+      footman.armor = 0; // Pure damage comparison
+      final hpBefore = footman.hp;
+      final dealt = footman.takeDamage(100, isPhysical: true);
+      expect(footman.isFrozen, isFalse); // Shattered!
+      expect(dealt, equals(100 + (footman.maxHp * 0.15).round())); // 100 base + 68 shatter = 168
+      expect(footman.hp, equals(hpBefore - dealt));
+    });
+
+    test('Status Effect Matrix: Vulnerable amplifies incoming damage by 25%', () {
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      footman.armor = 0; // Remove armor reduction to test pure multiplier
+
+      final normalDmg = footman.takeDamage(100);
+      expect(normalDmg, equals(100));
+
+      footman.vulnerableDuration = 90; // 3 seconds vulnerable
+      expect(footman.isVulnerable, isTrue);
+      final vulnDmg = footman.takeDamage(100);
+      expect(vulnDmg, equals(125)); // +25% amplified damage
+    });
   });
 }
 

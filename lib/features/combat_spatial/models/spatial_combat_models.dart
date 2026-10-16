@@ -201,8 +201,12 @@ class CombatUnitState {
   int attack;
   int speed;
   int bleedStacks;
+  int poisonStacks; // DoT Nature: deals true damage/sec; decays ATK & SPD by 2% per stack
   int burnDuration; // in ticks (30 ticks = 1 sec)
-  int stunDuration; // in ticks (freezes AP)
+  int freezeDuration; // in ticks (hard CC: cannot act, physical hits shatter for 15% max HP bonus damage)
+  int stunDuration; // in ticks (freezes AP, drains 25% on apply)
+  int vulnerableDuration; // in ticks (+25% incoming damage)
+  int hasteDuration; // in ticks (+35% base Speed)
   int aegisShield; // absorbs damage before HP
   int reviveCount; // tracking Soul Fracture (-20% max HP per revive)
   int? baseMaxHp; // original baseline Max HP prior to Soul Fractures
@@ -237,8 +241,12 @@ class CombatUnitState {
     required this.attack,
     required this.speed,
     this.bleedStacks = 0,
+    this.poisonStacks = 0,
     this.burnDuration = 0,
+    this.freezeDuration = 0,
     this.stunDuration = 0,
+    this.vulnerableDuration = 0,
+    this.hasteDuration = 0,
     this.aegisShield = 0,
     this.reviveCount = 0,
     int? baseMaxHp,
@@ -303,7 +311,26 @@ class CombatUnitState {
   bool get isAlive => hp > 0;
   bool get isDowned => hp <= 0;
   bool get isStunned => stunDuration > 0;
+  bool get isFrozen => freezeDuration > 0;
   bool get isBurning => burnDuration > 0;
+  bool get isPoisoned => poisonStacks > 0;
+  bool get isVulnerable => vulnerableDuration > 0;
+  bool get isHasted => hasteDuration > 0;
+
+  /// Effective Attack after Poison decay (2% per stack, up to 30% reduction at 15 stacks)
+  int get effectiveAttack {
+    final penalty = (poisonStacks * 0.02).clamp(0.0, 0.40);
+    return max(1, (attack * (1.0 - penalty)).round());
+  }
+
+  /// Effective Speed factoring Poison decay (-2%/stack) and Haste (+35%)
+  int get effectiveSpeed {
+    double mult = 1.0;
+    if (isHasted) mult += 0.35;
+    final penalty = (poisonStacks * 0.02).clamp(0.0, 0.40);
+    mult -= penalty;
+    return max(1, (speed * mult).round());
+  }
 
   /// Minimum AP requirement to reposition (50% of 10,000 threshold = 5,000 AP)
   static const int moveApCost = 5000;
@@ -425,11 +452,24 @@ class CombatUnitState {
     return occupiedNodes.any((n) => n.column == col && n.row == row);
   }
 
-  /// Inflicts damage taking Slag Carapace, Aegis Shield, and Armor into account
-  int takeDamage(int rawDamage, {bool ignoreArmor = false}) {
+  /// Inflicts damage taking Slag Carapace, Aegis Shield, Armor, Vulnerable, and Freeze Shatter into account
+  int takeDamage(int rawDamage, {bool ignoreArmor = false, bool isPhysical = true}) {
     if (isInvulnerable || isDowned) return 0;
 
     double finalDmg = rawDamage.toDouble();
+
+    // Vulnerable Debuff: +25% incoming damage (GDD §4 / §6.1)
+    if (isVulnerable) {
+      finalDmg *= 1.25;
+    }
+
+    // Freeze Shatter: Physical hits shatter freeze for +15% Max HP bonus damage and end freeze (GDD §4)
+    if (isFrozen && isPhysical) {
+      final shatterBonus = (maxHp * 0.15).round();
+      finalDmg += shatterBonus;
+      freezeDuration = 0; // Shattered
+    }
+
     if (isSlagCarapaceActive && armor > 0) {
       finalDmg *= 0.50; // -50% damage while Slag Carapace armor holds
     }
@@ -457,6 +497,13 @@ class CombatUnitState {
       hasStanceBonusReady = false;
       consecutiveTurnsStationary = 0;
       aegisShield = 0;
+      bleedStacks = 0;
+      poisonStacks = 0;
+      burnDuration = 0;
+      freezeDuration = 0;
+      stunDuration = 0;
+      vulnerableDuration = 0;
+      hasteDuration = 0;
     }
     return applied;
   }

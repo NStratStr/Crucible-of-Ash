@@ -398,9 +398,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
-                      // Substantially scaled grid size so tiles and units fill the scene proudly
-                      final double tileWidth = isDesktop ? 152.0 : 96.0;
-                      final double tileHeight = isDesktop ? 76.0 : 48.0;
+                      // Substantially scaled grid size so tiles and units fill the scene proudly with tactile presence
+                      final double tileWidth = isDesktop ? 190.0 : 130.0;
+                      final double tileHeight = isDesktop ? 95.0 : 65.0;
 
                       return Center(
                         child: SingleChildScrollView(
@@ -409,8 +409,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             scrollDirection: Axis.vertical,
                             child: Padding(
                               padding: EdgeInsets.symmetric(
-                                horizontal: isDesktop ? 24.0 : 8.0,
-                                vertical: isDesktop ? 12.0 : 6.0,
+                                horizontal: isDesktop ? 28.0 : 12.0,
+                                vertical: isDesktop ? 16.0 : 8.0,
                               ),
                               child: _buildUnifiedIsometricBattlefield(
                                 tileWidth: tileWidth,
@@ -2456,12 +2456,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     final double bossSpanWidth = isBoss ? (2 * tileWidth) : tileWidth;
     final double baseWidth = isBoss ? bossSpanWidth * 0.75 : (tileWidth - 12) * unitScaleMultiplier;
-    final double baseHeight = isBoss ? 28 : (14 * unitScaleMultiplier);
+    final double baseHeight = isBoss ? 32 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 0.95 * unitScaleMultiplier).clamp(60.0, 260.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.25 : tileWidth * 1.05 * unitScaleMultiplier).clamp(80.0, 320.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 3.6).clamp(160.0, 260.0)
-        : (tileHeight * 2.2 * unitScaleMultiplier).clamp(80.0, 160.0));
+        ? (tileHeight * 3.8).clamp(200.0, 320.0)
+        : (tileHeight * 2.3 * unitScaleMultiplier).clamp(110.0, 220.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -2668,6 +2668,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         style: const TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  if (unit.poisonStacks > 0)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: const Color(0xFF66BB6A), width: 0.6),
+                      ),
+                      child: Text(
+                        '🧪POISON x${unit.poisonStacks} (-${unit.poisonStacks * 2}%)',
+                        style: const TextStyle(fontSize: 6.0, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   if (unit.burnDuration > 0)
                     Container(
                       margin: const EdgeInsets.only(bottom: 1.0),
@@ -2681,6 +2695,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  if (unit.isFrozen)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0288D1),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: const Color(0xFF81D4FA), width: 0.6),
+                      ),
+                      child: const Text(
+                        '❄️FROZEN',
+                        style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.w900),
+                      ),
+                    ),
                   if (unit.isStunned)
                     Container(
                       margin: const EdgeInsets.only(bottom: 1.0),
@@ -2692,6 +2720,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       child: const Text(
                         '⚡STUNNED',
                         style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  if (unit.isVulnerable)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6A1B9A),
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(color: const Color(0xFFCE93D8), width: 0.6),
+                      ),
+                      child: const Text(
+                        '💔VULNERABLE (+25%)',
+                        style: TextStyle(fontSize: 6.0, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (unit.isHasted)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 1.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00B0FF),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: const Text(
+                        '⚡HASTE (+35%)',
+                        style: TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.w900),
                       ),
                     ),
                   if (unit.aegisShield > 0)

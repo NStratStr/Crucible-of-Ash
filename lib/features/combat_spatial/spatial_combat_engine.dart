@@ -365,12 +365,12 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
 
-    // Bleed Ticks (Every 30 ticks = 1 second)
+    // Bleed & Poison Ticks (Every 30 ticks = 1 second)
     if (currentTick % 30 == 0) {
       for (final unit in [...playerUnits, ...enemyUnits]) {
         if (unit.isAlive && unit.bleedStacks > 0) {
           final bleedDmg = (unit.bleedStacks * 18 * reckoningDamageMultiplier).round();
-          unit.takeDamage(bleedDmg, ignoreArmor: true);
+          unit.takeDamage(bleedDmg, ignoreArmor: true, isPhysical: true);
           addLog('${unit.name} suffers $bleedDmg Bleed damage ($unit.hp/${unit.maxHp} HP).');
           dispatchAction(SpatialActionEvent(
             id: 'bleed_${currentTick}_${unit.id}',
@@ -385,11 +385,29 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
 
+        // Poison Ticks (DoT Nature: true damage per second, GDD §6.1)
+        if (unit.isAlive && unit.poisonStacks > 0) {
+          final poisonDmg = (unit.poisonStacks * 14 * reckoningDamageMultiplier).round();
+          unit.takeDamage(poisonDmg, ignoreArmor: true, isPhysical: false);
+          addLog('${unit.name} suffers $poisonDmg Poison true damage ($unit.hp/${unit.maxHp} HP, -${unit.poisonStacks * 2}% ATK/SPD).');
+          dispatchAction(SpatialActionEvent(
+            id: 'poison_${currentTick}_${unit.id}',
+            attackerId: 'status_poison',
+            attackerName: 'POISON',
+            skillName: 'Caustic Toxin',
+            targetId: unit.id,
+            targetName: unit.name,
+            damage: poisonDmg,
+            isPlayerAttacker: false,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
+
         // Burn Ticks (Every 30 ticks = 1 second)
         if (unit.isAlive && unit.burnDuration > 0) {
           unit.burnDuration = max(0, unit.burnDuration - 30);
           final burnDmg = (24 * reckoningDamageMultiplier).round();
-          unit.takeDamage(burnDmg, ignoreArmor: false);
+          unit.takeDamage(burnDmg, ignoreArmor: false, isPhysical: false);
           addLog('${unit.name} burns for $burnDmg Fire damage (${unit.burnDuration ~/ 30}s remaining).');
           dispatchAction(SpatialActionEvent(
             id: 'burn_${currentTick}_${unit.id}',
@@ -408,14 +426,29 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (unit.isAlive && unit.stunDuration > 0) {
           unit.stunDuration = max(0, unit.stunDuration - 30);
         }
+
+        // Freeze countdown (Hard CC: cannot act or gain AP)
+        if (unit.isAlive && unit.freezeDuration > 0) {
+          unit.freezeDuration = max(0, unit.freezeDuration - 30);
+        }
+
+        // Vulnerable countdown
+        if (unit.isAlive && unit.vulnerableDuration > 0) {
+          unit.vulnerableDuration = max(0, unit.vulnerableDuration - 30);
+        }
+
+        // Haste countdown
+        if (unit.isAlive && unit.hasteDuration > 0) {
+          unit.hasteDuration = max(0, unit.hasteDuration - 30);
+        }
       }
     }
 
-    // Step AP Accumulation for all living units (Stun freezes AP accumulation per GDD §6.1)
+    // Step AP Accumulation for all living units (Stun & Freeze pause AP accumulation per GDD §4 / §6.1)
     final allUnits = [...enemyUnits, ...playerUnits].where((u) => u.isAlive).toList();
     for (final unit in allUnits) {
-      if (!unit.isStunned) {
-        unit.currentAp += unit.speed;
+      if (!unit.isStunned && !unit.isFrozen) {
+        unit.currentAp += unit.effectiveSpeed;
       }
     }
 
@@ -612,8 +645,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (target != null) {
         // Flanking Momentum check: Triggered if moved this turn cycle OR target has active Bleed
         final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0;
-        final int baseDmg = isFlankingBonus ? (unit.attack * 1.4).round() : unit.attack;
-        final dmg = target.takeDamage(baseDmg);
+        final int baseDmg = isFlankingBonus ? (unit.effectiveAttack * 1.4).round() : unit.effectiveAttack;
+        final dmg = target.takeDamage(baseDmg, isPhysical: true);
         final int appliedBleed = isFlankingBonus ? 4 : 2;
         target.bleedStacks += appliedBleed;
 
@@ -720,8 +753,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
         final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
         if (target != null) {
-          final int baseDmg = hasHoldTheLineBonus ? (unit.attack * 1.35).round() : unit.attack;
-          final dmg = target.takeDamage(baseDmg);
+          final int baseDmg = hasHoldTheLineBonus ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
+          final dmg = target.takeDamage(baseDmg, isPhysical: true);
           final skillName = hasHoldTheLineBonus
               ? (unit.id == 'lady_valeria' ? 'Solar Sunder Cleave' : 'Earth-Shattering Bash')
               : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : 'Shield Bash');
@@ -733,7 +766,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             // Lateral cleave across adjacent enemies in Row 0
             final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
             for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1))) {
-              final cleaveDmg = neighbor.takeDamage((baseDmg * 0.60).round());
+              final cleaveDmg = neighbor.takeDamage((baseDmg * 0.60).round(), isPhysical: true);
               neighbor.currentAp = max(0, neighbor.currentAp - 1500);
               addLog('  Lateral Cleave: ${neighbor.name} struck for $cleaveDmg DMG (-1,500 AP reset)!');
             }
@@ -852,8 +885,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       final frontEnemies = enemySquad.where((u) => u.isAlive && u.occupies(unit.occupiedNodes.first.column, 0)).toList();
       final target = frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
       if (target != null) {
-        final dmg = (unit.attack * 1.1).round();
-        target.takeDamage(dmg);
+        final dmg = (unit.effectiveAttack * 1.1).round();
+        target.takeDamage(dmg, isPhysical: false);
         unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
         // Push target back 1 row if target is displaceable and space is open
         if (!target.isDisplacementImmune && target.occupiedNodes.isNotEmpty) {
@@ -896,7 +929,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         for (int r = 0; r <= 2; r++) {
           final occupant = opposingSquad.where((u) => u.isAlive && u.occupies(targetCol, r)).firstOrNull;
           if (occupant != null) {
-            final dmg = occupant.takeDamage(unit.attack);
+            final dmg = occupant.takeDamage(unit.effectiveAttack, isPhysical: false);
             hitCount++;
             addLog('${unit.name} [AETHERIC ALIGNMENT] beam pierces ${occupant.name} for $dmg DMG (Hit #$hitCount)!');
           }
