@@ -1917,6 +1917,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate AOE)
+                if (isSpellAoeAffected)
+                  Center(
+                    child: Opacity(
+                      opacity: 0.65,
+                      child: Image.asset(
+                        activeCard != null && (activeCard.id == 'phalanx_intercept' || activeCard.id == 'stoke_the_embers')
+                            ? 'assets/images/Spells/Support_spell_magic_circle.png'
+                            : (activeCard != null && activeCard.id == 'revive_vitae'
+                                ? 'assets/images/Spells/Heal_spell_magic_circle.png'
+                                : 'assets/images/Spells/Attack_spell_magic_circle.png'),
+                        width: tileWidth * 0.90,
+                        height: tileHeight * 0.90,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+
                 // Reachable Movement Indicator / Move Button for Empty Cells
                 if (isReachable)
                   Center(
@@ -2561,10 +2580,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _isPlayerSkillBanner ? Icons.auto_awesome : Icons.warning_rounded,
-            color: themeColor,
-            size: 18,
+          Image.asset(
+            _isPlayerSkillBanner
+                ? 'assets/images/Spells/Support_spell_magic_circle.png'
+                : 'assets/images/Spells/Attack_spell_magic_circle.png',
+            width: 20,
+            height: 20,
+            errorBuilder: (_, __, ___) => Icon(
+              _isPlayerSkillBanner ? Icons.auto_awesome : Icons.warning_rounded,
+              color: themeColor,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 8),
           Text(
