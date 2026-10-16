@@ -240,7 +240,7 @@ class BattleScreen extends StatefulWidget {
   State<BattleScreen> createState() => _BattleScreenState();
 }
 
-class _BattleScreenState extends State<BattleScreen> {
+class _BattleScreenState extends State<BattleScreen> with SingleTickerProviderStateMixin {
   int _currentWaveIndex = 0;
   String? _selectedEnemyId;
   String _combatLog = 'Prepare for engagement. The Crucible awaits.';
@@ -249,6 +249,7 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _autoBattle = false;
   Timer? _autoBattleTimer;
   Timer? _aiTurnTimer;
+  late final AnimationController _atbReadyPulseController;
   bool _hasDispatchedEndOutcome = false;
   List<List<UnitEntity>>? _localEnemyWaves;
   bool _isPreBattleSetup = false;
@@ -621,6 +622,12 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void initState() {
     super.initState();
+    _atbReadyPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      value: 0.8,
+    );
+
     _isPreBattleSetup = widget.startInPreBattleSetup;
     if (_isPreBattleSetup && widget.tickManager.phase == CombatPhase.ticking) {
       widget.tickManager.pause();
@@ -693,6 +700,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   @override
   void dispose() {
+    _atbReadyPulseController.dispose();
     _shakeTimer?.cancel();
     _hitStopTimer?.cancel();
     _autoBattleTimer?.cancel();
@@ -960,6 +968,18 @@ class _BattleScreenState extends State<BattleScreen> {
             if (result.isGuarded) {
               _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
             }
+
+            // GDD Combat Feel: Turn Meter Push / Delay Feedbacks
+            if (result.target.isVanguard && result.damageDealt > 0) {
+              _addPop('+15% AP VANGUARD', const Color(0xFF00E5FF), targetUnitId: result.target.id);
+            }
+            final attackerTraits = <String>{
+              result.attacker.nativeTraitId.toLowerCase(),
+              if (result.attacker.graftedTraitId != null) result.attacker.graftedTraitId!.toLowerCase(),
+            };
+            if (attackerTraits.contains('screech') && !result.targetDefeated) {
+              _addPop('-15% AP SCREECH', const Color(0xFFFF9100), isCrit: true, targetUnitId: result.target.id);
+            }
           });
 
           // Step 3: Complete skill resolution, clear banner, and unpause/resume tick engine
@@ -1168,6 +1188,18 @@ class _BattleScreenState extends State<BattleScreen> {
 
         if (result.isGuarded) {
           _addPop('GUARDED (-20%)', const Color(0xFF90CAF9));
+        }
+
+        // GDD Combat Feel: Turn Meter Push / Delay Feedbacks
+        if (result.target.isVanguard && result.damageDealt > 0) {
+          _addPop('+15% AP VANGUARD', const Color(0xFF00E5FF), targetUnitId: result.target.id);
+        }
+        final attackerTraits = <String>{
+          result.attacker.nativeTraitId.toLowerCase(),
+          if (result.attacker.graftedTraitId != null) result.attacker.graftedTraitId!.toLowerCase(),
+        };
+        if (attackerTraits.contains('screech') && !result.targetDefeated) {
+          _addPop('-15% AP SCREECH', const Color(0xFFFF9100), isCrit: true, targetUnitId: result.target.id);
         }
       });
 
@@ -3765,29 +3797,42 @@ class _BattleScreenState extends State<BattleScreen> {
                         ),
                       ),
 
-                      // Rank Badge (1, 2, 3...) or ACT label
+                      // Rank Badge (ACT or ticks remaining e.g. 2t, 5t)
                       Positioned(
                         bottom: -3,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: isNow ? 4.0 : 3.0, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: isNow ? const Color(0xFFFFD54F) : const Color(0xFF14141B),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: borderCol,
-                              width: 1.0,
+                        child: Builder(builder: (ctx) {
+                          String label = isNow ? 'ACT' : '#${index + 1}';
+                          if (!isNow) {
+                            final double tmNeeded = (100.0 - u.turnMeter).clamp(0.0, 100.0);
+                            final double speedMod = u.hasHaste ? 1.35 : 1.0;
+                            final double delta = ((u.speed * speedMod) / 100.0) * InitiativeTickManager.tickScale;
+                            if (delta > 0) {
+                              final int ticksEst = (tmNeeded / delta).ceil();
+                              label = ticksEst <= 1 ? '1t' : '${ticksEst}t';
+                            }
+                          }
+
+                          return Container(
+                            padding: EdgeInsets.symmetric(horizontal: isNow ? 4.0 : 3.0, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: isNow ? const Color(0xFFFFD54F) : const Color(0xFF14141B),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: borderCol,
+                                width: 1.0,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            isNow ? 'ACT' : '#${index + 1}',
-                            style: TextStyle(
-                              color: isNow ? Colors.black : Colors.white70,
-                              fontSize: isNow ? 6.5 : 6.0,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                color: isNow ? Colors.black : Colors.white70,
+                                fontSize: isNow ? 6.5 : 6.0,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'monospace',
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ),
 
                       // Target indicator icon if this enemy is currently targeted
@@ -4543,6 +4588,8 @@ class _BattleScreenState extends State<BattleScreen> {
     double borderWidth = 1.0;
     List<BoxShadow>? shadows;
 
+    final bool isActionImminent = alive && unit.turnMeter >= 90.0 && !isActive;
+
     if (isSelectedForSwap) {
       borderColor = const Color(0xFFFFD54F);
       borderWidth = 2.5;
@@ -4578,9 +4625,21 @@ class _BattleScreenState extends State<BattleScreen> {
       borderWidth = 2.5;
       shadows = [
         BoxShadow(
-          color: const Color(0xFFFFD54F).withValues(alpha: 0.55),
-          blurRadius: 10,
-          spreadRadius: 2,
+          color: const Color(0xFFFFD54F).withValues(alpha: 0.75 + (0.25 * _atbReadyPulseController.value)),
+          blurRadius: 12 + (4.0 * _atbReadyPulseController.value),
+          spreadRadius: 2.0 + (1.0 * _atbReadyPulseController.value),
+        ),
+      ];
+    } else if (isActionImminent) {
+      // GDD Combat Feel: Imminent turn pulse (ATB >= 90%)
+      final Color imminentColor = isEnemy ? const Color(0xFFFF5252) : const Color(0xFF00E5FF);
+      borderColor = imminentColor;
+      borderWidth = 1.8 + (0.8 * _atbReadyPulseController.value);
+      shadows = [
+        BoxShadow(
+          color: imminentColor.withValues(alpha: 0.40 + (0.35 * _atbReadyPulseController.value)),
+          blurRadius: 8 + (6.0 * _atbReadyPulseController.value),
+          spreadRadius: 1.0 + (1.2 * _atbReadyPulseController.value),
         ),
       ];
     } else if (isSelectedTarget) {
@@ -4633,7 +4692,7 @@ class _BattleScreenState extends State<BattleScreen> {
     // Organic miniature outline glow around the model silhouette (only for figurines when alive)
     final bool hasModelGlow = alive &&
         unit.isFigurineCutout &&
-        (isSelectedForSwap || isSelectedTarget || isDamaged || isActive || isBossUnit);
+        (isSelectedForSwap || isSelectedTarget || isDamaged || isActive || isActionImminent || isBossUnit);
     Color modelGlowColor = Colors.transparent;
     double modelGlowAlpha = 0.0;
     double modelGlowBlur = 6.0;
@@ -4652,8 +4711,12 @@ class _BattleScreenState extends State<BattleScreen> {
       modelGlowBlur = 6.5;
     } else if (isActive) {
       modelGlowColor = const Color(0xFFFFD54F);
-      modelGlowAlpha = 0.80;
-      modelGlowBlur = 6.0;
+      modelGlowAlpha = 0.80 + (0.15 * _atbReadyPulseController.value);
+      modelGlowBlur = 6.0 + (3.0 * _atbReadyPulseController.value);
+    } else if (isActionImminent) {
+      modelGlowColor = isEnemy ? const Color(0xFFFF5252) : const Color(0xFF00E5FF);
+      modelGlowAlpha = 0.50 + (0.35 * _atbReadyPulseController.value);
+      modelGlowBlur = 5.0 + (3.0 * _atbReadyPulseController.value);
     } else if (isBossUnit) {
       modelGlowColor = const Color(0xFFFF5252);
       modelGlowAlpha = 0.60;
@@ -6831,14 +6894,19 @@ class _BattleScreenState extends State<BattleScreen> {
 
                 // Sub AP / Turn Meter Track
                 SizedBox(
-                  height: isCompact ? 3.5 : 4.5,
+                  height: isCompact ? 4.0 : 5.0,
                   child: Stack(
                     children: [
                       Container(
                         decoration: BoxDecoration(
                           color: const Color(0xFF060B10),
                           borderRadius: BorderRadius.circular(2.0),
-                          border: Border.all(color: Colors.white12, width: 0.5),
+                          border: Border.all(
+                            color: clampedTm >= 0.90
+                                ? (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF))
+                                : Colors.white12,
+                            width: clampedTm >= 0.90 ? 0.8 : 0.5,
+                          ),
                         ),
                       ),
                       FractionallySizedBox(
@@ -6849,14 +6917,19 @@ class _BattleScreenState extends State<BattleScreen> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: clampedTm >= 0.999
-                                  ? [const Color(0xFFFFE082), const Color(0xFFFFB300)]
-                                  : [const Color(0xFF80D8FF), const Color(0xFF00B0FF)],
+                                  ? [const Color(0xFFFFF9C4), const Color(0xFFFFB300)]
+                                  : (clampedTm >= 0.90
+                                      ? [const Color(0xFFE0F7FA), const Color(0xFF00E5FF)]
+                                      : [const Color(0xFF80D8FF), const Color(0xFF00B0FF)]),
                             ),
                             borderRadius: BorderRadius.circular(2.0),
                             boxShadow: [
                               BoxShadow(
-                                color: (clampedTm >= 0.999 ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
-                                blurRadius: 3,
+                                color: (clampedTm >= 0.999
+                                        ? const Color(0xFFFFD54F)
+                                        : (clampedTm >= 0.90 ? const Color(0xFF00E5FF) : const Color(0xFF00B0FF)))
+                                    .withValues(alpha: clampedTm >= 0.90 ? 0.85 : 0.55),
+                                blurRadius: clampedTm >= 0.90 ? 5 : 3,
                               ),
                             ],
                           ),
