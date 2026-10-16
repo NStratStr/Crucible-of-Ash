@@ -58,7 +58,7 @@ class _AppShellState extends State<AppShell> {
   int _maxUnlockedChapter = 1;
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
-  bool _isSpatialCombatActive = false;
+  bool _isSpatialCombatActive = true;
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;

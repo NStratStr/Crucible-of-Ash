@@ -1,10 +1,7 @@
 name: Deploy Flutter Web to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger only — prevents automatic runs on git push to save GitHub Actions minutes
 
 permissions:
   contents: read

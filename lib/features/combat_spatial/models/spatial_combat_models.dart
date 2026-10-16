@@ -373,7 +373,7 @@ class CombatUnitState {
       return 'assets/images/flayed_butcher.png';
     }
     if (id.contains('cinder_witch') || templateId.contains('cinder_witch')) {
-      return 'assets/images/occultist_base.png';
+      return 'assets/images/blood_initiate.png';
     }
     if (id.contains('pyre_zealot') || templateId.contains('pyre_zealot')) {
       return 'assets/images/grave_ghoul_g1.png';
@@ -382,13 +382,19 @@ class CombatUnitState {
       return 'assets/images/Ash Legion/lady_valeria_g1.png';
     }
     if (id.contains('iron_footman') || templateId.contains('iron_footman')) {
-      return 'assets/images/iron_footman_g1.png';
+      return 'assets/images/crimson_inquisitor.png';
     }
     if (id.contains('sanguine_blade') || templateId.contains('sanguine_blade')) {
       return 'assets/images/sanguine_flayer_g3.png';
     }
     if (id.contains('sun_smith') || templateId.contains('sun_smith')) {
       return 'assets/images/sun_scorched_cleric.png';
+    }
+    if (id.contains('crimson_inquisitor')) {
+      return 'assets/images/crimson_inquisitor.png';
+    }
+    if (id.contains('blood_initiate')) {
+      return 'assets/images/blood_initiate.png';
     }
     return 'assets/images/footman_base.png';
   }

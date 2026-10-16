@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
@@ -50,6 +51,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
 
+  // Ambient Dark Fantasy Combat Audio
+  AudioPlayer? _bgmPlayer;
+  bool _isMuted = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +62,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
     _startLoop();
+    _initAudio();
+  }
+
+  Future<void> _initAudio() async {
+    try {
+      _bgmPlayer = AudioPlayer();
+      await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+      await _bgmPlayer!.setVolume(0.45);
+      await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
+    } catch (e) {
+      debugPrint('Error starting combat audio: $e');
+    }
+  }
+
+  void _toggleMute() {
+    setState(() {
+      _isMuted = !_isMuted;
+      _bgmPlayer?.setVolume(_isMuted ? 0.0 : 0.45);
+    });
   }
 
   void _onEngineUpdate() {
@@ -231,6 +255,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
     _animTimers.clear();
     _engine.removeListener(_onEngineUpdate);
+    _bgmPlayer?.stop();
+    _bgmPlayer?.dispose();
     super.dispose();
   }
 
@@ -280,6 +306,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ],
         ),
         actions: [
+          // Ambient Audio Mute Toggle
+          IconButton(
+            icon: Icon(
+              _isMuted ? Icons.volume_off : Icons.volume_up,
+              color: _isMuted ? Colors.white38 : const Color(0xFFFFD54F),
+              size: 22,
+            ),
+            tooltip: _isMuted ? 'Unmute Ambient Sound' : 'Mute Ambient Sound',
+            onPressed: _toggleMute,
+          ),
           // Play / Pause Simulation
           IconButton(
             icon: Icon(
@@ -1298,13 +1334,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             final double bossSpanWidth = tileWidth * 2.2;
             final double bossSpanHeight = tileHeight * 2.0;
 
-            // Geometric center of Col 1,2 and gRow 1,2:
-            // midCol = 1.5, midGRow = 1.5
+            // Gorgoroth 4-tile cluster: Cols 1-2, Enemy Rows 0-1 (gRows 1-2).
+            // Midpoint of Col 1 & 2: midCol = 1.5.
             final double bossMidX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
-            final double bossMidY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
+
+            // In isometric projection:
+            // The bottom-most diamond vertex of the 2x2 cluster is Col 2, gRow 2 (Enemy Front Col 3).
+            // Its center point on screen is:
+            // Y = originY + (2.0 + 2.0) * (tileHeight * 0.5) + (tileHeight * 0.5) = originY + 2.5 * tileHeight.
+            // (Alternatively, the bottom vertex of the entire 4-tile zone is at Y = originY + 3.0 * tileHeight).
+            // To seat Gorgoroth's base firmly in the lower half of his 4 tiles so his base plinth rests
+            // on the bottom grid center (Y = originY + 2.5 * tileHeight):
+            final double bottomGridCenterY = originY + (2.0 + 2.0) * (tileHeight * 0.5) + (tileHeight * 0.5);
 
             final double bossScreenLeft = bossMidX - (bossSpanWidth * 0.5);
-            final double bossScreenTop = bossMidY - (tileHeight * 0.5);
+            // The miniature base plinth is located at bottom: 4 inside bossSpanHeight.
+            // Placing bossScreenTop so that (bossScreenTop + bossSpanHeight - 4) == bottomGridCenterY:
+            final double bossScreenTop = bottomGridCenterY - bossSpanHeight + 4.0;
 
             final bool isSelected = _selectedEnemyUnitId == boss.id;
 
@@ -2532,14 +2578,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       unitScaleMultiplier = 0.88; // Full-bleed canvas normalization for 1:1 tile footprint
     } else if (unit.id == 'pyre_zealot' || unit.templateId.contains('ghoul')) {
       unitScaleMultiplier = 1.45; // Ghoul crouches low; scale up plinth & figure
-    } else if (unit.id == 'iron_footman') {
-      unitScaleMultiplier = 1.25;
+    } else if (unit.id == 'iron_footman' || unit.id == 'crimson_inquisitor') {
+      unitScaleMultiplier = 1.35; // Crimson Inquisitor on tabletop plinth
     } else if (unit.id == 'sanguine_blade') {
       unitScaleMultiplier = 1.35;
     } else if (unit.id == 'sun_smith') {
       unitScaleMultiplier = 1.20;
-    } else if (unit.id == 'cinder_witch') {
-      unitScaleMultiplier = 1.25;
+    } else if (unit.id == 'cinder_witch' || unit.id == 'blood_initiate') {
+      unitScaleMultiplier = 1.30; // Blood Initiate on tabletop plinth
     }
 
     final double bossSpanWidth = isBoss ? (tileWidth * 2.2) : tileWidth;
