@@ -67,6 +67,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
+  AudioPlayer? _sfxPlayer;
   bool _isMuted = false;
 
   @override
@@ -90,11 +91,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   Future<void> _initAudio() async {
     try {
       _bgmPlayer = AudioPlayer();
+      _sfxPlayer = AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       await _bgmPlayer!.setVolume(0.45);
       await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
     } catch (e) {
       debugPrint('Error starting combat audio: $e');
+    }
+  }
+
+  void _playSfx(String sfxName) {
+    if (_isMuted || _sfxPlayer == null) return;
+    try {
+      _sfxPlayer!.stop();
+      _sfxPlayer!.setVolume(0.70);
+      _sfxPlayer!.play(AssetSource('audio/$sfxName'));
+    } catch (e) {
+      debugPrint('Error playing SFX $sfxName: $e');
     }
   }
 
@@ -155,21 +168,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
       durationMs = 800;
+      _playSfx('sfx_block.wav'); // Heavy armor crack / shield shatter
     } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt')) {
       vfxType = 'beam';
       primaryColor = event.isPlayerAttacker ? const Color(0xFFFFD54F) : const Color(0xFFFF7043);
       secondaryColor = const Color(0xFFFFEB3B);
       durationMs = 600;
+      _playSfx('sfx_spell.wav'); // Magic surge
     } else if (event.isHeal || event.skillName.contains('Phalanx')) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFF80D8FF);
       durationMs = 700;
+      _playSfx('sfx_block.wav'); // Defensive barrier
     } else if (event.isCrit) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFFFD54F);
       durationMs = 750;
+      _playSfx('sfx_slash.wav'); // Lethal blade critical
+    } else {
+      _playSfx('sfx_hit.wav'); // Standard melee impact
     }
 
     final newVfx = _CombatVfx(
@@ -627,7 +646,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                     if (_engine.isVictory && widget.onVictory != null) ...[
                                       const SizedBox(width: 12),
                                       ElevatedButton(
-                                        onPressed: widget.onVictory,
+                                        onPressed: () {
+                                          _playSfx('sfx_victory.wav');
+                                          widget.onVictory!();
+                                        },
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(0xFF1B5E20),
                                           foregroundColor: Colors.white,
@@ -2070,6 +2092,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                     });
                                     return;
                                   }
+                                  _playSfx('sfx_card.wav');
                                   _engine.castCard(card.id, targetUnit: occupant, targetCol: col, targetRow: row);
                                   setState(() {
                                     _selectedCardId = null;
@@ -3498,6 +3521,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                           // If card is non-targeted (Stoke the Embers or Wrath of Ashlar), cast immediately!
                           if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
+                            _playSfx('sfx_card.wav');
                             _engine.castCard(card.id);
                             setState(() {
                               _selectedCardId = null;
@@ -3511,6 +3535,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                 ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
                                 : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
                             if (targetAlly != null) {
+                              _playSfx('sfx_card.wav');
                               _engine.castCard(card.id, targetUnit: targetAlly);
                               setState(() {
                                 _selectedCardId = null;
@@ -3526,12 +3551,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
                                   _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
                               if (boss != null) {
+                                _playSfx('sfx_card.wav');
                                 _engine.castCard(card.id, targetUnit: boss);
                                 _selectedCardId = null;
                                 return;
                               }
                               _selectedCardId = null;
                             } else {
+                              _playSfx('sfx_card.wav');
                               _selectedCardId = card.id;
                               _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Click an enemy or double-tap card to unleash!';
                             }
