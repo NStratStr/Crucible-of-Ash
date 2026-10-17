@@ -1132,11 +1132,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
-            _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
+            // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Combat Docks (Ultimates & Grimoire Hand)
+            if (_engine.isPreBattlePhase)
+              _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
+            else ...[
+              // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
+              _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
 
-            // Tactical Card Hand & Burn Pit
-            _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
+              // Tactical Card Hand & Burn Pit
+              _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
+            ],
 
             // Live 30 Hz Combat Event Log (Hidden in Zen Mode and Mobile Landscape)
             if (!_isZenMode && !isLandscapeMobile)
@@ -1691,12 +1696,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final String? inspectedUnitId = _draggedUnitId ?? _selectedUnitId;
 
     void addPlayerUnitTrajectory(CombatUnitState unit, {required bool isPrimaryInspected}) {
-      if (!unit.isAlive || unit.occupiedNodes.isEmpty) return;
+      if (!unit.isAlive) return;
       final bool isHoveringPlayerCell = (isPrimaryInspected &&
           _draggedUnitId == unit.id &&
           _hoveredTileCol != null &&
           _hoveredTileGRow != null &&
           _hoveredTileGRow! > 3);
+      if (unit.occupiedNodes.isEmpty && !isHoveringPlayerCell) return;
 
       final int srcCol = isHoveringPlayerCell ? _hoveredTileCol! : unit.occupiedNodes.first.column;
       final int srcGRow = isHoveringPlayerCell ? _hoveredTileGRow! : (4 + unit.occupiedNodes.first.row);
@@ -3142,10 +3148,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     IconData icon = Icons.info_outline;
 
     if (_engine.isPreBattlePhase) {
-      if (_selectedUnitId != null) {
+      if (_draggedUnitId != null) {
+        final unit = _engine.playerUnits.where((u) => u.id == _draggedUnitId && u.isAlive).firstOrNull;
+        final name = unit?.name.toUpperCase() ?? 'UNIT';
+        message = '📍 DEPLOYING $name: Drop onto any blue glowing tile on your 3x5 grid! (Or drop on another unit to [⇄ SWAP])';
+        themeColor = const Color(0xFF00E5FF);
+        icon = Icons.touch_app;
+      } else if (_selectedUnitId != null) {
         final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
         if (unit != null) {
-          message = '🎯 PRE-BATTLE: Drag or click any glowing tile to deploy or [⇄ SWAP] ${unit.name.toUpperCase()} • Translucent line shows basic attack target!';
+          final isPlaced = unit.occupiedNodes.isNotEmpty;
+          message = isPlaced
+              ? '🎯 PRE-BATTLE: Drag or click any glowing tile to reposition/swap ${unit.name.toUpperCase()} • Drag to bottom dock to bench!'
+              : '📍 BENCH UNIT: Drag ${unit.name.toUpperCase()} from the reserve dock onto any grid tile to deploy!';
           themeColor = const Color(0xFF00E5FF);
           icon = Icons.gps_fixed;
         }
@@ -3157,7 +3172,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           icon = Icons.radar;
         }
       } else {
-        message = '🛡️ PRE-BATTLE DEPLOYMENT: Click or pick up any unit to inspect basic attack trajectories & freely arrange your squad!';
+        final unplacedCount = _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).length;
+        if (unplacedCount > 0) {
+          message = '🛡️ PRE-BATTLE: Drag units from the Reserve Dock into place on the grid, then tap [ENGAGE BATTLE]!';
+        } else {
+          message = '🛡️ SQUAD READY: Drag units to rearrange formation, or tap [ENGAGE BATTLE] to begin the Sunder!';
+        }
         themeColor = const Color(0xFFFFD54F);
         icon = Icons.touch_app;
       }
@@ -4512,6 +4532,337 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Pre-Battle Staging Reserve Dock:
+  /// Displays units ready for placement with portraits, roles, stats, and drag-and-drop handles.
+  Widget _buildPreBattleStagingDock({bool isLandscapeMobile = false}) {
+    final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
+    final int deployedCount = livingAllies.where((u) => u.occupiedNodes.isNotEmpty).length;
+    final int totalCount = livingAllies.length;
+    final double dockHeight = isLandscapeMobile ? 62.0 : 78.0;
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) => details.data.startsWith('unit:'),
+      onAcceptWithDetails: (details) {
+        final unitId = details.data.replaceFirst('unit:', '');
+        _engine.undeployUnitToBench(unitId);
+        setState(() {
+          _selectedUnitId = null;
+          _draggedUnitId = null;
+        });
+      },
+      builder: (context, candidateData, rejectedData) {
+        final bool isBenchDropTarget = candidateData.isNotEmpty;
+
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 3 : 6),
+          decoration: BoxDecoration(
+            color: isBenchDropTarget
+                ? const Color(0xFF1B2A38)
+                : const Color(0xFF0F111A),
+            border: Border(
+              top: BorderSide(
+                color: isBenchDropTarget ? const Color(0xFF00E5FF) : const Color(0xFF2A2D3D),
+                width: isBenchDropTarget ? 2.0 : 1.2,
+              ),
+            ),
+            boxShadow: isBenchDropTarget
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Controls Row
+              Row(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.group_work_rounded, color: Color(0xFF00E5FF), size: 14),
+                      const SizedBox(width: 5),
+                      Text(
+                        'RESERVE SQUAD ($deployedCount/$totalCount DEPLOYED)',
+                        style: const TextStyle(
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: Color(0xFF00E5FF),
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Quick Actions: Clear to Bench / Auto-Fill
+                  GestureDetector(
+                    onTap: () {
+                      _playSfx('sfx_block.wav');
+                      setState(() {
+                        _engine.clearAllUnitsToBench();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: Colors.white24, width: 0.8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.undo_rounded, size: 10, color: Colors.white70),
+                          SizedBox(width: 3),
+                          Text('BENCH ALL', style: TextStyle(fontSize: 8, color: Colors.white70, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () {
+                      _playSfx('sfx_card.wav');
+                      setState(() {
+                        _engine.autoDeployAllFromBench();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 0.8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome, size: 10, color: Color(0xFF80D8FF)),
+                          SizedBox(width: 3),
+                          Text('AUTO-DEPLOY', style: TextStyle(fontSize: 8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+
+              // Unit Cards Horizontal Carousel
+              SizedBox(
+                height: dockHeight,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: livingAllies.length,
+                  separatorBuilder: (context, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final unit = livingAllies[index];
+                    return _buildPreBattleBenchUnitCard(unit, isLandscapeMobile: isLandscapeMobile);
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Individual unit card in the Pre-Battle Staging Dock
+  Widget _buildPreBattleBenchUnitCard(CombatUnitState unit, {bool isLandscapeMobile = false}) {
+    final bool isPlaced = unit.occupiedNodes.isNotEmpty;
+    final bool isSelected = _selectedUnitId == unit.id;
+
+    final String placementText = isPlaced
+        ? 'COL ${unit.occupiedNodes.first.column + 1} • ${unit.currentDepth == RowDepth.front ? "FRONT" : (unit.currentDepth == RowDepth.mid ? "MID" : "BACK")}'
+        : 'DRAG TO GRID';
+
+    final Color statusColor = isPlaced ? const Color(0xFF00E676) : const Color(0xFFFFD54F);
+
+    final Widget cardWidget = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: isLandscapeMobile ? 120 : 138,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? const Color(0xFF1E2838)
+            : (isPlaced ? const Color(0xFF131722) : const Color(0xFF1E1A14)),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isSelected
+              ? const Color(0xFF00E5FF)
+              : (isPlaced ? const Color(0xFF2C3E50) : const Color(0xFFFFD54F).withValues(alpha: 0.8)),
+          width: isSelected ? 1.8 : (isPlaced ? 1.0 : 1.4),
+        ),
+        boxShadow: isSelected || !isPlaced
+            ? [
+                BoxShadow(
+                  color: (isSelected ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          // Unit Portrait & Archetype Indicator
+          Stack(
+            children: [
+              Container(
+                width: isLandscapeMobile ? 32 : 40,
+                height: isLandscapeMobile ? 44 : 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.white24, width: 0.8),
+                  color: Colors.black54,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: Image.asset(
+                    unit.assetPath,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: Colors.white38, size: 20),
+                  ),
+                ),
+              ),
+              // Deployed Checkmark / Unplaced Pulse
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(1.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor,
+                  ),
+                  child: Icon(
+                    isPlaced ? Icons.check : Icons.arrow_upward,
+                    size: 8,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
+
+          // Unit Meta
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  unit.name.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: isLandscapeMobile ? 8.0 : 8.5,
+                    fontWeight: FontWeight.w900,
+                    color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  unit.archetype == UnitArchetype.vanguardMelee
+                      ? 'Vanguard'
+                      : (unit.archetype == UnitArchetype.reachMidline ? 'Skirmisher' : 'Caster'),
+                  style: TextStyle(
+                    fontSize: 7.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white60,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      'HP ${unit.maxHp}',
+                      style: const TextStyle(fontSize: 6.5, color: Color(0xFF81C784), fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'ATK ${unit.attack}',
+                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFFF8A80), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(2),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.6), width: 0.5),
+                  ),
+                  child: Text(
+                    placementText,
+                    style: TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w900,
+                      color: statusColor,
+                      fontFamily: 'monospace',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Draggable<String>(
+      data: 'unit:${unit.id}',
+      onDragStarted: () {
+        setState(() {
+          _draggedUnitId = unit.id;
+          _selectedUnitId = unit.id;
+          _selectedEnemyUnitId = null;
+          _selectedCardId = null;
+        });
+      },
+      onDragEnd: (_) {
+        setState(() {
+          _draggedUnitId = null;
+          _hoveredTileGRow = null;
+          _hoveredTileCol = null;
+        });
+      },
+      feedback: Material(
+        color: Colors.transparent,
+        child: Transform.scale(
+          scale: 1.15,
+          child: Opacity(opacity: 0.90, child: cardWidget),
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: cardWidget,
+      ),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedUnitId = (_selectedUnitId == unit.id) ? null : unit.id;
+            _selectedEnemyUnitId = null;
+            _selectedCardId = null;
+          });
+        },
+        child: cardWidget,
       ),
     );
   }

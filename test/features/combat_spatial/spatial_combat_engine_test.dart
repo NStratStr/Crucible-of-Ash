@@ -641,6 +641,35 @@ void main() {
       final damageDealt = hpBefore - enemy.hp;
       expect(damageDealt, equals(expectedDmg));
     });
+
+    test('Pre-Battle Staging Bench: Units can be cleared to bench, drag deployed, and auto-deployed', () {
+      expect(engine.isPreBattlePhase, isTrue);
+      final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
+      expect(valeria.occupiedNodes.isNotEmpty, isTrue);
+
+      // 1. Recall Valeria to reserve staging bench
+      final recalled = engine.undeployUnitToBench('lady_valeria');
+      expect(recalled, isTrue);
+      expect(valeria.occupiedNodes.isEmpty, isTrue);
+
+      // 2. Drag deploy Valeria from bench onto target node (Col 0, Row 0)
+      final deployed = engine.movePlayerUnit('lady_valeria', 0, 0);
+      expect(deployed, isTrue);
+      expect(valeria.occupiedNodes.first.column, equals(0));
+      expect(valeria.occupiedNodes.first.row, equals(0));
+
+      // 3. Clear all units to staging bench
+      engine.clearAllUnitsToBench();
+      for (final u in engine.playerUnits) {
+        expect(u.occupiedNodes.isEmpty, isTrue);
+      }
+
+      // 4. Auto-deploy all units back onto tactical grid
+      engine.autoDeployAllFromBench();
+      for (final u in engine.playerUnits) {
+        expect(u.occupiedNodes.isNotEmpty, isTrue);
+      }
+    });
   });
 }
 

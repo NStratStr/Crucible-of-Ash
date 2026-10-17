@@ -1428,11 +1428,124 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Starts the combat encounter, transitioning from Pre-Battle Deployment to Live 30Hz Simulation
   void startBattle() {
+    // If any units were left on the staging bench, automatically assign them to available tiles
+    final unplaced = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).toList();
+    if (unplaced.isNotEmpty) {
+      for (final unit in unplaced) {
+        // Preferred row based on archetype
+        final preferredRow = unit.archetype == UnitArchetype.vanguardMelee
+            ? 0
+            : (unit.archetype == UnitArchetype.backlineCaster ? 2 : 1);
+        
+        bool placed = false;
+        // Search preferred row first, then others
+        for (final r in [preferredRow, 0, 1, 2]) {
+          for (int c = 0; c < 5; c++) {
+            final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(c, r));
+            if (!isOccupied) {
+              unit.occupiedNodes.clear();
+              unit.occupiedNodes.add(GridNode(column: c, row: r, occupantUnitId: unit.id));
+              placed = true;
+              break;
+            }
+          }
+          if (placed) break;
+        }
+      }
+    }
+
     isPreBattlePhase = false;
     isRunning = true;
     lastBannerMessage = '⚔️ THE SUNDER INITIATED! ENGAGE THE FOE!';
     addLog('DEPLOYMENT CONCLUDED: Battle engaged at 30 Hz discrete simulation speed.');
     notifyListeners();
+  }
+
+  /// Deploys an unplaced unit from the staging bench onto the player's 3x5 grid.
+  bool deployUnitFromBench(String unitId, int targetCol, int targetRow) {
+    if (!isPreBattlePhase) {
+      addLog('Units can only be deployed from the bench during the Pre-Battle phase.');
+      return false;
+    }
+    final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+    if (unit == null) return false;
+    if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
+
+    // If target node is occupied by another friendly unit, swap or displace to bench
+    final existingOccupant = playerUnits
+        .where((u) => u.isAlive && u.id != unit.id && u.occupies(targetCol, targetRow))
+        .firstOrNull;
+
+    if (existingOccupant != null) {
+      if (unit.occupiedNodes.isNotEmpty) {
+        // Normal formation swap on the board
+        final oldCol = unit.occupiedNodes.first.column;
+        final oldRow = unit.occupiedNodes.first.row;
+        existingOccupant.occupiedNodes.clear();
+        existingOccupant.occupiedNodes.add(GridNode(column: oldCol, row: oldRow, occupantUnitId: existingOccupant.id));
+      } else {
+        // Displace the existing occupant back to the bench so the incoming unit takes this tile
+        existingOccupant.occupiedNodes.clear();
+        addLog('${existingOccupant.name} was returned to the staging bench.');
+      }
+    }
+
+    unit.occupiedNodes.clear();
+    unit.occupiedNodes.add(GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id));
+    lastBannerMessage = '📍 ${unit.name.toUpperCase()} DEPLOYED to (Col ${targetCol + 1}, Row $targetRow)';
+    addLog('${unit.name} deployed from bench to Col ${targetCol + 1}, Row $targetRow.');
+    notifyListeners();
+    return true;
+  }
+
+  /// Recalls all player units to the staging reserve bench during pre-battle
+  void clearAllUnitsToBench() {
+    if (!isPreBattlePhase) return;
+    for (final unit in playerUnits.where((u) => u.isAlive)) {
+      unit.occupiedNodes.clear();
+    }
+    lastBannerMessage = '↩️ ALL UNITS RECALLED: Drag any unit from the dock to position!';
+    addLog('All squad units recalled to the staging reserve bench.');
+    notifyListeners();
+  }
+
+  /// Automatically places any unplaced reserve bench units onto available formation tiles
+  void autoDeployAllFromBench() {
+    if (!isPreBattlePhase) return;
+    final unplaced = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).toList();
+    for (final unit in unplaced) {
+      final preferredRow = unit.archetype == UnitArchetype.vanguardMelee
+          ? 0
+          : (unit.archetype == UnitArchetype.backlineCaster ? 2 : 1);
+      bool placed = false;
+      for (final r in [preferredRow, 0, 1, 2]) {
+        for (int c = 0; c < 5; c++) {
+          final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(c, r));
+          if (!isOccupied) {
+            unit.occupiedNodes.clear();
+            unit.occupiedNodes.add(GridNode(column: c, row: r, occupantUnitId: unit.id));
+            placed = true;
+            break;
+          }
+        }
+        if (placed) break;
+      }
+    }
+    lastBannerMessage = '✨ SQUAD DEPLOYED: Units stationed across tactical grid.';
+    addLog('All bench units auto-deployed onto tactical grid.');
+    notifyListeners();
+  }
+
+  /// Recalls a deployed unit back to the reserve staging bench during pre-battle
+  bool undeployUnitToBench(String unitId) {
+    if (!isPreBattlePhase) return false;
+    final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+    if (unit == null || unit.occupiedNodes.isEmpty) return false;
+    unit.occupiedNodes.clear();
+    lastBannerMessage = '↩️ ${unit.name.toUpperCase()} recalled to staging bench';
+    addLog('${unit.name} recalled to reserve bench.');
+    notifyListeners();
+    return true;
   }
 
   /// Tactical Plinth Triage: Player shifts or swaps unit across nodes
@@ -1441,6 +1554,11 @@ class SpatialCombatEngine extends ChangeNotifier {
   bool movePlayerUnit(String unitId, int targetCol, int targetRow) {
     final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
     if (unit == null) return false;
+
+    // If unit is currently on the staging bench (not placed on grid), deploy directly!
+    if (unit.occupiedNodes.isEmpty) {
+      return deployUnitFromBench(unitId, targetCol, targetRow);
+    }
     if (unit.occupies(targetCol, targetRow)) return false;
     if (unit.isDisplacementImmune) {
       addLog('${unit.name} has Mass Tenacity and cannot be shifted!');

@@ -353,7 +353,9 @@ class CombatUnitState {
     if (isDisplacementImmune) return false;
     if (!ignoreApCost && currentAp < moveApCost) return false;
     if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
-    if (occupiedNodes.isEmpty) return false;
+    if (occupiedNodes.isEmpty) {
+      return ignoreApCost; // In pre-battle deployment, unplaced units can be freely deployed onto any tile!
+    }
     final anchor = occupiedNodes.first;
     if (anchor.column == targetCol && anchor.row == targetRow) return false;
     if (ignoreApCost) return true; // Free placement across squad grid in pre-battle deployment
