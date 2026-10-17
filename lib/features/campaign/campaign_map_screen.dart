@@ -96,6 +96,7 @@ class CampaignMapScreen extends StatefulWidget {
   final VoidCallback? onOpenEndgameGauntlet;
   final VoidCallback? onLaunchMvpSkirmish;
   final VoidCallback? onOpenHome;
+  final VoidCallback? onOpenSummoning;
   final VoidCallback? onOpenSettings;
   final int currentChapter;
   final int maxUnlockedChapter;
@@ -116,6 +117,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.onOpenEndgameGauntlet,
     this.onLaunchMvpSkirmish,
     this.onOpenHome,
+    this.onOpenSummoning,
     this.onOpenSettings,
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
@@ -434,6 +436,12 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               ],
             ),
           ),
+          if (widget.onOpenSummoning != null)
+            IconButton(
+              icon: const Icon(Icons.auto_fix_high, color: Color(0xFFFFD54F), size: 19),
+              tooltip: 'Summoning Altar',
+              onPressed: widget.onOpenSummoning,
+            ),
           if (widget.onOpenSettings != null)
             IconButton(
               icon: Image.asset(

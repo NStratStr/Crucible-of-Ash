@@ -1590,6 +1590,7 @@ class _AppShellState extends State<AppShell> {
                       _saveCurrentState();
                     },
                     onOpenHome: () => _showHomeModal(),
+                    onOpenSummoning: () => _handleOpenSummoning(),
                     onOpenSettings: () => SettingsDialog.show(context),
                     onChapterChanged: (ch) => setState(() {
                       _currentChapter = ch;

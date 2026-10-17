@@ -395,38 +395,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             },
           ),
           const SizedBox(width: 4),
-          // Step 1 Tick Button for Testing
-          IconButton(
-            icon: const Icon(Icons.skip_next, color: Colors.white70, size: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            constraints: const BoxConstraints(),
-            tooltip: 'Step Tick',
-            onPressed: () {
-              if (_engine.isPreBattlePhase) {
-                _engine.isPreBattlePhase = false;
-              }
-              _engine.stepTick();
-            },
-          ),
-          const SizedBox(width: 4),
-          // Fast-Forward to Tick 135 (Telegraph moment)
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              minimumSize: const Size(0, 26),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: () {
-              if (_engine.isPreBattlePhase) {
-                _engine.isPreBattlePhase = false;
-              }
-              while (_engine.currentTick < 135) {
-                _engine.stepTick();
-              }
-            },
-            child: const Text('T135', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 2),
           // Zen / HUD Collapse Toggle
           IconButton(
             icon: Icon(
@@ -454,7 +422,49 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               PlatformFullscreen.toggleFullscreen();
             },
           ),
-          const SizedBox(width: 6),
+          // Subtle Dev / Debug Menu (tucks away T135 & Step Tick to reduce visual noise)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white38, size: 18),
+            padding: EdgeInsets.zero,
+            tooltip: 'Combat Diagnostics',
+            color: const Color(0xFF161622),
+            onSelected: (val) {
+              if (val == 'step') {
+                if (_engine.isPreBattlePhase) _engine.isPreBattlePhase = false;
+                _engine.stepTick();
+              } else if (val == 't135') {
+                if (_engine.isPreBattlePhase) _engine.isPreBattlePhase = false;
+                while (_engine.currentTick < 135) {
+                  _engine.stepTick();
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'step',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.skip_next, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('Step 1 Tick', style: TextStyle(fontSize: 12, color: Colors.white)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 't135',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.fast_forward, size: 16, color: Color(0xFFFFD54F)),
+                    SizedBox(width: 8),
+                    Text('Fast-Forward T135', style: TextStyle(fontSize: 12, color: Color(0xFFFFD54F))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -1941,7 +1951,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           }
           // Stoke the embers can be dropped anywhere
           if (card.id == 'stoke_the_embers') return true;
-          // Offensive spells target living enemies
+          // Offensive spells can target living enemies OR empty enemy tiles if it's an AoE/splash spell
+          final isAoeOrSplash = card.pattern != TargetPattern.singleTarget || card.id == 'searing_brand';
+          if (isAoeOrSplash) {
+            return !isPlayerSquad; // Can target any tile on enemy squad, empty or occupied
+          }
           return !isPlayerSquad && occupant != null;
         } else {
           // Unit movement & formation swap triage: allow if in player squad, unoccupied or swappable ally, and within unit moveRange
@@ -3854,7 +3868,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       },
                       feedback: Material(
                         color: Colors.transparent,
-                        child: _buildCardTile(card, canAfford, isFeedback: true),
+                        child: _buildCardTile(card, canAfford, isFeedback: true, isLandscapeMobile: isLandscapeMobile),
                       ),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -3912,7 +3926,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             }
                           });
                         },
-                        child: _buildCardTile(card, canAfford, isSelected: isCardSelected),
+                        child: _buildCardTile(card, canAfford, isSelected: isCardSelected, isLandscapeMobile: isLandscapeMobile),
                       ),
                     );
                   },
@@ -3929,22 +3943,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       bool canAfford, {
       bool isFeedback = false,
       bool isSelected = false,
+      bool isLandscapeMobile = false,
     }) {
+      final double cardW = isFeedback ? 85.0 : (isLandscapeMobile ? 68.0 : 78.0);
+      final double cardH = isFeedback ? 120.0 : (isLandscapeMobile ? 62.0 : 76.0);
+
       final Color borderColor = isSelected
           ? const Color(0xFFFFD54F)
-          : (canAfford ? const Color(0xFF00E5FF) : Colors.white24);
+          : (canAfford ? const Color(0xFFD4AF37) : const Color(0xFF383848));
 
       return Container(
-        width: 110,
-        height: 78,
+        width: cardW,
+        height: cardH,
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF2C2412)
-              : (canAfford ? const Color(0xFF141724) : const Color(0xFF101014)),
+          color: const Color(0xFF101016),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: borderColor,
-            width: isSelected || isFeedback ? 2.0 : 1.2,
+            width: isSelected || isFeedback ? 2.0 : 1.0,
           ),
           boxShadow: isFeedback || isSelected
               ? [
@@ -3952,72 +3968,157 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     color: (isSelected ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
                     blurRadius: 10,
                     spreadRadius: 2,
-                  )
+                  ),
                 ]
-              : null,
+              : [
+                  const BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Background Spell Art with soft gradient fade
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: 52,
-              child: Opacity(
-                opacity: canAfford ? 0.35 : 0.15,
-                child: Image.asset(
-                  card.assetPath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+            // 1. Dark backing fill
+            Positioned.fill(
+              child: Container(
+                color: const Color(0xFF0D0D14),
+              ),
+            ),
+
+            // 2. Wargaming Physical Dark-Iron Riveted Frame
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/Spells/wargaming_card_frame.png',
+                fit: BoxFit.fill,
+                errorBuilder: (_, __, ___) => Image.asset(
+                  'assets/images/Spells/Spell frame template.jpg',
+                  fit: BoxFit.fill,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
             ),
 
-            // Card Content Overlay
-            Padding(
-              padding: const EdgeInsets.all(5),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          card.name,
-                          style: TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: canAfford ? Colors.white : Colors.white38,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+            // 3. Central Spell Artwork with BlendMode.multiply to knockout white backgrounds seamlessly!
+            Positioned(
+              left: cardW * 0.190,
+              top: cardH * 0.20,
+              width: cardW * 0.620,
+              height: cardH * 0.35,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF14141E),
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: const Color(0xFF282838), width: 0.8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Image.asset(
+                    card.assetPath,
+                    fit: BoxFit.cover,
+                    color: const Color(0xFF202028),
+                    colorBlendMode: BlendMode.multiply, // Eliminates white JPG backing!
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFF161622),
+                      child: const Center(
+                        child: Icon(Icons.auto_awesome, size: 16, color: Color(0xFFFFD54F)),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 0.6),
-                        ),
-                        child: Text(
-                          '${card.focusCost}F',
-                          style: const TextStyle(fontSize: 8, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
+                ),
+              ),
+            ),
+
+            // 4. Circular Metallic Focus Socket (top-left)
+            Positioned(
+              top: cardH * 0.04,
+              left: cardW * 0.06,
+              child: Container(
+                width: cardW * 0.22,
+                height: cardW * 0.22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: canAfford
+                        ? const [Color(0xFFFFD54F), Color(0xFFE65100)]
+                        : const [Color(0xFF37474F), Color(0xFF1A2327)],
+                  ),
+                  border: Border.all(
+                    color: canAfford ? const Color(0xFFFFE082) : const Color(0xFF546E7A),
+                    width: 0.8,
+                  ),
+                  boxShadow: canAfford
+                      ? const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4)]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '${card.focusCost}',
+                    style: TextStyle(
+                      color: canAfford ? Colors.black : Colors.white70,
+                      fontSize: cardW * 0.12,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 5. Header Plaque: Spell Name
+            Positioned(
+              top: cardH * 0.05,
+              left: cardW * 0.28,
+              right: cardW * 0.10,
+              height: cardH * 0.12,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    card.name.toUpperCase(),
+                    style: const TextStyle(
+                      color: Color(0xFFFFE082),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.4,
+                      shadows: [
+                        Shadow(color: Colors.black, blurRadius: 2, offset: Offset(0.5, 0.5)),
+                      ],
+                    ),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+
+            // 6. Recessed Stone Plaque: Rules Description
+            Positioned(
+              left: cardW * 0.10,
+              right: cardW * 0.10,
+              top: cardH * 0.58,
+              bottom: cardH * 0.08,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: Text(
                     card.description,
-                    style: const TextStyle(fontSize: 7.5, color: Colors.white70),
-                    maxLines: 2,
+                    style: TextStyle(
+                      color: const Color(0xFFF0F0F5),
+                      fontSize: (cardW * 0.09).clamp(6.0, 9.0),
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 2.0, offset: Offset(0.5, 0.5)),
+                      ],
+                    ),
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
-                ],
+                ),
               ),
             ),
           ],

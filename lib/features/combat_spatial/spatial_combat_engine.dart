@@ -1466,8 +1466,13 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
     } else if (card.id == 'searing_brand') {
-      final target = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+      final target = targetUnit ??
+          (targetCol != null && targetRow != null
+              ? enemyUnits.where((u) => u.isAlive && u.occupies(targetCol, targetRow)).firstOrNull
+              : null) ??
+          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
           enemyUnits.where((u) => u.isAlive).firstOrNull;
+
       if (target != null) {
         final dmg = target.takeDamage(105);
         lastBannerMessage = '🔥 SEARING BRAND: Radiant strike ignites ${target.name} for $dmg DMG!';
@@ -1487,6 +1492,40 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetId: target.id,
           targetName: target.name,
           damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.stAshlarCross,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (targetCol != null && targetRow != null) {
+        // Target is an empty grid tile: resolve cross pattern splash on adjacent enemies!
+        final splashTargets = enemyUnits.where((u) {
+          if (!u.isAlive) return false;
+          // Cross pattern: center (col, row), (col±1, row), (col, row±1)
+          return u.occupiedNodes.any((n) {
+            final dist = (n.column - targetCol).abs() + (n.row - targetRow).abs();
+            return dist <= 1;
+          });
+        }).toList();
+
+        if (splashTargets.isNotEmpty) {
+          lastBannerMessage = '🔥 SEARING BRAND: Ground detonation ignited ${splashTargets.length} enemy targets!';
+          for (final splashTarget in splashTargets) {
+            final splash = splashTarget.takeDamage(75);
+            addLog('  Splash: ${splashTarget.name} took $splash Holy damage from ground detonation.');
+          }
+        } else {
+          lastBannerMessage = '🔥 SEARING BRAND: Ground detonation struck empty stone.';
+          addLog('CAST: Searing Brand detonated on empty stone ($targetCol, $targetRow).');
+        }
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_searing',
+          attackerId: 'sun_smith',
+          attackerName: 'SUN-SMITH',
+          skillName: 'Searing Brand',
+          targetId: 'ground_tile_${targetCol}_${targetRow}',
+          targetName: 'Ground Target ($targetCol, $targetRow)',
+          damage: 75,
           isPlayerAttacker: true,
           pattern: TargetPattern.stAshlarCross,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
