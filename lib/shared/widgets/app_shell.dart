@@ -1625,6 +1625,7 @@ class _AppShellState extends State<AppShell> {
                               _currentIndex = 0; // Return to Campaign Map
                             });
                           },
+                          relicService: _relicService,
                           onBackToStandardCombat: () {
                             setState(() {
                               _currentIndex = 0; // Return to Campaign Map

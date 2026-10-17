@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/utils/platform_fullscreen.dart';
 import '../settings/settings_service.dart';
+import '../relics/relic_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -23,6 +24,7 @@ class SpatialBattleScreen extends StatefulWidget {
   final String? encounterTitle;
   final String? backdropAsset;
   final bool isBossEncounter;
+  final RelicService? relicService;
 
   const SpatialBattleScreen({
     super.key,
@@ -34,6 +36,7 @@ class SpatialBattleScreen extends StatefulWidget {
     this.encounterTitle,
     this.backdropAsset,
     this.isBossEncounter = false,
+    this.relicService,
   });
 
   @override
@@ -90,6 +93,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       initialEnemyEntities: enemies,
       title: widget.encounterTitle,
       isBossEncounter: widget.isBossEncounter,
+      relicService: widget.relicService,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -362,6 +366,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         createdMs: nowMs,
         durationMs: isCrit ? 1200 : 900,
       ));
+
+      // Push floating popups for all secondary targets hit by multi-target / AOE spells
+      if (event.secondaryTargetHits.isNotEmpty) {
+        event.secondaryTargetHits.forEach((secId, secDmg) {
+          final secText = '-$secDmg';
+          _unitFloatingPops[secId] = secText;
+          _floatingPops.removeWhere((p) => p.unitId == secId);
+          _floatingPops.add(_FloatingCombatText(
+            id: 'pop_${event.id}_${secId}_$nowMs',
+            unitId: secId,
+            text: secText,
+            color: const Color(0xFFFF8A80),
+            borderColor: const Color(0xFFD50000),
+            fontSize: 11.0,
+            isCrit: false,
+            createdMs: nowMs,
+            durationMs: 900,
+          ));
+        });
+      }
     });
 
     // Clean up VFX after its duration
@@ -869,6 +893,153 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       ),
                                     ),
                                   ],
+
+                                  // Turn/Cycle Summary & Combat Statistics Dashboard (GDD §7 & Post-Battle Performance)
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0D0E18),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.white12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Row(
+                                              children: [
+                                                Icon(Icons.query_stats, color: Color(0xFF00E5FF), size: 14),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'BATTLE PERFORMANCE & TURN STATS',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF80D8FF),
+                                                    fontSize: 9.0,
+                                                    fontWeight: FontWeight.w900,
+                                                    letterSpacing: 0.6,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              'CYCLES: ${(_engine.currentTick / 30).toStringAsFixed(1)}s (${_engine.currentTick} TICKS)',
+                                              style: const TextStyle(color: Colors.white54, fontSize: 8.5, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF161828),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('TOTAL DAMAGE', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
+                                                    const SizedBox(height: 1),
+                                                    Text(
+                                                      '${_engine.totalDamageDealt}',
+                                                      style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 11, fontWeight: FontWeight.w900),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF161828),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('DAMAGE TAKEN', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
+                                                    const SizedBox(height: 1),
+                                                    Text(
+                                                      '${_engine.totalDamageTaken}',
+                                                      style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 11, fontWeight: FontWeight.w900),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF161828),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('BLEED BURSTS', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
+                                                    const SizedBox(height: 1),
+                                                    Text(
+                                                      '${_engine.bleedDetonationsCount}',
+                                                      style: const TextStyle(color: Color(0xFFFF1744), fontSize: 11, fontWeight: FontWeight.w900),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        // Unit Breakdown
+                                        ..._engine.playerUnits.map((u) {
+                                          final dealt = _engine.unitDamageDealt[u.id] ?? 0;
+                                          final shareRatio = _engine.totalDamageDealt > 0 ? (dealt / _engine.totalDamageDealt).clamp(0.0, 1.0) : 0.0;
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 1.5),
+                                            child: Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 70,
+                                                  child: Text(
+                                                    u.name,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(color: Colors.white70, fontSize: 8.0, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: ClipRRect(
+                                                    borderRadius: BorderRadius.circular(2),
+                                                    child: LinearProgressIndicator(
+                                                      value: shareRatio,
+                                                      backgroundColor: const Color(0xFF26283A),
+                                                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
+                                                      minHeight: 4,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  '$dealt DMG (${(shareRatio * 100).toStringAsFixed(0)}%) • HP ${u.hp}/${u.maxHp}',
+                                                  style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 7.5, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                      ],
+                                    ),
+                                  ),
 
                                   const SizedBox(height: 14),
                                   Wrap(

@@ -34,6 +34,7 @@ class SpatialActionEvent {
   final bool isPlayerAttacker;
   final TargetPattern pattern;
   final List<GridNode> affectedNodes;
+  final Map<String, int> secondaryTargetHits; // targetId -> damage dealt
   final int timestampMs;
 
   const SpatialActionEvent({
@@ -50,6 +51,7 @@ class SpatialActionEvent {
     required this.isPlayerAttacker,
     this.pattern = TargetPattern.singleTarget,
     this.affectedNodes = const [],
+    this.secondaryTargetHits = const {},
     required this.timestampMs,
   });
 }

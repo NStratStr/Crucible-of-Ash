@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'models/spatial_combat_models.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../core/combat_math.dart';
+import '../relics/relic_service.dart';
 
 /// Deterministic 30 Hz Spatial Combat Engine simulating the 3-Row x 5-Col Grid Plane
 class SpatialCombatEngine extends ChangeNotifier {
@@ -91,6 +92,13 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   String encounterTitle;
   String encounterDescription;
+  // Combat Statistics & Performance Tracking
+  final Map<String, int> unitDamageDealt = {};
+  final Map<String, int> unitDamageTaken = {};
+  int totalDamageDealt = 0;
+  int totalDamageTaken = 0;
+  int totalHealingDone = 0;
+  int bleedDetonationsCount = 0;
 
   SpatialCombatEngine({
     List<UnitEntity>? initialPlayerEntities,
@@ -98,6 +106,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     String? title,
     String? description,
     bool isBossEncounter = false,
+    RelicService? relicService,
   })  : encounterTitle = title ?? 'The Sunder at Ashen Gate',
         encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
     if (initialEnemyEntities != null && initialEnemyEntities.isNotEmpty) {
@@ -107,6 +116,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         isBoss: isBossEncounter,
         title: title,
         description: description,
+        relicService: relicService,
       );
     } else {
       setupSunderAtAshenGate();
@@ -136,6 +146,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     bool isBoss = false,
     String? title,
     String? description,
+    RelicService? relicService,
   }) {
     if (title != null) encounterTitle = title;
     if (description != null) encounterDescription = description;
@@ -145,6 +156,12 @@ class SpatialCombatEngine extends ChangeNotifier {
     hand.clear();
     burnPit.clear();
     combatLogs.clear();
+    unitDamageDealt.clear();
+    unitDamageTaken.clear();
+    totalDamageDealt = 0;
+    totalDamageTaken = 0;
+    totalHealingDone = 0;
+    bleedDetonationsCount = 0;
     currentTick = 0;
     isRunning = false;
     isPreBattlePhase = true;
@@ -244,6 +261,14 @@ class SpatialCombatEngine extends ChangeNotifier {
         final int pRow = isFront ? 0 : (p.archetype == Archetype.occultist || p.archetype == Archetype.support ? 2 : 1);
         final int pCol = p.columnIndexOverride ?? (i % 5);
 
+        // Apply Equipped Relic Bonuses (GDD Pillar 1 & Equipment System)
+        final relicBonuses = relicService?.calculateBonuses(p.id) ?? const UnitRelicBonuses();
+        final effectiveAtk = p.attack + relicBonuses.bonusAttack;
+        final effectiveDef = p.defense + relicBonuses.bonusDefense;
+        final effectiveMaxHp = p.maxHp + relicBonuses.bonusHp;
+        final effectiveHp = p.currentHp + relicBonuses.bonusHp;
+        final effectiveSpd = p.speed + relicBonuses.bonusSpeed;
+
         playerUnits.add(CombatUnitState(
           id: p.id,
           name: p.name,
@@ -253,12 +278,12 @@ class SpatialCombatEngine extends ChangeNotifier {
           archetype: mapArchetypeToSpatial(p.archetype),
           occupiedNodes: [GridNode(column: pCol, row: pRow, occupantUnitId: p.id)],
           level: p.level,
-          maxHp: p.maxHp,
-          hp: p.currentHp,
-          maxArmor: p.defense,
-          armor: p.defense,
-          attack: p.attack,
-          speed: p.speed,
+          maxHp: effectiveMaxHp,
+          hp: effectiveHp,
+          maxArmor: effectiveDef,
+          armor: effectiveDef,
+          attack: effectiveAtk,
+          speed: effectiveSpd,
           customAssetPath: p.customAvatarAsset,
         ));
       }
@@ -335,6 +360,33 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   void dispatchAction(SpatialActionEvent event) {
     activeActionEvent = event;
+    if (event.damage > 0) {
+      if (event.isPlayerAttacker) {
+        totalDamageDealt += event.damage;
+        unitDamageDealt[event.attackerId] = (unitDamageDealt[event.attackerId] ?? 0) + event.damage;
+      } else {
+        totalDamageTaken += event.damage;
+        unitDamageTaken[event.targetId] = (unitDamageTaken[event.targetId] ?? 0) + event.damage;
+      }
+    }
+    // Also record secondary target damage
+    if (event.secondaryTargetHits.isNotEmpty) {
+      event.secondaryTargetHits.forEach((secId, secDmg) {
+        if (event.isPlayerAttacker) {
+          totalDamageDealt += secDmg;
+          unitDamageDealt[event.attackerId] = (unitDamageDealt[event.attackerId] ?? 0) + secDmg;
+        } else {
+          totalDamageTaken += secDmg;
+          unitDamageTaken[secId] = (unitDamageTaken[secId] ?? 0) + secDmg;
+        }
+      });
+    }
+    if (event.isHeal) {
+      totalHealingDone += event.damage > 0 ? event.damage : 100;
+    }
+    if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
+      bleedDetonationsCount++;
+    }
     notifyListeners();
   }
 
@@ -351,6 +403,12 @@ class SpatialCombatEngine extends ChangeNotifier {
     hand.clear();
     burnPit.clear();
     combatLogs.clear();
+    unitDamageDealt.clear();
+    unitDamageTaken.clear();
+    totalDamageDealt = 0;
+    totalDamageTaken = 0;
+    totalHealingDone = 0;
+    bleedDetonationsCount = 0;
     currentTick = 0;
     isRunning = false;
     isPreBattlePhase = true;
@@ -1565,8 +1623,10 @@ class SpatialCombatEngine extends ChangeNotifier {
         addLog('CAST: Searing Brand struck ${target.name} for $dmg Holy damage.');
 
         // Splash on other alive enemies
+        final Map<String, int> splashHits = {};
         for (final other in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
           final splash = other.takeDamage(45);
+          splashHits[other.id] = splash;
           addLog('  Splash: ${other.name} took $splash Holy damage.');
         }
 
@@ -1580,6 +1640,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           damage: dmg,
           isPlayerAttacker: true,
           pattern: TargetPattern.stAshlarCross,
+          secondaryTargetHits: splashHits,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       } else if (targetCol != null && targetRow != null) {
@@ -1595,27 +1656,46 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         if (splashTargets.isNotEmpty) {
           lastBannerMessage = '🔥 SEARING BRAND: Ground detonation ignited ${splashTargets.length} enemy targets!';
-          for (final splashTarget in splashTargets) {
+          final primary = splashTargets.first;
+          final primaryDmg = primary.takeDamage(75);
+          final Map<String, int> otherSplashes = {};
+
+          for (final splashTarget in splashTargets.skip(1)) {
             final splash = splashTarget.takeDamage(75);
+            otherSplashes[splashTarget.id] = splash;
             addLog('  Splash: ${splashTarget.name} took $splash Holy damage from ground detonation.');
           }
+
+          dispatchAction(SpatialActionEvent(
+            id: 'card_${currentTick}_searing',
+            attackerId: 'sun_smith',
+            attackerName: 'SUN-SMITH',
+            skillName: 'Searing Brand',
+            targetId: primary.id,
+            targetName: primary.name,
+            damage: primaryDmg,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.stAshlarCross,
+            secondaryTargetHits: otherSplashes,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
         } else {
           lastBannerMessage = '🔥 SEARING BRAND: Ground detonation struck empty stone.';
           addLog('CAST: Searing Brand detonated on empty stone ($targetCol, $targetRow).');
-        }
 
-        dispatchAction(SpatialActionEvent(
-          id: 'card_${currentTick}_searing',
-          attackerId: 'sun_smith',
-          attackerName: 'SUN-SMITH',
-          skillName: 'Searing Brand',
-          targetId: 'ground_tile_${targetCol}_$targetRow',
-          targetName: 'Ground Target ($targetCol, $targetRow)',
-          damage: 75,
-          isPlayerAttacker: true,
-          pattern: TargetPattern.stAshlarCross,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
+          dispatchAction(SpatialActionEvent(
+            id: 'card_${currentTick}_searing',
+            attackerId: 'sun_smith',
+            attackerName: 'SUN-SMITH',
+            skillName: 'Searing Brand',
+            targetId: 'ground_tile_${targetCol}_$targetRow',
+            targetName: 'Ground Target ($targetCol, $targetRow)',
+            damage: 0,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.stAshlarCross,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
       }
     } else if (card.id == 'stoke_the_embers') {
       focus = min(maxFocus, focus + 2);
@@ -1642,15 +1722,21 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
     } else if (card.id == 'sun_ashlar_wrath') {
+      final livingEnemies = enemyUnits.where((u) => u.isAlive).toList();
       int totalDmg = 0;
-      for (final enemy in enemyUnits.where((u) => u.isAlive)) {
+      final Map<String, int> enemyHits = {};
+
+      for (final enemy in livingEnemies) {
         final dmg = enemy.takeDamage(110);
         totalDmg += dmg;
+        enemyHits[enemy.id] = dmg;
         addLog('RADIANT BURST: ${enemy.name} took $dmg Holy damage.');
       }
-      final boss = enemyUnits.where((u) => u.isAlive).firstOrNull;
+
+      final boss = livingEnemies.firstOrNull;
       lastBannerMessage = '☀️ WRATH OF ASHLAR: Radiant Cross strikes all enemies for $totalDmg total DMG!';
       if (boss != null) {
+        final bossDmg = enemyHits.remove(boss.id) ?? 110;
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_wrath',
           attackerId: 'sun_smith',
@@ -1658,10 +1744,11 @@ class SpatialCombatEngine extends ChangeNotifier {
           skillName: 'Wrath of Ashlar',
           targetId: boss.id,
           targetName: boss.name,
-          damage: 110,
+          damage: bossDmg,
           isCrit: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.stAshlarCross,
+          secondaryTargetHits: enemyHits,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }
@@ -1685,8 +1772,10 @@ class SpatialCombatEngine extends ChangeNotifier {
         addLog('APEX RITE: Cataclysm of the Sun-King incinerated ${target.name} for $dmg Holy damage!');
 
         // Splash on other alive enemies in adjacent columns
+        final Map<String, int> cataclysmSplashes = {};
         for (final other in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
           final splash = other.takeDamage(85);
+          cataclysmSplashes[other.id] = splash;
           addLog('  Solar Fallout: ${other.name} took $splash collateral Holy damage.');
         }
 
@@ -1701,6 +1790,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           isCrit: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.piercingColumnSkewer,
+          secondaryTargetHits: cataclysmSplashes,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }
@@ -1820,16 +1910,19 @@ class SpatialCombatEngine extends ChangeNotifier {
       final frontEnemies = enemyUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
       final affectedEnemies = frontEnemies.isNotEmpty ? frontEnemies : enemyUnits.where((u) => u.isAlive).toList();
 
+      final Map<String, int> eruptionHits = {};
       for (final enemy in affectedEnemies) {
         final int bleedBonus = enemy.bleedStacks * 20;
         final int rawHit = 120 + bleedBonus;
         final dmg = enemy.takeDamage(rawHit, isPhysical: false);
         totalDmg += dmg;
         enemiesHit++;
+        eruptionHits[enemy.id] = dmg;
         addLog('  Vitae Nova: ${enemy.name} struck for $dmg DMG (Base 120 + $bleedBonus Bleed Detonation)!');
       }
 
       final primary = affectedEnemies.firstOrNull ?? enemyUnits.first;
+      final primaryDmg = eruptionHits.remove(primary.id) ?? totalDmg;
       lastBannerMessage = '💥 VITAE ERUPTION: Detonated $totalDmg total damage across $enemiesHit frontline enemies!';
       addLog('APEX NOVA: Vitae Eruption cleaved through enemy line for $totalDmg total DMG.');
 
@@ -1840,10 +1933,11 @@ class SpatialCombatEngine extends ChangeNotifier {
         skillName: 'Vitae Eruption',
         targetId: primary.id,
         targetName: primary.name,
-        damage: totalDmg,
+        damage: primaryDmg,
         isCrit: true,
         isPlayerAttacker: true,
         pattern: TargetPattern.horizontalRowScythe,
+        secondaryTargetHits: eruptionHits,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
     }
