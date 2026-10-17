@@ -465,49 +465,93 @@ class CombatUnitState {
 
   /// Ultimate Skill Display Title
   String get ultimateTitle {
-    switch (id) {
-      case 'lady_valeria':
-        return 'Wrath of the Dawnbound';
-      case 'iron_footman':
-        return 'Unbreakable Phalanx';
-      case 'sanguine_blade':
-        return 'Crimson Evisceration';
-      case 'sun_smith':
-        return 'Solar Crucible Ignition';
-      default:
-        return 'Apex Burst';
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('valeria')) return 'Wrath of the Dawnbound';
+    if (key.contains('iron_footman')) return 'Unbreakable Phalanx';
+    if (key.contains('sanguine_blade')) return 'Crimson Evisceration';
+    if (key.contains('sun_smith')) return 'Solar Crucible Ignition';
+    if (key.contains('vladislav')) return 'Crimson Dread Cleave';
+    if (key.contains('arbalest')) return 'Siege-Breaker Volley';
+    if (key.contains('duelist')) return 'Phantom Riposte';
+    if (key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) return 'Aegis Resurgence';
+    
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Sovereign Cleave';
+      case UnitArchetype.reachMidline:
+        return 'Deadeye Execution';
+      case UnitArchetype.backlineCaster:
+        return 'Celestial Surge';
+      case UnitArchetype.colossusBehemoth:
+        return 'Cataclysmic Quake';
     }
   }
 
   /// Ultimate Skill Description
   String get ultimateDescription {
-    switch (id) {
-      case 'lady_valeria':
-        return 'Calls down a solar pillar for 240 Holy DMG, shatters Carapace, and fortifies Frontline with +30 Armor.';
-      case 'iron_footman':
-        return 'Slams tower shield into earth, granting +60 Aegis Barrier & taunt redirection to all allies in row for 4s.';
-      case 'sanguine_blade':
-        return 'Strikes target for 280 DMG & detonates all active Bleed stacks into an immediate kinetic burst!';
-      case 'sun_smith':
-        return 'Calls down an alchemical solar beam dealing 180 Fire DMG and leaving a 4s burning hazard zone.';
-      default:
-        return 'Unleashes devastating unit apex power!';
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('valeria')) {
+      return 'Calls down a solar pillar for 240 Holy DMG, shatters Carapace, and fortifies Frontline with +30 Armor.';
+    }
+    if (key.contains('iron_footman')) {
+      return 'Slams tower shield into earth, granting +60 Aegis Barrier to all Frontline allies.';
+    }
+    if (key.contains('sanguine_blade')) {
+      return 'Strikes target for 280 DMG & detonates all active Bleed stacks into an immediate kinetic burst!';
+    }
+    if (key.contains('sun_smith')) {
+      return 'Calls down an alchemical solar beam dealing 180 Fire DMG and leaving a 3s burning hazard zone.';
+    }
+    if (key.contains('vladislav')) {
+      return 'Sunders enemy line with vampiric force, dealing 240 DMG and bolstering frontline allies.';
+    }
+    if (key.contains('arbalest')) {
+      return 'Fires a piercing heavy ballista bolt through the entire target column dealing 250 DMG and 3 Bleed.';
+    }
+    if (key.contains('duelist')) {
+      return 'Executes a lethal pinpoint thrust dealing 260 DMG with guaranteed critical impact and 3 Bleed.';
+    }
+    if (key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      return 'Restores 60 HP to all squad allies and purges lingering afflictions.';
+    }
+
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Sovereign Cleave: Strikes for heavy physical damage and fortifies Frontline allies.';
+      case UnitArchetype.reachMidline:
+        return 'Deadeye Execution: Concentrated armor-piercing strike applying critical bleed.';
+      case UnitArchetype.backlineCaster:
+        return 'Celestial Surge: Cosmic magic burst across target zone and restores squad vitality.';
+      case UnitArchetype.colossusBehemoth:
+        return 'Cataclysmic Quake: Shakes the entire battlefield, staggering all adversaries.';
     }
   }
 
   /// Target Pattern for Ultimate Skill
   TargetPattern get ultimatePattern {
-    switch (id) {
-      case 'lady_valeria':
-        return TargetPattern.piercingColumnSkewer;
-      case 'iron_footman':
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('valeria') || key.contains('arbalest')) {
+      return TargetPattern.piercingColumnSkewer;
+    }
+    if (key.contains('iron_footman')) {
+      return TargetPattern.horizontalRowScythe;
+    }
+    if (key.contains('sanguine_blade') || key.contains('duelist')) {
+      return TargetPattern.singleTarget;
+    }
+    if (key.contains('sun_smith') || key.contains('vladislav')) {
+      return TargetPattern.stAshlarCross;
+    }
+    
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
         return TargetPattern.horizontalRowScythe;
-      case 'sanguine_blade':
+      case UnitArchetype.reachMidline:
         return TargetPattern.singleTarget;
-      case 'sun_smith':
+      case UnitArchetype.backlineCaster:
         return TargetPattern.stAshlarCross;
-      default:
-        return TargetPattern.singleTarget;
+      case UnitArchetype.colossusBehemoth:
+        return TargetPattern.tShapedCleave;
     }
   }
 

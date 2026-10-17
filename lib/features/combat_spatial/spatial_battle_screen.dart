@@ -217,12 +217,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     Color secondaryColor = const Color(0xFFFF8A80);
     int durationMs = 650;
 
-    if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration')) {
+    if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
       vfxType = 'bloodnova';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFD50000);
       durationMs = 850;
       _playSfx('sfx_slash.wav'); // High-impact blood cleave
+    } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
+      vfxType = 'slash';
+      primaryColor = const Color(0xFFFFD54F);
+      secondaryColor = const Color(0xFFFF1744);
+      durationMs = 750;
+      _playSfx('sfx_slash.wav');
+    } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
+      vfxType = 'slash';
+      primaryColor = const Color(0xFF00E5FF);
+      secondaryColor = const Color(0xFFFF1744);
+      durationMs = 700;
+      _playSfx('sfx_slash.wav');
+    } else if (event.skillName.contains('Celestial Surge')) {
+      vfxType = 'shockwave';
+      primaryColor = const Color(0xFF00E5FF);
+      secondaryColor = const Color(0xFFFFD54F);
+      durationMs = 800;
+      _playSfx('sfx_spell.wav');
     } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
       vfxType = 'bloodsiphon';
       primaryColor = const Color(0xFFFF5252);
@@ -2213,28 +2231,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   /// Calculates affected global grid cells when an Ultimate mini-slate is dragged over targetGRow, targetCol
   List<({int gRow, int col})> _getUltimateAffectedGridCells(String unitId, int targetGRow, int targetCol) {
     final List<({int gRow, int col})> cells = [];
-    switch (unitId) {
-      case 'lady_valeria':
-        // Wrath of Dawnbound: Entire enemy column (gRow 0, 1, 2 at targetCol)
+    final unit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+    final pattern = unit?.ultimatePattern ?? TargetPattern.singleTarget;
+
+    switch (pattern) {
+      case TargetPattern.piercingColumnSkewer:
+        // Skewers entire enemy column (gRow 0, 1, 2 at targetCol)
         for (int gr = 0; gr <= 2; gr++) {
           cells.add((gRow: gr, col: targetCol));
         }
         break;
 
-      case 'iron_footman':
-        // Unbreakable Phalanx: All Frontline ally nodes (gRow 4, all 5 cols)
-        for (int gc = 0; gc < 5; gc++) {
-          cells.add((gRow: 4, col: gc));
+      case TargetPattern.horizontalRowScythe:
+        // If ally protective buff (e.g. Iron Footman), targets player Frontline (gRow 4, all 5 cols)
+        if (unitId == 'iron_footman' || unit?.archetype == UnitArchetype.vanguardMelee && targetGRow >= 4) {
+          for (int gc = 0; gc < 5; gc++) {
+            cells.add((gRow: 4, col: gc));
+          }
+        } else {
+          // Offensive row scythe across enemy frontline (gRow 2, all 5 cols)
+          for (int gc = 0; gc < 5; gc++) {
+            cells.add((gRow: targetGRow <= 2 ? targetGRow : 2, col: gc));
+          }
         }
         break;
 
-      case 'sanguine_blade':
-        // Crimson Evisceration: Single enemy node
-        cells.add((gRow: targetGRow, col: targetCol));
-        break;
-
-      case 'sun_smith':
-        // Solar Crucible Ignition: Cross / 2x2 target pattern
+      case TargetPattern.stAshlarCross:
+        // Cross pattern centered on target
         cells.add((gRow: targetGRow, col: targetCol));
         const deltas = [(0, 1), (0, -1), (1, 0), (-1, 0)];
         for (final (dRow, dCol) in deltas) {
@@ -2246,6 +2269,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         }
         break;
 
+      case TargetPattern.tShapedCleave:
+        // T-cleave: target cell + adjacent horizontal tiles + tile behind/forward
+        cells.add((gRow: targetGRow, col: targetCol));
+        for (final dc in [-1, 1]) {
+          final nc = targetCol + dc;
+          if (nc >= 0 && nc < 5) cells.add((gRow: targetGRow, col: nc));
+        }
+        final nr = targetGRow > 3 ? targetGRow - 1 : targetGRow + 1;
+        if (nr >= 0 && nr < 7) cells.add((gRow: nr, col: targetCol));
+        break;
+
+      case TargetPattern.singleTarget:
       default:
         cells.add((gRow: targetGRow, col: targetCol));
         break;
@@ -2342,6 +2377,56 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
 
     return null;
+  }
+
+  /// Calculates predicted phantom damage or buff for a unit given the hovered Ultimate
+  String? _getPhantomUltimateEffect(CombatUnitState unit, String ultUnitId, int targetGRow, int targetCol) {
+    if (!unit.isAlive) return null;
+
+    final ultUnit = _engine.playerUnits.where((u) => u.id == ultUnitId && u.isAlive).firstOrNull;
+    if (ultUnit == null) return null;
+
+    final affected = _getUltimateAffectedGridCells(ultUnitId, targetGRow, targetCol);
+    bool isUnitHit = false;
+    for (final node in unit.occupiedNodes) {
+      final int unitGRow = unit.isPlayer ? (4 + node.row) : (2 - node.row);
+      if (affected.any((c) => c.gRow == unitGRow && c.col == node.column)) {
+        isUnitHit = true;
+        break;
+      }
+    }
+
+    if (!isUnitHit) return null;
+
+    if (ultUnitId == 'iron_footman') {
+      if (unit.isPlayer && unit.occupiedNodes.any((n) => n.row == 0)) {
+        return '+60 🛡️ AEGIS';
+      }
+      return null;
+    }
+
+    if (unit.isPlayer) {
+      if (ultUnit.archetype == UnitArchetype.vanguardMelee && unit.occupiedNodes.any((n) => n.row == 0)) {
+        return '+25 🛡️ ARMOR';
+      }
+      if (ultUnit.archetype == UnitArchetype.backlineCaster) {
+        return '+60 ❤️ HEAL';
+      }
+      return null;
+    }
+
+    // Offensive Ultimates targeting enemies:
+    int rawDmg = (ultUnit.effectiveAttack * 2.2).round();
+    if (ultUnitId == 'lady_valeria') {
+      rawDmg = 240;
+    } else if (ultUnitId == 'sanguine_blade') {
+      rawDmg = 280 + (unit.bleedStacks * 35);
+    } else if (ultUnitId == 'sun_smith') {
+      rawDmg = 180;
+    }
+
+    final projectedDmg = (rawDmg * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
+    return '⚡ -$projectedDmg APEX';
   }
 
   Widget _buildIsometricGridCell(
@@ -2457,8 +2542,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             });
           }
           final unitId = data.replaceFirst('ultimate:', '');
-          if (unitId == 'iron_footman') return isPlayerSquad;
-          return !isPlayerSquad; // Valeria, Sanguine, Sun-Smith target enemy grid/units
+          final ultUnit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+          final isSupportUlt = unitId == 'iron_footman' ||
+              (ultUnit != null && (ultUnit.templateId.contains('medicus') || ultUnit.templateId.contains('priestess') || ultUnit.templateId.contains('alchemist')));
+          if (isSupportUlt) return isPlayerSquad;
+          return !isPlayerSquad; // Valeria, Sanguine, Sun-Smith, and offensive roster ultimates target enemy grid/units
         } else if (data.startsWith('card:')) {
           if (_hoveredTileGRow != gRow || _hoveredTileCol != col) {
             setState(() {
@@ -2809,9 +2897,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   Builder(
                     builder: (context) {
                       final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
-                      final String? phantomEffect = (activeCard != null && (_hoveredTileGRow != null || _selectedCardId != null))
-                          ? _getPhantomUnitEffect(occupant, activeCard, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col)
-                          : null;
+                      final activeUltId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
+                      String? phantomEffect;
+                      if (activeUltId != null && (_hoveredTileGRow != null || _selectedUltimateUnitId != null)) {
+                        phantomEffect = _getPhantomUltimateEffect(occupant, activeUltId, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col);
+                      } else if (activeCard != null && (_hoveredTileGRow != null || _selectedCardId != null)) {
+                        phantomEffect = _getPhantomUnitEffect(occupant, activeCard, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col);
+                      }
 
                       return Center(
                         child: AnimatedOpacity(
@@ -3068,6 +3160,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         message = '🛡️ PRE-BATTLE DEPLOYMENT: Click or pick up any unit to inspect basic attack trajectories & freely arrange your squad!';
         themeColor = const Color(0xFFFFD54F);
         icon = Icons.touch_app;
+      }
+    } else if (_draggedUltimateUnitId != null || _selectedUltimateUnitId != null) {
+      final ultUnitId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
+      final unit = _engine.playerUnits.where((u) => u.id == ultUnitId && u.isAlive).firstOrNull;
+      if (unit != null) {
+        final ultName = unit.ultimateTitle;
+        message = '⚡ ULTIMATE ARMED: ${unit.name.toUpperCase()} [$ultName] • Drop on grid target to unleash!';
+        themeColor = const Color(0xFFFFD54F);
+        icon = Icons.bolt;
       }
     } else if (_selectedCardId != null) {
       final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
