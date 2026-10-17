@@ -3233,6 +3233,35 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                   );
+                } else if (unit.isPlayer && unit.isAlive) {
+                  final isUnderTelegraph = _engine.activeTelegraphedNodes.any((n) => unit.occupies(n.column, n.row));
+                  if (isUnderTelegraph) {
+                    return Container(
+                      margin: const EdgeInsets.only(left: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A000E),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 10, color: Color(0xFFFF1744)),
+                          SizedBox(width: 3),
+                          Text(
+                            '⚠️ DANGER: IN STRIKE ZONE! REPOSITION OR INTERRUPT',
+                            style: TextStyle(
+                              fontSize: 8.0,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFF8A80),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                 }
                 return const SizedBox.shrink();
               },
