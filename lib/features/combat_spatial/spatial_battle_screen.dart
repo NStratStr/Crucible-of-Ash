@@ -67,6 +67,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   bool _isPlayerSkillBanner = false;
   CombatUnitState? _activeUltimateUnit; // Active Ultimate Burst Cinematic Cut-in
   final Map<String, String> _unitFloatingPops = {};
+  final List<_FloatingCombatText> _floatingPops = [];
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
 
@@ -237,23 +238,60 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _activeSkillName = event.skillName;
       _activeSkillCasterName = event.attackerName;
       _isPlayerSkillBanner = event.isPlayerAttacker;
+
+      // Construct distinct styled floating pop
+      String popText;
+      Color popColor;
+      Color popBorder;
+      double popSize = 11.0;
+      bool isCrit = event.isCrit;
+
       if (event.isHeal) {
         if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
-          _unitFloatingPops[event.targetId] = '+60 🛡️ AEGIS';
+          popText = '+60 🛡️ AEGIS';
+          popColor = const Color(0xFF80D8FF);
+          popBorder = const Color(0xFF00E5FF);
         } else if (event.skillName == 'Stoke the Embers') {
-          _unitFloatingPops[event.targetId] = '+2 ⚡ FOCUS';
+          popText = '+2 ⚡ FOCUS';
+          popColor = const Color(0xFFFFD54F);
+          popBorder = const Color(0xFFFFC107);
         } else {
-          _unitFloatingPops[event.targetId] = '+HEAL';
+          popText = '+HEAL';
+          popColor = const Color(0xFF69F0AE);
+          popBorder = const Color(0xFF00E676);
         }
       } else {
-        _unitFloatingPops[event.targetId] = '-${event.damage} DMG';
         if (event.isCrit) {
-          _unitFloatingPops[event.targetId] = '💥 -${event.damage} CRIT!';
-        }
-        if (event.bleedStacks > 0) {
-          _unitFloatingPops[event.targetId] = '-${event.damage} DMG (🩸+${event.bleedStacks})';
+          popText = '💥 -${event.damage} CRIT!';
+          popColor = const Color(0xFFFFD54F);
+          popBorder = const Color(0xFFFF1744);
+          popSize = 13.5;
+        } else if (event.bleedStacks > 0) {
+          popText = '-${event.damage} (🩸+${event.bleedStacks})';
+          popColor = const Color(0xFFFF5252);
+          popBorder = const Color(0xFFB71C1C);
+        } else {
+          popText = '-${event.damage}';
+          popColor = const Color(0xFFFF8A80);
+          popBorder = const Color(0xFFD50000);
         }
       }
+
+      _unitFloatingPops[event.targetId] = popText;
+
+      // Clean up previous floating pop for this unit and push new animated item
+      _floatingPops.removeWhere((p) => p.unitId == event.targetId || p.isExpired);
+      _floatingPops.add(_FloatingCombatText(
+        id: 'pop_${event.id}_$nowMs',
+        unitId: event.targetId,
+        text: popText,
+        color: popColor,
+        borderColor: popBorder,
+        fontSize: popSize,
+        isCrit: isCrit,
+        createdMs: nowMs,
+        durationMs: isCrit ? 1200 : 900,
+      ));
     });
 
     // Clean up VFX after its duration
@@ -261,6 +299,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       if (mounted) {
         setState(() {
           _activeVfx.removeWhere((v) => v.id == newVfx.id);
+          _floatingPops.removeWhere((p) => p.isExpired);
         });
       }
     });
@@ -1139,61 +1178,176 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
           // 4. Live Initiative Action Timeline (ATB Sequence Preview)
           Container(
-            height: 22,
+            height: isLandscapeMobile ? 26 : 30,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFF0F0F16),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white10),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: Colors.white12),
             ),
             child: Row(
               children: [
-                const Text(
-                  'NEXT TURN ⏱️',
-                  style: TextStyle(fontSize: 8.0, color: Colors.white54, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.hourglass_top_rounded, size: 13, color: Color(0xFFFFD54F)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'INITIATIVE',
+                      style: TextStyle(
+                        fontSize: isLandscapeMobile ? 7.5 : 8.5,
+                        color: const Color(0xFFFFD54F),
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: allLivingUnits.take(5).length,
-                    separatorBuilder: (context, _) => const Icon(Icons.chevron_right, size: 12, color: Colors.white24),
+                    itemCount: allLivingUnits.take(7).length,
+                    separatorBuilder: (context, _) => const Icon(Icons.arrow_forward_ios_rounded, size: 9, color: Colors.white24),
                     itemBuilder: (context, idx) {
                       final u = allLivingUnits[idx];
                       final isAlly = u.isPlayer;
-                      final apPercent = ((u.currentAp / SpatialCombatEngine.tickThreshold) * 100).clamp(0, 100).toInt();
+                      final isSelected = (_selectedUnitId == u.id) || (_selectedEnemyUnitId == u.id);
+                      final isActingNext = idx == 0;
+                      final apRatio = (u.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
+                      final apPercent = (apRatio * 100).toInt();
 
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: isAlly ? const Color(0xFF1B3A24) : const Color(0xFF3E1C1D),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(
-                            color: isAlly ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
-                            width: 0.8,
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          setState(() {
+                            if (isAlly) {
+                              _selectedUnitId = u.id;
+                              _selectedEnemyUnitId = null;
+                            } else {
+                              _selectedEnemyUnitId = u.id;
+                              _selectedUnitId = null;
+                            }
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isAlly ? const Color(0xFF1E3A24) : const Color(0xFF4A1A1E))
+                                : (isAlly ? const Color(0xFF121E16) : const Color(0xFF221114)),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFFFFD54F)
+                                  : (isActingNext
+                                      ? (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80))
+                                      : (isAlly ? const Color(0xFF2E7D32) : const Color(0xFFC62828))),
+                              width: isSelected || isActingNext ? 1.4 : 0.8,
+                            ),
+                            boxShadow: isActingNext
+                                ? [
+                                    BoxShadow(
+                                      color: (isAlly ? const Color(0xFF4CAF50) : const Color(0xFFFF5252)).withValues(alpha: 0.4),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                  ]
+                                : null,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              u.name.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 7.5,
-                                fontWeight: FontWeight.bold,
-                                color: isAlly ? const Color(0xFFA5D6A7) : const Color(0xFFFFCDD2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Circular Unit Avatar
+                              Container(
+                                width: isLandscapeMobile ? 16 : 20,
+                                height: isLandscapeMobile ? 16 : 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.black45,
+                                  border: Border.all(
+                                    color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Image.asset(
+                                  u.assetPath,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.topCenter,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    isAlly ? Icons.shield : Icons.dangerous,
+                                    size: 11,
+                                    color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '$apPercent%',
-                              style: TextStyle(
-                                fontSize: 7.5,
-                                fontFamily: 'monospace',
-                                color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
+                              const SizedBox(width: 5),
+
+                              // Name and AP Badge
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isActingNext)
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 2.0),
+                                          child: Icon(Icons.flash_on, size: 9, color: Color(0xFFFFD54F)),
+                                        ),
+                                      Text(
+                                        u.name.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: isLandscapeMobile ? 7.0 : 8.0,
+                                          fontWeight: FontWeight.w900,
+                                          color: isSelected
+                                              ? const Color(0xFFFFD54F)
+                                              : (isAlly ? const Color(0xFFA5D6A7) : const Color(0xFFFFCDD2)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // Mini AP progress bar
+                                  Container(
+                                    width: 32,
+                                    height: 2,
+                                    margin: const EdgeInsets.only(top: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(1),
+                                    ),
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: apRatio,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: isActingNext
+                                              ? const Color(0xFFFFD54F)
+                                              : (isAlly ? const Color(0xFF66BB6A) : const Color(0xFFEF5350)),
+                                          borderRadius: BorderRadius.circular(1),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                '$apPercent%',
+                                style: TextStyle(
+                                  fontSize: 7.0,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                  color: isActingNext
+                                      ? const Color(0xFFFFD54F)
+                                      : (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80)),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -3235,167 +3389,171 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       ),
                     ),
-                  if (unit.isDowned)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF263238),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black54, blurRadius: 4),
-                        ],
-                      ),
-                      child: const Text(
-                        '🪨 INERT VESSEL',
-                        style: TextStyle(
-                          fontSize: 6.5,
-                          color: Color(0xFFCFD8DC),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.3,
+                  // Compact Horizontal Status Badges Cluster
+                  Builder(
+                    builder: (context) {
+                      final List<Widget> statusBadges = [];
+
+                      if (unit.isInvulnerable) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E5FF),
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 4)],
+                          ),
+                          child: const Text('✨AWAKEN', style: TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.w900)),
+                        ));
+                      }
+                      if (unit.isSlagCarapaceActive) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF221115),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
+                          ),
+                          child: const Text('CARAPACE', style: TextStyle(fontSize: 6.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.isDowned) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF263238),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
+                          ),
+                          child: const Text('🪨DOWN', style: TextStyle(fontSize: 6.0, color: Color(0xFFCFD8DC), fontWeight: FontWeight.w900)),
+                        ));
+                      }
+                      if (unit.reviveCount > 0) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A148C),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: Text('💀-${unit.reviveCount * 20}%', style: const TextStyle(fontSize: 5.5, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.bleedStacks > 0) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFB71C1C),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: Text('🩸${unit.bleedStacks}', style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.poisonStacks > 0) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E7D32),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFF66BB6A), width: 0.5),
+                          ),
+                          child: Text('🧪${unit.poisonStacks}', style: const TextStyle(fontSize: 6.0, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.burnDuration > 0) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE65100),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: const Text('🔥', style: TextStyle(fontSize: 6.0)),
+                        ));
+                      }
+                      if (unit.isFrozen) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0288D1),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFF81D4FA), width: 0.5),
+                          ),
+                          child: const Text('❄️', style: TextStyle(fontSize: 6.0)),
+                        ));
+                      }
+                      if (unit.isStunned) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFBC02D),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: const Text('⚡', style: TextStyle(fontSize: 6.0)),
+                        ));
+                      }
+                      if (unit.isVulnerable) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6A1B9A),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFFCE93D8), width: 0.5),
+                          ),
+                          child: const Text('💔+25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.isHasted) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00B0FF),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: const Text('⚡+35%', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.aegisShield > 0) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00B0FF),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: Text('🛡️${unit.aegisShield}', style: const TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.bold)),
+                        ));
+                      }
+
+                      if (statusBadges.isEmpty) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Wrap(
+                          spacing: 2,
+                          runSpacing: 1.5,
+                          alignment: WrapAlignment.center,
+                          children: statusBadges,
                         ),
-                      ),
-                    ),
-                  if (unit.reviveCount > 0)
+                      );
+                    },
+                  ),
+
+                  // Posture indicator: Show when unit is selected to prevent grid clutter
+                  if (isSelected && unit.isAlive)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A148C),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Text(
-                        '💀SOUL FRACTURE x${unit.reviveCount} (-${unit.reviveCount * 20}%)',
-                        style: const TextStyle(fontSize: 6.0, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  if (unit.bleedStacks > 0)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB71C1C),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Text(
-                        '🩸${unit.bleedStacks}',
-                        style: const TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  if (unit.poisonStacks > 0)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E7D32),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: const Color(0xFF66BB6A), width: 0.6),
-                      ),
-                      child: Text(
-                        '🧪POISON x${unit.poisonStacks} (-${unit.poisonStacks * 2}%)',
-                        style: const TextStyle(fontSize: 6.0, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  if (unit.burnDuration > 0)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE65100),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: const Text(
-                        '🔥BURNING',
-                        style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  if (unit.isFrozen)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0288D1),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: const Color(0xFF81D4FA), width: 0.6),
-                      ),
-                      child: const Text(
-                        '❄️FROZEN',
-                        style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  if (unit.isStunned)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFBC02D),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: const Text(
-                        '⚡STUNNED',
-                        style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  if (unit.isVulnerable)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6A1B9A),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: const Color(0xFFCE93D8), width: 0.6),
-                      ),
-                      child: const Text(
-                        '💔VULNERABLE (+25%)',
-                        style: TextStyle(fontSize: 6.0, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  if (unit.isHasted)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00B0FF),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: const Text(
-                        '⚡HASTE (+35%)',
-                        style: TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  if (unit.aegisShield > 0)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00B0FF),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Text(
-                        '🛡️${unit.aegisShield}',
-                        style: const TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  // Always display posture pill for active units
-                  if (unit.isAlive)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                      margin: const EdgeInsets.only(bottom: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                       decoration: BoxDecoration(
                         color: unit.archetype == UnitArchetype.vanguardMelee
                             ? (unit.currentDepth == RowDepth.front
-                                ? const Color(0xFFC62828).withValues(alpha: 0.85)
+                                ? const Color(0xFFC62828).withValues(alpha: 0.9)
                                 : (unit.currentDepth == RowDepth.mid
-                                    ? const Color(0xFFEF6C00).withValues(alpha: 0.85)
-                                    : const Color(0xFF1565C0).withValues(alpha: 0.85)))
-                            : const Color(0xFF263238).withValues(alpha: 0.85),
+                                    ? const Color(0xFFEF6C00).withValues(alpha: 0.9)
+                                    : const Color(0xFF1565C0).withValues(alpha: 0.9)))
+                            : const Color(0xFF263238).withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(2),
                         border: Border.all(
                           color: unit.currentDepth == RowDepth.front
                               ? const Color(0xFFFF5252)
                               : (unit.currentDepth == RowDepth.mid ? const Color(0xFFFFB74D) : const Color(0xFF4FC3F7)),
-                          width: 0.5,
+                          width: 0.6,
                         ),
                       ),
                       child: Text(
@@ -3404,13 +3562,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             : (unit.currentDepth == RowDepth.front ? 'POINT-BLANK' : 'CASTING'),
                         style: const TextStyle(
                           fontSize: 6.0,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.3,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
-                  ),
-                  // Only show name when unit is selected to keep screen uncluttered
+
+                  // Unit name label: Only shown when selected
                   if (isSelected)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -3434,8 +3593,65 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 4. Floating Damage / Effect Pop Text (Live execution)
-            if (floatingPop != null)
+            // 4. Floating Damage / Effect Pop Text (Live execution with animated rise & fade)
+            if (_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired)) ...[
+              () {
+                final pop = _floatingPops.firstWhere((p) => p.unitId == unit.id && !p.isExpired);
+                final t = pop.progress;
+                // Vertical rise: floats upward by up to 26 pixels
+                final double riseY = (t * 26.0);
+                // Opacity curve: solid for first 65%, then fades out to 0
+                final double opacity = (1.0 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
+                // Scale bounce on entry
+                final double scale = pop.isCrit
+                    ? (t < 0.2 ? 1.0 + (t / 0.2) * 0.35 : 1.35 - ((t - 0.2) * 0.35))
+                    : 1.0;
+
+                return Positioned(
+                  top: (isBoss ? -34 : -26) - riseY,
+                  child: Opacity(
+                    opacity: opacity,
+                    child: Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: pop.isCrit ? 8 : 6,
+                          vertical: pop.isCrit ? 3 : 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0C0C14).withValues(alpha: 0.94),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: pop.borderColor,
+                            width: pop.isCrit ? 1.8 : 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.65 : 0.40),
+                              blurRadius: pop.isCrit ? 10 : 5,
+                              spreadRadius: pop.isCrit ? 1.5 : 0.5,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          pop.text,
+                          style: TextStyle(
+                            color: pop.color,
+                            fontWeight: FontWeight.w900,
+                            fontSize: pop.fontSize,
+                            letterSpacing: pop.isCrit ? 0.8 : 0.4,
+                            fontFamily: 'monospace',
+                            shadows: const [
+                              Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }(),
+            ] else if (floatingPop != null)
               Positioned(
                 top: isBoss ? -34 : -26,
                 child: Container(
@@ -5108,5 +5324,38 @@ class _AttackTrajectoryOverlayPainter extends CustomPainter {
         oldDelegate.trajectories.length != trajectories.length ||
         true;
   }
+}
+
+/// Floating combat text with typography, color coding, and float animation
+class _FloatingCombatText {
+  final String id;
+  final String unitId;
+  final String text;
+  final Color color;
+  final Color borderColor;
+  final double fontSize;
+  final bool isCrit;
+  final int createdMs;
+  final int durationMs;
+
+  const _FloatingCombatText({
+    required this.id,
+    required this.unitId,
+    required this.text,
+    required this.color,
+    required this.borderColor,
+    this.fontSize = 11.0,
+    this.isCrit = false,
+    required this.createdMs,
+    this.durationMs = 950,
+  });
+
+  double get progress {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = now - createdMs;
+    return (elapsed / durationMs).clamp(0.0, 1.0);
+  }
+
+  bool get isExpired => progress >= 1.0;
 }
 
