@@ -47,6 +47,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _selectedEnemyUnitId;
   String? _draggedUnitId;
   String? _selectedCardId;
+  String? _hoveredCardId;
   SpatialCombatCard? _draggedCard;
   String? _selectedUltimateUnitId;
   String? _draggedUltimateUnitId;
@@ -609,6 +610,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       ),
                     ),
+
+                  // Pulled-Up Spell Card Inspector & Cast HUD (Floating just above the dock)
+                  if (_selectedCardId != null || _hoveredCardId != null)
+                    _buildPulledUpCardOverlay(isLandscapeMobile: isLandscapeMobile),
 
                   // Victory / Defeat Tactical Overlay Banner
                   if (_engine.isVictory || _engine.isDefeat)
@@ -1894,7 +1899,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         (!isPlayerSquad && _selectedEnemyUnitId != null && occupant?.id == _selectedEnemyUnitId);
 
     // Tactical Spell & Ultimate AOE Highlight Overlay calculation:
-    final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
+    final activeCard = _draggedCard ??
+        (_hoveredCardId != null ? _engine.hand.where((c) => c.id == _hoveredCardId).firstOrNull : null) ??
+        (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
     final activeUltimateUnitId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
     bool isSpellAoeAffected = false;
     if (activeUltimateUnitId != null && _hoveredTileGRow != null && _hoveredTileCol != null) {
@@ -1904,14 +1911,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       if (_hoveredTileGRow != null && _hoveredTileCol != null) {
         final affectedList = _getSpellAffectedGridCells(activeCard, _hoveredTileGRow!, _hoveredTileCol!);
         isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
-      } else if (_selectedCardId != null) {
-        // If card is selected by click, preview AOE if this cell is targetable
+      } else if (_selectedCardId != null || _hoveredCardId != null) {
+        // If card is hovered or selected by click, preview AOE / valid target tiles
         if (activeCard.id == 'sun_ashlar_wrath') {
           isSpellAoeAffected = !isPlayerSquad;
         } else if (activeCard.id == 'stoke_the_embers') {
           isSpellAoeAffected = isPlayerSquad;
         } else if (activeCard.id == 'phalanx_intercept') {
           isSpellAoeAffected = isPlayerSquad && occupant != null;
+        } else if (activeCard.id == 'searing_brand' || activeCard.pattern != TargetPattern.singleTarget) {
+          isSpellAoeAffected = !isPlayerSquad; // Can target any tile on enemy squad, empty or occupied
         } else {
           isSpellAoeAffected = !isPlayerSquad && occupant != null;
         }
@@ -2182,11 +2191,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             });
                           }
                         } else if (_selectedCardId != null) {
-                          // Cast clicked card on target tile if applicable (e.g. Stoke or Ashlar)
+                          // Cast clicked card on target tile if applicable
                           final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                          if (card != null && (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath')) {
-                            _engine.castCard(card.id, targetCol: col, targetRow: row);
-                            setState(() => _selectedCardId = null);
+                          if (card != null) {
+                            if (card.id == 'stoke_the_embers') {
+                              _engine.castCard(card.id, targetCol: col, targetRow: row);
+                              setState(() => _selectedCardId = null);
+                            } else if (!isPlayerSquad) {
+                              // Offensive or ground splash spells (Searing Brand, Wrath of Ashlar, Sun-King Cataclysm)
+                              _engine.castCard(card.id, targetCol: col, targetRow: row);
+                              setState(() => _selectedCardId = null);
+                            } else {
+                              setState(() {
+                                _engine.lastBannerMessage = '⚠️ ${card.name} must target enemy ground or units!';
+                              });
+                            }
                           }
                         }
                       },
@@ -3868,84 +3887,123 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                     final isCardSelected = _selectedCardId == card.id;
 
-                    return Draggable<String>(
-                      data: 'card:${card.id}',
-                      onDragStarted: () {
+                    return MouseRegion(
+                      onEnter: (_) {
                         setState(() {
-                          _draggedCard = card;
-                          _selectedCardId = null;
+                          _hoveredCardId = card.id;
                         });
-                        _engine.setBulletTime(true);
                       },
-                      onDragEnd: (_) {
+                      onExit: (_) {
                         setState(() {
-                          _draggedCard = null;
-                          _hoveredTileGRow = null;
-                          _hoveredTileCol = null;
+                          if (_hoveredCardId == card.id) {
+                            _hoveredCardId = null;
+                          }
                         });
-                        _engine.setBulletTime(false);
                       },
-                      feedback: Material(
-                        color: Colors.transparent,
-                        child: _buildCardTile(card, canAfford, isFeedback: true, isLandscapeMobile: isLandscapeMobile),
-                      ),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          if (!canAfford) {
-                            setState(() {
-                              _engine.lastBannerMessage =
-                                  '⚠️ NEED ${card.focusCost} FOCUS (HAVE ${_engine.focus})';
-                            });
-                            return;
-                          }
+                      child: Draggable<String>(
+                        data: 'card:${card.id}',
+                        onDragStarted: () {
+                          setState(() {
+                            _draggedCard = card;
+                            _selectedCardId = null;
+                            _hoveredCardId = null;
+                          });
+                          _engine.setBulletTime(true);
+                        },
+                        onDragEnd: (_) {
+                          setState(() {
+                            _draggedCard = null;
+                            _hoveredTileGRow = null;
+                            _hoveredTileCol = null;
+                          });
+                          _engine.setBulletTime(false);
+                        },
+                        feedback: Material(
+                          color: Colors.transparent,
+                          child: _buildCardTile(card, canAfford, isFeedback: true, isLandscapeMobile: isLandscapeMobile),
+                        ),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (!canAfford) {
+                              setState(() {
+                                _engine.lastBannerMessage =
+                                    '⚠️ NEED ${card.focusCost} FOCUS (HAVE ${_engine.focus})';
+                              });
+                              return;
+                            }
 
-                          // If card is non-targeted (Stoke the Embers or Wrath of Ashlar), cast immediately!
-                          if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
-                            _playSfx('sfx_card.wav');
-                            _engine.castCard(card.id);
-                            setState(() {
-                              _selectedCardId = null;
-                            });
-                            return;
-                          }
-
-                          // If unit is already selected, cast immediately on it!
-                          if (card.id == 'phalanx_intercept') {
-                            final targetAlly = _selectedUnitId != null
-                                ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
-                                : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
-                            if (targetAlly != null) {
+                            // If card is non-targeted (Stoke the Embers or Wrath of Ashlar), cast immediately!
+                            if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
+                              if (_engine.isPreBattlePhase) {
+                                setState(() {
+                                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before casting spells!';
+                                });
+                                return;
+                              }
                               _playSfx('sfx_card.wav');
-                              _engine.castCard(card.id, targetUnit: targetAlly);
+                              _engine.castCard(card.id);
                               setState(() {
                                 _selectedCardId = null;
                               });
                               return;
                             }
-                          }
 
-                          // Otherwise, toggle card selection for click-to-target
-                          setState(() {
-                            if (_selectedCardId == card.id) {
-                              // Double tap on armed card auto-targets primary enemy / Gorgoroth!
-                              final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
-                                  _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
-                              if (boss != null) {
-                                _playSfx('sfx_card.wav');
-                                _engine.castCard(card.id, targetUnit: boss);
-                                _selectedCardId = null;
+                            // If unit is already selected, cast immediately on it!
+                            if (card.id == 'phalanx_intercept') {
+                              if (_engine.isPreBattlePhase) {
+                                setState(() {
+                                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before casting spells!';
+                                });
                                 return;
                               }
-                              _selectedCardId = null;
-                            } else {
-                              _playSfx('sfx_card.wav');
-                              _selectedCardId = card.id;
-                              _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Click an enemy or double-tap card to unleash!';
+                              final targetAlly = _selectedUnitId != null
+                                  ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
+                                  : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
+                              if (targetAlly != null) {
+                                _playSfx('sfx_card.wav');
+                                _engine.castCard(card.id, targetUnit: targetAlly);
+                                setState(() {
+                                  _selectedCardId = null;
+                                });
+                                return;
+                              }
                             }
-                          });
-                        },
-                        child: _buildCardTile(card, canAfford, isSelected: isCardSelected, isLandscapeMobile: isLandscapeMobile),
+
+                            // Otherwise, toggle card selection for pull-up inspection & click-to-target
+                            setState(() {
+                              if (_selectedCardId == card.id) {
+                                // Double tap on armed card auto-targets primary enemy / Gorgoroth!
+                                if (!_engine.isPreBattlePhase) {
+                                  final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+                                      _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
+                                  if (boss != null) {
+                                    _playSfx('sfx_card.wav');
+                                    _engine.castCard(card.id, targetUnit: boss);
+                                    _selectedCardId = null;
+                                    return;
+                                  }
+                                }
+                                _selectedCardId = null;
+                              } else {
+                                _playSfx('sfx_card.wav');
+                                _selectedCardId = card.id;
+                                if (_engine.isPreBattlePhase) {
+                                  _engine.lastBannerMessage = '🔍 ${card.name.toUpperCase()} (PULLED UP): Reviewing spell details. Start battle to cast!';
+                                } else {
+                                  _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Tap an enemy node or tap CAST SPELL!';
+                                }
+                              }
+                            });
+                          },
+                          child: _buildCardTile(
+                            card,
+                            canAfford,
+                            isSelected: isCardSelected,
+                            isHovered: _hoveredCardId == card.id,
+                            isLandscapeMobile: isLandscapeMobile,
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -3962,14 +4020,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       bool canAfford, {
       bool isFeedback = false,
       bool isSelected = false,
+      bool isHovered = false,
+      bool isPulledUp = false,
       bool isLandscapeMobile = false,
     }) {
-      final double cardW = isFeedback ? 85.0 : (isLandscapeMobile ? 68.0 : 78.0);
-      final double cardH = isFeedback ? 120.0 : (isLandscapeMobile ? 62.0 : 76.0);
+      final double cardW = isPulledUp
+          ? (isLandscapeMobile ? 120.0 : 155.0)
+          : (isFeedback ? 85.0 : (isLandscapeMobile ? 68.0 : 78.0));
+      final double cardH = isPulledUp
+          ? (isLandscapeMobile ? 165.0 : 215.0)
+          : (isFeedback ? 120.0 : (isLandscapeMobile ? 62.0 : 76.0));
 
-      final Color borderColor = isSelected
+      final Color borderColor = isSelected || isPulledUp
           ? const Color(0xFFFFD54F)
-          : (canAfford ? const Color(0xFFD4AF37) : const Color(0xFF383848));
+          : (isHovered
+              ? const Color(0xFF00E5FF)
+              : (canAfford ? const Color(0xFFD4AF37) : const Color(0xFF383848)));
 
       return Container(
         width: cardW,
@@ -4126,14 +4192,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     card.description,
                     style: TextStyle(
                       color: const Color(0xFFF0F0F5),
-                      fontSize: (cardW * 0.09).clamp(6.0, 9.0),
-                      height: 1.1,
+                      fontSize: isPulledUp ? (isLandscapeMobile ? 9.5 : 11.5) : (cardW * 0.09).clamp(6.0, 9.0),
+                      height: 1.15,
                       fontWeight: FontWeight.w700,
                       shadows: const [
                         Shadow(color: Colors.black, blurRadius: 2.0, offset: Offset(0.5, 0.5)),
                       ],
                     ),
-                    maxLines: 3,
+                    maxLines: isPulledUp ? 5 : 3,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),
@@ -4144,6 +4210,292 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         ),
       );
     }
+
+  Widget _buildPulledUpCardOverlay({bool isLandscapeMobile = false}) {
+    final activeId = _selectedCardId ?? _hoveredCardId;
+    if (activeId == null) return const SizedBox.shrink();
+
+    final card = _engine.hand.where((c) => c.id == activeId).firstOrNull;
+    if (card == null) return const SizedBox.shrink();
+
+    final canAfford = _engine.focus >= card.focusCost;
+    final isArmed = _selectedCardId == card.id;
+
+    // Pattern label helper
+    String patternLabel;
+    IconData patternIcon;
+    switch (card.pattern) {
+      case TargetPattern.singleTarget:
+        patternLabel = 'SINGLE TARGET';
+        patternIcon = Icons.adjust;
+        break;
+      case TargetPattern.stAshlarCross:
+        patternLabel = 'CROSS SPLASH (1 TILE)';
+        patternIcon = Icons.flare;
+        break;
+      case TargetPattern.piercingColumnSkewer:
+        patternLabel = 'COLUMN PIERCING';
+        patternIcon = Icons.view_column;
+        break;
+      case TargetPattern.horizontalRowScythe:
+        patternLabel = 'ENTIRE ROW';
+        patternIcon = Icons.table_rows;
+        break;
+      case TargetPattern.tShapedCleave:
+        patternLabel = 'T-SHAPED CLEAVE';
+        patternIcon = Icons.call_split;
+        break;
+      case TargetPattern.reachMidToFront:
+        patternLabel = 'REACH ATTACK';
+        patternIcon = Icons.arrow_upward;
+        break;
+      case TargetPattern.flankShadowLeap:
+        patternLabel = 'FLANK SHADOW LEAP';
+        patternIcon = Icons.flight_takeoff;
+        break;
+    }
+
+    return Positioned(
+      bottom: isLandscapeMobile ? 12 : 18,
+      right: isLandscapeMobile ? 12 : 24,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: isLandscapeMobile ? 320 : 380,
+          ),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101018).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.35),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+              const BoxShadow(
+                color: Colors.black87,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Row: Card Title & Dismiss Icon
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(patternIcon, size: 14, color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)),
+                      const SizedBox(width: 6),
+                      Text(
+                        isArmed ? 'SPELL ARMED & PULLED UP' : 'SPELL DETAILS',
+                        style: TextStyle(
+                          color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedCardId = null;
+                        _hoveredCardId = null;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: Icon(Icons.close, size: 16, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Body: Enlarged Card Art + Descriptive Meta
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Enlarged Card Tile (Pulled-up wargaming frame)
+                  _buildCardTile(
+                    card,
+                    canAfford,
+                    isSelected: isArmed,
+                    isPulledUp: true,
+                    isLandscapeMobile: isLandscapeMobile,
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Metadata Column
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          card.name.toUpperCase(),
+                          style: const TextStyle(
+                            color: Color(0xFFFFE082),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1C1D2A),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: Colors.white24, width: 0.6),
+                          ),
+                          child: Text(
+                            patternLabel,
+                            style: const TextStyle(
+                              color: Color(0xFF80D8FF),
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          card.description,
+                          style: const TextStyle(
+                            color: Color(0xFFECEFF1),
+                            fontSize: 10.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.bolt, color: Color(0xFFFFD54F), size: 14),
+                            const SizedBox(width: 3),
+                            Text(
+                              'COST: ${card.focusCost} FOCUS',
+                              style: TextStyle(
+                                color: canAfford ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // Action Bar
+              if (_engine.isPreBattlePhase)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2B1D0E),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.5)),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '⚠️ DEPLOYMENT: Initiate battle to unleash spells',
+                      style: TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.auto_awesome, size: 14),
+                        label: Text(
+                          canAfford ? 'CAST SPELL' : 'NEED ${card.focusCost} FOCUS',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: canAfford ? const Color(0xFFB8860B) : Colors.white10,
+                          foregroundColor: canAfford ? Colors.black : Colors.white38,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                        onPressed: canAfford
+                            ? () {
+                                _playSfx('sfx_card.wav');
+                                if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
+                                  _engine.castCard(card.id);
+                                  setState(() {
+                                    _selectedCardId = null;
+                                  });
+                                  return;
+                                }
+                                if (card.id == 'phalanx_intercept') {
+                                  final targetAlly = _selectedUnitId != null
+                                      ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
+                                      : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
+                                  if (targetAlly != null) {
+                                    _engine.castCard(card.id, targetUnit: targetAlly);
+                                    setState(() {
+                                      _selectedCardId = null;
+                                    });
+                                    return;
+                                  }
+                                }
+                                final targetEnemy = _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
+                                if (targetEnemy != null) {
+                                  _engine.castCard(card.id, targetUnit: targetEnemy);
+                                  setState(() {
+                                    _selectedCardId = null;
+                                  });
+                                }
+                              }
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Colors.white24),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedCardId = null;
+                          _hoveredCardId = null;
+                        });
+                      },
+                      child: const Text('DISMISS', style: TextStyle(fontSize: 9.5)),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildCombatLogConsole() {
     return Container(

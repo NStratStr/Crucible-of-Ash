@@ -83,6 +83,7 @@ void main() {
     });
 
     test('Casting Smite the Calcified on Gorgoroth shatters Slag Carapace and halves armor', () {
+      engine.isPreBattlePhase = false; // Live combat started
       // Ensure we have Smite and 4 Focus
       engine.burnCard('stoke_the_embers'); // Focus: 3 -> 4, draws Smite the Calcified
       expect(engine.focus, equals(4));
@@ -246,6 +247,7 @@ void main() {
     });
 
     test('Unit Combat Triad: Manual Ultimate Burst execution consumes meter and shatters defenses', () {
+      engine.isPreBattlePhase = false; // Live combat started
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
       final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
       expect(gorgoroth.isSlagCarapaceActive, isTrue);
@@ -365,6 +367,7 @@ void main() {
       }
 
       engine.focus = 3;
+      engine.isPreBattlePhase = false; // Live combat started
       final castSuccess = engine.castCard('revive_vitae', targetUnit: footman);
       expect(castSuccess, isTrue);
 

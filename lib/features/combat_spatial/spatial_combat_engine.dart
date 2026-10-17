@@ -1425,6 +1425,12 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Casts a tactical card on a target node / unit
   bool castCard(String cardId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) {
+    if (isPreBattlePhase) {
+      addLog('Cannot cast Sovereign Spells during Deployment Phase! Start battle first.');
+      lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before casting spells!';
+      notifyListeners();
+      return false;
+    }
     final card = hand.where((c) => c.id == cardId).firstOrNull;
     if (card == null) return false;
     if (focus < card.focusCost) {
@@ -1722,6 +1728,12 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Ultimate Burst Resolution: Player manually drags charged unit mini-slate onto grid target
   bool castUltimate(String unitId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) {
+    if (isPreBattlePhase) {
+      addLog('Cannot cast Ultimate Burst during Deployment Phase! Start battle first.');
+      lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before unleashing Ultimates!';
+      notifyListeners();
+      return false;
+    }
     final unit = playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
     if (unit == null || !unit.isUltimateReady) {
       addLog('${unit?.name ?? "Unit"} Ultimate is not fully charged!');
