@@ -632,6 +632,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             if (!_isZenMode &&
                 !isLandscapeMobile &&
                 (_engine.lastBannerMessage != null ||
+                    _draggedUnitId != null ||
                     _selectedCardId != null ||
                     _selectedUnitId != null ||
                     _selectedEnemyUnitId != null ||
@@ -734,7 +735,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
 
                   // Mobile Landscape Floating Prompt (Top Center)
-                  if (!_isZenMode && isLandscapeMobile && (_selectedCardId != null || _engine.isPreBattlePhase))
+                  if (!_isZenMode && isLandscapeMobile && (_draggedUnitId != null || _selectedCardId != null || _engine.isPreBattlePhase))
                     Positioned(
                       top: (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null) ? 44 : 8,
                       left: 12,
@@ -1873,6 +1874,79 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       }
     }
 
+    // 5) Turn-Triage Movement & Evasion Arc Trajectory (when dragging a player unit)
+    if (_draggedUnitId != null &&
+        _hoveredTileCol != null &&
+        _hoveredTileGRow != null &&
+        _hoveredTileGRow! > 3) {
+      final draggedUnit = _engine.playerUnits.where((u) => u.id == _draggedUnitId && u.isAlive).firstOrNull;
+      if (draggedUnit != null && draggedUnit.occupiedNodes.isNotEmpty) {
+        final originNode = draggedUnit.occupiedNodes.first;
+        final int originCol = originNode.column;
+        final int originGRow = 4 + originNode.row;
+        final double srcX = originX + (originCol - originGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        final double srcY = originY + (originCol + originGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+
+        final int targetCol = _hoveredTileCol!;
+        final int targetGRow = _hoveredTileGRow!;
+        final int targetLocalRow = targetGRow - 4;
+        final double tgtX = originX + (targetCol - targetGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        final double tgtY = originY + (targetCol + targetGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+
+        // Movement validity checks
+        final occupantAlly = _engine.playerUnits
+            .where((u) => u.isAlive && u.id != draggedUnit.id && u.occupies(targetCol, targetLocalRow))
+            .firstOrNull;
+        final bool canEnterOrSwap = occupantAlly == null || !occupantAlly.isDisplacementImmune;
+        final bool isValidMove = canEnterOrSwap &&
+            draggedUnit.canMoveTo(targetCol, targetLocalRow, ignoreApCost: _engine.isPreBattlePhase);
+
+        // Danger evasion detection
+        final bool originInDanger = draggedUnit.occupiedNodes.any((n) =>
+            _engine.activeTelegraphedNodes.any((tn) => tn.column == n.column && tn.row == n.row));
+        final bool targetInDanger =
+            _engine.activeTelegraphedNodes.any((tn) => tn.column == targetCol && tn.row == targetLocalRow);
+
+        Color pathColor;
+        String skillLabel;
+        String targetDesc;
+        String iconPrefix;
+
+        if (!isValidMove) {
+          pathColor = const Color(0xFFFF1744); // Crimson for invalid/out-of-range
+          skillLabel = 'OUT OF RANGE';
+          targetDesc = 'Max ${draggedUnit.moveRange} Tile';
+          iconPrefix = '⛔';
+        } else if (originInDanger && !targetInDanger) {
+          pathColor = const Color(0xFF00E676); // Emerald Green for successful evasion!
+          skillLabel = 'EVADING DANGER!';
+          targetDesc = _engine.isPreBattlePhase ? '0 AP Safe Footing' : 'Safe Footing (50% AP)';
+          iconPrefix = '🛡️';
+        } else if (occupantAlly != null) {
+          pathColor = const Color(0xFFFFD54F); // Amber for formation swap
+          skillLabel = 'FORMATION SWAP';
+          targetDesc = 'Swap with ${occupantAlly.name}';
+          iconPrefix = '⇄';
+        } else {
+          pathColor = const Color(0xFF00E5FF); // Cyan for clean tactical move
+          skillLabel = 'REPOSITION';
+          targetDesc = _engine.isPreBattlePhase ? 'Free Deploy' : 'Move (50% AP)';
+          iconPrefix = '⚡';
+        }
+
+        trajectories.add(_TrajectoryData(
+          sourceOffset: Offset(srcX, srcY),
+          targetOffset: Offset(tgtX, tgtY),
+          skillName: skillLabel,
+          targetName: targetDesc,
+          color: pathColor,
+          showLabel: true,
+          isArcPath: true,
+          labelPrefix: iconPrefix,
+        ));
+      }
+    }
+
     return SizedBox(
       width: boardTotalWidth,
       height: boardTotalHeight,
@@ -2527,6 +2601,86 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
+                // Turn-Triage Ghost Preview: Translucent silhouette & pulsing base when hovered during unit drag
+                if (isPlayerSquad &&
+                    _draggedUnitId != null &&
+                    _hoveredTileGRow == gRow &&
+                    _hoveredTileCol == col)
+                  Builder(
+                    builder: (context) {
+                      final dragged = _engine.playerUnits.where((u) => u.id == _draggedUnitId && u.isAlive).firstOrNull;
+                      if (dragged == null) return const SizedBox.shrink();
+                      final bool canMove = dragged.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
+                      if (!canMove) return const SizedBox.shrink();
+
+                      final bool originInDanger = dragged.occupiedNodes.any((n) =>
+                          _engine.activeTelegraphedNodes.any((tn) => tn.column == n.column && tn.row == n.row));
+                      final bool targetInDanger = _engine.activeTelegraphedNodes.any((tn) => tn.column == col && tn.row == row);
+                      final Color ghostAuraColor = (originInDanger && !targetInDanger)
+                          ? const Color(0xFF00E676)
+                          : (occupant != null ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF));
+
+                      return Center(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Pulsing Plinth Placement Aura
+                            Container(
+                              width: tileWidth * 0.72,
+                              height: tileHeight * 0.72,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: ghostAuraColor.withValues(alpha: 0.9), width: 1.8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: ghostAuraColor.withValues(alpha: 0.55),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Translucent Ghost Silhouette of unit
+                            Opacity(
+                              opacity: 0.52,
+                              child: Image.asset(
+                                dragged.assetPath,
+                                height: tileHeight * 1.35,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.bottomCenter,
+                                errorBuilder: (context, error, stackTrace) => Icon(Icons.person, color: ghostAuraColor, size: 28),
+                              ),
+                            ),
+                            // Action Tag Pill
+                            Positioned(
+                              top: -12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xEE0B1019),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: ghostAuraColor, width: 1.0),
+                                ),
+                                child: Text(
+                                  originInDanger && !targetInDanger
+                                      ? '🛡️ SAFE FOOTING'
+                                      : (occupant != null ? '⇄ SWAP' : (_engine.isPreBattlePhase ? 'DEPLOY' : '50% AP')),
+                                  style: TextStyle(
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: ghostAuraColor,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
                 // Reachable Movement Indicator / Move Button for Empty Cells
                 if (isReachable)
                   Center(
@@ -2910,6 +3064,55 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         message = '✨ ${card.name.toUpperCase()} ARMED: Click a target node or enemy on the grid to cast!';
         themeColor = const Color(0xFF00E5FF);
         icon = Icons.auto_awesome;
+      }
+    } else if (_draggedUnitId != null) {
+      final unit = _engine.playerUnits.where((u) => u.id == _draggedUnitId && u.isAlive).firstOrNull;
+      if (unit != null) {
+        final apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
+        final bool originInDanger = unit.occupiedNodes.any((n) =>
+            _engine.activeTelegraphedNodes.any((tn) => tn.column == n.column && tn.row == n.row));
+
+        if (_hoveredTileCol != null && _hoveredTileGRow != null && _hoveredTileGRow! > 3) {
+          final targetCol = _hoveredTileCol!;
+          final targetRow = _hoveredTileGRow! - 4;
+          final bool hoveredInDanger = _engine.activeTelegraphedNodes.any((tn) => tn.column == targetCol && tn.row == targetRow);
+          final bool canMove = unit.canMoveTo(targetCol, targetRow, ignoreApCost: _engine.isPreBattlePhase);
+
+          if (originInDanger && !hoveredInDanger && canMove) {
+            message = '🛡️ TURN-TRIAGE: EVADING DANGER ZONE! Drop to secure safe footing (${_engine.isPreBattlePhase ? "Free Deploy" : "Costs 50% AP"})';
+            themeColor = const Color(0xFF00E676);
+            icon = Icons.verified_user;
+          } else if (hoveredInDanger && canMove) {
+            message = '⚠️ WARNING: Target tile is inside an active enemy strike zone!';
+            themeColor = const Color(0xFFFF5252);
+            icon = Icons.warning_amber_rounded;
+          } else if (canMove) {
+            final occupantAlly = _engine.playerUnits.where((u) => u.isAlive && u.id != unit.id && u.occupies(targetCol, targetRow)).firstOrNull;
+            if (occupantAlly != null) {
+              message = '⇄ FORMATION SWAP: Drop on ${occupantAlly.name.toUpperCase()} to swap positions (${_engine.isPreBattlePhase ? "Free Deploy" : "Costs 50% AP"})';
+              themeColor = const Color(0xFFFFD54F);
+              icon = Icons.swap_horiz;
+            } else {
+              message = '⚡ REPOSITIONING: Drop on tile ($targetCol, $targetRow) (${_engine.isPreBattlePhase ? "Free Deploy" : "Costs 50% AP"})';
+              themeColor = const Color(0xFF00E5FF);
+              icon = Icons.directions_run;
+            }
+          } else {
+            message = '⛔ OUT OF RANGE: ${unit.name.toUpperCase()} can only move ${unit.moveRange} tile(s)!';
+            themeColor = const Color(0xFFFF5252);
+            icon = Icons.block;
+          }
+        } else {
+          if (originInDanger) {
+            message = '🚨 DANGER: ${unit.name.toUpperCase()} is targeted by an incoming strike! Drag to a safe tile to EVADE!';
+            themeColor = const Color(0xFFFF5252);
+            icon = Icons.crisis_alert;
+          } else {
+            message = '🔄 TURN-TRIAGE: Dragging ${unit.name.toUpperCase()} (AP: $apPct%) • Drop on adjacent tile (${_engine.isPreBattlePhase ? "Free Deploy" : "Costs 50% AP"})';
+            themeColor = const Color(0xFF00E5FF);
+            icon = Icons.open_with;
+          }
+        }
       }
     } else if (_selectedUnitId != null) {
       final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
@@ -5657,6 +5860,8 @@ class _TrajectoryData {
   final Color color;
   final bool isSecondary;
   final bool showLabel;
+  final bool isArcPath;
+  final String? labelPrefix;
 
   const _TrajectoryData({
     required this.sourceOffset,
@@ -5666,6 +5871,8 @@ class _TrajectoryData {
     required this.color,
     this.isSecondary = false,
     this.showLabel = true,
+    this.isArcPath = false,
+    this.labelPrefix,
   });
 }
 
@@ -5811,8 +6018,13 @@ class _AttackTrajectoryOverlayPainter extends CustomPainter {
         targetOffset.dy - r - 14.0,
       );
 
+      final String prefix = traj.labelPrefix ?? '⚔️';
+      final String labelText = traj.isArcPath
+          ? '$prefix ${traj.skillName} • ${traj.targetName}'
+          : '$prefix ${traj.skillName} • TARGET: ${traj.targetName}';
+
       final textSpan = TextSpan(
-        text: '⚔️ ${traj.skillName} • TARGET: ${traj.targetName}',
+        text: labelText,
         style: TextStyle(
           color: trajectoryColor,
           fontSize: 8.5,
