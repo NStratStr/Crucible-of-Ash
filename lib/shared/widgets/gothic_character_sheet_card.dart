@@ -51,6 +51,7 @@ class GothicCharacterSheetCard extends StatefulWidget {
   final int totalIchor;
   final void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp;
   final VoidCallback? onClose;
+  final VoidCallback? onToggleClassicCodex;
 
   const GothicCharacterSheetCard({
     super.key,
@@ -59,6 +60,7 @@ class GothicCharacterSheetCard extends StatefulWidget {
     this.totalIchor = 0,
     this.onLevelUp,
     this.onClose,
+    this.onToggleClassicCodex,
   });
 
   @override
@@ -166,45 +168,59 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final bool canShowDrawerSideBySide = screenWidth >= 880 && _selectedDetail != null;
+    final mediaQuery = MediaQuery.of(context);
+    final screenWidth = mediaQuery.size.width;
+    final screenHeight = mediaQuery.size.height;
+
+    // Card dimensions proportional to art asset 1792 x 2400 (aspect ratio ~1 : 1.34)
+    // Max width 420, max height 88% of screen height
+    final double cardWidth = min(screenWidth * 0.94, min(420.0, (screenHeight * 0.86) / 1.34));
+    final double cardHeight = cardWidth * 1.34;
 
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Physical Gothic Faction Card with 3D Flip
-            AnimatedBuilder(
-              animation: _flipAnimation,
-              builder: (context, child) {
-                final angle = _flipAnimation.value * pi;
-                final isUnder = angle > (pi / 2);
-                return Transform(
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.0012)
-                    ..rotateY(angle),
-                  alignment: Alignment.center,
-                  child: isUnder
-                      ? Transform(
-                          transform: Matrix4.identity()..rotateY(pi),
-                          alignment: Alignment.center,
-                          child: _buildCardBack(),
-                        )
-                      : _buildCardFront(),
-                );
-              },
-            ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Physical Gothic Faction Card with 3D Flip
+          AnimatedBuilder(
+            animation: _flipAnimation,
+            builder: (context, child) {
+              final angle = _flipAnimation.value * pi;
+              final isUnder = angle > (pi / 2);
+              return Transform(
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.0012)
+                  ..rotateY(angle),
+                alignment: Alignment.center,
+                child: isUnder
+                    ? Transform(
+                        transform: Matrix4.identity()..rotateY(pi),
+                        alignment: Alignment.center,
+                        child: _buildCardBack(cardWidth, cardHeight),
+                      )
+                    : _buildCardFront(cardWidth, cardHeight),
+              );
+            },
+          ),
 
-            // Pop-out Inspection Drawer (Right Side on Wide Screens)
-            if (canShowDrawerSideBySide) ...[
-              const SizedBox(width: 16),
-              _buildPopOutDetailDrawer(isSidePanel: true),
-            ],
-          ],
-        ),
+          // Contextual Pop-out Inspection Drawer (Overlay with backdrop dismiss, never overflows)
+          if (_selectedDetail != null)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedDetail = null),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  child: GestureDetector(
+                    onTap: () {}, // Catch taps on the drawer itself
+                    child: _buildPopOutDetailDrawer(maxWidth: min(cardWidth - 24, 380)),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -212,11 +228,9 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
   // ==========================================
   // FRONT OF CARD: VITALS, DIORAMA, PROGRESS, STATS
   // ==========================================
-  Widget _buildCardFront() {
+  Widget _buildCardFront(double cardWidth, double cardHeight) {
     final factionColor = _getFactionColor();
     final unit = _currentUnit;
-    const double cardWidth = 380;
-    const double cardHeight = 620;
 
     final double xpProgress = unit.isMaxLevel ? 1.0 : (unit.currentXp / max(1, unit.xpToNextLevel)).clamp(0.0, 1.0);
     final canAffordNext = _currentIchor >= unit.xpNeededForNextLevel && !unit.isMaxLevel;
@@ -257,19 +271,19 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
               ),
             ),
 
-            // 2. Top Header Seal & Name Plate
+            // 2. Top Header Seal & Name Plate (Nested directly inside top engraved plaque)
             Positioned(
-              top: 14,
-              left: 18,
-              right: 18,
-              height: 58,
+              top: cardHeight * 0.065,
+              left: cardWidth * 0.05,
+              right: cardWidth * 0.05,
+              height: cardHeight * 0.082,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Faction Coin Seal
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: cardWidth * 0.10,
+                    height: cardWidth * 0.10,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.black.withValues(alpha: 0.65),
@@ -281,7 +295,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.all(4),
                     child: Image.asset(
                       _getFactionSealAsset(),
                       fit: BoxFit.contain,
@@ -300,7 +314,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           style: TextStyle(
                             fontFamily: 'serif',
                             color: Colors.white.withValues(alpha: 0.95),
-                            fontSize: 13.5,
+                            fontSize: cardWidth * 0.038,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.2,
                             shadows: const [
@@ -315,7 +329,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           'GEN ${unit.generation} • ${unit.archetype.name.toUpperCase()} • ${unit.factionName.toUpperCase()}',
                           style: TextStyle(
                             color: factionColor,
-                            fontSize: 8.5,
+                            fontSize: cardWidth * 0.024,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.8,
                           ),
@@ -336,48 +350,44 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: Colors.white24, width: 0.8),
                         ),
-                        child: const Icon(Icons.close, color: Colors.white70, size: 15),
+                        child: Icon(Icons.close, color: Colors.white70, size: cardWidth * 0.04),
                       ),
                     )
                   else
-                    const SizedBox(width: 24),
+                    SizedBox(width: cardWidth * 0.06),
                 ],
               ),
             ),
 
             // 3. Mini-Diorama Arch Chamber (Unit Figure on Pedestal)
+            // Perfectly contained inside the stone arch chamber (y: 15.5% to 44.5%)
             Positioned(
-              top: 76,
-              left: 100,
-              right: 100,
-              height: 168,
-              child: Stack(
+              top: cardHeight * 0.155,
+              left: cardWidth * 0.22,
+              right: cardWidth * 0.22,
+              height: cardHeight * 0.29,
+              child: Align(
                 alignment: Alignment.bottomCenter,
-                children: [
-                  // Unit Cutout Figure
-                  Positioned(
-                    bottom: 8,
-                    child: SizedBox(
-                      width: 140,
-                      height: 155,
-                      child: Image.asset(
-                        unit.effectiveAvatarAsset,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomCenter,
-                        errorBuilder: (_, _, _) => const Icon(Icons.person, color: Colors.white38, size: 64),
-                      ),
-                    ),
+                child: SizedBox(
+                  width: cardWidth * 0.46,
+                  height: cardHeight * 0.28,
+                  child: Image.asset(
+                    unit.effectiveAvatarAsset,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.bottomCenter,
+                    errorBuilder: (_, _, _) => const Icon(Icons.person, color: Colors.white38, size: 64),
                   ),
-                ],
+                ),
               ),
             ),
 
             // 4. Middle Tier: Level Progression & Bloodline Infusion Bar
+            // Sits directly across the stone tier bar (y: 45.5% to 51.5%)
             Positioned(
-              top: 254,
-              left: 48,
-              right: 48,
-              height: 48,
+              top: cardHeight * 0.455,
+              left: cardWidth * 0.08,
+              right: cardWidth * 0.08,
+              height: cardHeight * 0.060,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -389,9 +399,9 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                         children: [
                           Text(
                             'LV. ${unit.level}/${unit.maxLevel}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 10.5,
+                              fontSize: cardWidth * 0.028,
                               fontWeight: FontWeight.w900,
                               fontFamily: 'monospace',
                             ),
@@ -408,7 +418,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                               unit.isVanguard ? 'VANGUARD' : 'ARCANUM',
                               style: TextStyle(
                                 color: factionColor,
-                                fontSize: 7.5,
+                                fontSize: cardWidth * 0.020,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -440,7 +450,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                                   canAffordNext ? '+1 LVL (${unit.xpNeededForNextLevel})' : '+100 XP',
                                   style: TextStyle(
                                     color: canAffordNext || canAfford100 ? Colors.white : Colors.white38,
-                                    fontSize: 8.0,
+                                    fontSize: cardWidth * 0.021,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -480,25 +490,27 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
             ),
 
             // 5. Center Socket: Hexagonal Affinity Wheel
+            // Centered directly within the circular stone socket (y: 52.5% to 70.5%)
             Positioned(
-              top: 310,
-              left: 90,
-              right: 90,
-              height: 140,
+              top: cardHeight * 0.525,
+              left: cardWidth * 0.20,
+              right: cardWidth * 0.20,
+              height: cardHeight * 0.18,
               child: Center(
                 child: HexagonalAffinityWheelWidget(
                   activeArchetype: unit.archetype,
-                  size: 132,
+                  size: cardHeight * 0.175,
                 ),
               ),
             ),
 
             // 6. Bottom Tier: Core Combat Attributes (Left) & Tactical Formation Trait (Right)
+            // Perfectly inset in the lower two framed boxes (y: 72.5% to 92.5%)
             Positioned(
-              bottom: 30,
-              left: 36,
-              right: 36,
-              height: 120,
+              top: cardHeight * 0.725,
+              left: cardWidth * 0.08,
+              right: cardWidth * 0.08,
+              height: cardHeight * 0.20,
               child: Row(
                 children: [
                   // Left Stat Table (HP, ATK, ARMOR, CRIT)
@@ -540,14 +552,14 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                         children: [
                           Row(
                             children: [
-                              Icon(unit.isVanguard ? Icons.shield : Icons.auto_awesome, color: factionColor, size: 12),
+                              Icon(unit.isVanguard ? Icons.shield : Icons.auto_awesome, color: factionColor, size: cardWidth * 0.032),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   unit.isVanguard ? 'DEFENSE AEGIS' : 'ARCANUM FOCUS',
                                   style: TextStyle(
                                     color: factionColor,
-                                    fontSize: 8.5,
+                                    fontSize: cardWidth * 0.024,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.5,
                                   ),
@@ -563,9 +575,9 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                               unit.isVanguard
                                   ? '• Frontline Vanguard absorbs assault.\n• Converts ally Stagger into barriers.\n• Draws enemy melee aggro.'
                                   : '• Sheltered from direct melee.\n• Concentrated area spells & blights.\n• High critical damage bonus.',
-                              style: const TextStyle(
-                                color: Color(0xFFC5C5D2),
-                                fontSize: 8.0,
+                              style: TextStyle(
+                                color: const Color(0xFFC5C5D2),
+                                fontSize: cardWidth * 0.022,
                                 height: 1.25,
                               ),
                               overflow: TextOverflow.fade,
@@ -581,13 +593,13 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
 
             // 7. Coin Button (Bottom Right) to Flip to Arsenal/Equipment Back
             Positioned(
-              bottom: 8,
-              right: 8,
+              bottom: cardHeight * 0.015,
+              right: cardWidth * 0.025,
               child: GestureDetector(
                 onTap: _toggleFlip,
                 child: Container(
-                  width: 32,
-                  height: 32,
+                  width: cardWidth * 0.085,
+                  height: cardWidth * 0.085,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF1E1E28),
@@ -599,7 +611,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                       ),
                     ],
                   ),
-                  child: Icon(Icons.flip_camera_android, color: factionColor, size: 16),
+                  child: Icon(Icons.flip_camera_android, color: factionColor, size: cardWidth * 0.045),
                 ),
               ),
             ),
@@ -612,11 +624,9 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
   // ==========================================
   // BACK OF CARD: SKILLS, STANCE & 6-SOCKET ARSENAL
   // ==========================================
-  Widget _buildCardBack() {
+  Widget _buildCardBack(double cardWidth, double cardHeight) {
     final factionColor = _getFactionColor();
     final unit = _currentUnit;
-    const double cardWidth = 380;
-    const double cardHeight = 620;
 
     final skills = unit.resolvedSkills;
     final primarySkill = skills.isNotEmpty ? skills.first : null;
@@ -664,23 +674,24 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
               ),
             ),
 
-            // 2. Top Banner: Unit Arsenal
+            // 2. Top Banner: Unit Arsenal (y: 6.5% to 14.5%)
             Positioned(
-              top: 18,
-              left: 20,
-              right: 20,
-              height: 48,
+              top: cardHeight * 0.065,
+              left: cardWidth * 0.05,
+              right: cardWidth * 0.05,
+              height: cardHeight * 0.080,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: cardWidth * 0.09,
+                    height: cardWidth * 0.09,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.black54,
                       border: Border.all(color: factionColor, width: 1.2),
                     ),
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(3.5),
                     child: Image.asset(
                       _getFactionSealAsset(),
                       fit: BoxFit.contain,
@@ -694,7 +705,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                       style: TextStyle(
                         fontFamily: 'serif',
                         color: Colors.white.withValues(alpha: 0.95),
-                        fontSize: 12.5,
+                        fontSize: cardWidth * 0.034,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.8,
                       ),
@@ -706,40 +717,58 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                     'SLOT: ${unit.slot.name.toUpperCase()}',
                     style: TextStyle(
                       color: factionColor,
-                      fontSize: 8.5,
+                      fontSize: cardWidth * 0.024,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  // Close Button
+                  if (widget.onClose != null)
+                    GestureDetector(
+                      onTap: widget.onClose,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white24, width: 0.8),
+                        ),
+                        child: Icon(Icons.close, color: Colors.white70, size: cardWidth * 0.04),
+                      ),
+                    ),
                 ],
               ),
             ),
 
-            // 3. Top Tier: Active Skills (Row 1 & Row 2)
+            // 3. Top Tier: Active Skills (Row 1 & Row 2) (y: 16.0% to 39.0%)
             Positioned(
-              top: 76,
-              left: 32,
-              right: 32,
-              height: 140,
+              top: cardHeight * 0.160,
+              left: cardWidth * 0.07,
+              right: cardWidth * 0.07,
+              height: cardHeight * 0.230,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   if (primarySkill != null)
-                    _buildSkillBar(primarySkill, Icons.gavel, const Color(0xFFFFB300)),
-                  const SizedBox(height: 6),
+                    Expanded(child: _buildSkillBar(primarySkill, Icons.gavel, const Color(0xFFFFB300), cardWidth: cardWidth)),
+                  if (primarySkill != null && secondarySkill != null)
+                    const SizedBox(height: 5),
                   if (secondarySkill != null)
-                    _buildSkillBar(secondarySkill, Icons.colorize, const Color(0xFFFF5252)),
-                  const SizedBox(height: 6),
+                    Expanded(child: _buildSkillBar(secondarySkill, Icons.colorize, const Color(0xFFFF5252), cardWidth: cardWidth)),
+                  if (secondarySkill != null && ultimateSkill != null)
+                    const SizedBox(height: 5),
                   if (ultimateSkill != null)
-                    _buildSkillBar(ultimateSkill, Icons.bolt, const Color(0xFFFFD54F), isUltimate: true),
+                    Expanded(child: _buildSkillBar(ultimateSkill, Icons.bolt, const Color(0xFFFFD54F), isUltimate: true, cardWidth: cardWidth)),
                 ],
               ),
             ),
 
-            // 4. Middle Tier: Formation Stance / Passive Inscription Banner
+            // 4. Middle Tier: Formation Stance / Passive Inscription Banner (y: 40.5% to 49.5%)
             Positioned(
-              top: 228,
-              left: 32,
-              right: 32,
-              height: 52,
+              top: cardHeight * 0.405,
+              left: cardWidth * 0.07,
+              right: cardWidth * 0.07,
+              height: cardHeight * 0.090,
               child: GestureDetector(
                 onTap: () {
                   setState(() {
@@ -761,7 +790,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(6),
@@ -773,13 +802,13 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(5),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: factionColor.withValues(alpha: 0.2),
                           border: Border.all(color: factionColor, width: 0.8),
                         ),
-                        child: Icon(unit.isVanguard ? Icons.shield : Icons.auto_awesome, color: factionColor, size: 14),
+                        child: Icon(unit.isVanguard ? Icons.shield : Icons.auto_awesome, color: factionColor, size: cardWidth * 0.035),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -791,7 +820,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                               unit.isVanguard ? 'FRONTLINE BULWARK' : 'ARCANUM WEAVE',
                               style: TextStyle(
                                 color: factionColor,
-                                fontSize: 9.0,
+                                fontSize: cardWidth * 0.024,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.6,
                               ),
@@ -801,14 +830,14 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                               unit.isVanguard
                                   ? 'Converts stagger into shield barriers. Solar burns attackers.'
                                   : 'Sheltered spell focus; column pierce and high critical damage.',
-                              style: const TextStyle(color: Colors.white70, fontSize: 7.5),
+                              style: TextStyle(color: Colors.white70, fontSize: cardWidth * 0.020),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.info_outline, color: Colors.white38, size: 13),
+                      Icon(Icons.info_outline, color: Colors.white38, size: cardWidth * 0.035),
                     ],
                   ),
                 ),
@@ -816,11 +845,12 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
             ),
 
             // 5. Bottom Tier: 6-Socket Equipment Matrix (Weapon, Shield, Armor, Plinth, Talisman, Crest)
+            // Perfectly inset into the 2x3 embossed squares on the back art (y: 52.0% to 92.5%)
             Positioned(
-              bottom: 24,
-              left: 28,
-              right: 28,
-              height: 280,
+              top: cardHeight * 0.520,
+              left: cardWidth * 0.065,
+              right: cardWidth * 0.065,
+              height: cardHeight * 0.405,
               child: Column(
                 children: [
                   // Row 1 (Sockets 1, 2, 3)
@@ -835,6 +865,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             accentColor: weaponRelic?.rarityColor ?? const Color(0xFFFFB300),
                             relic: weaponRelic,
                             defaultLore: 'Forged iron blade with jagged edges tailored to sever sinew.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -845,6 +876,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             icon: Icons.shield,
                             accentColor: const Color(0xFF42A5F5),
                             defaultLore: 'Reinforced heavy kite shield bearing heraldic sigils of warding.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -856,12 +888,13 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             accentColor: armorRelic?.rarityColor ?? const Color(0xFF81C784),
                             relic: armorRelic,
                             defaultLore: 'Segmented iron plate armor forged to deflect crushing impacts.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   // Row 2 (Sockets 4, 5, 6)
                   Expanded(
                     child: Row(
@@ -873,6 +906,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             icon: Icons.view_in_ar,
                             accentColor: const Color(0xFFB0BEC5),
                             defaultLore: 'Imbued cold iron pedestal conferring permanent armor and poise stability.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -884,6 +918,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             accentColor: talismanRelic?.rarityColor ?? const Color(0xFFFFD54F),
                             relic: talismanRelic,
                             defaultLore: 'Sun-warmed amber talisman channeling restorative radiant focus.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -895,6 +930,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                             accentColor: sigilRelic?.rarityColor ?? const Color(0xFFE53935),
                             relic: sigilRelic,
                             defaultLore: 'Skull-embossed cindershell warding the unit against lethal execution.',
+                            cardWidth: cardWidth,
                           ),
                         ),
                       ],
@@ -906,13 +942,13 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
 
             // 6. Flip Coin Button (Bottom Right) to Flip back to Front
             Positioned(
-              bottom: 8,
-              right: 8,
+              bottom: cardHeight * 0.015,
+              right: cardWidth * 0.025,
               child: GestureDetector(
                 onTap: _toggleFlip,
                 child: Container(
-                  width: 32,
-                  height: 32,
+                  width: cardWidth * 0.085,
+                  height: cardWidth * 0.085,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFF1E1E28),
@@ -924,7 +960,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                       ),
                     ],
                   ),
-                  child: Icon(Icons.flip_camera_android, color: factionColor, size: 16),
+                  child: Icon(Icons.flip_camera_android, color: factionColor, size: cardWidth * 0.045),
                 ),
               ),
             ),
@@ -937,7 +973,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
   // ==========================================
   // SKILL COMPACT BAR IN ARSENAL
   // ==========================================
-  Widget _buildSkillBar(SkillEntity skill, IconData defaultIcon, Color defaultColor, {bool isUltimate = false}) {
+  Widget _buildSkillBar(SkillEntity skill, IconData defaultIcon, Color defaultColor, {bool isUltimate = false, required double cardWidth}) {
     final bool isSelected = _selectedDetail?.skill?.id == skill.id;
     final color = isUltimate ? const Color(0xFFFFD54F) : defaultColor;
 
@@ -963,8 +999,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
         });
       },
       child: Container(
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.70),
           borderRadius: BorderRadius.circular(5),
@@ -984,13 +1019,13 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(3.5),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 color: color.withValues(alpha: 0.2),
                 border: Border.all(color: color, width: 0.7),
               ),
-              child: Icon(defaultIcon, color: color, size: 14),
+              child: Icon(defaultIcon, color: color, size: cardWidth * 0.034),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1002,7 +1037,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                     skill.name.toUpperCase(),
                     style: TextStyle(
                       color: isUltimate ? const Color(0xFFFFD54F) : Colors.white,
-                      fontSize: 9.0,
+                      fontSize: cardWidth * 0.024,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
                     ),
@@ -1011,7 +1046,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                   ),
                   Text(
                     skill.description,
-                    style: const TextStyle(color: Colors.white70, fontSize: 7.5),
+                    style: TextStyle(color: Colors.white70, fontSize: cardWidth * 0.019),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1029,7 +1064,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                 isUltimate ? '⚡ ULT' : (skill.cooldownTurns > 0 ? '${skill.cooldownTurns}T' : 'BASIC'),
                 style: TextStyle(
                   color: color,
-                  fontSize: 7.5,
+                  fontSize: cardWidth * 0.019,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1050,6 +1085,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
     required Color accentColor,
     required String defaultLore,
     RelicEntity? relic,
+    required double cardWidth,
   }) {
     final bool isSelected = _selectedDetail?.title == title;
 
@@ -1082,7 +1118,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
         });
       },
       child: Container(
-        padding: const EdgeInsets.all(5),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.65),
           borderRadius: BorderRadius.circular(6),
@@ -1104,21 +1140,21 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: cardWidth * 0.08,
+              height: cardWidth * 0.08,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 color: accentColor.withValues(alpha: 0.15),
                 border: Border.all(color: accentColor, width: 0.8),
               ),
-              child: Icon(icon, color: accentColor, size: 18),
+              child: Icon(icon, color: accentColor, size: cardWidth * 0.045),
             ),
             const SizedBox(height: 3),
             Text(
               title.toUpperCase(),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 7.5,
+                fontSize: cardWidth * 0.020,
                 fontWeight: FontWeight.bold,
               ),
               maxLines: 1,
@@ -1129,7 +1165,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
               subtitle,
               style: TextStyle(
                 color: accentColor,
-                fontSize: 6.5,
+                fontSize: cardWidth * 0.018,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.4,
               ),
@@ -1141,14 +1177,14 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
   }
 
   // ==========================================
-  // POP-OUT DETAIL DRAWER (RIGHT PANEL)
+  // POP-OUT DETAIL DRAWER (OVERLAY / RIGHT PANEL)
   // ==========================================
-  Widget _buildPopOutDetailDrawer({required bool isSidePanel}) {
+  Widget _buildPopOutDetailDrawer({required double maxWidth}) {
     final detail = _selectedDetail;
     if (detail == null) return const SizedBox.shrink();
 
     return Container(
-      width: isSidePanel ? 320 : double.infinity,
+      width: maxWidth,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF14141E).withValues(alpha: 0.98),
@@ -1156,10 +1192,10 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
         border: Border.all(color: detail.themeColor.withValues(alpha: 0.8), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: detail.themeColor.withValues(alpha: 0.25),
-            blurRadius: 16,
+            color: detail.themeColor.withValues(alpha: 0.35),
+            blurRadius: 18,
           ),
-          const BoxShadow(color: Colors.black87, blurRadius: 10),
+          const BoxShadow(color: Colors.black87, blurRadius: 12),
         ],
       ),
       child: Column(
@@ -1185,7 +1221,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                   children: [
                     Text(
                       detail.title.toUpperCase(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontFamily: 'serif',
                         color: Colors.white,
                         fontSize: 12.5,
@@ -1221,7 +1257,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
             detail.description,
             style: const TextStyle(
               color: Color(0xFFD0D0DE),
-              fontSize: 10,
+              fontSize: 10.5,
               height: 1.35,
             ),
           ),

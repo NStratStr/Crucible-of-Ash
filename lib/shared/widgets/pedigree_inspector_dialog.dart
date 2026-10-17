@@ -218,6 +218,33 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
     final equippedRelics = relicService?.getRelicsForUnit(unit.id) ?? const <RelicEntity>[];
     final relicBonuses = relicService?.calculateBonuses(unit.id) ?? const UnitRelicBonuses();
 
+    if (_showCharacterSheet) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 24, top: 12),
+          child: GothicCharacterSheetCard(
+            unit: unit,
+            relicService: relicService,
+            totalIchor: _currentIchor,
+            onLevelUp: (updated, cost) {
+              setState(() {
+                _currentUnit = updated;
+                _currentIchor -= cost;
+              });
+              widget.onLevelUp?.call(updated, cost);
+            },
+            onClose: () => Navigator.pop(context),
+            onToggleClassicCodex: () {
+              setState(() {
+                _showCharacterSheet = false;
+              });
+            },
+          ),
+        ),
+      );
+    }
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.90,
@@ -433,27 +460,10 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
 
           const Divider(color: Color(0xFF2B2B36), height: 1),
 
-          // Scrollable Content
+          // Scrollable Content (Classic Codex Fallback)
           Expanded(
-            child: _showCharacterSheet
-                ? SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    child: GothicCharacterSheetCard(
-                      unit: unit,
-                      relicService: relicService,
-                      totalIchor: _currentIchor,
-                      onLevelUp: (updated, cost) {
-                        setState(() {
-                          _currentUnit = updated;
-                          _currentIchor -= cost;
-                        });
-                        widget.onLevelUp?.call(updated, cost);
-                      },
-                      onClose: () => Navigator.pop(context),
-                    ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.all(16),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
                     children: [
                       // Section 0: Grand Portrait Card
                       Center(
