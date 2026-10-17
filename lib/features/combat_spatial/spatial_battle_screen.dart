@@ -70,6 +70,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<_FloatingCombatText> _floatingPops = [];
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
+  final List<_GroundShockwaveRipple> _groundRipples = [];
+  Offset _screenShakeOffset = Offset.zero;
+  double _shakeIntensity = 0.0;
 
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
@@ -169,6 +172,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return Offset(screenX, screenY);
   }
 
+  void _triggerScreenShake({double intensity = 6.0}) {
+    _shakeIntensity = intensity;
+    const int stepCount = 6;
+    const int stepMs = 35;
+
+    for (int i = 0; i <= stepCount; i++) {
+      final t = Timer(Duration(milliseconds: i * stepMs), () {
+        if (!mounted) return;
+        setState(() {
+          if (i == stepCount) {
+            _screenShakeOffset = Offset.zero;
+            _shakeIntensity = 0.0;
+          } else {
+            final double decay = 1.0 - (i / stepCount);
+            final double sign = (i % 2 == 0) ? 1.0 : -1.0;
+            final double offsetX = sign * _shakeIntensity * decay * (i % 3 == 0 ? 0.7 : 1.0);
+            final double offsetY = -sign * _shakeIntensity * decay * 0.65;
+            _screenShakeOffset = Offset(offsetX, offsetY);
+          }
+        });
+      });
+      _animTimers.add(t);
+    }
+  }
+
   void _triggerVisualCombatSequence(SpatialActionEvent event) {
     // Locate caster and target units to calculate real isometric trajectory points
     final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
@@ -229,6 +257,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (isUltimate && caster != null && caster.isPlayer) {
       _activeUltimateUnit = caster;
       _playSfx('sfx_spell.wav');
+    }
+
+    // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, and crits
+    final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
+    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm');
+
+    if (isHeavyImpact) {
+      final double shakePower = isUltimate ? 8.5 : (isBossStrike ? 7.0 : (event.isCrit ? 5.5 : 4.0));
+      _triggerScreenShake(intensity: shakePower);
+      _groundRipples.add(_GroundShockwaveRipple(
+        id: 'ripple_${event.id}_$nowMs',
+        origin: targetOffset,
+        color: isBossStrike
+            ? const Color(0xFFFF1744)
+            : (event.isCrit ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)),
+        maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : 100.0),
+        createdMs: nowMs,
+        durationMs: 650,
+      ));
     }
 
     setState(() {
@@ -608,9 +655,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               horizontal: isDesktop ? 28.0 : 12.0,
                               vertical: isDesktop ? 16.0 : 8.0,
                             ),
-                            child: _buildUnifiedIsometricBattlefield(
-                              tileWidth: tileWidth,
-                              tileHeight: tileHeight,
+                            child: Transform.translate(
+                              offset: _screenShakeOffset,
+                              child: _buildUnifiedIsometricBattlefield(
+                                tileWidth: tileWidth,
+                                tileHeight: tileHeight,
+                              ),
                             ),
                           ),
                         ),
@@ -1778,6 +1828,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   painter: _AttackTrajectoryOverlayPainter(
                     trajectories: trajectories,
                     dashPhase: _dashPhase,
+                  ),
+                ),
+              ),
+            ),
+
+          // Ground Shockwave Ripple Painter Layer (Expanding concentric isometric shockwaves)
+          if (_groundRipples.isNotEmpty)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _GroundShockwaveRipplePainter(
+                    ripples: _groundRipples,
+                    currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
                   ),
                 ),
               ),
@@ -3313,30 +3376,57 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: 6,
-              child: SizedBox(
-                width: modelWidth,
-                height: modelHeight,
-                child: ColorFiltered(
-                  colorFilter: unit.isDowned
-                      ? const ColorFilter.matrix(<double>[
-                          0.15, 0.15, 0.15, 0, 15,
-                          0.15, 0.15, 0.15, 0, 15,
-                          0.18, 0.18, 0.18, 0, 20,
-                          0, 0, 0, 0.75, 0,
-                        ]) // GDD §3.6 / §4.3: Fully desaturated grey stone plinth
-                      : (isDamaged
-                          ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
-                          : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
-                  child: Image.asset(
-                    unit.assetPath,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.bottomCenter,
-                    filterQuality: FilterQuality.medium,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      unit.isPlayer ? Icons.shield : Icons.dangerous,
-                      color: factionColor,
-                      size: isBoss ? 48 : 36,
+              bottom: unit.isDowned ? 2 : 6,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 500),
+                opacity: unit.isDowned ? 0.68 : 1.0,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 500),
+                  scale: unit.isDowned ? 0.94 : 1.0,
+                  curve: Curves.easeOutCubic,
+                  child: SizedBox(
+                    width: modelWidth,
+                    height: modelHeight,
+                    child: Stack(
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        // Main Character Sprite (with Stone Petrification / Hit-Flash color filter)
+                        ColorFiltered(
+                          colorFilter: unit.isDowned
+                              ? const ColorFilter.matrix(<double>[
+                                  0.2126, 0.7152, 0.0722, 0, 10,
+                                  0.2126, 0.7152, 0.0722, 0, 10,
+                                  0.2126, 0.7152, 0.0722, 0, 14,
+                                  0,      0,      0,      0.82, 0,
+                                ]) // GDD §3.6 / §4.3: True petrified grey stone plinth
+                              : (isDamaged
+                                  ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
+                                  : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
+                          child: Image.asset(
+                            unit.assetPath,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.bottomCenter,
+                            filterQuality: FilterQuality.medium,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              unit.isPlayer ? Icons.shield : Icons.dangerous,
+                              color: factionColor,
+                              size: isBoss ? 48 : 36,
+                            ),
+                          ),
+                        ),
+
+                        // Ash Dissolve Floating Embers for Downed / Inert Vessels
+                        if (unit.isDowned)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: CustomPaint(
+                                painter: _AshEmbersDissolvePainter(
+                                  timestampMs: DateTime.now().millisecondsSinceEpoch,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -5357,5 +5447,148 @@ class _FloatingCombatText {
   }
 
   bool get isExpired => progress >= 1.0;
+}
+
+/// Dynamic ground ripple shockwave originating from high-impact strikes
+class _GroundShockwaveRipple {
+  final String id;
+  final Offset origin;
+  final Color color;
+  final double maxRadius;
+  final int createdMs;
+  final int durationMs;
+
+  const _GroundShockwaveRipple({
+    required this.id,
+    required this.origin,
+    required this.color,
+    this.maxRadius = 120.0,
+    required this.createdMs,
+    this.durationMs = 600,
+  });
+
+  double get progress {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = now - createdMs;
+    return (elapsed / durationMs).clamp(0.0, 1.0);
+  }
+
+  bool get isExpired => progress >= 1.0;
+}
+
+/// Painter for 2.5D concentric ground shockwave ripples on the isometric grid
+class _GroundShockwaveRipplePainter extends CustomPainter {
+  final List<_GroundShockwaveRipple> ripples;
+  final int currentTimestampMs;
+
+  const _GroundShockwaveRipplePainter({
+    required this.ripples,
+    required this.currentTimestampMs,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final ripple in ripples) {
+      final elapsed = currentTimestampMs - ripple.createdMs;
+      if (elapsed < 0 || elapsed > ripple.durationMs) continue;
+
+      final double p = (elapsed / ripple.durationMs).clamp(0.0, 1.0);
+      final double radiusX = ripple.maxRadius * p;
+      final double radiusY = radiusX * 0.50; // 2:1 isometric ground perspective flattening
+      final int alpha = ((1.0 - p) * 230).round().clamp(0, 255);
+
+      // Primary expanding ground shock ellipse
+      final ellipseRect = Rect.fromCenter(
+        center: ripple.origin,
+        width: radiusX * 2,
+        height: radiusY * 2,
+      );
+
+      final shockPaint = Paint()
+        ..color = ripple.color.withAlpha(alpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (3.5 * (1.0 - p)).clamp(1.0, 4.0);
+      canvas.drawOval(ellipseRect, shockPaint);
+
+      // Inner high-energy accent ring
+      if (p > 0.15) {
+        final double innerP = (p - 0.15) / 0.85;
+        final double innerRadiusX = ripple.maxRadius * innerP * 0.70;
+        final double innerRadiusY = innerRadiusX * 0.50;
+        final int innerAlpha = ((1.0 - innerP) * 180).round().clamp(0, 255);
+
+        final innerRect = Rect.fromCenter(
+          center: ripple.origin,
+          width: innerRadiusX * 2,
+          height: innerRadiusY * 2,
+        );
+        final innerPaint = Paint()
+          ..color = Colors.white.withAlpha(innerAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5;
+        canvas.drawOval(innerRect, innerPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GroundShockwaveRipplePainter oldDelegate) {
+    return true;
+  }
+}
+
+/// Custom painter rendering drifting, smoldering ash embers over downed units
+class _AshEmbersDissolvePainter extends CustomPainter {
+  final int timestampMs;
+
+  const _AshEmbersDissolvePainter({
+    required this.timestampMs,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+
+    // Fixed pseudo-random ember particle seeds
+    const int particleCount = 10;
+    for (int i = 0; i < particleCount; i++) {
+      // Individual cyclic phase offset (cycle = 1800ms)
+      final double seed = (i * 137.5) % 1.0;
+      final double cyclePhase = ((timestampMs + (i * 220)) % 1800) / 1800.0;
+
+      // Particle rises upward from base to top
+      final double x = (w * 0.15) + (w * 0.70 * ((seed + cyclePhase * 0.2) % 1.0)) + (sin(cyclePhase * 3.14159 * 2 + i) * 6.0);
+      final double y = h * (1.0 - cyclePhase * 0.95);
+
+      // Fade in at bottom, fade out near top
+      final double opacity = cyclePhase < 0.2
+          ? (cyclePhase / 0.2)
+          : (cyclePhase > 0.7 ? (1.0 - (cyclePhase - 0.7) / 0.3) : 1.0);
+      final int alpha = (opacity * 210).round().clamp(0, 255);
+
+      final double radius = 1.0 + (i % 3) * 0.7;
+
+      // Smoldering embers gradient (radiant ash gold & crimson)
+      final Color emberColor = (i % 2 == 0) ? const Color(0xFFFF9100) : const Color(0xFFFF5252);
+      final paint = Paint()
+        ..color = emberColor.withAlpha(alpha)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(x, y), radius, paint);
+
+      // Core ember spark glow
+      if (radius > 1.5) {
+        final corePaint = Paint()
+          ..color = const Color(0xFFFFE082).withAlpha((alpha * 0.85).round())
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(x, y), radius * 0.5, corePaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AshEmbersDissolvePainter oldDelegate) {
+    return true;
+  }
 }
 
