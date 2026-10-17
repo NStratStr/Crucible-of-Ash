@@ -2258,12 +2258,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (unit.id == 'sanguine_blade') {
       return 'Flensing Thrust (Crit & Bleed)';
     }
-    if (unit.id == 'sun_smith') {
-      return simulatedRow == 2 ? 'Aetheric Piercing Beam (+1 Focus)' : 'Sun-Bolt Volley';
+    if (unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest')) {
+      return simulatedRow == 2 ? 'Armor-Piercing Bolt (Crit)' : 'Heavy Crossbow Volley';
+    }
+    if (unit.templateId == 'grave_duelist' || unit.name.toLowerCase().contains('duelist')) {
+      return 'Dueling Thrust (Bleed & Crit)';
+    }
+    if (unit.archetype == UnitArchetype.reachMidline) {
+      return 'Skirmish Thrust (Reach Impact)';
+    }
+    if (unit.id == 'sun_smith' || unit.archetype == UnitArchetype.backlineCaster) {
+      return simulatedRow == 2 ? 'Aetheric Piercing Beam (+1 Focus)' : 'Arcane Bolt Volley';
     }
     if (unit.archetype == UnitArchetype.vanguardMelee) {
       if (simulatedRow == 0) {
-        return unit.id == 'lady_valeria' ? 'Sunbrand Slash (100% Impact)' : 'Shield Bash (100% + Stun)';
+        return unit.id == 'lady_valeria'
+            ? 'Sunbrand Slash (100% Impact)'
+            : (unit.id == 'iron_footman' ? 'Shield Bash (100% + Stun)' : 'Vanguard Cleave (100% Impact)');
       } else if (simulatedRow == 1) {
         return 'Shockwave Tremor (60% Dmg + Poise)';
       } else {

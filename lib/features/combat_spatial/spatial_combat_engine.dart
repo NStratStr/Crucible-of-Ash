@@ -976,48 +976,6 @@ class SpatialCombatEngine extends ChangeNotifier {
       );
       lastBannerMessage = '⚠️ PYRE ZEALOT WINDS UP: PYRE SKEWER (2.0s)!';
       addLog('${unit.name} begins 2s windup for Pyre Skewer targeting Col ${zCol + 1}!');
-    } else if (unit.id == 'sanguine_blade') {
-      // Sanguine Blade: Dynamically resolves target from her current column (cascading to adjacent columns if empty)
-      final sbCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 3;
-      final target = _resolveColumnTarget(unitCol: sbCol, targetingPlayers: false) ??
-          _resolveColumnTarget(unitCol: 2, targetingPlayers: false);
-      if (target != null) {
-        // Flanking Momentum check: Triggered if moved this turn cycle OR target has active Bleed
-        final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0;
-        final int baseDmg = isFlankingBonus ? (unit.effectiveAttack * 1.4).round() : unit.effectiveAttack;
-        final dmg = target.takeDamage(baseDmg, isPhysical: true);
-        final int appliedBleed = isFlankingBonus ? 4 : 2;
-        target.bleedStacks += appliedBleed;
-
-        // Ultimate charge: +15% per basic action
-        unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-
-        if (isFlankingBonus) {
-          // Refund 3,000 AP (initiating next attack cadence 30% faster)
-          unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 3000);
-          unit.hasStanceBonusReady = false;
-          unit.movedSinceLastTurn = false;
-          addLog('${unit.name} [FLANKING MOMENTUM] crits ${target.name} for $dmg DMG & 4 BLEED stacks! Refunds +3,000 AP!');
-          lastBannerMessage = '⚡ FLANKING MOMENTUM: ${unit.name} dealt $dmg CRIT & refunded 3,000 AP!';
-        } else {
-          addLog('${unit.name} executes Flensing Thrust on ${target.name} for $dmg DMG & 2 BLEED stacks.');
-        }
-
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: isFlankingBonus ? 'Flanking Evisceration' : 'Flensing Thrust',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          bleedStacks: appliedBleed,
-          isCrit: isFlankingBonus,
-          isPlayerAttacker: true,
-          pattern: TargetPattern.reachMidToFront,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
     } else if (unit.id == 'cinder_witch') {
       // Cinder Witch: Winds up 60-tick (2.0s) telegraphed Cinder Orb down her column
       final wCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 1;
@@ -1039,6 +997,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       );
       lastBannerMessage = '⚠️ CINDER WITCH WINDS UP: CINDER ORB (2.0s)!';
       addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col ${wCol + 1}!');
+    } else if (unit.archetype == UnitArchetype.reachMidline) {
+      _executeReachMidlineAction(unit);
     } else if (unit.archetype == UnitArchetype.vanguardMelee) {
       _executeVanguardAction(unit);
     } else if (unit.archetype == UnitArchetype.backlineCaster) {
@@ -1065,6 +1025,69 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       }
+    }
+  }
+
+  /// Adaptive Posture System: Resolves action for Reach / Midline Strikers (Skirmishers, Assassins, Marksmen)
+  void _executeReachMidlineAction(CombatUnitState unit) {
+    if (unit.occupiedNodes.isEmpty) return;
+    final sbCol = unit.occupiedNodes.first.column;
+    final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+    final target = _resolveColumnTarget(unitCol: sbCol, targetingPlayers: !unit.isPlayer) ??
+        opposingSquad.where((u) => u.isAlive).firstOrNull;
+
+    if (target != null) {
+      // Flanking Momentum / Marksman Precision check:
+      // Triggered if unit moved this turn cycle, target has active Bleed, or Marksman shooting from Backline
+      final bool isBacklineMarksman = unit.currentDepth == RowDepth.back;
+      final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0 || isBacklineMarksman;
+      final int baseDmg = isFlankingBonus ? (unit.effectiveAttack * 1.4).round() : unit.effectiveAttack;
+      final dmg = target.takeDamage(baseDmg, isPhysical: true);
+
+      // Skirmishers / Assassins inflict bleed (4 on Flanking crit, 2 on basic hit); Marksmen inflict 1
+      final bool isMarksman = unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest');
+      final int appliedBleed = isMarksman ? (isFlankingBonus ? 2 : 1) : (isFlankingBonus ? 4 : 2);
+      target.bleedStacks += appliedBleed;
+
+      // Ultimate charge: +15% per basic action
+      unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+
+      String skillName;
+      if (unit.id == 'sanguine_blade') {
+        skillName = isFlankingBonus ? 'Flanking Evisceration' : 'Flensing Thrust';
+      } else if (unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest')) {
+        skillName = isBacklineMarksman ? 'Armor-Piercing Bolt' : 'Heavy Crossbow Volley';
+      } else if (unit.templateId == 'grave_duelist' || unit.name.toLowerCase().contains('duelist')) {
+        skillName = isFlankingBonus ? 'Riposte Evisceration' : 'Dueling Thrust';
+      } else {
+        skillName = isFlankingBonus ? 'Flanking Strike' : 'Skirmish Thrust';
+      }
+
+      if (isFlankingBonus) {
+        // Refund 3,000 AP (initiating next attack cadence 30% faster)
+        unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 3000);
+        unit.hasStanceBonusReady = false;
+        unit.movedSinceLastTurn = false;
+        addLog('${unit.name} [FLANKING MOMENTUM] crits ${target.name} for $dmg DMG with $skillName! Refunds +3,000 AP!');
+        lastBannerMessage = '⚡ FLANKING MOMENTUM: ${unit.name} dealt $dmg CRIT & refunded 3,000 AP!';
+      } else {
+        addLog('${unit.name} executes $skillName on ${target.name} for $dmg DMG & $appliedBleed BLEED stacks.');
+      }
+
+      dispatchAction(SpatialActionEvent(
+        id: 'act_${currentTick}_${unit.id}',
+        attackerId: unit.id,
+        attackerName: unit.name,
+        skillName: skillName,
+        targetId: target.id,
+        targetName: target.name,
+        damage: dmg,
+        bleedStacks: appliedBleed,
+        isCrit: isFlankingBonus,
+        isPlayerAttacker: unit.isPlayer,
+        pattern: isBacklineMarksman ? TargetPattern.piercingColumnSkewer : TargetPattern.reachMidToFront,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
     }
   }
 
@@ -1096,7 +1119,9 @@ class SpatialCombatEngine extends ChangeNotifier {
           final dmg = target.takeDamage(baseDmg, isPhysical: true);
           final skillName = hasHoldTheLineBonus
               ? (unit.id == 'lady_valeria' ? 'Solar Sunder Cleave' : 'Earth-Shattering Bash')
-              : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : 'Shield Bash');
+              : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : (unit.id == 'iron_footman' ? 'Shield Bash' : 'Vanguard Sunder'));
+
+          final Map<String, int> lateralHits = {};
 
           if (hasHoldTheLineBonus) {
             // Earth-Shattering Bash cleaves laterally and resets 1,500 AP on targets hit
@@ -1107,6 +1132,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1))) {
               final cleaveDmg = neighbor.takeDamage((baseDmg * 0.60).round(), isPhysical: true);
               neighbor.currentAp = max(0, neighbor.currentAp - 1500);
+              lateralHits[neighbor.id] = cleaveDmg;
               addLog('  Lateral Cleave: ${neighbor.name} struck for $cleaveDmg DMG (-1,500 AP reset)!');
             }
 
@@ -1134,6 +1160,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             isCrit: hasHoldTheLineBonus,
             isPlayerAttacker: unit.isPlayer,
             pattern: hasHoldTheLineBonus ? TargetPattern.horizontalRowScythe : TargetPattern.singleTarget,
+            secondaryTargetHits: lateralHits,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
         }
@@ -1265,11 +1292,21 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (isAethericBonus) {
         // Piercing strike hitting entire column
         int hitCount = 0;
+        int primaryDmg = 0;
+        CombatUnitState? primaryTarget;
+        final Map<String, int> pierceHits = {};
+
         for (int r = 0; r <= 2; r++) {
           final occupant = opposingSquad.where((u) => u.isAlive && u.occupies(targetCol, r)).firstOrNull;
           if (occupant != null) {
             final dmg = occupant.takeDamage(unit.effectiveAttack, isPhysical: false);
             hitCount++;
+            if (primaryTarget == null) {
+              primaryTarget = occupant;
+              primaryDmg = dmg;
+            } else {
+              pierceHits[occupant.id] = dmg;
+            }
             addLog('${unit.name} [AETHERIC ALIGNMENT] beam pierces ${occupant.name} for $dmg DMG (Hit #$hitCount)!');
           }
         }
@@ -1283,18 +1320,21 @@ class SpatialCombatEngine extends ChangeNotifier {
         unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
         lastBannerMessage = '✨ AETHERIC ALIGNMENT: ${unit.name} column beam pierced enemies & granted +1 Focus!';
 
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Aetheric Piercing Beam',
-          targetId: opposingSquad.first.id,
-          targetName: opposingSquad.first.name,
-          damage: unit.attack,
-          isPlayerAttacker: unit.isPlayer,
-          pattern: TargetPattern.piercingColumnSkewer,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
+        if (primaryTarget != null) {
+          dispatchAction(SpatialActionEvent(
+            id: 'act_${currentTick}_${unit.id}',
+            attackerId: unit.id,
+            attackerName: unit.name,
+            skillName: 'Aetheric Piercing Beam',
+            targetId: primaryTarget.id,
+            targetName: primaryTarget.name,
+            damage: primaryDmg,
+            secondaryTargetHits: pierceHits,
+            isPlayerAttacker: unit.isPlayer,
+            pattern: TargetPattern.piercingColumnSkewer,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
       } else {
         final target = opposingSquad.where((u) => u.isAlive).firstOrNull;
         if (target != null) {
@@ -2080,6 +2120,82 @@ class SpatialCombatEngine extends ChangeNotifier {
             pattern: TargetPattern.stAshlarCross,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
+        }
+        break;
+
+      default:
+        // Universal Archetype Fallback Ultimate Burst for campaign party units:
+        if (unit.archetype == UnitArchetype.vanguardMelee) {
+          // Vanguard Colossus Cleave: 220 DMG + 30 Armor to Frontline allies
+          final target = targetUnit ?? enemyUnits.where((u) => u.isAlive).firstOrNull;
+          if (target != null) {
+            final dmg = target.takeDamage((unit.effectiveAttack * 2.2).round(), isPhysical: true);
+            for (final ally in playerUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0))) {
+              ally.armor = min(ally.maxArmor + 35, ally.armor + 25);
+            }
+            addLog('${unit.name} unleashes Sovereign Cleave for $dmg DMG!');
+            lastBannerMessage = '⚔️ SOVEREIGN CLEAVE: ${unit.name} dealt $dmg DMG & reinforced Frontline!';
+            dispatchAction(SpatialActionEvent(
+              id: 'ult_${currentTick}_${unit.id}',
+              attackerId: unit.id,
+              attackerName: unit.name,
+              skillName: 'Sovereign Cleave',
+              targetId: target.id,
+              targetName: target.name,
+              damage: dmg,
+              isCrit: true,
+              isPlayerAttacker: true,
+              pattern: TargetPattern.horizontalRowScythe,
+              timestampMs: DateTime.now().millisecondsSinceEpoch,
+            ));
+          }
+        } else if (unit.archetype == UnitArchetype.reachMidline) {
+          // Skirmisher / Marksman Deadeye Execution: 260 DMG + 3 Bleed
+          final target = targetUnit ?? enemyUnits.where((u) => u.isAlive).firstOrNull;
+          if (target != null) {
+            final dmg = target.takeDamage((unit.effectiveAttack * 2.4).round(), isPhysical: true);
+            target.bleedStacks += 3;
+            addLog('${unit.name} unleashes Deadeye Execution for $dmg DMG & 3 Bleed stacks!');
+            lastBannerMessage = '🎯 DEADEYE EXECUTION: ${unit.name} dealt $dmg CRIT & applied 3 Bleed!';
+            dispatchAction(SpatialActionEvent(
+              id: 'ult_${currentTick}_${unit.id}',
+              attackerId: unit.id,
+              attackerName: unit.name,
+              skillName: 'Deadeye Execution',
+              targetId: target.id,
+              targetName: target.name,
+              damage: dmg,
+              bleedStacks: 3,
+              isCrit: true,
+              isPlayerAttacker: true,
+              pattern: TargetPattern.singleTarget,
+              timestampMs: DateTime.now().millisecondsSinceEpoch,
+            ));
+          }
+        } else {
+          // Caster Celestial Burst: 200 Magic DMG across enemies + heals allies
+          final target = targetUnit ?? enemyUnits.where((u) => u.isAlive).firstOrNull;
+          if (target != null) {
+            final dmg = target.takeDamage((unit.effectiveAttack * 2.0).round(), isPhysical: false);
+            for (final ally in playerUnits.where((u) => u.isAlive)) {
+              ally.hp = min(ally.maxHp, ally.hp + 60);
+            }
+            addLog('${unit.name} unleashes Celestial Surge for $dmg DMG & heals squad for 60 HP!');
+            lastBannerMessage = '✨ CELESTIAL SURGE: ${unit.name} dealt $dmg DMG & restored squad HP!';
+            dispatchAction(SpatialActionEvent(
+              id: 'ult_${currentTick}_${unit.id}',
+              attackerId: unit.id,
+              attackerName: unit.name,
+              skillName: 'Celestial Surge',
+              targetId: target.id,
+              targetName: target.name,
+              damage: dmg,
+              isCrit: true,
+              isPlayerAttacker: true,
+              pattern: TargetPattern.stAshlarCross,
+              timestampMs: DateTime.now().millisecondsSinceEpoch,
+            ));
+          }
         }
         break;
     }
