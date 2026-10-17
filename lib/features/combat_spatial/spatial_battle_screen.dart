@@ -107,6 +107,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _isMuted = !settings.bgmEnabled;
       _bgmPlayer = AudioPlayer();
       _sfxPlayer = AudioPlayer();
+      
+      // Stop loop event spam on Windows native backend
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       final bgmVol = _isMuted ? 0.0 : (settings.bgmVolume * 0.45);
       await _bgmPlayer!.setVolume(bgmVol);
@@ -122,9 +124,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final settings = SettingsService();
     if (_isMuted || !settings.sfxEnabled || _sfxPlayer == null) return;
     try {
-      _sfxPlayer!.stop();
-      _sfxPlayer!.setVolume(settings.sfxVolume * 0.70);
-      _sfxPlayer!.play(AssetSource('audio/$sfxName'));
+      final vol = settings.sfxVolume * 0.70;
+      // Do not invoke _sfxPlayer.stop() immediately prior to play() to avoid
+      // triggering asynchronous native Windows Media Player event channel callbacks
+      // on background worker threads.
+      _sfxPlayer!.setVolume(vol).then((_) {
+        if (mounted && _sfxPlayer != null) {
+          _sfxPlayer!.play(AssetSource('audio/$sfxName'));
+        }
+      }).catchError((e) {
+        debugPrint('Error playing SFX $sfxName: $e');
+      });
     } catch (e) {
       debugPrint('Error playing SFX $sfxName: $e');
     }
@@ -476,10 +486,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
     _animTimers.clear();
     _engine.removeListener(_onEngineUpdate);
-    _bgmPlayer?.stop();
-    _bgmPlayer?.dispose();
-    _sfxPlayer?.stop();
-    _sfxPlayer?.dispose();
+    final bgm = _bgmPlayer;
+    final sfx = _sfxPlayer;
+    _bgmPlayer = null;
+    _sfxPlayer = null;
+    try {
+      bgm?.stop().then((_) => bgm.dispose()).catchError((_) {});
+      sfx?.stop().then((_) => sfx.dispose()).catchError((_) {});
+    } catch (_) {}
     super.dispose();
   }
 
