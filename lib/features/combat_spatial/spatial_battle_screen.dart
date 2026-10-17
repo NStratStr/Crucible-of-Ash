@@ -65,6 +65,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _lastHandledEventId;
   String? _attackingUnitId;
   String? _damagedUnitId;
+  final Set<String> _damagedUnitIds = {};
   String? _activeSkillName;
   String? _activeSkillCasterName;
   bool _isPlayerSkillBanner = false;
@@ -296,6 +297,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       createdMs: nowMs,
     );
 
+    // Spawn secondary target impact flashes/shockwaves for AOE / Cleave hits
+    final List<_CombatVfx> secondaryVfxList = [];
+    if (event.secondaryTargetHits.isNotEmpty) {
+      event.secondaryTargetHits.forEach((secId, secDmg) {
+        final secUnit = allUnits.where((u) => u.id == secId).firstOrNull;
+        if (secUnit != null) {
+          final secOffset = _getUnitCenterIsometricOffset(secUnit);
+          secondaryVfxList.add(_CombatVfx(
+            id: 'vfx_${event.id}_sec_${secId}_$nowMs',
+            startOffset: targetOffset,
+            targetOffset: secOffset,
+            primaryColor: primaryColor.withValues(alpha: 0.9),
+            secondaryColor: secondaryColor.withValues(alpha: 0.8),
+            type: vfxType == 'beam' ? 'shockwave' : vfxType,
+            durationMs: (durationMs * 0.85).round(),
+            createdMs: nowMs,
+          ));
+        }
+      });
+    }
+
     // Check if event is a player Ultimate Burst
     final bool isUltimate = event.id.startsWith('ult_');
     if (isUltimate && caster != null && caster.isPlayer) {
@@ -306,7 +328,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
     final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
     final bool isBloodnova = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
-    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm');
+    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
 
     if (isHeavyImpact) {
       final double shakePower = isUltimate ? 8.5 : (isBossStrike ? 7.0 : (isBloodnova ? 6.5 : (event.isCrit ? 5.5 : 4.0)));
@@ -325,8 +347,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     setState(() {
       _activeVfx.add(newVfx);
+      _activeVfx.addAll(secondaryVfxList);
       _attackingUnitId = event.attackerId;
       _damagedUnitId = event.targetId;
+      _damagedUnitIds.clear();
+      _damagedUnitIds.add(event.targetId);
+      if (event.secondaryTargetHits.isNotEmpty) {
+        _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
+      }
       _activeSkillName = event.skillName;
       _activeSkillCasterName = event.attackerName;
       _isPlayerSkillBanner = event.isPlayerAttacker;
@@ -398,19 +426,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       // Push floating popups for all secondary targets hit by multi-target / AOE spells
       if (event.secondaryTargetHits.isNotEmpty) {
         event.secondaryTargetHits.forEach((secId, secDmg) {
-          final secText = '-$secDmg';
+          final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
+          final secText = isSecBlood ? '🩸 -$secDmg SPLASH' : '-$secDmg CLEAVE';
           _unitFloatingPops[secId] = secText;
           _floatingPops.removeWhere((p) => p.unitId == secId);
           _floatingPops.add(_FloatingCombatText(
             id: 'pop_${event.id}_${secId}_$nowMs',
             unitId: secId,
             text: secText,
-            color: const Color(0xFFFF8A80),
-            borderColor: const Color(0xFFD50000),
-            fontSize: 11.0,
+            color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
+            borderColor: isSecBlood ? const Color(0xFF880E4F) : const Color(0xFFD50000),
+            fontSize: 11.5,
             isCrit: false,
             createdMs: nowMs,
-            durationMs: 900,
+            durationMs: 950,
           ));
         });
       }
@@ -420,7 +449,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
       if (mounted) {
         setState(() {
-          _activeVfx.removeWhere((v) => v.id == newVfx.id);
+          _activeVfx.removeWhere((v) => v.id == newVfx.id || secondaryVfxList.any((s) => s.id == v.id));
           _floatingPops.removeWhere((p) => p.isExpired);
         });
       }
@@ -433,7 +462,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         setState(() {
           _attackingUnitId = null;
           _damagedUnitId = null;
+          _damagedUnitIds.clear();
           _unitFloatingPops.remove(event.targetId);
+          if (event.secondaryTargetHits.isNotEmpty) {
+            for (final sId in event.secondaryTargetHits.keys) {
+              _unitFloatingPops.remove(sId);
+            }
+          }
         });
       }
     });
@@ -1806,14 +1841,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             final int secGRow = 2 - secNode.row;
             final double secX = originX + (secNode.column - secGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
             final double secY = originY + (secNode.column + secGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+            
+            // Secondary cleave/pierce typically strikes for 50%-75% of primary hit
+            final int secEstDmg = (estDmg * 0.60).round();
             trajectories.add(_TrajectoryData(
               sourceOffset: sourceOffset,
               targetOffset: Offset(secX, secY),
-              skillName: 'SPLASH / PIERCE',
+              skillName: 'CLEAVE [~$secEstDmg DMG]',
               targetName: sec.name,
-              color: trajColor,
+              color: trajColor.withValues(alpha: 0.85),
               isSecondary: true,
-              showLabel: false,
+              showLabel: true,
+              labelPrefix: '⚡',
             ));
           }
         }
@@ -3910,7 +3949,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
 
     final bool isAttacking = _attackingUnitId == unit.id;
-    final bool isDamaged = _damagedUnitId == unit.id;
+    final bool isDamaged = _damagedUnitId == unit.id || _damagedUnitIds.contains(unit.id);
     final String? floatingPop = _unitFloatingPops[unit.id];
 
     // Lunge forward across clash line during attack
