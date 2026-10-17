@@ -213,7 +213,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     Color secondaryColor = const Color(0xFFFF8A80);
     int durationMs = 650;
 
-    if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
+    if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration')) {
+      vfxType = 'bloodnova';
+      primaryColor = const Color(0xFFFF1744);
+      secondaryColor = const Color(0xFFD50000);
+      durationMs = 850;
+      _playSfx('sfx_slash.wav'); // High-impact blood cleave
+    } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
+      vfxType = 'bloodsiphon';
+      primaryColor = const Color(0xFFFF5252);
+      secondaryColor = const Color(0xFF880E4F);
+      durationMs = 700;
+      _playSfx('sfx_spell.wav'); // Dark blood drain surge
+    } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
       vfxType = 'shatter';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
@@ -259,20 +271,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _playSfx('sfx_spell.wav');
     }
 
-    // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, and crits
+    // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
     final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
-    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm');
+    final bool isBloodnova = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
+    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm');
 
     if (isHeavyImpact) {
-      final double shakePower = isUltimate ? 8.5 : (isBossStrike ? 7.0 : (event.isCrit ? 5.5 : 4.0));
+      final double shakePower = isUltimate ? 8.5 : (isBossStrike ? 7.0 : (isBloodnova ? 6.5 : (event.isCrit ? 5.5 : 4.0)));
       _triggerScreenShake(intensity: shakePower);
       _groundRipples.add(_GroundShockwaveRipple(
         id: 'ripple_${event.id}_$nowMs',
         origin: targetOffset,
-        color: isBossStrike
+        color: (isBossStrike || isBloodnova)
             ? const Color(0xFFFF1744)
             : (event.isCrit ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)),
-        maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : 100.0),
+        maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
         createdMs: nowMs,
         durationMs: 650,
       ));
@@ -308,7 +321,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           popBorder = const Color(0xFF00E676);
         }
       } else {
-        if (event.isCrit) {
+        if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
+          popText = '🩸 -${event.damage} BLOODNOVA!';
+          popColor = const Color(0xFFFF1744);
+          popBorder = const Color(0xFF880E4F);
+          popSize = 13.0;
+        } else if (event.skillName.contains('Sanguine Siphon')) {
+          popText = '🩸 -${event.damage} (DRAIN +3🩸)';
+          popColor = const Color(0xFFFF5252);
+          popBorder = const Color(0xFFB71C1C);
+          popSize = 12.0;
+        } else if (event.isCrit) {
           popText = '💥 -${event.damage} CRIT!';
           popColor = const Color(0xFFFFD54F);
           popBorder = const Color(0xFFFF1744);
@@ -5234,8 +5257,85 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         case 'shatter':
           _drawShockwave(canvas, vfx, progress);
           break;
+        case 'bloodnova':
+          _drawBloodnova(canvas, vfx, progress);
+          break;
+        case 'bloodsiphon':
+          _drawBloodsiphon(canvas, vfx, progress);
+          break;
       }
     }
+  }
+
+  void _drawBloodnova(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.targetOffset;
+    final maxRadius = 85.0;
+    final currentRadius = maxRadius * progress;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+
+    // Expanding blood mist wave
+    final mistPaint = Paint()
+      ..color = const Color(0xFFFF1744).withAlpha((alpha * 0.45).round())
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, currentRadius * 0.7, mistPaint);
+
+    // Jagged crimson detonation ring
+    final ringPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (4.5 * (1.0 - progress)).clamp(1.0, 5.0);
+    canvas.drawCircle(center, currentRadius, ringPaint);
+
+    // Detonating blood spikes radiating outwards
+    final spikePaint = Paint()
+      ..color = const Color(0xFFFF5252).withAlpha(alpha)
+      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(1.0, 3.5)
+      ..strokeCap = StrokeCap.round;
+    const int numSpikes = 8;
+    for (int i = 0; i < numSpikes; i++) {
+      final angle = (i * 3.14159 * 2) / numSpikes + (progress * 0.4);
+      final rInner = currentRadius * 0.5;
+      final rOuter = currentRadius * (1.1 + (i % 2 == 0 ? 0.2 : 0.05));
+      final p1 = Offset(center.dx + cos(angle) * rInner, center.dy + sin(angle) * rInner);
+      final p2 = Offset(center.dx + cos(angle) * rOuter, center.dy + sin(angle) * rOuter);
+      canvas.drawLine(p1, p2, spikePaint);
+    }
+  }
+
+  void _drawBloodsiphon(Canvas canvas, _CombatVfx vfx, double progress) {
+    final start = vfx.startOffset; // Caster or ally receiving heal
+    final target = vfx.targetOffset; // Bleeding enemy being siphoned
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+
+    // Spiral / curved crimson tendril siphoning from target to caster
+    final path = Path();
+    path.moveTo(target.dx, target.dy);
+    final midX = (target.dx + start.dx) * 0.5 + sin(progress * 3.14159 * 2) * 35.0;
+    final midY = (target.dy + start.dy) * 0.5 - 25.0;
+    path.quadraticBezierTo(midX, midY, start.dx, start.dy);
+
+    final tendrilPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(1.2, 4.0)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, tendrilPaint);
+
+    // Inner bright leech core
+    final corePaint = Paint()
+      ..color = Colors.white.withAlpha((alpha * 0.75).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 * (1.0 - progress)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, corePaint);
+
+    // Impact blood droplet burst on target
+    final burstRadius = 16.0 * progress;
+    final burstPaint = Paint()
+      ..color = const Color(0xFFD50000).withAlpha((alpha * 0.8).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(target, burstRadius, burstPaint);
   }
 
   void _drawSlash(Canvas canvas, _CombatVfx vfx, double progress) {
