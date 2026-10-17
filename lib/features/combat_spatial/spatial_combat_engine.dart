@@ -583,6 +583,12 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// 30 Hz Discrete Tick Execution
   void stepTick() {
+    // If encounter is already decided, halt simulation immediately!
+    if (isVictory || isDefeat) {
+      isRunning = false;
+      return;
+    }
+
     // If a skill or attack cut-in is currently resolving on screen, pause tick progression
     // so players and enemies have kinetic focus and readability!
     if (isActionPauseEnabled && activeActionEvent != null) {
@@ -590,6 +596,22 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
 
     currentTick++;
+
+    // Grimoire Card Draw: Draw 1 card every 90 ticks (~3.0 seconds) if hand has room (< 4 cards)
+    if (currentTick % 90 == 0 && hand.length < 4) {
+      if (drawPile.isEmpty && burnPit.isNotEmpty) {
+        drawPile.addAll(burnPit);
+        burnPit.clear();
+        drawPile.shuffle();
+        addLog('Grimoire reshuffled: ${drawPile.length} cards returned to draw pile.');
+      }
+      if (drawPile.isNotEmpty) {
+        final drawn = drawPile.removeAt(0);
+        hand.add(drawn);
+        addLog('Grimoire: Drew sovereign card "${drawn.name}".');
+        notifyListeners();
+      }
+    }
 
     // Focus Passive Accumulation: Lady Valeria fills 1 Focus per 40 ticks (~1.33 seconds).
     // GDD §4.3: If Commander is in downed state ("Severed Resonance"), Focus generation is throttled by 50% (80 ticks).
@@ -1412,6 +1434,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     focus -= card.focusCost;
     hand.remove(card);
+    burnPit.add(card);
 
     if (card.id == 'smite_the_calcified') {
       final boss = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??

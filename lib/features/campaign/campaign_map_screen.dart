@@ -106,6 +106,7 @@ class CampaignMapScreen extends StatefulWidget {
   final ValueChanged<int>? onAscensionChanged;
   final Set<ExpeditionBoon> activeBoons;
   final CampaignViewMode initialViewMode;
+  final int completedLinearStages;
 
   const CampaignMapScreen({
     super.key,
@@ -127,6 +128,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.onAscensionChanged,
     this.activeBoons = const {},
     this.initialViewMode = CampaignViewMode.linearLadder,
+    this.completedLinearStages = 2,
   });
 
   static String chapterTitle(int ch) {
@@ -148,12 +150,21 @@ class CampaignMapScreen extends StatefulWidget {
 
 class _CampaignMapScreenState extends State<CampaignMapScreen> {
   late CampaignViewMode _viewMode;
-  int _completedLinearStages = 2; // Default starting progress on ladder
+  late int _completedLinearStages;
 
   @override
   void initState() {
     super.initState();
     _viewMode = widget.initialViewMode;
+    _completedLinearStages = widget.completedLinearStages;
+  }
+
+  @override
+  void didUpdateWidget(CampaignMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.completedLinearStages != widget.completedLinearStages) {
+      _completedLinearStages = widget.completedLinearStages;
+    }
   }
 
   @override
@@ -888,6 +899,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                               isVisited: isCompleted,
                               hazard: stage.hazard,
                               customThumbnailAsset: stage.thumbnailAsset,
+                              customBackgroundAsset: stage.backgroundAsset,
                               scoutedAffinities: stage.enemyAffinities,
                             );
                             widget.onSelectNode(node);

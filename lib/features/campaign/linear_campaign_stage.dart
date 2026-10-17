@@ -88,7 +88,7 @@ class LinearCampaignStage {
       rewardSigils: 1,
       enemyAffinities: [Archetype.occultist, Archetype.support],
       hazard: CampaignHazardType.none,
-      backgroundAsset: 'assets/images/blood_altar_sigil.jpg',
+      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
       thumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
     ),
     LinearCampaignStage(
@@ -117,7 +117,7 @@ class LinearCampaignStage {
       rewardSigils: 1,
       enemyAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.marksman],
       hazard: CampaignHazardType.ashenEmberStorm,
-      backgroundAsset: 'assets/images/ironclad_dreadnought.jpg',
+      backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
       thumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
     ),
     LinearCampaignStage(
@@ -131,7 +131,7 @@ class LinearCampaignStage {
       rewardOre: 20,
       enemyAffinities: [],
       hazard: CampaignHazardType.none,
-      backgroundAsset: 'assets/images/bone_campfire.jpg',
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
       thumbnailAsset: 'assets/images/bone_campfire.jpg',
     ),
     LinearCampaignStage(
@@ -189,7 +189,7 @@ class LinearCampaignStage {
       rewardSigils: 2,
       enemyAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin, Archetype.marksman],
       hazard: CampaignHazardType.ashenEmberStorm,
-      backgroundAsset: 'assets/images/flayed_butcher.jpg',
+      backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
       thumbnailAsset: 'assets/images/flayed_butcher.jpg',
       isBoss: true,
     ),
@@ -222,7 +222,7 @@ class LinearCampaignStage {
       rewardSigils: 1,
       enemyAffinities: [Archetype.occultist, Archetype.juggernaut],
       hazard: CampaignHazardType.miasmaMire,
-      backgroundAsset: 'assets/images/plague_occultist.jpg',
+      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
       thumbnailAsset: 'assets/images/plague_occultist.jpg',
     ),
     LinearCampaignStage(
@@ -237,7 +237,7 @@ class LinearCampaignStage {
       rewardSigils: 3,
       enemyAffinities: [Archetype.occultist, Archetype.juggernaut, Archetype.skirmisher],
       hazard: CampaignHazardType.miasmaMire,
-      backgroundAsset: 'assets/images/plague_occultist.jpg',
+      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
       thumbnailAsset: 'assets/images/plague_occultist.jpg',
       isBoss: true,
     ),

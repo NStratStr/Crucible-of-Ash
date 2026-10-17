@@ -93,6 +93,7 @@ class CampaignNode {
   final List<Archetype> scoutedAffinities; // Enemy brigade roles at this node
   final CampaignHazardType hazard;        // Atmospheric hazard modifier
   final String? customThumbnailAsset;     // Thematic thumbnail for encounter cards
+  final String? customBackgroundAsset;    // Atmospheric arena battlefield background
 
   const CampaignNode({
     required this.id,
@@ -112,6 +113,7 @@ class CampaignNode {
     this.scoutedAffinities = const [],
     this.hazard = CampaignHazardType.none,
     this.customThumbnailAsset,
+    this.customBackgroundAsset,
   });
 
   CampaignNode copyWith({
@@ -125,6 +127,7 @@ class CampaignNode {
     int? rewardSigils,
     CampaignHazardType? hazard,
     String? customThumbnailAsset,
+    String? customBackgroundAsset,
   }) {
     return CampaignNode(
       id: id,
@@ -144,6 +147,7 @@ class CampaignNode {
       scoutedAffinities: scoutedAffinities ?? this.scoutedAffinities,
       hazard: hazard ?? this.hazard,
       customThumbnailAsset: customThumbnailAsset ?? this.customThumbnailAsset,
+      customBackgroundAsset: customBackgroundAsset ?? this.customBackgroundAsset,
     );
   }
 }

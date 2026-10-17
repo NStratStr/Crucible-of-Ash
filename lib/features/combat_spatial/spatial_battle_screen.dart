@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/utils/platform_fullscreen.dart';
+import '../settings/settings_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -93,21 +94,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   Future<void> _initAudio() async {
     try {
+      final settings = SettingsService();
+      _isMuted = !settings.bgmEnabled;
       _bgmPlayer = AudioPlayer();
       _sfxPlayer = AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer!.setVolume(0.45);
-      await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
+      final bgmVol = _isMuted ? 0.0 : (settings.bgmVolume * 0.45);
+      await _bgmPlayer!.setVolume(bgmVol);
+      if (settings.bgmEnabled) {
+        await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
+      }
     } catch (e) {
       debugPrint('Error starting combat audio: $e');
     }
   }
 
   void _playSfx(String sfxName) {
-    if (_isMuted || _sfxPlayer == null) return;
+    final settings = SettingsService();
+    if (_isMuted || !settings.sfxEnabled || _sfxPlayer == null) return;
     try {
       _sfxPlayer!.stop();
-      _sfxPlayer!.setVolume(0.70);
+      _sfxPlayer!.setVolume(settings.sfxVolume * 0.70);
       _sfxPlayer!.play(AssetSource('audio/$sfxName'));
     } catch (e) {
       debugPrint('Error playing SFX $sfxName: $e');
@@ -115,10 +122,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _toggleMute() {
+    final settings = SettingsService();
+    final newMuted = !_isMuted;
     setState(() {
-      _isMuted = !_isMuted;
-      _bgmPlayer?.setVolume(_isMuted ? 0.0 : 0.45);
+      _isMuted = newMuted;
     });
+    settings.setBgmEnabled(!newMuted);
+    settings.setSfxEnabled(!newMuted);
+    if (newMuted) {
+      _bgmPlayer?.pause();
+      _bgmPlayer?.setVolume(0.0);
+    } else {
+      _bgmPlayer?.setVolume(settings.bgmVolume * 0.45);
+      _bgmPlayer?.resume();
+    }
   }
 
   void _onEngineUpdate() {
@@ -309,6 +326,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _engine.removeListener(_onEngineUpdate);
     _bgmPlayer?.stop();
     _bgmPlayer?.dispose();
+    _sfxPlayer?.stop();
+    _sfxPlayer?.dispose();
     super.dispose();
   }
 

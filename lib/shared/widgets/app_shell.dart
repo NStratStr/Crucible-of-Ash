@@ -63,6 +63,7 @@ class _AppShellState extends State<AppShell> {
   int _maxUnlockedChapter = 1;
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
+  int _completedLinearStages = 2;
   bool _isSpatialCombatActive = true;
 
   late InitiativeTickManager _tickManager;
@@ -782,6 +783,14 @@ class _AppShellState extends State<AppShell> {
       _dungeonDelveSigils += sigilsReward;
     });
     if (_activeNode != null) {
+      if (_activeNode!.id.startsWith('linear_')) {
+        final stageNum = _activeNode!.depth;
+        if (stageNum > _completedLinearStages) {
+          setState(() {
+            _completedLinearStages = stageNum;
+          });
+        }
+      }
       _markNodeCompleted(_activeNode!.id);
     }
 
@@ -1596,6 +1605,7 @@ class _AppShellState extends State<AppShell> {
                       _currentChapter = ch;
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
                     }),
+                    completedLinearStages: _completedLinearStages,
                   ),
                   // Tab 1: Tactical Arena (2.5D Spatial Node Battlefield)
                   _isSpatialCombatActive
@@ -1604,7 +1614,7 @@ class _AppShellState extends State<AppShell> {
                           initialPlayerUnits: _tickManager.allies,
                           initialEnemyUnits: _tickManager.enemies,
                           encounterTitle: _activeNode?.name ?? 'The Sunder at Ashen Gate',
-                          backdropAsset: _activeNode?.customThumbnailAsset ?? ChapterTheme.forChapter(_currentChapter).backgroundAsset,
+                          backdropAsset: _activeNode?.customBackgroundAsset ?? ChapterTheme.forChapter(_currentChapter).backgroundAsset,
                           isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
                           onVictory: () {
                             _onCombatVictory();
