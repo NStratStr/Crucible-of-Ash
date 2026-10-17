@@ -573,7 +573,76 @@ void main() {
       expect(minion.footprint, equals(UnitFootprint.single1x1));
       expect(minion.occupiedNodes.first.column, equals(0)); // First flank minion placed on Col 0
     });
+
+    test('redrawHand discards current hand, spends 1 Focus, and draws fresh cards during battle', () {
+      // Set to live battle
+      engine.isPreBattlePhase = false;
+
+      final initialHandIds = engine.hand.map((c) => c.id).toList();
+      final initialFocus = engine.focus;
+      expect(initialFocus, greaterThanOrEqualTo(1));
+
+      final success = engine.redrawHand();
+      expect(success, isTrue);
+      expect(engine.focus, equals(initialFocus - 1));
+      expect(engine.hand.isNotEmpty, isTrue);
+
+      // Verify burnPit received previous hand cards
+      for (final id in initialHandIds) {
+        expect(engine.burnPit.any((c) => c.id == id), isTrue);
+      }
+    });
+
+    test('Sanguine Siphon deals damage, applies 3 Bleed stacks, and heals lowest ally', () {
+      engine.isPreBattlePhase = false;
+
+      // Damage a player ally
+      final ally = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      ally.hp = 100;
+      expect(ally.hp, equals(100));
+
+      final enemy = engine.enemyUnits.firstWhere((u) => u.id == 'pyre_zealot');
+      final enemyHpBefore = enemy.hp;
+
+      // Provide Sanguine Siphon card
+      const card = SpatialCombatCard(
+        id: 'sanguine_siphon',
+        name: 'Sanguine Siphon',
+        focusCost: 1,
+        description: 'Test Siphon',
+        pattern: TargetPattern.singleTarget,
+      );
+      engine.hand.add(card);
+      engine.castCard('sanguine_siphon', targetUnit: enemy);
+
+      expect(enemy.hp, lessThan(enemyHpBefore));
+      expect(enemy.bleedStacks, greaterThanOrEqualTo(3));
+      expect(ally.hp, greaterThan(100));
+    });
+
+    test('Vitae Eruption inflicts base damage plus bonus detonation damage for Bleed stacks', () {
+      engine.isPreBattlePhase = false;
+
+      final enemy = engine.enemyUnits.firstWhere((u) => u.id == 'pyre_zealot');
+      enemy.bleedStacks = 3;
+      final hpBefore = enemy.hp;
+      final expectedDmg = (180 * (1.0 - enemy.physicalReductionRatio)).round();
+
+      const card = SpatialCombatCard(
+        id: 'vitae_eruption',
+        name: 'Vitae Eruption',
+        focusCost: 2,
+        description: 'Test Eruption',
+        pattern: TargetPattern.horizontalRowScythe,
+      );
+      engine.hand.add(card);
+      engine.castCard('vitae_eruption', targetUnit: enemy);
+
+      final damageDealt = hpBefore - enemy.hp;
+      expect(damageDealt, equals(expectedDmg));
+    });
   });
 }
+
 
 

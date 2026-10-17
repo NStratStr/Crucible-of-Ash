@@ -2961,6 +2961,88 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ],
             ],
+
+            // 4. Tactical Synergy Indicator
+            Builder(
+              builder: (context) {
+                final enemies = _engine.enemyUnits.where((u) => u.isAlive);
+                final anyBleeding = enemies.any((u) => u.hasBleed);
+                final totalBleed = enemies.fold<int>(0, (sum, u) => sum + u.bleedStacks);
+
+                if (_selectedCardId == 'vitae_eruption' && anyBleeding) {
+                  return Container(
+                    margin: const EdgeInsets.only(left: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A000E),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.water_drop, size: 10, color: Color(0xFFFF1744)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '🩸 BLOODNOVA SYNERGY: +${totalBleed * 20} DETONATION DMG ($totalBleed BLEED STACKS)',
+                          style: const TextStyle(
+                            fontSize: 8.0,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFF8A80),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (_selectedCardId == 'sanguine_siphon' && unit.hasBleed) {
+                  return Container(
+                    margin: const EdgeInsets.only(left: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF381016),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF5252), width: 1.0),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.healing, size: 10, color: Color(0xFFFF5252)),
+                        SizedBox(width: 3),
+                        Text(
+                          '🩸 LEECH SYNERGY: STACKS VULNERABILITY & RESTORES HP',
+                          style: TextStyle(
+                            fontSize: 8.0,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFF8A80),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (unit.hasBleed && unit.isPlayer == false) {
+                  return Container(
+                    margin: const EdgeInsets.only(left: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF261014),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
+                    ),
+                    child: Text(
+                      '🩸 VULNERABLE: ${unit.bleedStacks} BLEED STACKS',
+                      style: const TextStyle(
+                        fontSize: 8.0,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFF8A80),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ],
         ),
       ),
@@ -4176,6 +4258,79 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               );
             },
+          ),
+          const SizedBox(width: 6),
+
+          // Grimoire Redraw Button (1 Focus cost to cycle hand)
+          GestureDetector(
+            onTap: () {
+              if (_engine.isPreBattlePhase) {
+                setState(() {
+                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle first!';
+                });
+                return;
+              }
+              if (_engine.focus < 1) {
+                setState(() {
+                  _engine.lastBannerMessage = '⚠️ NEED 1 FOCUS TO REDRAW GRIMOIRE!';
+                });
+                return;
+              }
+              _playSfx('sfx_card.wav');
+              _engine.redrawHand();
+              setState(() {
+                _selectedCardId = null;
+                _hoveredCardId = null;
+              });
+            },
+            child: Container(
+              width: isLandscapeMobile ? 54 : 66,
+              height: dockHeight,
+              decoration: BoxDecoration(
+                color: _engine.focus >= 1 ? const Color(0xFF142434) : const Color(0xFF181C22),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _engine.focus >= 1 ? const Color(0xFF00E5FF) : Colors.white24,
+                  width: _engine.focus >= 1 ? 1.2 : 0.8,
+                ),
+                boxShadow: _engine.focus >= 1
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                          blurRadius: 6,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.autorenew_rounded,
+                    color: _engine.focus >= 1 ? const Color(0xFF00E5FF) : Colors.white38,
+                    size: isLandscapeMobile ? 18 : 22,
+                  ),
+                  if (!isLandscapeMobile) const SizedBox(height: 2),
+                  Text(
+                    'REDRAW',
+                    style: TextStyle(
+                      fontSize: isLandscapeMobile ? 7.5 : 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: _engine.focus >= 1 ? const Color(0xFF80D8FF) : Colors.white38,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  Text(
+                    '1 FOCUS',
+                    style: TextStyle(
+                      fontSize: isLandscapeMobile ? 6.5 : 7.0,
+                      fontWeight: FontWeight.bold,
+                      color: _engine.focus >= 1 ? const Color(0xFFFFD54F) : Colors.white38,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(width: 8),
 

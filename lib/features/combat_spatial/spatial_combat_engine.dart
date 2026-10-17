@@ -561,6 +561,23 @@ class SpatialCombatEngine extends ChangeNotifier {
         description: 'SOVEREIGN SLIP: Resurrects downed plinth with 50% HP & 6-tick invulnerability (-20% max HP Soul Fracture).',
         pattern: TargetPattern.singleTarget,
       ),
+      const SpatialCombatCard(
+        id: 'sanguine_siphon',
+        name: 'Sanguine Siphon',
+        focusCost: 2,
+        description: 'Drains 85 HP from enemy, applies 3 Bleed stacks, and heals lowest ally for 100% of damage dealt.',
+        pattern: TargetPattern.singleTarget,
+        damageMultiplier: 1.4,
+        bleedStacks: 3,
+      ),
+      const SpatialCombatCard(
+        id: 'vitae_eruption',
+        name: 'Vitae Eruption',
+        focusCost: 3,
+        description: 'Bloodnova across entire enemy frontline row: deals 120 DMG and detonates +20 bonus damage per bleed stack!',
+        pattern: TargetPattern.horizontalRowScythe,
+        damageMultiplier: 1.6,
+      ),
     ]);
 
     addLog('Encounter Initialized: The Sunder at Ashen Gate.');
@@ -1423,6 +1440,46 @@ class SpatialCombatEngine extends ChangeNotifier {
     return true;
   }
 
+  /// Grimoire Redraw: Discards current hand into Burn Pit and draws up to 3 fresh cards (Costs 1 Focus)
+  bool redrawHand() {
+    if (isPreBattlePhase) {
+      addLog('Cannot redraw during Deployment Phase! Start battle first.');
+      lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle first!';
+      notifyListeners();
+      return false;
+    }
+    if (focus < 1) {
+      lastBannerMessage = '⚠️ NEED 1 FOCUS TO REDRAW GRIMOIRE!';
+      addLog('Redraw failed: Requires 1 Focus.');
+      notifyListeners();
+      return false;
+    }
+
+    focus--; // Consume 1 Focus
+    final int discardedCount = hand.length;
+    burnPit.addAll(hand);
+    hand.clear();
+
+    // Replenish draw pile if empty
+    if (drawPile.length < 3 && burnPit.isNotEmpty) {
+      drawPile.addAll(burnPit);
+      burnPit.clear();
+      drawPile.shuffle();
+      addLog('Grimoire reshuffled: ${drawPile.length} cards returned to draw pile.');
+    }
+
+    // Draw up to 3 new cards
+    final int toDraw = min(3, drawPile.length);
+    for (int i = 0; i < toDraw; i++) {
+      hand.add(drawPile.removeAt(0));
+    }
+
+    lastBannerMessage = '📖 GRIMOIRE REDRAW: Cycled $discardedCount cards into Burn Pit & drew ${hand.length} fresh spells!';
+    addLog('GRIMOIRE REDRAW: Consumed 1 Focus. Hand refreshed with ${hand.length} sovereign spells.');
+    notifyListeners();
+    return true;
+  }
+
   /// Casts a tactical card on a target node / unit
   bool castCard(String cardId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) {
     if (isPreBattlePhase) {
@@ -1552,7 +1609,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           attackerId: 'sun_smith',
           attackerName: 'SUN-SMITH',
           skillName: 'Searing Brand',
-          targetId: 'ground_tile_${targetCol}_${targetRow}',
+          targetId: 'ground_tile_${targetCol}_$targetRow',
           targetName: 'Ground Target ($targetCol, $targetRow)',
           damage: 75,
           isPlayerAttacker: true,
@@ -1720,6 +1777,75 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       }
+    } else if (card.id == 'sanguine_siphon') {
+      // Sanguine Siphon: Drains 85 HP from enemy, applies 3 Bleed stacks, and heals lowest ally
+      final target = targetUnit ??
+          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits.where((u) => u.isAlive).firstOrNull;
+
+      if (target != null) {
+        final dmg = target.takeDamage(85, isPhysical: false);
+        target.bleedStacks += 3;
+
+        // Heal lowest living player ally for 100% of damage dealt
+        final livingAllies = playerUnits.where((u) => u.isAlive).toList()..sort((a, b) => a.hp.compareTo(b.hp));
+        final lowestAlly = livingAllies.firstOrNull;
+        if (lowestAlly != null) {
+          lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + dmg);
+          addLog('  Siphon Transfusion: Restored $dmg HP to ${lowestAlly.name} (${lowestAlly.hp}/${lowestAlly.maxHp}).');
+        }
+
+        lastBannerMessage = '🩸 SANGUINE SIPHON: Drained $dmg HP from ${target.name} & applied 3 Bleed stacks!';
+        addLog('CAST: Sanguine Siphon drained $dmg HP from ${target.name} and healed ${lowestAlly?.name ?? "ally"}.');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_siphon',
+          attackerId: 'sanguine_blade',
+          attackerName: 'SANGUINE BLADE',
+          skillName: 'Sanguine Siphon',
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmg,
+          bleedStacks: 3,
+          isCrit: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'vitae_eruption') {
+      // Vitae Eruption: Bloodnova across entire enemy frontline row: 120 DMG + 20 bonus damage per bleed stack!
+      int totalDmg = 0;
+      int enemiesHit = 0;
+      final frontEnemies = enemyUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
+      final affectedEnemies = frontEnemies.isNotEmpty ? frontEnemies : enemyUnits.where((u) => u.isAlive).toList();
+
+      for (final enemy in affectedEnemies) {
+        final int bleedBonus = enemy.bleedStacks * 20;
+        final int rawHit = 120 + bleedBonus;
+        final dmg = enemy.takeDamage(rawHit, isPhysical: false);
+        totalDmg += dmg;
+        enemiesHit++;
+        addLog('  Vitae Nova: ${enemy.name} struck for $dmg DMG (Base 120 + $bleedBonus Bleed Detonation)!');
+      }
+
+      final primary = affectedEnemies.firstOrNull ?? enemyUnits.first;
+      lastBannerMessage = '💥 VITAE ERUPTION: Detonated $totalDmg total damage across $enemiesHit frontline enemies!';
+      addLog('APEX NOVA: Vitae Eruption cleaved through enemy line for $totalDmg total DMG.');
+
+      dispatchAction(SpatialActionEvent(
+        id: 'card_${currentTick}_vitae_eruption',
+        attackerId: 'sanguine_blade',
+        attackerName: 'SANGUINE BLADE',
+        skillName: 'Vitae Eruption',
+        targetId: primary.id,
+        targetName: primary.name,
+        damage: totalDmg,
+        isCrit: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.horizontalRowScythe,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
     }
 
     notifyListeners();

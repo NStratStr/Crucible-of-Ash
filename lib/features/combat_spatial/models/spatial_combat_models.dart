@@ -126,6 +126,12 @@ class SpatialCombatCard {
     if (id == 'revive_vitae') {
       return 'assets/images/Spells/Sanguine Re-Summon.png';
     }
+    if (id == 'sanguine_siphon') {
+      return 'assets/images/Spells/Sanguine Siphon.jpg';
+    }
+    if (id == 'vitae_eruption') {
+      return 'assets/images/Spells/Vitae Erution - Tier 1 no txt.png';
+    }
     if (id == 'stoke_the_embers') {
       return 'assets/images/Spells/Attack_spell_magic_circle.png';
     }
@@ -317,6 +323,7 @@ class CombatUnitState {
   bool get isFrozen => freezeDuration > 0;
   bool get isBurning => burnDuration > 0;
   bool get isPoisoned => poisonStacks > 0;
+  bool get hasBleed => bleedStacks > 0;
   bool get isVulnerable => vulnerableDuration > 0;
   bool get isHasted => hasteDuration > 0;
 
