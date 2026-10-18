@@ -68,6 +68,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final Set<String> _damagedUnitIds = {};
   String? _activeSkillName;
   String? _activeSkillCasterName;
+  CombatUnitState? _activeSkillCaster;
+  CombatUnitState? _activeSkillTarget;
   bool _isPlayerSkillBanner = false;
   CombatUnitState? _activeUltimateUnit; // Active Ultimate Burst Cinematic Cut-in
   final Map<String, String> _unitFloatingPops = {};
@@ -345,8 +347,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       ));
     }
 
+    // Spawn invocation rune at caster's plinth for active skill cast
+    final casterRuneVfx = _CombatVfx(
+      id: 'vfx_${event.id}_rune_$nowMs',
+      startOffset: casterOffset,
+      targetOffset: casterOffset,
+      primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+      type: 'rune_invocation',
+      durationMs: 700,
+      createdMs: nowMs,
+    );
+
     setState(() {
       _activeVfx.add(newVfx);
+      _activeVfx.add(casterRuneVfx);
       _activeVfx.addAll(secondaryVfxList);
       _attackingUnitId = event.attackerId;
       _damagedUnitId = event.targetId;
@@ -357,6 +372,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       }
       _activeSkillName = event.skillName;
       _activeSkillCasterName = event.attackerName;
+      _activeSkillCaster = caster;
+      _activeSkillTarget = target;
       _isPlayerSkillBanner = event.isPlayerAttacker;
 
       // Construct distinct styled floating pop
@@ -449,7 +466,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
       if (mounted) {
         setState(() {
-          _activeVfx.removeWhere((v) => v.id == newVfx.id || secondaryVfxList.any((s) => s.id == v.id));
+          _activeVfx.removeWhere((v) => v.id == newVfx.id || v.id == casterRuneVfx.id || secondaryVfxList.any((s) => s.id == v.id));
           _floatingPops.removeWhere((p) => p.isExpired);
         });
       }
@@ -479,6 +496,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       if (mounted) {
         setState(() {
           _activeSkillName = null;
+          _activeSkillCaster = null;
+          _activeSkillTarget = null;
           _activeUltimateUnit = null;
         });
         _engine.clearActiveAction();
@@ -3662,60 +3681,113 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   Widget _buildSkillCutInBanner() {
     final Color themeColor = _isPlayerSkillBanner ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
+    final caster = _activeSkillCaster;
+    final String? assetPath = caster?.assetPath;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF14141E).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: themeColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: themeColor.withValues(alpha: 0.4),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            _isPlayerSkillBanner
-                ? 'assets/images/Spells/Support_spell_magic_circle.png'
-                : 'assets/images/Spells/Attack_spell_magic_circle.png',
-            width: 20,
-            height: 20,
-            errorBuilder: (_, __, ___) => Icon(
-              _isPlayerSkillBanner ? Icons.auto_awesome : Icons.warning_rounded,
-              color: themeColor,
-              size: 18,
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0E17).withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: themeColor, width: 1.6),
+          boxShadow: [
+            BoxShadow(
+              color: themeColor.withValues(alpha: 0.50),
+              blurRadius: 16,
+              spreadRadius: 1.5,
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _activeSkillCasterName?.toUpperCase() ?? 'CONSTRUCT',
-            style: TextStyle(
-              color: themeColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 10,
-              fontFamily: 'monospace',
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.8),
+              blurRadius: 8,
             ),
-          ),
-          const SizedBox(width: 6),
-          const Text('•', style: TextStyle(color: Colors.white38)),
-          const SizedBox(width: 6),
-          Text(
-            _activeSkillName?.toUpperCase() ?? 'ATTACK',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 11,
-              letterSpacing: 0.8,
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Caster Miniature Portrait Thumbnail (if available)
+            if (assetPath != null) ...[
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: themeColor, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(color: themeColor.withValues(alpha: 0.4), blurRadius: 6),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  assetPath,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  errorBuilder: (_, __, ___) => Icon(
+                    _isPlayerSkillBanner ? Icons.shield : Icons.dangerous,
+                    color: themeColor,
+                    size: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+
+            // Arcane Rotating Magic Circle Glyph
+            Image.asset(
+              _isPlayerSkillBanner
+                  ? 'assets/images/Spells/Support_spell_magic_circle.png'
+                  : 'assets/images/Spells/Attack_spell_magic_circle.png',
+              width: 22,
+              height: 22,
+              errorBuilder: (_, __, ___) => Icon(
+                _isPlayerSkillBanner ? Icons.auto_awesome : Icons.warning_rounded,
+                color: themeColor,
+                size: 18,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+
+            // Caster Name Badge
+            Text(
+              _activeSkillCasterName?.toUpperCase() ?? 'CONSTRUCT',
+              style: TextStyle(
+                color: themeColor,
+                fontWeight: FontWeight.w900,
+                fontSize: 10.5,
+                fontFamily: 'monospace',
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 3,
+              height: 12,
+              decoration: BoxDecoration(
+                color: themeColor.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Skill Name Banner with Glowing Text
+            Text(
+              _activeSkillName?.toUpperCase() ?? 'ATTACK',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                letterSpacing: 1.0,
+                shadows: [
+                  Shadow(color: themeColor.withValues(alpha: 0.8), blurRadius: 8),
+                  const Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -6182,6 +6254,9 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         case 'bloodsiphon':
           _drawBloodsiphon(canvas, vfx, progress);
           break;
+        case 'rune_invocation':
+          _drawRuneInvocation(canvas, vfx, progress);
+          break;
       }
     }
   }
@@ -6359,6 +6434,48 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         final p2 = Offset(center.dx + cos(angle) * d2, center.dy + sin(angle) * d2);
         canvas.drawLine(p1, p2, shardPaint);
       }
+    }
+  }
+
+  void _drawRuneInvocation(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.startOffset; // Centered at caster plinth
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+    final currentRadius = 28.0 + (progress * 18.0);
+
+    // 1. Concentric rotating invocation runic circle
+    final outerRing = Paint()
+      ..color = vfx.primaryColor.withAlpha((alpha * 0.85).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6 * (1.0 - progress * 0.5);
+    canvas.drawCircle(center, currentRadius, outerRing);
+
+    final innerRing = Paint()
+      ..color = vfx.secondaryColor.withAlpha((alpha * 0.65).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawCircle(center, currentRadius * 0.65, innerRing);
+
+    // 2. Rotating runic rays
+    final rayPaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha((alpha * 0.75).round())
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    const int rayCount = 6;
+    final double spinAngle = progress * 3.14159;
+    for (int i = 0; i < rayCount; i++) {
+      final angle = (i * 3.14159 * 2) / rayCount + spinAngle;
+      final p1 = Offset(center.dx + cos(angle) * (currentRadius * 0.65), center.dy + sin(angle) * (currentRadius * 0.65));
+      final p2 = Offset(center.dx + cos(angle) * (currentRadius * 1.15), center.dy + sin(angle) * (currentRadius * 1.15));
+      canvas.drawLine(p1, p2, rayPaint);
+    }
+
+    // 3. Central incantation flare burst
+    if (progress < 0.45) {
+      final burstT = progress / 0.45;
+      final flarePaint = Paint()
+        ..color = Colors.white.withAlpha(((1.0 - burstT) * 220).round())
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, 12.0 * burstT, flarePaint);
     }
   }
 
