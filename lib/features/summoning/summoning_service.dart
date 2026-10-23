@@ -1,12 +1,12 @@
 import 'dart:math';
 import '../../core/combat_math.dart';
-import '../../shared/data/starter_brigades.dart';
 import '../../shared/models/unit_entity.dart';
 
 enum SummonBannerType {
   ashenBloodline,
   consecratedSigil,
   cryptCovenant,
+  commanderCovenant,
 }
 
 class BannerConfig {
@@ -105,6 +105,22 @@ class SummoningService {
       bannerBadge: 'FOCUS BATCH',
       themeColorHex: '#9C27B0',
     ),
+    SummonBannerType.commanderCovenant: const BannerConfig(
+      type: SummonBannerType.commanderCovenant,
+      title: 'PROGENITOR ARCHONS',
+      subtitle: 'Legendary Commander Manifestation',
+      loreDescription:
+          'Invoke the primal bloodline of high commanders: Lord Vladislav, Lady Valeria, High Inquisitor Malakor, and Mother Morrigan with boosted pull rates.',
+      currencyName: 'Bloodline Sigils',
+      singleCost: 2,
+      multiCost: 18,
+      usesSigils: true,
+      gen1Rate: 0.20,
+      gen2Rate: 0.50,
+      gen3Rate: 0.30,
+      bannerBadge: 'COMMANDER RATE-UP',
+      themeColorHex: '#FF1744',
+    ),
   };
 
   /// Performs a single (1x) or multi (10x) summon based on count and selected banner.
@@ -160,7 +176,9 @@ class SummoningService {
     final archetype = Archetype.values[archetypeIndex];
     final timestamp = DateTime.now().microsecondsSinceEpoch + indexOffset;
 
-    if (banner.type == SummonBannerType.cryptCovenant) {
+    if (banner.type == SummonBannerType.commanderCovenant) {
+      return _generateCommanderOrArchon(generation, archetype, timestamp, rng);
+    } else if (banner.type == SummonBannerType.cryptCovenant) {
       return _generateCryptSpecialist(generation, archetype, timestamp, rng);
     } else {
       return _generateAshOrStandardThrall(generation, archetype, timestamp, rng);
@@ -302,6 +320,118 @@ class SummoningService {
           plinthMaterial: generation >= 3 ? PlinthMaterial.gold : (generation == 2 ? PlinthMaterial.obsidian : PlinthMaterial.iron),
         );
     }
+  }
+
+  static UnitEntity _generateCommanderOrArchon(
+    int generation,
+    Archetype archetype,
+    int timestamp,
+    Random rng,
+  ) {
+    // 60% chance to pull one of the four legendary commanders directly
+    final isCommanderPull = rng.nextDouble() < 0.60;
+    if (isCommanderPull) {
+      final cmdRoll = rng.nextInt(4);
+      final statMult = 1.0 + (generation - 1) * 0.40;
+      switch (cmdRoll) {
+        case 0:
+          return UnitEntity(
+            id: 'summon_cmd_vladislav_$timestamp',
+            speciesId: 'commander_vladislav',
+            name: generation >= 3 ? 'Paragon Lord Vladislav' : (generation == 2 ? 'Veteran Lord Vladislav' : 'Lord Vladislav'),
+            generation: generation,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.assassin,
+            slot: FormationSlot.front1,
+            level: 1,
+            maxLevel: 30 + (generation * 5),
+            currentHp: (900 * statMult).round(),
+            maxHp: (900 * statMult).round(),
+            attack: (140 * statMult).round(),
+            defense: (110 * statMult).round(),
+            speed: (105 * statMult).round(),
+            resist: 65,
+            critRate: 0.20,
+            critDamage: 1.60,
+            nativeTraitId: 'vampiric_conduit',
+            lineageAncestors: ['strigoi_lord'],
+            plinthMaterial: PlinthMaterial.gold,
+          );
+        case 1:
+          return UnitEntity(
+            id: 'summon_cmd_valeria_$timestamp',
+            speciesId: 'commander_valeria',
+            name: generation >= 3 ? 'Paragon Lady Valeria' : (generation == 2 ? 'Veteran Lady Valeria' : 'Lady Valeria'),
+            generation: generation,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.juggernaut,
+            slot: FormationSlot.front1,
+            level: 1,
+            maxLevel: 30 + (generation * 5),
+            currentHp: (950 * statMult).round(),
+            maxHp: (950 * statMult).round(),
+            attack: (130 * statMult).round(),
+            defense: (135 * statMult).round(),
+            speed: (100 * statMult).round(),
+            resist: 70,
+            critRate: 0.20,
+            critDamage: 1.50,
+            nativeTraitId: 'iron_fortitude',
+            lineageAncestors: ['ironclad_matron'],
+            plinthMaterial: PlinthMaterial.gold,
+          );
+        case 2:
+          return UnitEntity(
+            id: 'summon_cmd_malakor_$timestamp',
+            speciesId: 'commander_malakor',
+            name: generation >= 3 ? 'Paragon Inquisitor Malakor' : (generation == 2 ? 'Veteran Inquisitor Malakor' : 'High Inquisitor Malakor'),
+            generation: generation,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.skirmisher,
+            slot: FormationSlot.front2,
+            level: 1,
+            maxLevel: 30 + (generation * 5),
+            currentHp: (880 * statMult).round(),
+            maxHp: (880 * statMult).round(),
+            attack: (150 * statMult).round(),
+            defense: (110 * statMult).round(),
+            speed: (115 * statMult).round(),
+            resist: 60,
+            critRate: 0.25,
+            critDamage: 1.65,
+            nativeTraitId: 'purifying_flame',
+            lineageAncestors: ['calx_justiciar'],
+            plinthMaterial: PlinthMaterial.gold,
+          );
+        case 3:
+        default:
+          return UnitEntity(
+            id: 'summon_cmd_morrigan_$timestamp',
+            speciesId: 'commander_morrigan',
+            name: generation >= 3 ? 'Paragon Mother Morrigan' : (generation == 2 ? 'Veteran Mother Morrigan' : 'Mother Morrigan'),
+            generation: generation,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.occultist,
+            slot: FormationSlot.back2,
+            level: 1,
+            maxLevel: 30 + (generation * 5),
+            currentHp: (780 * statMult).round(),
+            maxHp: (780 * statMult).round(),
+            attack: (165 * statMult).round(),
+            defense: (90 * statMult).round(),
+            speed: (105 * statMult).round(),
+            resist: 75,
+            critRate: 0.20,
+            critDamage: 1.55,
+            nativeTraitId: 'miasma_conduit',
+            lineageAncestors: ['mire_matron'],
+            plinthMaterial: PlinthMaterial.gold,
+          );
+      }
+    }
+    // Otherwise fallback to elite standard/crypt unit with Epic rarity
+    final fallbackUnit = _generateAshOrStandardThrall(generation, archetype, timestamp, rng);
+    return fallbackUnit.copyWith(rarity: UnitRarity.epic);
   }
 
   static UnitEntity _generateCryptSpecialist(

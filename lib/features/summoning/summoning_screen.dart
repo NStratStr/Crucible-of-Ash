@@ -1,8 +1,6 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/unit_entity.dart';
-import '../../shared/widgets/pedigree_inspector_dialog.dart';
 import 'summoning_service.dart';
 
 class SummoningScreen extends StatefulWidget {
@@ -276,9 +274,11 @@ class _SummoningScreenState extends State<SummoningScreen> {
         children: SummonBannerType.values.map((type) {
           final banner = SummoningService.banners[type]!;
           final isSelected = _selectedBannerType == type;
-          final accentColor = type == SummonBannerType.consecratedSigil
-              ? const Color(0xFFFFD54F)
-              : (type == SummonBannerType.cryptCovenant ? const Color(0xFFAB47BC) : const Color(0xFFE5A93C));
+          final accentColor = type == SummonBannerType.commanderCovenant
+              ? const Color(0xFFFF1744)
+              : (type == SummonBannerType.consecratedSigil
+                  ? const Color(0xFFFFD54F)
+                  : (type == SummonBannerType.cryptCovenant ? const Color(0xFFAB47BC) : const Color(0xFFE5A93C)));
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -333,9 +333,11 @@ class _SummoningScreenState extends State<SummoningScreen> {
   }
 
   Widget _buildCenterAltarStage(BannerConfig banner) {
-    final accentColor = banner.type == SummonBannerType.consecratedSigil
-        ? const Color(0xFFFFD54F)
-        : (banner.type == SummonBannerType.cryptCovenant ? const Color(0xFFAB47BC) : const Color(0xFFE5A93C));
+    final accentColor = banner.type == SummonBannerType.commanderCovenant
+        ? const Color(0xFFFF1744)
+        : (banner.type == SummonBannerType.consecratedSigil
+            ? const Color(0xFFFFD54F)
+            : (banner.type == SummonBannerType.cryptCovenant ? const Color(0xFFAB47BC) : const Color(0xFFE5A93C)));
 
     return Container(
       width: double.infinity,

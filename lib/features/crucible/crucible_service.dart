@@ -23,7 +23,7 @@ class CrucibleService {
       "Progenitors must share the same species lineage.",
     );
 
-    final int nextGeneration = (max(parentA.generation, parentB.generation) + 1).clamp(1, 4);
+    final int nextGeneration = (max(parentA.generation, parentB.generation) + 1).clamp(1, 6);
 
     // 10% transfer at max level; 5% transfer if premature
     final double ratioA = (parentA.level >= parentA.maxLevel) ? 0.10 : 0.05;
@@ -39,12 +39,13 @@ class CrucibleService {
     int finalDef = speciesBaseDef + bonusDef;
     int finalSpd = speciesBaseSpd + bonusSpd;
 
-    // Pureblood Resonance (Gen 4 pinnacle lineage bonus)
+    // Pureblood & Apex Resonance (Gen 4+ pinnacle lineage bonuses)
     if (nextGeneration >= 4) {
-      finalMaxHp = (finalMaxHp * 1.15).round();
-      finalAtk = (finalAtk * 1.15).round();
-      finalDef = (finalDef * 1.15).round();
-      finalSpd = (finalSpd * 1.15).round();
+      final double purebloodMult = 1.15 + ((nextGeneration - 4) * 0.10); // +15% at G4, +25% at G5, +35% at G6
+      finalMaxHp = (finalMaxHp * purebloodMult).round();
+      finalAtk = (finalAtk * purebloodMult).round();
+      finalDef = (finalDef * purebloodMult).round();
+      finalSpd = (finalSpd * purebloodMult).round();
     }
 
     final List<String> combinedPedigree = {
@@ -56,7 +57,9 @@ class CrucibleService {
       parentB.id,
     }.toList();
 
-    final int maxLvl = nextGeneration >= 4 ? 50 : 30 + (nextGeneration * 5);
+    // Max Level formula (10 levels per generation):
+    // G1=10, G2=20, G3=30, G4=40, G5=50, G6=60
+    final int maxLvl = nextGeneration * 10;
 
     return UnitEntity(
       id: "unit_${DateTime.now().millisecondsSinceEpoch}",
@@ -80,7 +83,7 @@ class CrucibleService {
 
   /// GDD v2.6 Section 14.1: Maximum allowed generation for MVP specification.
   /// Generations 4 through 6 are cleanly deferred to Post-MVP expansion.
-  static const int maxMvpGeneration = 3;
+  static const int maxMvpGeneration = 6;
 
   /// GDD v2.6 Section 12 & 14.1: Exponential Fusion Tax in Ash.
   /// Formula: Cost_Ash = 1000 * (1.85)^Generation
@@ -159,7 +162,13 @@ class CrucibleService {
     final String childName = customChildName ??
         (targetGen == 2
             ? 'Veteran ${parentA.name}'
-            : 'Paragon ${parentA.name}');
+            : (targetGen == 3
+                ? 'Paragon ${parentA.name}'
+                : (targetGen == 4
+                    ? 'Pureblood ${parentA.name}'
+                    : (targetGen == 5
+                        ? 'Ascendant ${parentA.name}'
+                        : 'Apex ${parentA.name}'))));
 
     final int maxLvl = 30 + (targetGen * 5); // Gen 2 = 40, Gen 3 = 45
 
@@ -182,6 +191,7 @@ class CrucibleService {
       reviveCount: 0,
       critRate: parentA.critRate,
       critDamage: parentA.critDamage,
+      rarity: parentA.rarity.index >= parentB.rarity.index ? parentA.rarity : parentB.rarity,
       nativeTraitId: parentA.nativeTraitId,
       graftedTraitId: parentB.nativeTraitId != parentA.nativeTraitId
           ? parentB.nativeTraitId

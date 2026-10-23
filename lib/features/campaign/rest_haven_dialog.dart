@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../shared/models/relic_entity.dart';
 import '../relics/relic_service.dart';
 import 'campaign_node.dart';
 

@@ -66,7 +66,7 @@ void main() {
         ),
       );
 
-      expect(find.text('CH. II: SUNKEN NECROPOLIS'), findsOneWidget);
+      expect(find.text('CH. II: SMOLDERING BARRICADE'), findsOneWidget);
       expect(find.byIcon(Icons.arrow_left), findsOneWidget);
       expect(find.byIcon(Icons.arrow_right), findsNothing);
 

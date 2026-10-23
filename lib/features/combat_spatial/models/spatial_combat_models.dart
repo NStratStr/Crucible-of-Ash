@@ -36,6 +36,8 @@ class SpatialActionEvent {
   final List<GridNode> affectedNodes;
   final Map<String, int> secondaryTargetHits; // targetId -> damage dealt
   final int timestampMs;
+  final bool isSignatureSkill;
+  final String? graftedTraitProc;
 
   const SpatialActionEvent({
     required this.id,
@@ -53,6 +55,8 @@ class SpatialActionEvent {
     this.affectedNodes = const [],
     this.secondaryTargetHits = const {},
     required this.timestampMs,
+    this.isSignatureSkill = false,
+    this.graftedTraitProc,
   });
 }
 
@@ -113,28 +117,28 @@ class SpatialCombatCard {
   });
 
   String get assetPath {
-    if (id == 'phalanx_intercept') {
+    if (id == 'phalanx_intercept' || id == 'stand_resolute' || id == 'iron_bulwark' || id == 'sanguine_ward') {
       return 'assets/images/Spells/Ash Armour.jpg';
     }
-    if (id == 'searing_brand') {
+    if (id == 'searing_brand' || id == 'smite_the_wicked') {
       return 'assets/images/Spells/Sunburst - Tier 1 Spell no text.png';
     }
-    if (id == 'smite_the_calcified') {
+    if (id == 'smite_the_calcified' || id == 'exsanguinating_strike' || id == 'disrupting_cleave') {
       return 'assets/images/Spells/Soul Shatter.jpg';
     }
     if (id == 'sun_ashlar_wrath' || id == 'sun_king_cataclysm') {
       return 'assets/images/Spells/Sunburst - Tier 1 Spell.png';
     }
-    if (id == 'revive_vitae') {
+    if (id == 'revive_vitae' || id == 'sanguine_revival' || id == 'rebind_flesh') {
       return 'assets/images/Spells/Sanguine Re-Summon.png';
     }
-    if (id == 'sanguine_siphon') {
+    if (id == 'sanguine_siphon' || id == 'siphon_vitality' || id == 'rend_flesh' || id == 'feast_of_ruin') {
       return 'assets/images/Spells/Sanguine Siphon.jpg';
     }
-    if (id == 'vitae_eruption') {
+    if (id == 'vitae_eruption' || id == 'corpse_burst' || id == 'virulent_cascade') {
       return 'assets/images/Spells/Vitae Erution - Tier 1 no txt.png';
     }
-    if (id == 'stoke_the_embers') {
+    if (id == 'stoke_the_embers' || id == 'retributive_stride' || id == 'quicken' || id == 'unravel_hex' || id == 'echoing_hourglass' || id == 'blood_boil') {
       return 'assets/images/Spells/Attack_spell_magic_circle.png';
     }
     return 'assets/images/Spells/Attack_spell_magic_circle.png';
@@ -227,10 +231,15 @@ class CombatUnitState {
   SpatialTelegraphIntent? pendingIntent;
 
   final String? customAssetPath;
+  final String? nativeTraitId;
+  final String? graftedTraitId;
   StanceType activeStance;
   int consecutiveTurnsStationary;
   bool hasStanceBonusReady;
   bool movedSinceLastTurn;
+  int actionCycleCount;
+  int signatureCooldown; // 0 = Signature Skill Ready! Fires every 3rd action cycle (2 basic -> 1 skill)
+  bool get isSignatureReady => signatureCooldown <= 0;
 
   CombatUnitState({
     required this.id,
@@ -266,9 +275,13 @@ class CombatUnitState {
     this.pendingIntent,
     StanceType? activeStance,
     this.customAssetPath,
+    this.nativeTraitId,
+    this.graftedTraitId,
     this.consecutiveTurnsStationary = 0,
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
+    this.actionCycleCount = 0,
+    this.signatureCooldown = 2,
   })  : baseMaxHp = baseMaxHp ?? maxHp,
         isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
         activeStance = activeStance ?? _defaultStanceForArchetype(archetype);
@@ -321,6 +334,7 @@ class CombatUnitState {
 
   bool get isAlive => hp > 0;
   bool get isDowned => hp <= 0;
+  bool get isTurnReady => currentAp >= 10000;
   bool get isStunned => stunDuration > 0;
   bool get isFrozen => freezeDuration > 0;
   bool get isBurning => burnDuration > 0;
@@ -435,7 +449,10 @@ class CombatUnitState {
     if (key.contains('ghoul')) {
       return 'assets/images/grave_ghoul_g1.png';
     }
-    if (key.contains('warhound') || key.contains('beast') || key.contains('crawler') || key.contains('voidfang')) {
+    if (key.contains('cerberus')) {
+      return 'assets/images/cerberus_pureblood.png';
+    }
+    if (key.contains('warhound') || key.contains('beast') || key.contains('crawler') || key.contains('voidfang') || key.contains('hound')) {
       return 'assets/images/feral_warhound.png';
     }
     if (key.contains('golem') || key.contains('magma')) {
@@ -463,6 +480,113 @@ class CombatUnitState {
       return 'assets/images/marksman_base.png';
     }
     return 'assets/images/footman_base.png';
+  }
+
+  /// Distinct Unit Signature Skill Name (triggers every 3rd action cycle)
+  String get signatureSkillName {
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('vladislav')) return 'Crimson Exsanguination';
+    if (key.contains('valeria')) return 'Aegis of the Iron Legion';
+    if (key.contains('malakor')) return 'Solar Judgment';
+    if (key.contains('morrigan')) return 'Blighted Miasma Hex';
+    if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      return 'Concussive Shield Slam';
+    }
+    if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
+      return 'Lacerating Cross-Slash';
+    }
+    if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      return 'Armor-Piercing Volley';
+    }
+    if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
+      return 'Savage Fang Maul';
+    }
+    if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      return 'Sanctified Vitae Surge';
+    }
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
+      return 'Abyssal Soul Bolt';
+    }
+
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Crushing Vanguard Slam';
+      case UnitArchetype.reachMidline:
+        return 'Rending Flank Strike';
+      case UnitArchetype.backlineCaster:
+        return 'Arcane Conduit Surge';
+      case UnitArchetype.colossusBehemoth:
+        return 'Tectonic Crush';
+    }
+  }
+
+  /// Signature Skill Tactical Effect Description
+  String get signatureSkillDescription {
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('vladislav')) {
+      return '160% ATK cleave + 2 Bleed stacks + drains 35% of damage dealt as HP.';
+    }
+    if (key.contains('valeria')) {
+      return '145% ATK strike + shreds 25% Armor + grants +25 Aegis Shield to Frontline allies.';
+    }
+    if (key.contains('malakor')) {
+      return '160% Holy DMG + inflicts 3s Solar Burn and Vulnerable.';
+    }
+    if (key.contains('morrigan')) {
+      return '145% Nature DMG + inflicts 3 Poison stacks and Vulnerable.';
+    }
+    if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      return '135% ATK bash + shreds 15 Armor, staggers -1,500 AP, and grants +25 Aegis Shield.';
+    }
+    if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
+      return '150% ATK twin slash + inflicts 2 Bleed stacks and +15% Crit surge.';
+    }
+    if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      return '155% ATK piercing shot ignoring 50% Armor + inflicts Vulnerable (3s).';
+    }
+    if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
+      return '150% ATK lunging bite + 2 Bleed stacks and grants Haste (3s).';
+    }
+    if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      return '130% Magic burst + heals lowest-HP ally for 40 HP and grants +20 Aegis Shield.';
+    }
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
+      return '155% Arcane burst + inflicts 2 Bleed/Burn and siphons +1 Global Focus.';
+    }
+    return 'Unleashes a 145% power signature strike every 3rd turn (+25% Ultimate Charge).';
+  }
+
+  /// Human-readable Grafted Trait label for Crucible-bred lineages
+  String? get graftedTraitDisplayName {
+    final trait = graftedTraitId;
+    if (trait == null || trait.isEmpty) return null;
+    final t = trait.toLowerCase();
+    if (t.contains('vampiric') || t.contains('siphon') || t.contains('leech')) {
+      return 'Vampiric Conduit (+25% Lifesteal)';
+    }
+    if (t.contains('rabid') || t.contains('serrated') || t.contains('bleed') || t.contains('hemorrhage')) {
+      return 'Serrated Lineage (+1 Bleed & Haste)';
+    }
+    if (t.contains('bastion') || t.contains('carapace') || t.contains('bulwark') || t.contains('iron') || t.contains('shield')) {
+      return 'Iron Bastion (+20 Aegis on Hit)';
+    }
+    if (t.contains('solar') || t.contains('cinder') || t.contains('pyre') || t.contains('burn') || t.contains('flame')) {
+      return 'Solar Ignition (+2s Burn on Hit)';
+    }
+    if (t.contains('miasma') || t.contains('venom') || t.contains('blight') || t.contains('poison') || t.contains('spore')) {
+      return 'Miasmic Spores (+2 Poison on Hit)';
+    }
+    if (t.contains('keen') || t.contains('predator') || t.contains('pack') || t.contains('execution')) {
+      return 'Predator Instinct (+20% DMG & +1,200 AP)';
+    }
+    // Format snake_case ID nicely
+    final formatted = trait
+        .replaceAll('trait_', '')
+        .split('_')
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+    return '$formatted (+15% DMG & +15 Aegis)';
   }
 
   /// Ultimate Skill Display Title

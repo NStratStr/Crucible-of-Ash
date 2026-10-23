@@ -97,14 +97,27 @@ void main() {
       expect(g3Child.maxHp, equals(1213));
     });
 
-    test('Fusing beyond G3 is blocked by MVP boundary', () {
+    test('Fusing allows progression up to Gen 6 and blocks beyond Gen 6', () {
       final g2A = CrucibleService.fuseMvpDuplicates(parentA: parentA, parentB: parentB, fixedVariance: 1.0);
       final g2B = CrucibleService.fuseMvpDuplicates(parentA: parentA, parentB: parentB, fixedVariance: 1.0);
       final g3A = CrucibleService.fuseMvpDuplicates(parentA: g2A, parentB: g2B, fixedVariance: 1.0);
       final g3B = CrucibleService.fuseMvpDuplicates(parentA: g2A, parentB: g2B, fixedVariance: 1.0);
+      expect(g3A.generation, equals(3));
+
+      final g4A = CrucibleService.fuseMvpDuplicates(parentA: g3A, parentB: g3B, fixedVariance: 1.0);
+      final g4B = CrucibleService.fuseMvpDuplicates(parentA: g3A, parentB: g3B, fixedVariance: 1.0);
+      expect(g4A.generation, equals(4));
+
+      final g5A = CrucibleService.fuseMvpDuplicates(parentA: g4A, parentB: g4B, fixedVariance: 1.0);
+      final g5B = CrucibleService.fuseMvpDuplicates(parentA: g4A, parentB: g4B, fixedVariance: 1.0);
+      expect(g5A.generation, equals(5));
+
+      final g6 = CrucibleService.fuseMvpDuplicates(parentA: g5A, parentB: g5B, fixedVariance: 1.0);
+      expect(g6.generation, equals(6));
+      expect(g6.name, contains('Apex'));
 
       expect(
-        () => CrucibleService.fuseMvpDuplicates(parentA: g3A, parentB: g3B, fixedVariance: 1.0),
+        () => CrucibleService.fuseMvpDuplicates(parentA: g6, parentB: g6, fixedVariance: 1.0),
         throwsA(isA<StateError>()),
       );
     });

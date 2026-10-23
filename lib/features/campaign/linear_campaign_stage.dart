@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import 'campaign_node.dart';
 
@@ -35,19 +34,37 @@ class LinearCampaignStage {
     this.isBoss = false,
   });
 
-  static List<LinearCampaignStage> getStagesForChapter(int chapter) {
-    switch (chapter) {
+  /// Returns 10 stages for any given mission (1 to 10)
+  static List<LinearCampaignStage> getStagesForChapter(int missionNumber) {
+    switch (missionNumber) {
       case 2:
-        return _chapter2Stages;
+        return _mission2Stages;
       case 3:
-        return _chapter3Stages;
+        return _mission3Stages;
+      case 4:
+        return _mission4Stages;
+      case 5:
+        return _mission5Stages;
+      case 6:
+        return _mission6Stages;
+      case 7:
+        return _mission7Stages;
+      case 8:
+        return _mission8Stages;
+      case 9:
+        return _mission9Stages;
+      case 10:
+        return _mission10Stages;
       case 1:
       default:
-        return _chapter1Stages;
+        return _mission1Stages;
     }
   }
 
-  static const List<LinearCampaignStage> _chapter1Stages = [
+  // =========================================================================
+  // MISSION 1: THE OUTSKIRT WRECKAGE (1-1 to 1-10) • Act I
+  // =========================================================================
+  static const List<LinearCampaignStage> _mission1Stages = [
     LinearCampaignStage(
       stageNumber: 1,
       stageCode: '1-1',
@@ -57,7 +74,7 @@ class LinearCampaignStage {
       type: CampaignNodeType.skirmish,
       rewardIchor: 150,
       rewardOre: 20,
-      enemyAffinities: [Archetype.juggernaut, Archetype.marksman],
+      enemyAffinities: [Archetype.juggernaut, Archetype.skirmisher],
       hazard: CampaignHazardType.ashenEmberStorm,
       backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
       thumbnailAsset: 'assets/images/ashen_trail_desolation.jpg',
@@ -66,70 +83,68 @@ class LinearCampaignStage {
       stageNumber: 2,
       stageCode: '1-2',
       name: 'Sunken Trench',
-      description: 'Feral war-hounds prowling through the mud and calcified bones.',
+      description: 'Feral pyrehounds and scavenging ghouls prowling through mud and calcified bones.',
       environmentTitle: 'Trench Ruins • Depth 2',
       type: CampaignNodeType.skirmish,
       rewardIchor: 180,
       rewardOre: 25,
-      enemyAffinities: [Archetype.skirmisher, Archetype.occultist],
+      enemyAffinities: [Archetype.skirmisher, Archetype.assassin],
       hazard: CampaignHazardType.ashenEmberStorm,
       backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
-      thumbnailAsset: 'assets/images/feral_warhound.jpg',
+      thumbnailAsset: 'assets/images/feral_warhound.png',
     ),
     LinearCampaignStage(
       stageNumber: 3,
       stageCode: '1-3',
       name: 'Siphon Threshold',
-      description: 'Ancient bloodline conduit radiating dark alchemical energy.',
+      description: 'Ancient bloodline conduit radiating dark alchemical energy and blood chanters.',
       environmentTitle: 'Altar Grounds • Depth 3',
-      type: CampaignNodeType.altar,
+      type: CampaignNodeType.skirmish,
       rewardIchor: 220,
       rewardOre: 30,
-      rewardSigils: 1,
       enemyAffinities: [Archetype.occultist, Archetype.support],
       hazard: CampaignHazardType.none,
-      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
       thumbnailAsset: 'assets/images/blood_altar_sigil.jpg',
     ),
     LinearCampaignStage(
       stageNumber: 4,
       stageCode: '1-4',
       name: 'The Scorched Bridge',
-      description: 'Armored vanguard patrols blocking the passage across the volcanic ravine.',
+      description: 'Lava-infused colossi and fiery vanguard guards blocking the basalt viaduct.',
       environmentTitle: 'Basalt Viaduct • Depth 4',
       type: CampaignNodeType.skirmish,
       rewardIchor: 250,
       rewardOre: 35,
-      enemyAffinities: [Archetype.juggernaut, Archetype.assassin],
+      enemyAffinities: [Archetype.juggernaut, Archetype.skirmisher],
       hazard: CampaignHazardType.ashenEmberStorm,
-      backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
-      thumbnailAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
+      thumbnailAsset: 'assets/images/magma_golem.png',
     ),
     LinearCampaignStage(
       stageNumber: 5,
       stageCode: '1-5',
       name: 'Abyssal Juggernaut',
-      description: 'Elite heavy guardian wielding an iron slab in the storm eye.',
+      description: 'Heavy Dreadnought Colossus clad in wrought iron, crushing intruders.',
       environmentTitle: 'Chamber of Iron • Midpoint Elite',
       type: CampaignNodeType.elite,
       rewardIchor: 350,
       rewardOre: 50,
-      rewardSigils: 1,
-      enemyAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.marksman],
-      hazard: CampaignHazardType.ashenEmberStorm,
-      backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
+      enemyAffinities: [Archetype.juggernaut, Archetype.marksman],
+      hazard: CampaignHazardType.none,
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
       thumbnailAsset: 'assets/images/ironclad_dreadnought.jpg',
     ),
     LinearCampaignStage(
       stageNumber: 6,
       stageCode: '1-6',
       name: 'Smoldering Haven',
-      description: 'Sanctuary fires burning with soul embers. Bind wounds and rearm.',
+      description: 'Soulfire embers provide refuge, guarded by fallen sentinel remnants.',
       environmentTitle: 'Rest Haven • Depth 6',
-      type: CampaignNodeType.restHaven,
+      type: CampaignNodeType.skirmish,
       rewardIchor: 150,
       rewardOre: 20,
-      enemyAffinities: [],
+      enemyAffinities: [Archetype.support, Archetype.skirmisher],
       hazard: CampaignHazardType.none,
       backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
       thumbnailAsset: 'assets/images/bone_campfire.jpg',
@@ -138,44 +153,43 @@ class LinearCampaignStage {
       stageNumber: 7,
       stageCode: '1-7',
       name: 'Ravenwood Thicket',
-      description: 'Winged crypt stalkers ambushing from the blackened branches.',
+      description: 'Winged crypt stalkers and feral beasts ambushing from petrified groves.',
       environmentTitle: 'Blighted Forest • Depth 7',
       type: CampaignNodeType.skirmish,
       rewardIchor: 280,
       rewardOre: 40,
-      enemyAffinities: [Archetype.skirmisher, Archetype.marksman],
-      hazard: CampaignHazardType.ashenEmberStorm,
+      enemyAffinities: [Archetype.assassin, Archetype.skirmisher],
+      hazard: CampaignHazardType.miasmaMire,
       backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
-      thumbnailAsset: 'assets/images/ashen_trail_desolation.jpg',
+      thumbnailAsset: 'assets/images/cerberus_pureblood.png',
     ),
     LinearCampaignStage(
       stageNumber: 8,
       stageCode: '1-8',
-      name: 'Obsidian Spire',
-      description: 'High watchtower overlooking the Ashen Rift and the Titan lair.',
-      environmentTitle: 'Observation Spire • Depth 8',
-      type: CampaignNodeType.watchtower,
-      rewardIchor: 200,
+      name: 'Plague Altar of the Flayed',
+      description: 'Corrupted zealots offering calcified marrow to the flayed titans.',
+      environmentTitle: 'Desecrated Crypt • Depth 8',
+      type: CampaignNodeType.skirmish,
+      rewardIchor: 320,
       rewardOre: 45,
-      enemyAffinities: [],
-      hazard: CampaignHazardType.none,
-      backgroundAsset: 'assets/images/realm_overworld_map.jpg',
-      thumbnailAsset: 'assets/images/realm_overworld_map.jpg',
+      enemyAffinities: [Archetype.occultist, Archetype.juggernaut],
+      hazard: CampaignHazardType.miasmaMire,
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
+      thumbnailAsset: 'assets/images/plague_occultist.jpg',
     ),
     LinearCampaignStage(
       stageNumber: 9,
       stageCode: '1-9',
-      name: 'Chained Sarcophagus',
-      description: 'Ancient lineage crypt holding sealed progenitor blood.',
-      environmentTitle: 'Defiled Crypt • Depth 9',
-      type: CampaignNodeType.crypt,
-      rewardIchor: 300,
-      rewardOre: 50,
-      rewardSigils: 1,
-      enemyAffinities: [Archetype.occultist, Archetype.assassin],
-      hazard: CampaignHazardType.none,
-      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
-      thumbnailAsset: 'assets/images/gothic_arch_battlefield.jpg',
+      name: 'Spire of the Fallen Sentinels',
+      description: 'Ancient watchtower teeming with sharpshooters and void balistas.',
+      environmentTitle: 'Obsidian Spire • Depth 9',
+      type: CampaignNodeType.elite,
+      rewardIchor: 400,
+      rewardOre: 60,
+      enemyAffinities: [Archetype.marksman, Archetype.assassin],
+      hazard: CampaignHazardType.ashenEmberStorm,
+      backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
+      thumbnailAsset: 'assets/images/ballista_pureblood.png',
     ),
     LinearCampaignStage(
       stageNumber: 10,
@@ -190,89 +204,48 @@ class LinearCampaignStage {
       enemyAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin, Archetype.marksman],
       hazard: CampaignHazardType.ashenEmberStorm,
       backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
-      thumbnailAsset: 'assets/images/flayed_butcher.jpg',
+      thumbnailAsset: 'assets/images/flayed_butcher.png',
       isBoss: true,
     ),
   ];
 
-  static const List<LinearCampaignStage> _chapter2Stages = [
-    LinearCampaignStage(
-      stageNumber: 1,
-      stageCode: '2-1',
-      name: 'Sunken Crypt Entrance',
-      description: 'Mire vapors choke the flooded necropolis arches.',
-      environmentTitle: 'Submerged Tombs • Depth 1',
-      type: CampaignNodeType.skirmish,
-      rewardIchor: 250,
-      rewardOre: 35,
-      enemyAffinities: [Archetype.skirmisher, Archetype.occultist],
-      hazard: CampaignHazardType.miasmaMire,
-      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
-      thumbnailAsset: 'assets/images/gothic_arch_battlefield.jpg',
-    ),
-    LinearCampaignStage(
-      stageNumber: 5,
-      stageCode: '2-5',
-      name: 'Plague Alchemist Coven',
-      description: 'Corrosive alchemists distilling necrotic plague cauldrons.',
-      environmentTitle: 'Alchemical Sanctum • Depth 5',
-      type: CampaignNodeType.elite,
-      rewardIchor: 500,
-      rewardOre: 70,
-      rewardSigils: 1,
-      enemyAffinities: [Archetype.occultist, Archetype.juggernaut],
-      hazard: CampaignHazardType.miasmaMire,
-      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
-      thumbnailAsset: 'assets/images/plague_occultist.jpg',
-    ),
-    LinearCampaignStage(
-      stageNumber: 10,
-      stageCode: '2-10',
-      name: 'Malakor the Carrion Father',
-      description: 'Ancient necromancer commanding decaying legions from the sunken mire.',
-      environmentTitle: 'Carrion Cathedral • CHAPTER II CLIMAX',
-      type: CampaignNodeType.boss,
-      rewardIchor: 1500,
-      rewardOre: 150,
-      rewardSigils: 3,
-      enemyAffinities: [Archetype.occultist, Archetype.juggernaut, Archetype.skirmisher],
-      hazard: CampaignHazardType.miasmaMire,
-      backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
-      thumbnailAsset: 'assets/images/plague_occultist.jpg',
-      isBoss: true,
-    ),
-  ];
+  // Helper factory to generate generic regional stages
+  static List<LinearCampaignStage> _buildGenericStages(int mission, String zoneName, String bgAsset, String bossName, String bossAsset) {
+    return List.generate(10, (i) {
+      final stageNum = i + 1;
+      final isBoss = stageNum == 10;
+      final isElite = stageNum == 5 || stageNum == 9;
+      return LinearCampaignStage(
+        stageNumber: stageNum,
+        stageCode: '$mission-$stageNum',
+        name: isBoss ? bossName : (isElite ? '$zoneName Vanguard Elite' : '$zoneName Sector $stageNum'),
+        description: isBoss
+            ? 'The apex guardian of the $zoneName. Defeat it to secure the regional catalyst!'
+            : 'Clear enemy scouting battalions holding defensive fortifications in $zoneName.',
+        environmentTitle: '$zoneName • Stage $stageNum',
+        type: isBoss ? CampaignNodeType.boss : (isElite ? CampaignNodeType.elite : CampaignNodeType.skirmish),
+        rewardIchor: isBoss ? 1200 + mission * 150 : 200 + stageNum * 20,
+        rewardOre: isBoss ? 120 + mission * 15 : 25 + stageNum * 4,
+        rewardSigils: isBoss ? 2 + (mission ~/ 3) : (isElite ? 1 : 0),
+        enemyAffinities: [
+          Archetype.values[stageNum % Archetype.values.length],
+          Archetype.values[(stageNum + 2) % Archetype.values.length],
+        ],
+        hazard: mission % 2 == 0 ? CampaignHazardType.miasmaMire : CampaignHazardType.ashenEmberStorm,
+        backgroundAsset: bgAsset,
+        thumbnailAsset: isBoss ? bossAsset : (isElite ? 'assets/images/ironclad_dreadnought.jpg' : bgAsset),
+        isBoss: isBoss,
+      );
+    });
+  }
 
-  static const List<LinearCampaignStage> _chapter3Stages = [
-    LinearCampaignStage(
-      stageNumber: 1,
-      stageCode: '3-1',
-      name: 'Abyssal Void Rift',
-      description: 'Gravity fluctuates as reality cracks into the void.',
-      environmentTitle: 'Fractured Realm • Depth 1',
-      type: CampaignNodeType.skirmish,
-      rewardIchor: 400,
-      rewardOre: 60,
-      enemyAffinities: [Archetype.assassin, Archetype.marksman],
-      hazard: CampaignHazardType.voidDistortion,
-      backgroundAsset: 'assets/images/realm_overworld_map.jpg',
-      thumbnailAsset: 'assets/images/realm_overworld_map.jpg',
-    ),
-    LinearCampaignStage(
-      stageNumber: 10,
-      stageCode: '3-10',
-      name: 'The Void Sovereign Colossus',
-      description: 'The ancient titan that ruptured the Undying Hearth.',
-      environmentTitle: 'Core Hearth • FINAL ASCENSION',
-      type: CampaignNodeType.boss,
-      rewardIchor: 3000,
-      rewardOre: 250,
-      rewardSigils: 5,
-      enemyAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin, Archetype.marksman, Archetype.support],
-      hazard: CampaignHazardType.voidDistortion,
-      backgroundAsset: 'assets/images/realm_overworld_map.jpg',
-      thumbnailAsset: 'assets/images/realm_overworld_map.jpg',
-      isBoss: true,
-    ),
-  ];
+  static final List<LinearCampaignStage> _mission2Stages = _buildGenericStages(2, 'Smoldering Barricade', 'assets/images/ashen_trail_desolation.jpg', 'Slag-Carapace Sentinel', 'assets/images/magma_golem.png');
+  static final List<LinearCampaignStage> _mission3Stages = _buildGenericStages(3, 'Resonance Beacon Perimeter', 'assets/images/ashen_trail_desolation.jpg', 'Ash-Storm Colossus', 'assets/images/flayed_butcher.png');
+  static final List<LinearCampaignStage> _mission4Stages = _buildGenericStages(4, 'Forge-Master\'s Gate', 'assets/images/volcanic_chasm_battlefield.jpg', 'Dreadnought Forge-Master', 'assets/images/ironclad_dreadnought.jpg');
+  static final List<LinearCampaignStage> _mission5Stages = _buildGenericStages(5, 'The Molten Caldera', 'assets/images/volcanic_chasm_battlefield.jpg', 'Pyre Drake Gorgoroth', 'assets/images/flayed_butcher.png');
+  static final List<LinearCampaignStage> _mission6Stages = _buildGenericStages(6, 'The Glass Scriptorium', 'assets/images/gothic_arch_battlefield.jpg', 'Arch-Lich Malakor', 'assets/images/plague_occultist.jpg');
+  static final List<LinearCampaignStage> _mission7Stages = _buildGenericStages(7, 'The Petrified Bog-Lands', 'assets/images/gothic_arch_battlefield.jpg', 'Mother Morrigan\'s Avatar', 'assets/images/cerberus_pureblood.png');
+  static final List<LinearCampaignStage> _mission8Stages = _buildGenericStages(8, 'The Obsidian Sepulcher', 'assets/images/gothic_arch_battlefield.jpg', 'Strigoi Blood-Lord', 'assets/images/strigoi_lord_g6.png');
+  static final List<LinearCampaignStage> _mission9Stages = _buildGenericStages(9, 'The Tectonic Trench', 'assets/images/volcanic_chasm_battlefield.jpg', 'Tectonic Engine Juggernaut', 'assets/images/magma_golem.png');
+  static final List<LinearCampaignStage> _mission10Stages = _buildGenericStages(10, 'Siege of the Ash-Spire', 'assets/images/realm_overworld_map.jpg', 'Grand Inquisitor of the Pyre', 'assets/images/lord_justicar_g6.png');
 }

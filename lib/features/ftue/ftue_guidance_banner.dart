@@ -19,7 +19,7 @@ class FtueGuidanceBanner extends StatefulWidget {
 }
 
 class _FtueGuidanceBannerState extends State<FtueGuidanceBanner> {
-  bool _isExpanded = true;
+  bool _isExpanded = false;
 
   void _showTomeDialog(BuildContext context, FtueStage stage) {
     showDialog(
@@ -97,7 +97,7 @@ class _FtueGuidanceBannerState extends State<FtueGuidanceBanner> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: const Color(0xFF15151D),
         borderRadius: BorderRadius.circular(12),
@@ -119,27 +119,27 @@ class _FtueGuidanceBannerState extends State<FtueGuidanceBanner> {
           // Header Bar
           InkWell(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: Row(
                 children: [
-                  Icon(stage.icon, color: const Color(0xFFE5A93C), size: 18),
+                  Icon(stage.icon, color: const Color(0xFFE5A93C), size: 16),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFF261010),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: const Color(0xFFB3261E)),
                     ),
                     child: Text(
-                      isFinished ? 'PROLOGUE COMPLETE' : 'PROLOGUE [${stage.stepNumber}/5]',
+                      isFinished ? 'PROLOGUE' : 'PROLOGUE [${stage.stepNumber}/5]',
                       style: const TextStyle(
                         color: Color(0xFFE5A93C),
-                        fontSize: 9,
+                        fontSize: 8.5,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                        letterSpacing: 0.6,
                       ),
                     ),
                   ),
@@ -149,20 +149,66 @@ class _FtueGuidanceBannerState extends State<FtueGuidanceBanner> {
                       stage.title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.4,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(_isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, size: 18),
-                    color: Colors.white60,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => setState(() => _isExpanded = !_isExpanded),
-                  ),
+                  if (!_isExpanded) ...[
+                    InkWell(
+                      onTap: () => _showTomeDialog(context, stage),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E28),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.6)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.menu_book, size: 10, color: Color(0xFFE5A93C)),
+                            SizedBox(width: 3),
+                            Text('TOME', style: TextStyle(color: Color(0xFFE5A93C), fontSize: 8.5, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: isFinished
+                          ? (widget.onReplayAwakening ?? widget.onLaunchStageAction)
+                          : widget.onLaunchStageAction,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isFinished ? const Color(0xFF333340) : const Color(0xFFB3261E),
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFB3261E).withValues(alpha: 0.4),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(isFinished ? Icons.replay : Icons.play_arrow, size: 11, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              isFinished ? 'REPLAY' : 'LAUNCH',
+                              style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Icon(_isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, size: 16, color: Colors.white60),
                 ],
               ),
             ),

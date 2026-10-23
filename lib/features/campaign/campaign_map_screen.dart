@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/expedition_boon.dart';
-import 'ascension_tier_data.dart';
 import 'ascension_tier_dialog.dart';
 import 'campaign_node.dart';
 import 'linear_campaign_stage.dart';
@@ -43,29 +42,127 @@ class ChapterTheme {
       case 2:
         return const ChapterTheme(
           chapter: 2,
-          title: 'CH. II: SUNKEN NECROPOLIS',
-          subtitle: 'The Submerged Tombs • Depths 0–5',
+          title: 'CH. II: SMOLDERING BARRICADE',
+          subtitle: 'Scavenger Checkpoint • Depth 1–10',
+          primaryColor: Color(0xFFE65100),
+          secondaryColor: Color(0xFFFF9100),
+          backgroundColor: Color(0xFF140C08),
+          surfaceColor: Color(0xFF24160E),
+          pathColor: Color(0xFF382012),
+          activePathColor: Color(0xFFFF6D00),
+          chapterIcon: Icons.shield,
+          backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
+        );
+      case 3:
+        return const ChapterTheme(
+          chapter: 3,
+          title: 'CH. III: FIRST BEACON PULSE',
+          subtitle: 'The Sanctuary Frontier • Depth 1–10',
+          primaryColor: Color(0xFF00E5FF),
+          secondaryColor: Color(0xFF80D8FF),
+          backgroundColor: Color(0xFF061418),
+          surfaceColor: Color(0xFF0C242A),
+          pathColor: Color(0xFF163C44),
+          activePathColor: Color(0xFF00B0FF),
+          chapterIcon: Icons.cell_tower,
+          backgroundAsset: 'assets/images/ashen_trail_desolation.jpg',
+        );
+      case 4:
+        return const ChapterTheme(
+          chapter: 4,
+          title: 'CH. IV: FORGE-MASTER\'S GATE',
+          subtitle: 'Basalt Ridges Outpost • Depth 1–10',
+          primaryColor: Color(0xFFFF5722),
+          secondaryColor: Color(0xFFFFAB91),
+          backgroundColor: Color(0xFF190C0A),
+          surfaceColor: Color(0xFF281410),
+          pathColor: Color(0xFF40221A),
+          activePathColor: Color(0xFFFF3D00),
+          chapterIcon: Icons.hardware,
+          backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
+        );
+      case 5:
+        return const ChapterTheme(
+          chapter: 5,
+          title: 'CH. V: THE MOLTEN CALDERA',
+          subtitle: 'Master Crucible Core • Depth 1–10',
+          primaryColor: Color(0xFFD50000),
+          secondaryColor: Color(0xFFFF1744),
+          backgroundColor: Color(0xFF1A0606),
+          surfaceColor: Color(0xFF2D0E0E),
+          pathColor: Color(0xFF481414),
+          activePathColor: Color(0xFFFF5252),
+          chapterIcon: Icons.fireplace,
+          backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
+        );
+      case 6:
+        return const ChapterTheme(
+          chapter: 6,
+          title: 'CH. VI: GLASS SCRIPTORIUM',
+          subtitle: 'Quicksilver Archives • Depth 1–10',
           primaryColor: Color(0xFF00897B),
           secondaryColor: Color(0xFF26A69A),
           backgroundColor: Color(0xFF0A1312),
           surfaceColor: Color(0xFF10211F),
           pathColor: Color(0xFF1C3432),
           activePathColor: Color(0xFF00BFA5),
-          chapterIcon: Icons.water,
+          chapterIcon: Icons.menu_book,
           backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
         );
-      case 3:
+      case 7:
         return const ChapterTheme(
-          chapter: 3,
-          title: 'CH. III: ABYSSAL RIFT',
-          subtitle: 'The Primordial Void • Depths 0–5',
-          primaryColor: Color(0xFF8E24AA),
+          chapter: 7,
+          title: 'CH. VII: PETRIFIED BOG-LANDS',
+          subtitle: 'The Mire Coven Canopy • Depth 1–10',
+          primaryColor: Color(0xFF2E7D32),
+          secondaryColor: Color(0xFF81C784),
+          backgroundColor: Color(0xFF09140A),
+          surfaceColor: Color(0xFF112214),
+          pathColor: Color(0xFF1C3620),
+          activePathColor: Color(0xFF4CAF50),
+          chapterIcon: Icons.forest,
+          backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
+        );
+      case 8:
+        return const ChapterTheme(
+          chapter: 8,
+          title: 'CH. VIII: OBSIDIAN SEPULCHER',
+          subtitle: 'The Deep Blood Pools • Depth 1–10',
+          primaryColor: Color(0xFF6A1B9A),
           secondaryColor: Color(0xFFBA68C8),
-          backgroundColor: Color(0xFF0F0B16),
-          surfaceColor: Color(0xFF1B1226),
-          pathColor: Color(0xFF2C193C),
-          activePathColor: Color(0xFFD500F9),
-          chapterIcon: Icons.dark_mode,
+          backgroundColor: Color(0xFF0F0716),
+          surfaceColor: Color(0xFF1F0E2C),
+          pathColor: Color(0xFF321648),
+          activePathColor: Color(0xFFAB47BC),
+          chapterIcon: Icons.vpn_key,
+          backgroundAsset: 'assets/images/gothic_arch_battlefield.jpg',
+        );
+      case 9:
+        return const ChapterTheme(
+          chapter: 9,
+          title: 'CH. IX: THE TECTONIC TRENCH',
+          subtitle: 'Subterranean World-Wound • Depth 1–10',
+          primaryColor: Color(0xFFBF360C),
+          secondaryColor: Color(0xFFFF7043),
+          backgroundColor: Color(0xFF140804),
+          surfaceColor: Color(0xFF251008),
+          pathColor: Color(0xFF3D1C10),
+          activePathColor: Color(0xFFFF5722),
+          chapterIcon: Icons.landslide,
+          backgroundAsset: 'assets/images/volcanic_chasm_battlefield.jpg',
+        );
+      case 10:
+        return const ChapterTheme(
+          chapter: 10,
+          title: 'CH. X: SIEGE OF THE ASH-SPIRE',
+          subtitle: 'The Final Cataclysm • Depth 1–10',
+          primaryColor: Color(0xFFFFD54F),
+          secondaryColor: Color(0xFFFFE082),
+          backgroundColor: Color(0xFF161308),
+          surfaceColor: Color(0xFF26200D),
+          pathColor: Color(0xFF403615),
+          activePathColor: Color(0xFFFFC107),
+          chapterIcon: Icons.castle,
           backgroundAsset: 'assets/images/realm_overworld_map.jpg',
         );
       case 1:
@@ -73,7 +170,7 @@ class ChapterTheme {
         return const ChapterTheme(
           chapter: 1,
           title: 'CH. I: ASHEN PERIMETER',
-          subtitle: 'The Burning Outposts • Depths 0–4',
+          subtitle: 'The Burning Outposts • Depth 1–10',
           primaryColor: Color(0xFFB3261E),
           secondaryColor: Color(0xFFE5A93C),
           backgroundColor: Color(0xFF111114),
@@ -128,7 +225,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.onAscensionChanged,
     this.activeBoons = const {},
     this.initialViewMode = CampaignViewMode.linearLadder,
-    this.completedLinearStages = 2,
+    this.completedLinearStages = 0,
   });
 
   static String chapterTitle(int ch) {
@@ -136,11 +233,25 @@ class CampaignMapScreen extends StatefulWidget {
       case 1:
         return 'CH. I: ASHEN PERIMETER';
       case 2:
-        return 'CH. II: SUNKEN NECROPOLIS';
+        return 'CH. II: SMOLDERING BARRICADE';
       case 3:
-        return 'CH. III: ABYSSAL RIFT';
+        return 'CH. III: FIRST BEACON PULSE';
+      case 4:
+        return 'CH. IV: FORGE-MASTER\'S GATE';
+      case 5:
+        return 'CH. V: THE MOLTEN CALDERA';
+      case 6:
+        return 'CH. VI: GLASS SCRIPTORIUM';
+      case 7:
+        return 'CH. VII: PETRIFIED BOG-LANDS';
+      case 8:
+        return 'CH. VIII: OBSIDIAN SEPULCHER';
+      case 9:
+        return 'CH. IX: THE TECTONIC TRENCH';
+      case 10:
+        return 'CH. X: SIEGE OF THE ASH-SPIRE';
       default:
-        return 'TIER $ch: DEEP DESCENT';
+        return 'CH. $ch: DEEP DESCENT';
     }
   }
 
@@ -151,12 +262,16 @@ class CampaignMapScreen extends StatefulWidget {
 class _CampaignMapScreenState extends State<CampaignMapScreen> {
   late CampaignViewMode _viewMode;
   late int _completedLinearStages;
+  final ScrollController _linearStagesScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _viewMode = widget.initialViewMode;
     _completedLinearStages = widget.completedLinearStages;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToActiveStage(animate: false);
+    });
   }
 
   @override
@@ -164,7 +279,45 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.completedLinearStages != widget.completedLinearStages) {
       _completedLinearStages = widget.completedLinearStages;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToActiveStage(animate: true);
+      });
     }
+  }
+
+  @override
+  void dispose() {
+    _linearStagesScrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToActiveStage({bool animate = true}) {
+    if (!_linearStagesScrollController.hasClients) return;
+    final int targetIndex = (_completedLinearStages).clamp(0, 9);
+    const double itemStride = 244.0; // 220px card + 24px separator
+    final double viewportWidth = _linearStagesScrollController.position.viewportDimension;
+    final double targetOffset = (targetIndex * itemStride - (viewportWidth * 0.25))
+        .clamp(0.0, _linearStagesScrollController.position.maxScrollExtent);
+    if (animate) {
+      _linearStagesScrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _linearStagesScrollController.jumpTo(targetOffset);
+    }
+  }
+
+  void _scrollStagesBy(double delta) {
+    if (!_linearStagesScrollController.hasClients) return;
+    final double nextOffset = (_linearStagesScrollController.offset + delta)
+        .clamp(0.0, _linearStagesScrollController.position.maxScrollExtent);
+    _linearStagesScrollController.animateTo(
+      nextOffset,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -621,6 +774,21 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                     const SizedBox(width: 8),
                     Row(
                       children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left, color: Color(0xFFFFD54F), size: 18),
+                          tooltip: 'Scroll Stages Left',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
+                          onPressed: () => _scrollStagesBy(-488),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right, color: Color(0xFFFFD54F), size: 18),
+                          tooltip: 'Scroll to Next Stages',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
+                          onPressed: () => _scrollStagesBy(488),
+                        ),
+                        const SizedBox(width: 6),
                         Text(
                           '$_completedLinearStages/${stages.length} CLEARED',
                           style: const TextStyle(
@@ -654,10 +822,17 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
 
               // Horizontal Stages ListView
               Expanded(
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  itemCount: stages.length,
+                child: RawScrollbar(
+                  controller: _linearStagesScrollController,
+                  thumbVisibility: true,
+                  thickness: 6,
+                  radius: const Radius.circular(3),
+                  thumbColor: const Color(0xFFE5A93C).withValues(alpha: 0.55),
+                  child: ListView.separated(
+                    controller: _linearStagesScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    itemCount: stages.length,
                   separatorBuilder: (_, __) => Center(
                     child: Container(
                       width: 24,
@@ -677,6 +852,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                     return _buildStageCard(context, stage, isUnlocked, isCompleted, isCurrent, theme);
                   },
                 ),
+              ),
               ),
             ],
           ),

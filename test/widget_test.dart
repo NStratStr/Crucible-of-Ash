@@ -102,13 +102,12 @@ void main() {
 
     // Verify Home Screen modal opened
     expect(find.text('COMMAND CITADEL • CHAPTER HEADQUARTERS'), findsOneWidget);
-    expect(find.text('WAR ROOM & GAME MODES'), findsOneWidget);
-    expect(find.text('CAMPAIGN JOURNEY'), findsOneWidget);
-    expect(find.text('THE CRUCIBLE ALTAR'), findsOneWidget);
-    expect(find.text('SPATIAL BATTLE ARENA'), findsOneWidget);
+    expect(find.text('RESONANCE BEACON'), findsOneWidget);
+    expect(find.text('THE CRUCIBLE ALTAR'), findsWidgets);
+    expect(find.text('THE RELIC FORGE'), findsWidgets);
 
-    // Tap THE CRUCIBLE ALTAR mode card
-    await tester.tap(find.text('THE CRUCIBLE ALTAR'));
+    // Tap THE CRUCIBLE ALTAR interactive building
+    await tester.tap(find.text('THE CRUCIBLE ALTAR').first);
     await tester.pumpAndSettle();
 
     // Verify switched to Crucible Altar screen

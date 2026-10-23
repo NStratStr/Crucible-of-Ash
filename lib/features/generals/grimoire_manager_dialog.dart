@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../generals/general_command_service.dart';
-import '../combat/wargaming_spell_card.dart';
 
 /// Modal dialog allowing players to manage their Commander's Grimoire deck,
 /// inspect card counts, add/remove orders from their active battle deck,

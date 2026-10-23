@@ -56,8 +56,8 @@ void main() {
       await tester.tap(find.text('Battle Arena'));
       await tester.pump();
 
-      // Verify level badges are displayed on combat cards
-      expect(find.text('Lv.10'), findsWidgets);
+      // Verify level badges are displayed on combat cards (starter squad begins at Lv.1 in new 10 lvl/gen system)
+      expect(find.text('Lv.1'), findsWidgets);
     });
   });
 }

@@ -60,11 +60,11 @@ void main() {
         selectedGraftTraitId: 'iron_bastion',
       );
 
-      // Verify Gen 4 Pureblood status
+      // Verify Gen 4 Pureblood status (10 levels per gen -> Gen 4 max level = 40)
       expect(child.generation, 4);
       expect(child.isPureblood, isTrue);
       expect(child.generationTitle, 'Pureblood (Gen 4)');
-      expect(child.maxLevel, 50);
+      expect(child.maxLevel, 40);
 
       // Verify Pureblood Resonance (+15% compounded stats)
       // Base bonus from parents: 10% of (1200 + 1150) = 235 HP bonus -> 800 + 235 = 1035 -> 1035 * 1.15 = 1190

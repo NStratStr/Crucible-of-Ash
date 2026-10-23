@@ -5,6 +5,61 @@ import 'skill_entity.dart';
 
 enum FormationSlot { front1, front2, front3, back1, back2 }
 
+/// GDD v2.6 / v3.2: Discrete Rarity Tiers decoupled from Lineage Generation.
+/// Rarity confers base stat potential, border aesthetics, and passive multiplier.
+enum UnitRarity {
+  common,
+  uncommon,
+  rare,
+  epic,
+  legendary;
+
+  String get displayName {
+    switch (this) {
+      case UnitRarity.common:
+        return 'Common';
+      case UnitRarity.uncommon:
+        return 'Uncommon';
+      case UnitRarity.rare:
+        return 'Rare';
+      case UnitRarity.epic:
+        return 'Epic';
+      case UnitRarity.legendary:
+        return 'Legendary';
+    }
+  }
+
+  double get statMultiplier {
+    switch (this) {
+      case UnitRarity.common:
+        return 1.00;
+      case UnitRarity.uncommon:
+        return 1.10;
+      case UnitRarity.rare:
+        return 1.25;
+      case UnitRarity.epic:
+        return 1.45;
+      case UnitRarity.legendary:
+        return 1.70;
+    }
+  }
+
+  int get borderHexColor {
+    switch (this) {
+      case UnitRarity.common:
+        return 0xFF757575;
+      case UnitRarity.uncommon:
+        return 0xFF4CAF50;
+      case UnitRarity.rare:
+        return 0xFF2196F3;
+      case UnitRarity.epic:
+        return 0xFF9C27B0;
+      case UnitRarity.legendary:
+        return 0xFFFFD700;
+    }
+  }
+}
+
 /// GDD v2.6 Pillar 1 & Sec 4: Physical Miniature Plinth Crafting
 /// Modular bases and plinth materials providing distinct tabletop tactile aesthetics and passive stat affinity.
 enum PlinthMaterial {
@@ -23,6 +78,7 @@ class UnitEntity {
   final int generation; // 1, 2, 3, or 4 (Pureblood)
   final Archetype archetype;
   final FormationSlot slot;
+  final UnitRarity rarity;
   final PlinthMaterial plinthMaterial;
   final bool? isFrontlineOverride; // When set, overrides slot-based frontline/backline assignment
   final int? columnIndexOverride; // When set, explicitly assigns column (0..4)
@@ -67,6 +123,7 @@ class UnitEntity {
     required this.generation,
     required this.archetype,
     required this.slot,
+    this.rarity = UnitRarity.common,
     this.plinthMaterial = PlinthMaterial.slate,
     this.isFrontlineOverride,
     this.columnIndexOverride,
@@ -101,6 +158,9 @@ class UnitEntity {
 
   /// GDD v2.6 Sec 3.1: Effective Health (EHP) calculation.
   double get ehp => CombatMath.calculateEhp(currentHp, armor: defense, resist: resist);
+
+  /// Standard Generation-based Level Cap formula: 10 levels per generation (Gen 1=10, Gen 6=60)
+  int get generationMaxLevel => (generation * 10).clamp(10, 60);
 
   bool get isMaxLevel => level >= maxLevel;
   int get xpToNextLevel => level * 100;
@@ -188,6 +248,28 @@ class UnitEntity {
         return 'assets/images/Ash Legion/lady_valeria_g3.png';
       }
       return 'assets/images/Ash Legion/lady_valeria_g1.png';
+    }
+
+    // Commander: High Inquisitor Malakor
+    if (id.contains('malakor') || speciesId.contains('malakor') || name.contains('Malakor')) {
+      if (generation >= 6) {
+        return 'assets/images/lord_justicar_g6.png';
+      }
+      if (generation >= 3) {
+        return 'assets/images/sun_forged_veteran_g3.png';
+      }
+      return 'assets/images/crimson_inquisitor.png';
+    }
+
+    // Commander: Mother Morrigan (Mire Coven)
+    if (id.contains('morrigan') || speciesId.contains('morrigan') || name.contains('Morrigan')) {
+      if (generation >= 6) {
+        return 'assets/images/Crypt Stalkers/CRY-05-SUP-G6 Saunguine Matron.png';
+      }
+      if (generation >= 3) {
+        return 'assets/images/Crypt Stalkers/CRY-05-SUP-G3 Saunguine Priestess.png';
+      }
+      return 'assets/images/occultist_base.png';
     }
 
     // Primordial Boss / Titan / Colossus
@@ -432,7 +514,102 @@ class UnitEntity {
   }
 
   bool get isPureblood => generation >= 4;
-  String get generationTitle => isPureblood ? 'Pureblood (Gen 4)' : 'Gen $generation';
+  String get generationTitle {
+    switch (generation) {
+      case 1:
+        return 'Gen 1';
+      case 2:
+        return 'Gen 2';
+      case 3:
+        return 'Gen 3';
+      case 4:
+        return 'Pureblood (Gen 4)';
+      case 5:
+        return 'Ascendant (Gen 5)';
+      case 6:
+        return 'Apex Ascendant (Gen 6)';
+      default:
+        return generation >= 6 ? 'Apex Ascendant (Gen $generation)' : 'Gen $generation';
+    }
+  }
+
+  /// Roman numeral representation for UI badges
+  String get generationRoman {
+    switch (generation) {
+      case 1: return 'I';
+      case 2: return 'II';
+      case 3: return 'III';
+      case 4: return 'IV';
+      case 5: return 'V';
+      case 6: return 'VI';
+      default: return '$generation';
+    }
+  }
+
+  bool get canPromoteRarity => rarity.index < UnitRarity.values.length - 1 && isMaxLevel;
+
+  bool get canAscendRarityWithDuplicate => rarity.index < UnitRarity.values.length - 1;
+
+  String get rarityLabel {
+    switch (rarity) {
+      case UnitRarity.common:
+        return 'Common';
+      case UnitRarity.uncommon:
+        return 'Uncommon';
+      case UnitRarity.rare:
+        return 'Rare';
+      case UnitRarity.epic:
+        return 'Epic';
+      case UnitRarity.legendary:
+        return 'Legendary';
+    }
+  }
+
+  String get nextRarityLabel {
+    if (rarity.index >= UnitRarity.values.length - 1) return rarityLabel;
+    final next = UnitRarity.values[rarity.index + 1];
+    switch (next) {
+      case UnitRarity.common:
+        return 'Common';
+      case UnitRarity.uncommon:
+        return 'Uncommon';
+      case UnitRarity.rare:
+        return 'Rare';
+      case UnitRarity.epic:
+        return 'Epic';
+      case UnitRarity.legendary:
+        return 'Legendary';
+    }
+  }
+
+  int get rarityPromotionIchorCost {
+    switch (rarity) {
+      case UnitRarity.common:
+        return 120;
+      case UnitRarity.uncommon:
+        return 250;
+      case UnitRarity.rare:
+        return 450;
+      case UnitRarity.epic:
+        return 750;
+      case UnitRarity.legendary:
+        return 0;
+    }
+  }
+
+  UnitEntity promoteRarity({String? newGraftedTraitId}) {
+    if (rarity.index >= UnitRarity.values.length - 1) return this;
+    final nextRarity = UnitRarity.values[rarity.index + 1];
+    return copyWith(
+      rarity: nextRarity,
+      graftedTraitId: newGraftedTraitId ?? graftedTraitId,
+      maxHp: (maxHp * 1.15).round(),
+      currentHp: (currentHp * 1.15).round(),
+      attack: (attack * 1.15).round(),
+      defense: (defense * 1.12).round(),
+      speed: (speed * 1.05).round(),
+    );
+  }
 
   /// Plinth material title and tactical passive affinity (GDD v2.6 Pillar 1)
   String get plinthMaterialTitle {
@@ -680,6 +857,7 @@ class UnitEntity {
     String? nativeTraitId,
     String? graftedTraitId,
     FormationSlot? slot,
+    UnitRarity? rarity,
     PlinthMaterial? plinthMaterial,
     String? customAvatarAsset,
     int? currentXp,
@@ -693,6 +871,7 @@ class UnitEntity {
       generation: generation ?? this.generation,
       archetype: archetype ?? this.archetype,
       slot: slot ?? this.slot,
+      rarity: rarity ?? this.rarity,
       plinthMaterial: plinthMaterial ?? this.plinthMaterial,
       isFrontlineOverride: isFrontlineOverride ?? this.isFrontlineOverride,
       columnIndexOverride: columnIndexOverride ?? this.columnIndexOverride,
@@ -795,6 +974,7 @@ class UnitEntity {
       'speciesId': speciesId,
       'name': name,
       'generation': generation,
+      'rarity': rarity.name,
       'archetype': archetype.name,
       'slot': slot.name,
       'level': level,
@@ -826,6 +1006,10 @@ class UnitEntity {
       speciesId: json['speciesId'] as String,
       name: json['name'] as String,
       generation: (json['generation'] as num).toInt(),
+      rarity: UnitRarity.values.firstWhere(
+        (r) => r.name == json['rarity'],
+        orElse: () => UnitRarity.common,
+      ),
       archetype: Archetype.values.firstWhere(
         (a) => a.name == json['archetype'],
         orElse: () => Archetype.juggernaut,

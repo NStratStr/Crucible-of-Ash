@@ -3,9 +3,11 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../core/combat_math.dart';
 import '../../shared/utils/platform_fullscreen.dart';
 import '../settings/settings_service.dart';
 import '../relics/relic_service.dart';
+import '../generals/general_command_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -21,10 +23,14 @@ class SpatialBattleScreen extends StatefulWidget {
   final VoidCallback? onDefeat;
   final List<dynamic>? initialPlayerUnits; // UnitEntity or CombatUnitState
   final List<dynamic>? initialEnemyUnits;
+  final List<List<UnitEntity>>? enemyWaves;
+  final List<UnitEntity>? availableRosterUnits; // Reserve pool for tactical substitutions
+  final ValueChanged<List<UnitEntity>>? onSquadUpdated;
   final String? encounterTitle;
   final String? backdropAsset;
   final bool isBossEncounter;
   final RelicService? relicService;
+  final GeneralCommandService? commandService;
 
   const SpatialBattleScreen({
     super.key,
@@ -33,10 +39,14 @@ class SpatialBattleScreen extends StatefulWidget {
     this.onDefeat,
     this.initialPlayerUnits,
     this.initialEnemyUnits,
+    this.enemyWaves,
+    this.availableRosterUnits,
+    this.onSquadUpdated,
     this.encounterTitle,
     this.backdropAsset,
     this.isBossEncounter = false,
     this.relicService,
+    this.commandService,
   });
 
   @override
@@ -45,6 +55,8 @@ class SpatialBattleScreen extends StatefulWidget {
 
 class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   late final SpatialCombatEngine _engine;
+  List<UnitEntity> _currentSquadUnits = [];
+  List<UnitEntity> _reserveUnits = [];
   Timer? _loopTimer;
   String? _selectedUnitId;
   String? _selectedEnemyUnitId;
@@ -69,9 +81,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   String? _activeSkillName;
   String? _activeSkillCasterName;
   CombatUnitState? _activeSkillCaster;
-  CombatUnitState? _activeSkillTarget;
   bool _isPlayerSkillBanner = false;
   CombatUnitState? _activeUltimateUnit; // Active Ultimate Burst Cinematic Cut-in
+  CombatUnitState? _activeSignatureUnit; // Active Signature Skill Spotlight Cut-in
   final Map<String, String> _unitFloatingPops = {};
   final List<_FloatingCombatText> _floatingPops = [];
   final List<Timer> _animTimers = [];
@@ -91,12 +103,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
+    _currentSquadUnits = players != null ? List<UnitEntity>.from(players) : [];
+    _reserveUnits = widget.availableRosterUnits != null
+        ? List<UnitEntity>.from(widget.availableRosterUnits!)
+        : [];
+
     _engine = SpatialCombatEngine(
       initialPlayerEntities: players,
       initialEnemyEntities: enemies,
+      enemyWaves: widget.enemyWaves,
       title: widget.encounterTitle,
       isBossEncounter: widget.isBossEncounter,
       relicService: widget.relicService,
+      commandService: widget.commandService,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -115,6 +134,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       final bgmVol = _isMuted ? 0.0 : (settings.bgmVolume * 0.45);
       await _bgmPlayer!.setVolume(bgmVol);
+      await _sfxPlayer!.setVolume(settings.sfxVolume * 0.70);
       if (settings.bgmEnabled) {
         await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
       }
@@ -127,15 +147,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final settings = SettingsService();
     if (_isMuted || !settings.sfxEnabled || _sfxPlayer == null) return;
     try {
-      final vol = settings.sfxVolume * 0.70;
-      // Do not invoke _sfxPlayer.stop() immediately prior to play() to avoid
-      // triggering asynchronous native Windows Media Player event channel callbacks
-      // on background worker threads.
-      _sfxPlayer!.setVolume(vol).then((_) {
-        if (mounted && _sfxPlayer != null) {
-          _sfxPlayer!.play(AssetSource('audio/$sfxName'));
-        }
-      }).catchError((e) {
+      _sfxPlayer!.play(AssetSource('audio/$sfxName')).catchError((e) {
         debugPrint('Error playing SFX $sfxName: $e');
       });
     } catch (e) {
@@ -175,14 +187,29 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   Offset _getUnitCenterIsometricOffset(CombatUnitState unit, {double tileWidth = 152.0, double tileHeight = 76.0}) {
     if (unit.occupiedNodes.isEmpty) return const Offset(100, 100);
-    final anchor = unit.occupiedNodes.first;
-    final int col = anchor.column;
-    final int localRow = anchor.row;
-    final int gRow = unit.isPlayer ? (localRow + 4) : (2 - localRow);
 
     const int numGRows = 7;
     final double originX = (numGRows - 1) * (tileWidth * 0.5);
     final double originY = 0.0;
+
+    if (unit.occupiedNodes.length > 1) {
+      double sumCol = 0;
+      double sumGRow = 0;
+      for (final n in unit.occupiedNodes) {
+        sumCol += n.column;
+        sumGRow += unit.isPlayer ? (n.row + 4) : (2 - n.row);
+      }
+      final double midCol = sumCol / unit.occupiedNodes.length;
+      final double midGRow = sumGRow / unit.occupiedNodes.length;
+      final double screenX = originX + (midCol - midGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+      final double screenY = originY + (midCol + midGRow) * (tileHeight * 0.5) + (tileHeight * 0.35);
+      return Offset(screenX, screenY);
+    }
+
+    final anchor = unit.occupiedNodes.first;
+    final int col = anchor.column;
+    final int localRow = anchor.row;
+    final int gRow = unit.isPlayer ? (localRow + 4) : (2 - localRow);
 
     final double screenX = originX + (col - gRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
     final double screenY = originY + (col + gRow) * (tileHeight * 0.5) + (tileHeight * 0.35);
@@ -320,10 +347,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
     }
 
-    // Check if event is a player Ultimate Burst
+    // Check if event is a player Ultimate Burst or Signature Skill
     final bool isUltimate = event.id.startsWith('ult_');
     if (isUltimate && caster != null && caster.isPlayer) {
       _activeUltimateUnit = caster;
+      _playSfx('sfx_spell.wav');
+    } else if (event.isSignatureSkill && caster != null) {
+      _activeSignatureUnit = caster;
       _playSfx('sfx_spell.wav');
     }
 
@@ -332,9 +362,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isBloodnova = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
     final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
 
+    // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
     if (isHeavyImpact) {
-      final double shakePower = isUltimate ? 8.5 : (isBossStrike ? 7.0 : (isBloodnova ? 6.5 : (event.isCrit ? 5.5 : 4.0)));
-      _triggerScreenShake(intensity: shakePower);
       _groundRipples.add(_GroundShockwaveRipple(
         id: 'ripple_${event.id}_$nowMs',
         origin: targetOffset,
@@ -373,7 +402,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _activeSkillName = event.skillName;
       _activeSkillCasterName = event.attackerName;
       _activeSkillCaster = caster;
-      _activeSkillTarget = target;
       _isPlayerSkillBanner = event.isPlayerAttacker;
 
       // Construct distinct styled floating pop
@@ -440,6 +468,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         durationMs: isCrit ? 1200 : 900,
       ));
 
+      // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
+      if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
+        final graftText = '🧬 ${event.graftedTraitProc}';
+        _unitFloatingPops[event.attackerId] = graftText;
+        _floatingPops.removeWhere((p) => p.unitId == event.attackerId);
+        _floatingPops.add(_FloatingCombatText(
+          id: 'pop_graft_${event.id}_$nowMs',
+          unitId: event.attackerId,
+          text: graftText,
+          color: const Color(0xFFEA80FC),
+          borderColor: const Color(0xFFD500F9),
+          fontSize: 10.5,
+          isCrit: false,
+          createdMs: nowMs,
+          durationMs: 1100,
+        ));
+      }
+
       // Push floating popups for all secondary targets hit by multi-target / AOE spells
       if (event.secondaryTargetHits.isNotEmpty) {
         event.secondaryTargetHits.forEach((secId, secDmg) {
@@ -468,6 +514,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         setState(() {
           _activeVfx.removeWhere((v) => v.id == newVfx.id || v.id == casterRuneVfx.id || secondaryVfxList.any((s) => s.id == v.id));
           _floatingPops.removeWhere((p) => p.isExpired);
+          _groundRipples.removeWhere((r) => r.isExpired);
         });
       }
     });
@@ -491,14 +538,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     });
     _animTimers.add(t1);
 
-    // Dismiss banner & resume combat ticks after 1600ms
-    final t2 = Timer(const Duration(milliseconds: 1600), () {
+    // Dismiss banner & resume combat ticks after 1800ms for Signature/Ultimate, or 1400ms for basic attacks
+    final int pauseWindowMs = (isUltimate || event.isSignatureSkill) ? 1900 : 1400;
+    final t2 = Timer(Duration(milliseconds: pauseWindowMs), () {
       if (mounted) {
         setState(() {
           _activeSkillName = null;
           _activeSkillCaster = null;
-          _activeSkillTarget = null;
           _activeUltimateUnit = null;
+          _activeSignatureUnit = null;
         });
         _engine.clearActiveAction();
       }
@@ -509,7 +557,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   void _startLoop() {
     _loopTimer?.cancel();
     // Paced loop: ~50ms per tick (~20 ticks/sec default), scaled genuinely by simulationSpeed (0.3x in bullet-time)
-    const baseIntervalMs = 50;
+    const baseIntervalMs = 75;
     _loopTimer = Timer.periodic(const Duration(milliseconds: baseIntervalMs), (timer) {
       if (!mounted) return;
       final hasVisibleTrajectory = _selectedUnitId != null ||
@@ -521,10 +569,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         _dashPhase = (_dashPhase + 0.06) % 1.0;
       }
       if (_engine.isRunning) {
-        _tickAccumulator += _engine.simulationSpeed;
-        while (_tickAccumulator >= 1.0) {
-          _tickAccumulator -= 1.0;
-          _engine.stepTick();
+        if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+          // Pause all AP generation and tick accumulation while watching a skill/attack in action!
+          _tickAccumulator = 0.0;
+        } else {
+          _tickAccumulator += _engine.simulationSpeed;
+          while (_tickAccumulator >= 1.0) {
+            _tickAccumulator -= 1.0;
+            _engine.stepTick();
+            if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+              _tickAccumulator = 0.0;
+              break;
+            }
+          }
         }
       } else if (hasVisibleTrajectory) {
         setState(() {});
@@ -553,7 +610,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gorgoroth = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss').firstOrNull;
+    final gorgoroth = _engine.enemyUnits
+        .where((u) =>
+            u.id == 'gorgoroth_boss' ||
+            u.archetype == UnitArchetype.colossusBehemoth ||
+            u.footprint != UnitFootprint.single1x1)
+        .firstOrNull;
     final screenHeight = MediaQuery.of(context).size.height;
     final bool isLandscapeMobile = screenHeight < 550;
 
@@ -714,27 +776,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Top HUD: Status Banner, Focus Bar & Boss Telemetry (hidden in Zen mode)
             if (!_isZenMode) _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
 
-            // Persistent Action & Tactical Instruction Banner (when NOT in landscape mobile or zen mode)
-            if (!_isZenMode &&
-                !isLandscapeMobile &&
-                (_engine.lastBannerMessage != null ||
-                    _draggedUnitId != null ||
-                    _selectedCardId != null ||
-                    _selectedUnitId != null ||
-                    _selectedEnemyUnitId != null ||
-                    _engine.isPreBattlePhase))
-              _buildTacticalPromptBanner(),
-
-            // Selected / Dragged Unit Combat Triad Inspector Strip (when NOT in landscape mobile or zen mode)
-            if (!_isZenMode &&
-                !isLandscapeMobile &&
-                (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null))
-              _buildUnitCombatTriadStrip(),
-
-            // Live Skill Invocation Banner
-            if (_activeSkillName != null)
-              _buildSkillCutInBanner(),
-
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
@@ -770,31 +811,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                  // Interactive 2.5D Battlefield Arena Plane (Unified Isometric Board)
+                  // Stationary 2.5D Battlefield Arena Plane (Only units move/drag, screen does not pan or bounce)
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
-                      // Substantially scaled grid size so tiles and units fill the scene proudly with tactile presence
-                      final double tileWidth = isDesktop ? 190.0 : 130.0;
-                      final double tileHeight = isDesktop ? 95.0 : 65.0;
+                      final double tileWidth = isDesktop ? 170.0 : 118.0;
+                      final double tileHeight = isDesktop ? 85.0 : 59.0;
 
-                      return InteractiveViewer(
-                        boundaryMargin: const EdgeInsets.all(180),
-                        minScale: 0.4,
-                        maxScale: 2.2,
-                        clipBehavior: Clip.none,
-                        child: Center(
+                      return Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: isDesktop ? 28.0 : 12.0,
-                              vertical: isDesktop ? 16.0 : 8.0,
+                              vertical: isDesktop ? 24.0 : 12.0,
                             ),
-                            child: Transform.translate(
-                              offset: _screenShakeOffset,
-                              child: _buildUnifiedIsometricBattlefield(
-                                tileWidth: tileWidth,
-                                tileHeight: tileHeight,
-                              ),
+                            child: _buildUnifiedIsometricBattlefield(
+                              tileWidth: tileWidth,
+                              tileHeight: tileHeight,
                             ),
                           ),
                         ),
@@ -802,37 +836,59 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     },
                   ),
 
-                  // In-Combat Ultimate Burst Dramatic Cut-In Overlay
-                  if (_activeUltimateUnit != null)
-                    _buildUltimateCinematicOverlay(_activeUltimateUnit!),
-
-                  // Mobile Landscape Floating Tactical Overlay (Top-Left corner)
-                  if (!_isZenMode && isLandscapeMobile && (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null))
+                  // Floating Tactical Prompt & Unit Combat Triad Overlays (Non-shifting Stack overlays!)
+                  if (!_isZenMode &&
+                      (_engine.lastBannerMessage != null ||
+                          _draggedUnitId != null ||
+                          _selectedCardId != null ||
+                          _selectedUnitId != null ||
+                          _selectedEnemyUnitId != null ||
+                          _engine.isPreBattlePhase))
                     Positioned(
-                      top: 8,
+                      top: 6,
+                      left: 12,
+                      right: 12,
+                      child: IgnorePointer(
+                        ignoring: _selectedCardId == null && _selectedUnitId == null && _selectedEnemyUnitId == null,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 680),
+                            child: _buildTacticalPromptBanner(),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  if (!_isZenMode &&
+                      (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null))
+                    Positioned(
+                      top: 38,
                       left: 12,
                       right: 12,
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 550),
+                          constraints: const BoxConstraints(maxWidth: 680),
                           child: _buildUnitCombatTriadStrip(),
                         ),
                       ),
                     ),
 
-                  // Mobile Landscape Floating Prompt (Top Center)
-                  if (!_isZenMode && isLandscapeMobile && (_draggedUnitId != null || _selectedCardId != null || _engine.isPreBattlePhase))
+                  // Floating Live Skill Invocation Banner (does not push or resize the battlefield)
+                  if (_activeSkillName != null && _activeSignatureUnit == null)
                     Positioned(
-                      top: (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null) ? 44 : 8,
-                      left: 12,
-                      right: 12,
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 550),
-                          child: _buildTacticalPromptBanner(),
-                        ),
+                      top: (_draggedUnitId != null || _selectedUnitId != null || _selectedEnemyUnitId != null) ? 80 : 38,
+                      left: 16,
+                      right: 16,
+                      child: IgnorePointer(
+                        child: _buildSkillCutInBanner(),
                       ),
                     ),
+
+                  // In-Combat Ultimate Burst or Signature Skill Dramatic Cut-In Overlay
+                  if (_activeUltimateUnit != null)
+                    _buildUltimateCinematicOverlay(_activeUltimateUnit!),
+                  if (_activeSignatureUnit != null && _activeUltimateUnit == null)
+                    _buildSignatureSkillCinematicBanner(_activeSignatureUnit!, _activeSkillName ?? _activeSignatureUnit!.signatureSkillName),
 
                   // Pulled-Up Spell Card Inspector & Cast HUD (Floating just above the dock)
                   if (_selectedCardId != null || _hoveredCardId != null)
@@ -1350,7 +1406,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
                 const SizedBox(width: 8),
 
-                // 2b. Lady Valeria Commander Stance Badge (GDD 4.2)
+                // 2b. Active Commander Aura & Wave Indicator Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -1372,7 +1428,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)',
+                        _engine.commandService != null
+                            ? 'AURA: ${_engine.activeCommanderAuraLabel.split(" (").first.toUpperCase()}'
+                            : (_engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)'),
                         style: TextStyle(
                           color: _engine.isValeriaInFrontline ? const Color(0xFFFFE082) : const Color(0xFFD1C4E9),
                           fontWeight: FontWeight.bold,
@@ -1383,6 +1441,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ],
                   ),
                 ),
+                if (_engine.totalWaves > 1) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5252).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFF5252), width: 0.9),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.waves, color: Color(0xFFFF8A80), size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          'WAVE ${_engine.currentWaveIndex}/${_engine.totalWaves}',
+                          style: const TextStyle(
+                            color: Color(0xFFFF8A80),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 8.5,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 8),
 
                 // 2c. Tactical Attack Trajectory Lines Overlay Toggle ("ALL VECTORS")
@@ -1453,32 +1537,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ],
 
                 const SizedBox(width: 12),
-
-                // Pre-Battle Deployment Start Button
-                if (_engine.isPreBattlePhase)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _engine.startBattle();
-                      });
-                    },
-                    icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 16),
-                    label: const Text(
-                      'ENGAGE BATTLE',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 10,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD54F),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      elevation: 4,
-                      shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
-                    ),
-                  ),
 
                 // 3. Boss Telegraph Execution Warning Badge
                 if (boss != null && boss.pendingIntent != null) ...[
@@ -1804,21 +1862,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       final target = _engine.resolveProjectedTarget(unit, simulatedCol: srcCol);
       if (target != null && target.occupiedNodes.isNotEmpty) {
-        final bool isTargetBoss = target.footprint == UnitFootprint.quadColossus2x2 || target.footprint == UnitFootprint.horizontal1x2;
-        final double tgtX;
-        final double tgtY;
-        if (isTargetBoss) {
-          // Point directly to Gorgoroth's centered colossus coordinate (midCol 1.5, midGRow 1.5)
-          tgtX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
-          tgtY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
-        } else {
-          final targetNode = target.occupiedNodes.first;
-          final int tgtCol = targetNode.column;
-          final int tgtGRow = 2 - targetNode.row;
-          tgtX = originX + (tgtCol - tgtGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-          tgtY = originY + (tgtCol + tgtGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-        }
-        final Offset targetOffset = Offset(tgtX, tgtY);
+        final Offset targetOffset = _getUnitCenterIsometricOffset(target, tileWidth: tileWidth, tileHeight: tileHeight);
 
         // Adaptive Posture Color & Damage Estimate
         Color trajColor = const Color(0xFF00E5FF);
@@ -1893,18 +1937,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (_selectedEnemyUnitId != null) {
       final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
       if (enemy != null && enemy.occupiedNodes.isNotEmpty && enemy.pendingIntent == null) {
-        final bool isEnemyBoss = enemy.footprint == UnitFootprint.quadColossus2x2 || enemy.footprint == UnitFootprint.horizontal1x2;
-        final double srcX;
-        final double srcY;
-        if (isEnemyBoss) {
-          srcX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
-          srcY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
-        } else {
-          final eNode = enemy.occupiedNodes.first;
-          final int eGRow = 2 - eNode.row;
-          srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-          srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-        }
+        final Offset enemyCenter = _getUnitCenterIsometricOffset(enemy, tileWidth: tileWidth, tileHeight: tileHeight);
+        final double srcX = enemyCenter.dx;
+        final double srcY = enemyCenter.dy;
 
         final targetAlly = _engine.resolveProjectedTarget(enemy, simulatedCol: enemy.occupiedNodes.first.column);
         if (targetAlly != null && targetAlly.occupiedNodes.isNotEmpty) {
@@ -1932,19 +1967,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     for (final enemy in _engine.enemyUnits.where((u) => u.isAlive && u.pendingIntent != null)) {
       if (enemy.occupiedNodes.isEmpty) continue;
       final intent = enemy.pendingIntent!;
-      final bool isEnemyBoss = enemy.footprint == UnitFootprint.quadColossus2x2 || enemy.footprint == UnitFootprint.horizontal1x2;
-      final double srcX;
-      final double srcY;
-      if (isEnemyBoss) {
-        srcX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
-        srcY = originY + (1.5 + 1.5) * (tileHeight * 0.5) + (tileHeight * 0.5);
-      } else {
-        final eNode = enemy.occupiedNodes.first;
-        final int eGRow = 2 - eNode.row;
-        srcX = originX + (eNode.column - eGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-        srcY = originY + (eNode.column + eGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-      }
-      final Offset sourceOffset = Offset(srcX, srcY);
+      final Offset sourceOffset = _getUnitCenterIsometricOffset(enemy, tileWidth: tileWidth, tileHeight: tileHeight);
 
       final int remTicks = max(0, intent.triggerTick - _engine.currentTick);
       final String remSec = (remTicks / 30.0).toStringAsFixed(1);
@@ -2112,74 +2135,131 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             );
           }),
 
-          // Centered Behemoth Boss Layer (Gorgoroth 2x2 Colossus)
-          // Positions the colossus at the exact geometric midpoint of his 4 occupied nodes
-          // (Cols 1-2, Enemy Rows 0-1 / gRows 1-2), creating a symmetrical, epic tabletop presence.
-          ..._engine.enemyUnits.where((u) => u.isAlive && (u.footprint == UnitFootprint.quadColossus2x2 || u.footprint == UnitFootprint.horizontal1x2)).map((boss) {
-            final double bossSpanWidth = tileWidth * 2.2;
-            final double bossSpanHeight = tileHeight * 2.0;
+          // Centered Multi-Tile / Behemoth Unit Layer (Generic for any 2x2, 1x2, 2x1, or multi-node unit)
+          // Dynamically computes bounding box center from unit.occupiedNodes for seamless targeting & visual positioning.
+          ...[..._engine.enemyUnits, ..._engine.playerUnits].where((u) => u.isAlive && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1)).map((multiUnit) {
+            final double spanWidth = tileWidth * (multiUnit.footprint == UnitFootprint.quadColossus2x2 ? 2.2 : (multiUnit.occupiedNodes.length > 2 ? 2.0 : 1.6));
+            final double spanHeight = tileHeight * (multiUnit.footprint == UnitFootprint.quadColossus2x2 ? 2.0 : 1.5);
 
-            // Gorgoroth 4-tile cluster: Cols 1-2, Enemy Rows 0-1 (gRows 1-2).
-            // Midpoint of Col 1 & 2: midCol = 1.5.
-            final double bossMidX = originX + (1.5 - 1.5) * (tileWidth * 0.5) + (tileWidth * 0.5);
+            final centerOffset = _getUnitCenterIsometricOffset(multiUnit, tileWidth: tileWidth, tileHeight: tileHeight);
+            final double screenLeft = centerOffset.dx - (spanWidth * 0.5);
+            final double screenTop = centerOffset.dy - spanHeight + (tileHeight * 0.45);
 
-            // In isometric projection:
-            // The bottom-most diamond vertex of the 2x2 cluster is Col 2, gRow 2 (Enemy Front Col 3).
-            // Its center point on screen is:
-            // Y = originY + (2.0 + 2.0) * (tileHeight * 0.5) + (tileHeight * 0.5) = originY + 2.5 * tileHeight.
-            // (Alternatively, the bottom vertex of the entire 4-tile zone is at Y = originY + 3.0 * tileHeight).
-            // To seat Gorgoroth's base firmly in the lower half of his 4 tiles so his base plinth rests
-            // on the bottom grid center (Y = originY + 2.5 * tileHeight):
-            final double bottomGridCenterY = originY + (2.0 + 2.0) * (tileHeight * 0.5) + (tileHeight * 0.5);
-
-            final double bossScreenLeft = bossMidX - (bossSpanWidth * 0.5);
-            // The miniature base plinth is located at bottom: 4 inside bossSpanHeight.
-            // Placing bossScreenTop so that (bossScreenTop + bossSpanHeight - 4) == bottomGridCenterY:
-            final double bossScreenTop = bottomGridCenterY - bossSpanHeight + 4.0;
-
-            final bool isSelected = _selectedEnemyUnitId == boss.id;
+            final bool isSelected = multiUnit.isPlayer ? (_selectedUnitId == multiUnit.id) : (_selectedEnemyUnitId == multiUnit.id);
+            final targetAnchor = multiUnit.occupiedNodes.isNotEmpty ? multiUnit.occupiedNodes.first : const GridNode(column: 1, row: 0);
 
             return Positioned(
-              left: bossScreenLeft,
-              top: bossScreenTop,
-              width: bossSpanWidth,
-              height: bossSpanHeight,
-              child: IgnorePointer(
-                ignoring: false,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (_draggedCard != null) {
-                      _engine.castCard(_draggedCard!.id, targetUnit: boss);
-                      setState(() => _draggedCard = null);
-                    } else if (_selectedCardId != null) {
-                      final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                      if (card != null) {
-                        _engine.castCard(card.id, targetUnit: boss, targetCol: 1, targetRow: 0);
-                        setState(() {
-                          _selectedCardId = null;
-                          _hoveredTileGRow = null;
-                          _hoveredTileCol = null;
-                        });
-                      }
-                    } else {
-                      setState(() {
-                        _selectedEnemyUnitId = (_selectedEnemyUnitId == boss.id) ? null : boss.id;
-                        _selectedUnitId = null;
-                        _selectedCardId = null;
-                      });
-                    }
-                  },
-                  child: Center(
-                    child: _buildUnitMiniatureWidget(
-                      boss,
-                      tileWidth: tileWidth,
-                      tileHeight: tileHeight,
-                      colGap: 0.0,
-                      isSelected: isSelected,
+              left: screenLeft,
+              top: screenTop,
+              width: spanWidth,
+              height: spanHeight,
+              child: DragTarget<String>(
+                onWillAcceptWithDetails: (details) {
+                  final data = details.data;
+                  if (data.startsWith('card:')) {
+                    final cardId = data.replaceFirst('card:', '');
+                    final card = _engine.hand.where((c) => c.id == cardId).firstOrNull;
+                    if (card == null) return false;
+                    if (card.id == 'phalanx_intercept') return multiUnit.isPlayer;
+                    if (card.id == 'stoke_the_embers') return true;
+                    return !multiUnit.isPlayer;
+                  } else if (data.startsWith('ultimate:')) {
+                    final unitId = data.replaceFirst('ultimate:', '');
+                    final ultUnit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+                    final isSupportUlt = unitId == 'iron_footman' ||
+                        (ultUnit != null && (ultUnit.templateId.contains('medicus') || ultUnit.templateId.contains('priestess') || ultUnit.templateId.contains('alchemist')));
+                    return isSupportUlt ? multiUnit.isPlayer : !multiUnit.isPlayer;
+                  }
+                  return false;
+                },
+                onAcceptWithDetails: (details) {
+                  final data = details.data;
+                  if (data.startsWith('card:')) {
+                    final cardId = data.replaceFirst('card:', '');
+                    _engine.castCard(cardId, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
+                    setState(() {
+                      _draggedCard = null;
+                      _hoveredTileGRow = null;
+                      _hoveredTileCol = null;
+                    });
+                  } else if (data.startsWith('ultimate:')) {
+                    final unitId = data.replaceFirst('ultimate:', '');
+                    _engine.castUltimate(unitId, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
+                    setState(() {
+                      _draggedUltimateUnitId = null;
+                      _selectedUltimateUnitId = null;
+                      _hoveredTileGRow = null;
+                      _hoveredTileCol = null;
+                    });
+                  }
+                },
+                builder: (context, candidateData, rejectedData) {
+                  final bool isDropCandidate = candidateData.isNotEmpty;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: isDropCandidate
+                        ? BoxDecoration(
+                            border: Border.all(color: const Color(0xFFFFD54F), width: 2.0),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
+                                blurRadius: 16,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          )
+                        : null,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (_draggedCard != null) {
+                          _engine.castCard(_draggedCard!.id, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
+                          setState(() => _draggedCard = null);
+                        } else if (_selectedCardId != null) {
+                          final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+                          if (card != null) {
+                            if (card.id == 'phalanx_intercept' && !multiUnit.isPlayer) {
+                              setState(() => _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!');
+                              return;
+                            }
+                            if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && multiUnit.isPlayer) {
+                              setState(() => _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!');
+                              return;
+                            }
+                            _playSfx('sfx_card.wav');
+                            _engine.castCard(card.id, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
+                            setState(() {
+                              _selectedCardId = null;
+                              _hoveredTileGRow = null;
+                              _hoveredTileCol = null;
+                            });
+                          }
+                        } else {
+                          setState(() {
+                            if (multiUnit.isPlayer) {
+                              _selectedUnitId = (_selectedUnitId == multiUnit.id) ? null : multiUnit.id;
+                              _selectedEnemyUnitId = null;
+                            } else {
+                              _selectedEnemyUnitId = (_selectedEnemyUnitId == multiUnit.id) ? null : multiUnit.id;
+                              _selectedUnitId = null;
+                            }
+                            _selectedCardId = null;
+                          });
+                        }
+                      },
+                      child: Center(
+                        child: _buildUnitMiniatureWidget(
+                          multiUnit,
+                          tileWidth: tileWidth,
+                          tileHeight: tileHeight,
+                          colGap: 0.0,
+                          isSelected: isSelected || isDropCandidate,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             );
           }),
@@ -2915,6 +2995,47 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
+                // Multi-Node Secondary Cell Tap Handler: forward card/spell directly to the occupying unit
+                if (occupant != null && (occupant.occupiedNodes.length > 1 || occupant.footprint != UnitFootprint.single1x1))
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (_selectedCardId != null) {
+                          final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
+                          if (card != null) {
+                            if (card.id == 'phalanx_intercept' && !isPlayerSquad) {
+                              setState(() => _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!');
+                              return;
+                            }
+                            if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && isPlayerSquad) {
+                              setState(() => _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!');
+                              return;
+                            }
+                            _playSfx('sfx_card.wav');
+                            _engine.castCard(card.id, targetUnit: occupant, targetCol: col, targetRow: row);
+                            setState(() {
+                              _selectedCardId = null;
+                              _hoveredTileGRow = null;
+                              _hoveredTileCol = null;
+                            });
+                            return;
+                          }
+                        }
+                        setState(() {
+                          if (isPlayerSquad) {
+                            _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
+                            _selectedEnemyUnitId = null;
+                          } else {
+                            _selectedEnemyUnitId = (_selectedEnemyUnitId == occupant.id) ? null : occupant.id;
+                            _selectedUnitId = null;
+                          }
+                          _selectedCardId = null;
+                        });
+                      },
+                    ),
+                  ),
+
                 // Empty Tile Tap Handler (fallback when no unit on cell)
                 if (occupant == null)
                   Positioned.fill(
@@ -2971,7 +3092,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
 
                 // Occupant Miniature (Rendered on Anchor node for 1x1 units; Behemoths render centered on the board overlay)
-                if (occupant != null && isAnchorCell && occupant.footprint != UnitFootprint.quadColossus2x2 && occupant.footprint != UnitFootprint.horizontal1x2)
+                if (occupant != null && isAnchorCell && occupant.occupiedNodes.length <= 1 && occupant.footprint == UnitFootprint.single1x1)
                   Builder(
                     builder: (context) {
                       final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
@@ -3248,7 +3369,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         if (unplacedCount > 0) {
           message = '🛡️ PRE-BATTLE: Drag units from the Reserve Dock into place on the grid, then tap [ENGAGE BATTLE]!';
         } else {
-          message = '🛡️ SQUAD READY: Drag units to rearrange formation, or tap [ENGAGE BATTLE] to begin the Sunder!';
+          message = '🛡️ SQUAD READY: Drag units to rearrange formation, or tap [ENGAGE BATTLE] in the Reserve Dock to begin!';
         }
         themeColor = const Color(0xFFFFD54F);
         icon = Icons.touch_app;
@@ -3512,6 +3633,53 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
             const SizedBox(width: 12),
+
+            // 1b. Distinct Unit Signature Skill (Every 3rd Action Cycle)
+            Icon(
+              Icons.stars_rounded,
+              size: 13,
+              color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              unit.isSignatureReady
+                  ? '★ SKILL READY: ${unit.signatureSkillName}'
+                  : 'SKILL: ${unit.signatureSkillName} (${unit.signatureCooldown} turns)',
+              style: TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900,
+                color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFCC80),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // 1c. Crucible Grafted Trait Badge (if present)
+            if (unit.graftedTraitDisplayName != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF311B92).withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFEA80FC), width: 0.8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.biotech, size: 11, color: Color(0xFFEA80FC)),
+                    const SizedBox(width: 3),
+                    Text(
+                      'GRAFT: ${unit.graftedTraitDisplayName}',
+                      style: const TextStyle(
+                        fontSize: 8.0,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFF3E5F5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
 
             // 2. Stance Mastery (Passive Positional Trait)
             Icon(Icons.shield_moon, size: 12, color: stanceColor),
@@ -4006,6 +4174,114 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+  /// Dramatic In-Combat Signature Skill Spotlight Cut-In Banner (Pauses all AP generation while watching skill)
+  Widget _buildSignatureSkillCinematicBanner(CombatUnitState unit, String skillName) {
+    final Color accentColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
+    return Positioned(
+      top: 18,
+      left: 24,
+      right: 24,
+      child: IgnorePointer(
+        ignoring: true,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF141022).withValues(alpha: 0.96),
+                    const Color(0xFF281838).withValues(alpha: 0.96),
+                    const Color(0xFF141022).withValues(alpha: 0.96),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentColor, width: 1.8),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.55),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: accentColor, width: 1.4),
+                      color: Colors.black54,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset(
+                      unit.assetPath,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                      errorBuilder: (_, __, ___) => Icon(Icons.stars_rounded, color: accentColor, size: 28),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.pause_circle_filled, color: accentColor, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              '★ SIGNATURE SKILL UNLEASHED • AP TIME-FREEZE ★',
+                              style: TextStyle(
+                                color: accentColor,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${unit.name.toUpperCase()} — ${skillName.replaceAll('★ ', '').toUpperCase()}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          unit.signatureSkillDescription,
+                          style: const TextStyle(
+                            color: Color(0xFFE0E0E0),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUnitMiniatureWidget(
     CombatUnitState unit, {
     required double tileWidth,
@@ -4015,7 +4291,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     bool isSelected = false,
     String? phantomEffect,
   }) {
-    final bool isBoss = unit.footprint == UnitFootprint.quadColossus2x2 || unit.footprint == UnitFootprint.horizontal1x2;
+    final bool isBoss = unit.occupiedNodes.length > 1 || unit.footprint != UnitFootprint.single1x1;
     final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
@@ -4165,7 +4441,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   0,      0,      0,      0.82, 0,
                                 ]) // GDD §3.6 / §4.3: True petrified grey stone plinth
                               : (isDamaged
-                                  ? const ColorFilter.mode(Color(0xFFFF1744), BlendMode.srcATop)
+                                  ? ColorFilter.mode(
+                                      (floatingPop != null && floatingPop.contains('CRIT'))
+                                          ? const Color(0x99FFFFFF)
+                                          : const Color(0x66FF1744), // Translucent crimson flash so miniature artwork remains clear
+                                      BlendMode.srcATop,
+                                    )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                           child: Image.asset(
                             unit.assetPath,
@@ -4373,6 +4654,28 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             borderRadius: BorderRadius.circular(2),
                           ),
                           child: Text('🛡️${unit.aegisShield}', style: const TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.bold)),
+                        ));
+                      }
+                      if (unit.isAlive && unit.isSignatureReady) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD54F),
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4)],
+                          ),
+                          child: const Text('★SKILL', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.w900)),
+                        ));
+                      }
+                      if (unit.isAlive && unit.graftedTraitId != null && unit.graftedTraitId!.isNotEmpty) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A148C),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFFEA80FC), width: 0.5),
+                          ),
+                          child: const Text('🧬GRAFT', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
                         ));
                       }
 
@@ -4605,13 +4908,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                       child: Stack(
                         children: [
-                          // Base HP
+                          // Base HP: Pure emerald green for player squad, pure vivid crimson/garnet for enemies
                           FractionallySizedBox(
                             alignment: Alignment.centerLeft,
                             widthFactor: hpRatio,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: unit.isPlayer ? const Color(0xFF4CAF50) : const Color(0xFFE53935),
+                                color: unit.isPlayer ? const Color(0xFF00E676) : const Color(0xFFFF1744),
                                 borderRadius: BorderRadius.circular(1),
                               ),
                             ),
@@ -4663,6 +4966,298 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   /// Pre-Battle Staging Reserve Dock:
   /// Displays units ready for placement with portraits, roles, stats, and drag-and-drop handles.
+  
+  Color _getRosterArchetypeColor(Archetype arc) {
+    switch (arc) {
+      case Archetype.juggernaut:
+        return const Color(0xFFC62828);
+      case Archetype.assassin:
+        return const Color(0xFF6A1B9A);
+      case Archetype.marksman:
+        return const Color(0xFF2E7D32);
+      case Archetype.skirmisher:
+        return const Color(0xFFE65100);
+      case Archetype.support:
+        return const Color(0xFF00838F);
+      case Archetype.occultist:
+        return const Color(0xFF4527A0);
+    }
+  }
+
+  void _openRosterSwapSheet(CombatUnitState? targetUnit) {
+    if (_reserveUnits.isEmpty) return;
+    Archetype? filterArchetype;
+    bool filterCommandersOnly = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF101016),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        side: BorderSide(color: Color(0xFFE5A93C), width: 1.2),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final activeIds = _engine.playerUnits.map((u) => u.id).toSet();
+            final availableCandidates = _reserveUnits.where((u) => !activeIds.contains(u.id)).toList();
+
+            final filteredReserves = availableCandidates.where((u) {
+              if (filterCommandersOnly && !u.isCommander) return false;
+              if (filterArchetype != null && u.archetype != filterArchetype) return false;
+              return true;
+            }).toList();
+
+            final String headerTitle = targetUnit != null
+                ? 'SWAP OUT: ${targetUnit.name.toUpperCase()}'
+                : 'SELECT RESERVE CHAMPION TO DEPLOY';
+
+            return SafeArea(
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.65,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Bar
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.swap_horiz, color: Color(0xFFFFD54F), size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              headerTitle,
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Filter Role Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildRosterFilterChip('👑 COMMANDERS', filterCommandersOnly, () {
+                            setSheetState(() {
+                              filterCommandersOnly = !filterCommandersOnly;
+                            });
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('ALL ROLES', filterArchetype == null && !filterCommandersOnly, () {
+                            setSheetState(() {
+                              filterArchetype = null;
+                              filterCommandersOnly = false;
+                            });
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('JUGGERNAUT', filterArchetype == Archetype.juggernaut, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.juggernaut ? null : Archetype.juggernaut);
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('ASSASSIN', filterArchetype == Archetype.assassin, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.assassin ? null : Archetype.assassin);
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('MARKSMAN', filterArchetype == Archetype.marksman, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.marksman ? null : Archetype.marksman);
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('SKIRMISHER', filterArchetype == Archetype.skirmisher, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.skirmisher ? null : Archetype.skirmisher);
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('SUPPORT', filterArchetype == Archetype.support, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.support ? null : Archetype.support);
+                          }),
+                          const SizedBox(width: 4),
+                          _buildRosterFilterChip('OCCULTIST', filterArchetype == Archetype.occultist, () {
+                            setSheetState(() => filterArchetype = filterArchetype == Archetype.occultist ? null : Archetype.occultist);
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // List of Available Reserve Champions
+                    Expanded(
+                      child: filteredReserves.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'NO RESERVE CHAMPIONS MATCH CRITERIA',
+                                style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: filteredReserves.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 6),
+                              itemBuilder: (ctx, idx) {
+                                final candidate = filteredReserves[idx];
+                                final arcColor = _getRosterArchetypeColor(candidate.archetype);
+
+                                return Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF14141E),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: arcColor.withValues(alpha: 0.5), width: 0.8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.asset(
+                                          candidate.effectiveAvatarAsset,
+                                          width: 38,
+                                          height: 38,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Colors.white38),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  candidate.name,
+                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                                                    borderRadius: BorderRadius.circular(3),
+                                                  ),
+                                                  child: Text(
+                                                    'G${candidate.generation}',
+                                                    style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 8.0, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: arcColor.withValues(alpha: 0.25),
+                                                    borderRadius: BorderRadius.circular(3),
+                                                  ),
+                                                  child: Text(
+                                                    candidate.archetype.name.substring(0, 3).toUpperCase(),
+                                                    style: TextStyle(color: arcColor, fontSize: 8.0, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'HP ${candidate.maxHp} • ATK ${candidate.attack} • DEF ${candidate.defense} • SPD ${candidate.speed}',
+                                              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.0),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFB3261E),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pop(sheetCtx);
+                                          _executeUnitSubstitution(targetUnit, candidate);
+                                        },
+                                        child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRosterFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF1E1E28),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF333344), width: 0.8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white70,
+            fontSize: 8.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _executeUnitSubstitution(CombatUnitState? outgoingUnit, UnitEntity incomingUnit) {
+    final outgoingId = outgoingUnit?.id ?? _engine.playerUnits.firstOrNull?.id;
+    if (outgoingId == null) return;
+
+    // 1. Locate replaced entity in _currentSquadUnits (if present)
+    final squadIdx = _currentSquadUnits.indexWhere((u) => u.id == outgoingId);
+    UnitEntity? replacedEntity;
+    if (squadIdx != -1) {
+      replacedEntity = _currentSquadUnits[squadIdx];
+      _currentSquadUnits[squadIdx] = incomingUnit;
+    } else {
+      _currentSquadUnits.add(incomingUnit);
+    }
+
+    // 2. Update reserve list
+    _reserveUnits.removeWhere((u) => u.id == incomingUnit.id);
+    if (replacedEntity != null && !_reserveUnits.any((u) => u.id == replacedEntity!.id)) {
+      _reserveUnits.add(replacedEntity);
+    }
+
+    // 3. Update engine playerUnits
+    final success = _engine.swapPlayerUnit(outgoingId, incomingUnit, relicService: widget.relicService);
+    if (success) {
+      _playSfx('sfx_summon.wav');
+      // 4. Notify parent shell to persist updated squad
+      widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+      setState(() {
+        _selectedUnitId = incomingUnit.id;
+      });
+    }
+  }
+
   Widget _buildPreBattleStagingDock({bool isLandscapeMobile = false}) {
     final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
     final int deployedCount = livingAllies.where((u) => u.occupiedNodes.isNotEmpty).length;
@@ -4710,24 +5305,29 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               // Header Controls Row
               Row(
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.group_work_rounded, color: Color(0xFF00E5FF), size: 14),
-                      const SizedBox(width: 5),
-                      Text(
-                        'RESERVE SQUAD ($deployedCount/$totalCount DEPLOYED)',
-                        style: const TextStyle(
-                          fontSize: 9.0,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
-                          color: Color(0xFF00E5FF),
-                          fontFamily: 'monospace',
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.group_work_rounded, color: Color(0xFF00E5FF), size: 14),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'RESERVE SQUAD ($deployedCount/$totalCount DEPLOYED)',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                              color: Color(0xFF00E5FF),
+                              fontFamily: 'monospace',
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   // Quick Actions: Clear to Bench / Auto-Fill
                   GestureDetector(
                     onTap: () {
@@ -4776,6 +5376,63 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           Text('AUTO-DEPLOY', style: TextStyle(fontSize: 8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900)),
                         ],
                       ),
+                    ),
+                  ),
+                  if (_reserveUnits.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () {
+                        _playSfx('sfx_card.wav');
+                        final target = _selectedUnitId != null
+                            ? _engine.playerUnits.where((u) => u.id == _selectedUnitId).firstOrNull
+                            : _engine.playerUnits.firstOrNull;
+                        if (target != null) {
+                          _openRosterSwapSheet(target);
+                        } else {
+                          _openRosterSwapSheet(null);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5A93C).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.7), width: 0.8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_horiz_rounded, size: 11, color: Color(0xFFFFD54F)),
+                            SizedBox(width: 3),
+                            Text('ROSTER SWAP', style: TextStyle(fontSize: 8, color: Color(0xFFFFD54F), fontWeight: FontWeight.w900)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      _playSfx('sfx_spell.wav');
+                      setState(() {
+                        _engine.startBattle();
+                      });
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 15),
+                    label: const Text(
+                      'ENGAGE BATTLE',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 9.5,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD54F),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      elevation: 3,
+                      shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -4911,13 +5568,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
+                Wrap(
+                  spacing: 4,
                   children: [
+                    Text(
+                      'Lv.${unit.level}',
+                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
+                    ),
                     Text(
                       'HP ${unit.maxHp}',
                       style: const TextStyle(fontSize: 6.5, color: Color(0xFF81C784), fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 4),
                     Text(
                       'ATK ${unit.attack}',
                       style: const TextStyle(fontSize: 6.5, color: Color(0xFFFF8A80), fontWeight: FontWeight.bold),
@@ -4925,24 +5586,64 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.6), width: 0.5),
-                  ),
-                  child: Text(
-                    placementText,
-                    style: TextStyle(
-                      fontSize: 6.5,
-                      fontWeight: FontWeight.w900,
-                      color: statusColor,
-                      fontFamily: 'monospace',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(2),
+                          border: Border.all(color: statusColor.withValues(alpha: 0.6), width: 0.5),
+                        ),
+                        child: Text(
+                          placementText,
+                          style: TextStyle(
+                            fontSize: 6.5,
+                            fontWeight: FontWeight.w900,
+                            color: statusColor,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    if (_reserveUnits.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () {
+                          _playSfx('sfx_card.wav');
+                          _openRosterSwapSheet(unit);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.8), width: 0.6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.swap_horiz, size: 8, color: Color(0xFFFFD54F)),
+                              SizedBox(width: 1.5),
+                              Text(
+                                'SWAP',
+                                style: TextStyle(
+                                  fontSize: 6.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFFFD54F),
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

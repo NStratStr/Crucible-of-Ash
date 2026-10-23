@@ -14,7 +14,6 @@ import '../../shared/widgets/hexagonal_affinity_wheel_widget.dart';
 import 'combat_resolution_service.dart';
 import 'enemy_ai_service.dart';
 import 'initiative_tick_manager.dart';
-import 'plinth_rim_status_painter.dart';
 import 'wargaming_spell_card.dart';
 import '../generals/general_command_service.dart';
 import '../generals/general_selection_dialog.dart';

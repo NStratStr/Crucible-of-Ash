@@ -16,6 +16,7 @@ class PedigreeInspectorDialog extends StatefulWidget {
   final RelicService? relicService;
   final int totalIchor;
   final void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp;
+  final bool initialShowCharacterSheet;
 
   const PedigreeInspectorDialog({
     super.key,
@@ -24,6 +25,7 @@ class PedigreeInspectorDialog extends StatefulWidget {
     this.relicService,
     this.totalIchor = 0,
     this.onLevelUp,
+    this.initialShowCharacterSheet = false,
   });
 
   static Future<void> show(
@@ -33,6 +35,7 @@ class PedigreeInspectorDialog extends StatefulWidget {
     RelicService? relicService,
     int totalIchor = 0,
     void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp,
+    bool initialShowCharacterSheet = false,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -44,6 +47,7 @@ class PedigreeInspectorDialog extends StatefulWidget {
         relicService: relicService,
         totalIchor: totalIchor,
         onLevelUp: onLevelUp,
+        initialShowCharacterSheet: initialShowCharacterSheet,
       ),
     );
   }
@@ -55,13 +59,14 @@ class PedigreeInspectorDialog extends StatefulWidget {
 class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
   late UnitEntity _currentUnit;
   late int _currentIchor;
-  bool _showCharacterSheet = true;
+  late bool _showCharacterSheet;
 
   @override
   void initState() {
     super.initState();
     _currentUnit = widget.unit;
     _currentIchor = widget.totalIchor;
+    _showCharacterSheet = widget.initialShowCharacterSheet;
   }
 
   void _handleLevelUp({int levels = 1}) {
@@ -95,6 +100,44 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
       _currentIchor -= cost;
     });
     widget.onLevelUp?.call(updated, cost);
+  }
+
+  void _handlePromoteRarity() {
+    if (!_currentUnit.canPromoteRarity) return;
+    final cost = _currentUnit.rarityPromotionIchorCost;
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.promoteRarity();
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
+  void _handleSculptPlinth(PlinthMaterial material, int cost) {
+    if (_currentUnit.plinthMaterial == material) return;
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.copyWith(plinthMaterial: material);
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
+  String _getPlinthPassiveDescription(PlinthMaterial material) {
+    switch (material) {
+      case PlinthMaterial.slate:
+        return 'Standard Crypt Slate (Balanced Baseline)';
+      case PlinthMaterial.iron:
+        return '+15% Armor & Frontline Fortitude';
+      case PlinthMaterial.bone:
+        return '+25% Vampiric Siphon on Strike';
+      case PlinthMaterial.obsidian:
+        return '+10% Attack Power & Piercing Impact';
+      case PlinthMaterial.gold:
+        return '+10% All Combat Attributes (Sovereign Pedestal)';
+    }
   }
 
   Widget _buildInfusionButton({
@@ -708,6 +751,105 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                                     : null,
                               ),
                             ),
+                          ],
+                        ),
+                      ],
+                      if (!isEnemy && widget.onLevelUp != null && unit.isMaxLevel && unit.canPromoteRarity) ...[
+                        const SizedBox(height: 8),
+                        const Divider(color: Color(0xFF2B2B36), height: 1),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: _buildInfusionButton(
+                            label: '★ CONSECRATE RARITY (${unit.rarityLabel.toUpperCase()} ➔ ${unit.nextRarityLabel.toUpperCase()} • +8% STATS)',
+                            cost: unit.rarityPromotionIchorCost,
+                            isHighlight: true,
+                            onPressed: _currentIchor >= unit.rarityPromotionIchorCost
+                                ? _handlePromoteRarity
+                                : null,
+                          ),
+                        ),
+                      ],
+                      if (!isEnemy && widget.onLevelUp != null) ...[
+                        const SizedBox(height: 10),
+                        const Divider(color: Color(0xFF2B2B36), height: 1),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.layers, color: Color(0xFFE5A93C), size: 13),
+                                SizedBox(width: 4),
+                                Text(
+                                  'CONSECRATE PLINTH PEDESTAL',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5A93C),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              unit.plinthMaterial.name.toUpperCase(),
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _getPlinthPassiveDescription(unit.plinthMaterial),
+                          style: const TextStyle(color: Color(0xFF81C784), fontSize: 9, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final entry in [
+                              (PlinthMaterial.iron, 'IRON (+15% ARM)', 150),
+                              (PlinthMaterial.bone, 'BONE (+25% SIPHON)', 200),
+                              (PlinthMaterial.obsidian, 'OBSIDIAN (+10% ATK)', 200),
+                              (PlinthMaterial.gold, 'GOLD (+10% ALL)', 350),
+                            ])
+                              InkWell(
+                                onTap: (unit.plinthMaterial != entry.$1 && _currentIchor >= entry.$3)
+                                    ? () => _handleSculptPlinth(entry.$1, entry.$3)
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: unit.plinthMaterial == entry.$1
+                                        ? const Color(0xFFE5A93C).withValues(alpha: 0.25)
+                                        : const Color(0xFF22222C),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: unit.plinthMaterial == entry.$1
+                                          ? const Color(0xFFFFD54F)
+                                          : (_currentIchor >= entry.$3 ? Colors.white24 : Colors.white10),
+                                      width: unit.plinthMaterial == entry.$1 ? 1.2 : 0.8,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    unit.plinthMaterial == entry.$1
+                                        ? '✓ ${entry.$2}'
+                                        : '${entry.$2} (${entry.$3} Ichor)',
+                                    style: TextStyle(
+                                      color: unit.plinthMaterial == entry.$1
+                                          ? const Color(0xFFFFD54F)
+                                          : (_currentIchor >= entry.$3 ? Colors.white70 : Colors.white30),
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ],

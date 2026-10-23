@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+ 
+# Scratch helper scripts
+scratch/
+
+# Large raw soundbank library dumps
+assets/audio/*.wav
+!assets/audio/sfx_*.wav
+assets/audio/*.pdf
+assets/audio/backup_arcade/

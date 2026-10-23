@@ -20,7 +20,6 @@ void main() {
       await tester.scrollUntilVisible(
         find.widgetWithText(ElevatedButton, 'DEPLOY'),
         200,
-        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
 

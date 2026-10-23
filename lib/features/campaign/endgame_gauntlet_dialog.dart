@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/combat_math.dart';
 import '../../shared/models/unit_entity.dart';
 
 enum EndgameTrialType {

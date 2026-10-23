@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "481449277184",
+    "project_id": "ashen-crucible",
+    "storage_bucket": "ashen-crucible.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:481449277184:android:ccae8696363b118cd265e5",
+        "android_client_info": {
+          "package_name": "com.ashencrucible.ashen_crucible"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhtBGBb_GqmZR0PCEabRtJR5DLZBmlZv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

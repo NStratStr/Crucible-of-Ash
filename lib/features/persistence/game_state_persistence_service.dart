@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/combat_math.dart';
 import '../../shared/models/relic_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../campaign/endgame_gauntlet_dialog.dart';

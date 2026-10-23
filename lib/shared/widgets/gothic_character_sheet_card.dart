@@ -130,6 +130,18 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
     widget.onLevelUp?.call(updated, xp);
   }
 
+  void _handlePromoteRarity() {
+    if (!_currentUnit.canPromoteRarity) return;
+    final cost = 200 * (_currentUnit.rarity.index + 1);
+    if (_currentIchor < cost) return;
+    final updated = _currentUnit.promoteRarity();
+    setState(() {
+      _currentUnit = updated;
+      _currentIchor -= cost;
+    });
+    widget.onLevelUp?.call(updated, cost);
+  }
+
   String _getFactionKey() {
     final faction = _currentUnit.factionName.toLowerCase();
     if (faction.contains('crypt') || faction.contains('stalker')) return 'crypt_stalkers';
@@ -326,7 +338,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          'GEN ${unit.generation} • ${unit.archetype.name.toUpperCase()} • ${unit.factionName.toUpperCase()}',
+                          'GEN ${unit.generation} • ${unit.rarity.displayName.toUpperCase()} • ${unit.archetype.name.toUpperCase()}',
                           style: TextStyle(
                             color: factionColor,
                             fontSize: cardWidth * 0.024,
@@ -425,7 +437,7 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           ),
                         ],
                       ),
-                      // Quick Infusion Pill Button
+                      // Quick Infusion or Rarity Promotion Pill Button
                       if (!unit.isMaxLevel)
                         GestureDetector(
                           onTap: canAffordNext ? () => _handleLevelUp(1) : (canAfford100 ? () => _handleInfuseXp(100) : null),
@@ -451,6 +463,40 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                                   style: TextStyle(
                                     color: canAffordNext || canAfford100 ? Colors.white : Colors.white38,
                                     fontSize: cardWidth * 0.021,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (unit.canPromoteRarity)
+                        GestureDetector(
+                          onTap: _currentIchor >= (200 * (unit.rarity.index + 1)) ? _handlePromoteRarity : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _currentIchor >= (200 * (unit.rarity.index + 1))
+                                  ? const Color(0xFFFF8F00)
+                                  : Colors.white10,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: _currentIchor >= (200 * (unit.rarity.index + 1))
+                                    ? const Color(0xFFFFD54F)
+                                    : Colors.white24,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.auto_awesome, color: Color(0xFFFFD54F), size: 10),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '★ PROMOTE (${200 * (unit.rarity.index + 1)})',
+                                  style: TextStyle(
+                                    color: _currentIchor >= (200 * (unit.rarity.index + 1)) ? Colors.white : Colors.white38,
+                                    fontSize: cardWidth * 0.020,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -1331,14 +1377,19 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white60,
-            fontSize: 7.5,
-            fontWeight: FontWeight.bold,
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 7.5,
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
+        const SizedBox(width: 4),
         Text(
           value,
           style: TextStyle(

@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../../shared/models/relic_entity.dart';
-import '../../shared/models/unit_entity.dart';
 
 @immutable
 class UnitRelicBonuses {

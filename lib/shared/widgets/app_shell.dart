@@ -22,7 +22,6 @@ import '../../features/generals/general_selection_dialog.dart';
 import '../../features/generals/grimoire_manager_dialog.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/summoning/summoning_screen.dart';
-import '../../features/summoning/summoning_service.dart';
 import '../../features/settings/settings_dialog.dart';
 import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
@@ -31,6 +30,7 @@ import '../../features/ftue/awakening_dialog.dart';
 import '../../features/ftue/ftue_guidance_banner.dart';
 import '../../features/ftue/ftue_service.dart';
 import '../../features/ftue/ftue_stage.dart';
+import '../../features/persistence/cloud_auth_service.dart';
 import '../data/starter_brigades.dart';
 import '../models/expedition_boon.dart';
 import '../models/relic_entity.dart';
@@ -63,7 +63,7 @@ class _AppShellState extends State<AppShell> {
   int _maxUnlockedChapter = 1;
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
-  int _completedLinearStages = 2;
+  int _completedLinearStages = 0;
   bool _isSpatialCombatActive = true;
 
   late InitiativeTickManager _tickManager;
@@ -107,7 +107,40 @@ class _AppShellState extends State<AppShell> {
       if (mounted) setState(() {});
     });
 
+    // Ensure tester is automatically signed in with an anonymous Cloud Firestore UID
+    CloudAuthService().ensureSignedIn().then((_) {
+      // Check if there is existing cloud data to restore
+      CloudAuthService().fetchSaveFromCloud().then((cloudData) {
+        if (cloudData != null && mounted) {
+          _restoreSaveData(cloudData);
+        }
+      });
+    });
+
     _loadPersistedState();
+  }
+
+  void _restoreSaveData(GameSaveData saved) {
+    setState(() {
+      _totalIchor = saved.totalIchor;
+      _cursedOre = saved.cursedOre;
+      _bloodlineSigils = saved.bloodlineSigils;
+      _activeGeneralType = saved.activeGeneralType;
+      _phylacteryRanks = Map.from(saved.phylacteryRanks);
+      _currentChapter = saved.currentChapter;
+      _maxUnlockedChapter = saved.maxUnlockedChapter;
+      _currentAscension = saved.currentAscension;
+      _maxUnlockedAscension = saved.maxUnlockedAscension;
+      _clearedGauntletTrials.clear();
+      _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
+
+      if (saved.allies.isNotEmpty) {
+        _tickManager.updateSquads(allies: saved.allies);
+      }
+      if (saved.reserveInventory.isNotEmpty) {
+        _inventory = List.from(saved.reserveInventory);
+      }
+    });
   }
 
   Future<void> _loadPersistedState() async {
@@ -128,24 +161,9 @@ class _AppShellState extends State<AppShell> {
           _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
           List<UnitEntity> alliesToRestore = saved.allies;
-          // MVP migration: if the restored squad doesn't contain Lord Vladislav, ensure Lord Vladislav is leading in slot front1
-          final bool hasVladInAllies = alliesToRestore.any(
-            (u) => u.name.contains('Vladislav') || u.speciesId.contains('vladislav') || u.id.contains('vladislav'),
-          );
-          final bool hasVladInReserve = saved.reserveInventory.any(
-            (u) => u.name.contains('Vladislav') || u.speciesId.contains('vladislav') || u.id.contains('vladislav'),
-          );
-
-          if (!hasVladInAllies && !hasVladInReserve) {
-            final vlad = StarterBrigades.createAshLegionPlayerSquad().first;
-            if (alliesToRestore.isNotEmpty) {
-              alliesToRestore = [
-                vlad.copyWith(slot: alliesToRestore.first.slot),
-                ...alliesToRestore.skip(1),
-              ];
-            } else {
-              alliesToRestore = StarterBrigades.createAshLegionPlayerSquad();
-            }
+          // Ensure the player's saved active commander is present in the squad if allies were empty
+          if (alliesToRestore.isEmpty) {
+            alliesToRestore = StarterBrigades.createSoloStarterSquad(_activeGeneralType);
           }
 
           if (alliesToRestore.isNotEmpty) {
@@ -209,6 +227,9 @@ class _AppShellState extends State<AppShell> {
         lastSavedTimestamp: DateTime.now().millisecondsSinceEpoch,
       );
       await GameStatePersistenceService.save(data);
+
+      // Background asynchronous sync to Cloud Firestore
+      CloudAuthService().syncSaveToCloud(data);
     } catch (e) {
       debugPrint('Error saving state: $e');
     }
@@ -403,18 +424,21 @@ class _AppShellState extends State<AppShell> {
     );
     if (!mounted || chosen == null) return;
 
+    final soloStarter = StarterBrigades.createSoloStarterSquad(chosen);
     setState(() {
       _activeGeneralType = chosen;
       _commandService.setActiveGeneral(chosen);
+      _tickManager.updateSquads(allies: soloStarter);
       if (_ftueService.currentStage == FtueStage.awakening) {
         _ftueService.advanceStage();
       }
     });
+    _saveCurrentState();
 
     final profile = _commandService.currentProfile;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Covenant sealed with ${profile.name}! Starter brigade bound under ${profile.auraName}.'),
+        content: Text('Covenant sealed with ${profile.name}! Deploying solo Commander into Stage 1-1.'),
         backgroundColor: profile.themeColor,
       ),
     );
@@ -429,7 +453,14 @@ class _AppShellState extends State<AppShell> {
         node.type == CampaignNodeType.elite ||
         node.type == CampaignNodeType.boss) {
       List<UnitEntity> enemies;
-      if (node.type == CampaignNodeType.boss) {
+      if (node.id.startsWith('linear_')) {
+        // Linear story campaign stage: fetch curated stage roster (e.g. Stage 1-1 is 1v1 against 1x Feral Ash-Scavenger)
+        enemies = StarterBrigades.createEnemiesForStage(
+          chapter: _currentChapter,
+          stageNumber: node.depth,
+          type: node.type,
+        );
+      } else if (node.type == CampaignNodeType.boss) {
         enemies = StarterBrigades.createChapterBossEnemies(_currentChapter);
       } else if (node.type == CampaignNodeType.elite) {
         enemies = StarterBrigades.createEliteEnemiesForChapter(_currentChapter);
@@ -748,15 +779,17 @@ class _AppShellState extends State<AppShell> {
         return n;
       }).toList();
 
-      // Unlock forward nodes
-      final completed = _campaignNodes.firstWhere((n) => n.id == nodeId);
-      for (final nextId in completed.nextNodeIds) {
-        _campaignNodes = _campaignNodes.map((n) {
-          if (n.id == nextId) {
-            return n.copyWith(isReachable: true);
-          }
-          return n;
-        }).toList();
+      // Unlock forward nodes (safe for linear_ or gauntlet_ synthetic nodes that are not in _campaignNodes)
+      final completed = _campaignNodes.where((n) => n.id == nodeId).firstOrNull;
+      if (completed != null) {
+        for (final nextId in completed.nextNodeIds) {
+          _campaignNodes = _campaignNodes.map((n) {
+            if (n.id == nextId) {
+              return n.copyWith(isReachable: true);
+            }
+            return n;
+          }).toList();
+        }
       }
     });
   }
@@ -822,19 +855,6 @@ class _AppShellState extends State<AppShell> {
         _activeGauntletTrial = null;
       }
 
-      String extraReward = '';
-      if (levelUps.isNotEmpty) {
-        extraReward += ' • LEVEL UP: ${levelUps.join(", ")}';
-      }
-      if (isFirstConquest) {
-        extraReward += ' • FIRST CONQUEST BONUS (+1 Sigil, +500 Ichor)';
-      }
-      if (sigilsReward > 0) {
-        extraReward += ' • +$sigilsReward Sigil(s)';
-      }
-      if (purebloodDrop != null) {
-        extraReward += ' • PINNACLE LINEAGE: ${purebloodDrop.name} (PUREBLOOD GEN 4)!';
-      }
       String? relicDrop;
       if (_activeNode?.type == CampaignNodeType.elite) {
         final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
@@ -1207,6 +1227,7 @@ class _AppShellState extends State<AppShell> {
     required String unitId,
     required int xpAmount,
     required int ichorCost,
+    UnitEntity? replacementUnit,
   }) {
     if (_totalIchor < ichorCost) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1219,12 +1240,14 @@ class _AppShellState extends State<AppShell> {
     }
 
     UnitEntity? updatedUnit;
+    bool wasRarityPromotion = false;
 
     // 1. Check active squad
     final allyIndex = _tickManager.allies.indexWhere((u) => u.id == unitId);
     if (allyIndex != -1) {
       final ally = _tickManager.allies[allyIndex];
-      final leveled = ally.addXp(xpAmount);
+      wasRarityPromotion = replacementUnit != null && replacementUnit.rarity != ally.rarity;
+      final leveled = replacementUnit ?? ally.addXp(xpAmount);
       updatedUnit = leveled;
 
       final newAllies = List<UnitEntity>.from(_tickManager.allies);
@@ -1235,7 +1258,8 @@ class _AppShellState extends State<AppShell> {
       final invIndex = _inventory.indexWhere((u) => u.id == unitId);
       if (invIndex != -1) {
         final unit = _inventory[invIndex];
-        final leveled = unit.addXp(xpAmount);
+        wasRarityPromotion = replacementUnit != null && replacementUnit.rarity != unit.rarity;
+        final leveled = replacementUnit ?? unit.addXp(xpAmount);
         updatedUnit = leveled;
 
         _inventory[invIndex] = leveled;
@@ -1251,11 +1275,15 @@ class _AppShellState extends State<AppShell> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            updatedUnit.isMaxLevel
-                ? '👑 ${updatedUnit.name} reached MAX LEVEL ${updatedUnit.maxLevel}! 10% Inheritance Unlocked!'
-                : '✦ ${updatedUnit.name} infused with $xpAmount XP (Lv. ${updatedUnit.level}/${updatedUnit.maxLevel})!',
+            wasRarityPromotion
+                ? '★ RARITY CONSECRATED: ${updatedUnit.name} ascended to ${updatedUnit.rarity.displayName.toUpperCase()} (+15% HP/ATK, +12% DEF)!'
+                : (updatedUnit.isMaxLevel
+                    ? '👑 ${updatedUnit.name} reached MAX LEVEL ${updatedUnit.maxLevel}! 10% Inheritance Unlocked!'
+                    : '✦ ${updatedUnit.name} infused with $xpAmount XP (Lv. ${updatedUnit.level}/${updatedUnit.maxLevel})!'),
           ),
-          backgroundColor: updatedUnit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF2E7D32),
+          backgroundColor: wasRarityPromotion
+              ? Color(updatedUnit.rarity.borderHexColor)
+              : (updatedUnit.isMaxLevel ? const Color(0xFFE5A93C) : const Color(0xFF2E7D32)),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1532,8 +1560,58 @@ class _AppShellState extends State<AppShell> {
         onOpenSettings: () {
           SettingsDialog.show(dialogCtx);
         },
+        onCloudDataRestored: () {
+          _resetToFreshPrologue();
+        },
       ),
     );
+  }
+
+  void _resetToFreshPrologue() {
+    setState(() {
+      _totalIchor = 0;
+      _cursedOre = 0;
+      _bloodlineSigils = 0;
+      _currentChapter = 1;
+      _maxUnlockedChapter = 1;
+      _currentAscension = 0;
+      _maxUnlockedAscension = 0;
+      _completedLinearStages = 0;
+      _clearedGauntletTrials.clear();
+      _currentIndex = 0; // Return to Campaign / Home
+
+      final starterSquad = StarterBrigades.createSoloStarterSquad(GeneralType.vladislav);
+      _inventory = [];
+      _relicService.allRelics.clear();
+
+      _tickManager.dispose();
+      _commandService.dispose();
+      _tickManager = InitiativeTickManager(
+        initialAllies: starterSquad,
+        initialEnemies: StarterBrigades.createEnemiesForStage(chapter: 1, stageNumber: 1),
+        tickInterval: const Duration(milliseconds: 140),
+        onTick: () => _commandService.onSimulationTick(),
+      );
+      _commandService = GeneralCommandService(
+        tickManager: _tickManager,
+        generalType: GeneralType.vladislav,
+        initialFocus: 1,
+        maxFocus: GeneralCommandService.defaultMaxFocusCap,
+      );
+      _combatService = CombatResolutionService(
+        tickManager: _tickManager,
+        commandService: _commandService,
+        relicService: _relicService,
+      );
+      _ftueService.setStage(FtueStage.awakening);
+    });
+
+    // Dismiss any active HomeScreen modal if open so the Awakening Dialog is front and center
+    if (Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+    }
+
+    _showAwakeningDialog();
   }
 
   void _handleOpenSummoning() {
@@ -1613,6 +1691,18 @@ class _AppShellState extends State<AppShell> {
                           key: ValueKey('${_activeNode?.id ?? "sunder"}_${_currentChapter}_$_currentIndex'),
                           initialPlayerUnits: _tickManager.allies,
                           initialEnemyUnits: _tickManager.enemies,
+                          enemyWaves: _activeEnemyWaves,
+                          availableRosterUnits: _inventory,
+                          commandService: _commandService,
+                          onSquadUpdated: (updatedSquad) {
+                            setState(() {
+                              _tickManager.updateSquads(allies: updatedSquad);
+                              // Sync reserve inventory: remove active units from inventory, add any dropped
+                              final activeIds = updatedSquad.map((u) => u.id).toSet();
+                              _inventory.removeWhere((u) => activeIds.contains(u.id));
+                            });
+                            _saveCurrentState();
+                          },
                           encounterTitle: _activeNode?.name ?? 'The Sunder at Ashen Gate',
                           backdropAsset: _activeNode?.customBackgroundAsset ?? ChapterTheme.forChapter(_currentChapter).backgroundAsset,
                           isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
@@ -1673,6 +1763,7 @@ class _AppShellState extends State<AppShell> {
                       unitId: updatedUnit.id,
                       xpAmount: cost,
                       ichorCost: cost,
+                      replacementUnit: updatedUnit,
                     ),
                   ),
                   // Tab 3: Relic Forge
@@ -1697,66 +1788,74 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: hideBottomBar
           ? null
           : BottomNavigationBar(
-              currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF14141B),
-        selectedItemColor: const Color(0xFFB3261E),
-        unselectedItemColor: const Color(0xFF8E8EA0),
-        selectedFontSize: 10,
-        unselectedFontSize: 9,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-        },
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Campaign Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
-              width: 21,
-              height: 21,
-              errorBuilder: (_, __, ___) => const Icon(Icons.shield),
-            ),
-            label: 'Battle Arena',
-          ),
-          BottomNavigationBarItem(
-            icon: Image.asset(
-              'assets/images/UI/Flame Shield icon Transparent.png',
-              width: 21,
-              height: 21,
-              errorBuilder: (_, __, ___) => const Icon(Icons.fireplace),
-            ),
-            label: 'Crucible Altar',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.auto_awesome),
-            label: 'Relic Forge',
-          ),
-          BottomNavigationBarItem(
-            icon: Stack(
-              alignment: Alignment.center,
-              children: [
-                const Icon(Icons.people_alt, size: 21, color: Colors.transparent),
-                IgnorePointer(
-                  child: Image.asset(
-                    'assets/images/UI/Skull Shield Icon Transparent.png',
+              currentIndex: _currentIndex + 1,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: const Color(0xFF14141B),
+              selectedItemColor: const Color(0xFFB3261E),
+              unselectedItemColor: const Color(0xFF8E8EA0),
+              selectedFontSize: 10,
+              unselectedFontSize: 9,
+              onTap: (index) {
+                if (index == 0) {
+                  _showHomeModal();
+                  return;
+                }
+                setState(() => _currentIndex = index - 1);
+              },
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home, color: Color(0xFFFFD54F)),
+                  label: 'Citadel Home',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.map),
+                  label: 'Campaign Map',
+                ),
+                BottomNavigationBarItem(
+                  icon: Image.asset(
+                    'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
                     width: 21,
                     height: 21,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.people_alt),
+                    errorBuilder: (_, __, ___) => const Icon(Icons.shield),
                   ),
+                  label: 'Battle Arena',
+                ),
+                BottomNavigationBarItem(
+                  icon: Image.asset(
+                    'assets/images/UI/Flame Shield icon Transparent.png',
+                    width: 21,
+                    height: 21,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.fireplace),
+                  ),
+                  label: 'Crucible Altar',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.auto_awesome),
+                  label: 'Relic Forge',
+                ),
+                BottomNavigationBarItem(
+                  icon: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.people_alt, size: 21, color: Colors.transparent),
+                      IgnorePointer(
+                        child: Image.asset(
+                          'assets/images/UI/Skull Shield Icon Transparent.png',
+                          width: 21,
+                          height: 21,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.people_alt),
+                        ),
+                      ),
+                    ],
+                  ),
+                  label: 'Brigade Roster',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.menu_book),
+                  label: 'Affinity Codex',
                 ),
               ],
             ),
-            label: 'Brigade Roster',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book),
-            label: 'Affinity Codex',
-          ),
-        ],
-      ),
     );
   }
 
@@ -2049,6 +2148,7 @@ class _AppShellState extends State<AppShell> {
                       unitId: updatedUnit.id,
                       xpAmount: cost,
                       ichorCost: cost,
+                      replacementUnit: updatedUnit,
                     ),
                   ),
                   borderRadius: BorderRadius.circular(8),
@@ -2169,15 +2269,38 @@ class _AppShellState extends State<AppShell> {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    unit.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                  Flexible(
+                                    child: Text(
+                                      unit.name,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Color(unit.rarity.borderHexColor).withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(3),
+                                      border: Border.all(
+                                        color: Color(unit.rarity.borderHexColor),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      unit.rarity.displayName.toUpperCase(),
+                                      style: TextStyle(
+                                        color: Color(unit.rarity.borderHexColor),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -2235,11 +2358,18 @@ class _AppShellState extends State<AppShell> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (!unit.isMaxLevel) ...[
+                            if (!unit.isMaxLevel || unit.canPromoteRarity) ...[
                               OutlinedButton(
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFE5A93C),
-                                  side: const BorderSide(color: Color(0xFFE5A93C), width: 0.8),
+                                  foregroundColor: unit.canPromoteRarity
+                                      ? Color(unit.rarity.borderHexColor)
+                                      : const Color(0xFFE5A93C),
+                                  side: BorderSide(
+                                    color: unit.canPromoteRarity
+                                        ? Color(unit.rarity.borderHexColor)
+                                        : const Color(0xFFE5A93C),
+                                    width: 0.8,
+                                  ),
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   minimumSize: Size.zero,
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -2253,9 +2383,13 @@ class _AppShellState extends State<AppShell> {
                                     unitId: updatedUnit.id,
                                     xpAmount: cost,
                                     ichorCost: cost,
+                                    replacementUnit: updatedUnit,
                                   ),
                                 ),
-                                child: const Text('INFUSE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  unit.canPromoteRarity ? '★ PROMOTE' : 'INFUSE',
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const SizedBox(width: 6),
                             ],

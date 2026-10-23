@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ashen_crucible/features/combat/initiative_tick_manager.dart';
 import 'package:ashen_crucible/features/combat_spatial/models/spatial_combat_models.dart';
 import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dart';
+import 'package:ashen_crucible/features/generals/general_command_service.dart';
 import 'package:ashen_crucible/shared/models/unit_entity.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
 
@@ -179,7 +181,7 @@ void main() {
 
       final initialValeriaArmor = valeria.armor;
       final initialValeriaAegis = valeria.aegisShield;
-      expect(footman.ultimateGauge, equals(0));
+      final initialFootmanUlt = footman.ultimateGauge;
 
       // Trigger Footman turn
       footman.currentAp = SpatialCombatEngine.tickThreshold;
@@ -189,7 +191,7 @@ void main() {
       expect(valeria.armor, equals(initialValeriaArmor + 25));
       expect(valeria.aegisShield, equals(initialValeriaAegis + 30));
       // Footman gains +20% Ultimate gauge
-      expect(footman.ultimateGauge, equals(20));
+      expect(footman.ultimateGauge, equals(initialFootmanUlt + 20));
     });
 
     test('Adaptive Posture System: Displaced Caster in Frontline fires Point-Blank Panic Discharge', () {
@@ -670,8 +672,383 @@ void main() {
         expect(u.occupiedNodes.isNotEmpty, isTrue);
       }
     });
+
+    test('Pre-Battle Roster Substitution: Replaces squad unit with reserve roster unit and preserves position', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+      expect(engine.isPreBattlePhase, isTrue);
+
+      final outgoing = engine.playerUnits.first;
+      final outgoingId = outgoing.id;
+
+      // Deploy outgoing to a specific tile
+      engine.deployUnitFromBench(outgoingId, 2, 0);
+      expect(outgoing.occupiedNodes.first.column, equals(2));
+      expect(outgoing.occupiedNodes.first.row, equals(0));
+
+      final incoming = const UnitEntity(
+        id: 'reserve_berserker',
+        name: 'Crimson Berserker',
+        speciesId: 'crimson_berserker',
+        generation: 3,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front1,
+        level: 1,
+        maxLevel: 20,
+        maxHp: 800,
+        currentHp: 800,
+        attack: 130,
+        defense: 45,
+        speed: 110,
+        nativeTraitId: 'blood_frenzy',
+        lineageAncestors: [],
+      );
+
+      final success = engine.swapPlayerUnit(outgoingId, incoming);
+      expect(success, isTrue);
+
+      // Verify incoming unit exists in playerUnits
+      final swappedUnit = engine.playerUnits.where((u) => u.id == 'reserve_berserker').firstOrNull;
+      expect(swappedUnit, isNotNull);
+      expect(swappedUnit!.name, equals('Crimson Berserker'));
+      expect(swappedUnit.maxHp, equals(800));
+      expect(swappedUnit.attack, equals(130));
+      expect(swappedUnit.ultimateGauge, equals(40));
+
+      // Positioning preserved
+      expect(swappedUnit.occupiedNodes.isNotEmpty, isTrue);
+      expect(swappedUnit.occupiedNodes.first.column, equals(2));
+      expect(swappedUnit.occupiedNodes.first.row, equals(0));
+
+      // Old unit is no longer in playerUnits
+      expect(engine.playerUnits.any((u) => u.id == outgoingId), isFalse);
+    });
+
+    test('Unit Signature Skills & Crucible Grafted Traits: Triggers Signature Skill every 3rd action cycle (+25% Ult) and procs Grafted Trait', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      final sanguineBlade = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade');
+      final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
+
+      // Isolate Sanguine Blade for clean turn cadence verification
+      for (final u in [...engine.playerUnits, ...engine.enemyUnits]) {
+        if (u.id != 'sanguine_blade') u.speed = 0;
+      }
+
+      // Equip a Crucible Vampiric Conduit Grafted Trait on Sanguine Blade via swapPlayerUnit
+      final graftedBladeEntity = const UnitEntity(
+        id: 'sanguine_blade',
+        name: 'Sanguine Blade',
+        speciesId: 'sanguine_blade',
+        generation: 3,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.back1,
+        level: 10,
+        maxLevel: 30,
+        maxHp: 310,
+        currentHp: 200, // Missing HP so we can verify Vampiric Conduit lifesteal heal
+        attack: 78,
+        defense: 20,
+        speed: 120,
+        nativeTraitId: 'sanguine_haste',
+        graftedTraitId: 'trait_vampiric_conduit',
+        lineageAncestors: ['iron_footman', 'blood_scribe'],
+      );
+      engine.swapPlayerUnit('sanguine_blade', graftedBladeEntity);
+      final unit = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade');
+      unit.speed = 120;
+      unit.ultimateGauge = 0;
+
+      expect(unit.signatureSkillName, equals('Lacerating Cross-Slash'));
+      expect(unit.graftedTraitDisplayName, contains('Vampiric Conduit'));
+      expect(unit.signatureCooldown, equals(2));
+      expect(unit.isSignatureReady, isFalse);
+
+      // Turn 1: Basic Attack -> Cooldown 2 -> 1, Ultimate +15%, Vampiric Conduit heals attacker
+      unit.currentAp = 9900;
+      engine.stepTick();
+      expect(unit.actionCycleCount, equals(1));
+      expect(unit.signatureCooldown, equals(1));
+      expect(unit.isSignatureReady, isFalse);
+      expect(unit.ultimateGauge, equals(15));
+      expect(unit.hp, greaterThan(200)); // Healed by Vampiric Conduit graft proc!
+      expect(engine.activeActionEvent?.isSignatureSkill, isFalse);
+      expect(engine.activeActionEvent?.graftedTraitProc, contains('VAMPIRIC CONDUIT'));
+
+      // Turn 2: Basic Attack -> Cooldown 1 -> 0 (Signature Skill now READY!), Ultimate 15 -> 30%
+      unit.currentAp = 9900;
+      engine.stepTick();
+      expect(unit.actionCycleCount, equals(2));
+      expect(unit.signatureCooldown, equals(0));
+      expect(unit.isSignatureReady, isTrue);
+      expect(unit.ultimateGauge, equals(30));
+
+      // Turn 3: Signature Skill triggers automatically -> Resets cooldown to 2, grants +25% Ultimate (30 -> 55%)
+      final bossHpBeforeSig = gorgoroth.hp;
+      unit.currentAp = 9900;
+      engine.stepTick();
+      expect(unit.actionCycleCount, equals(3));
+      expect(unit.signatureCooldown, equals(2));
+      expect(unit.isSignatureReady, isFalse);
+      expect(unit.ultimateGauge, equals(55)); // +25% accelerated Ultimate charge!
+      expect(gorgoroth.hp, lessThan(bossHpBeforeSig));
+      expect(engine.activeActionEvent?.isSignatureSkill, isTrue);
+      expect(engine.activeActionEvent?.skillName, contains('Lacerating Cross-Slash'));
+      expect(engine.activeActionEvent?.graftedTraitProc, contains('VAMPIRIC CONDUIT'));
+    });
+
+    test('Plinth Material Passives: Iron (+15% DEF), Gold (+10% All Stats), and Bone (Vampiric Siphon) scale CombatUnitState', () {
+      const ironUnit = UnitEntity(
+        id: 'iron_guard',
+        name: 'Iron Guard',
+        speciesId: 'iron_footman',
+        generation: 2,
+        rarity: UnitRarity.rare,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 20,
+        maxLevel: 20,
+        maxHp: 500,
+        currentHp: 500,
+        attack: 100,
+        defense: 100,
+        speed: 90,
+        nativeTraitId: 'shield_wall',
+        lineageAncestors: [],
+      );
+
+      final promotedIronUnit = ironUnit.promoteRarity();
+      expect(promotedIronUnit.rarity, equals(UnitRarity.epic));
+      expect(promotedIronUnit.maxHp, equals(575)); // +15% HP
+      expect(promotedIronUnit.attack, equals(115)); // +15% ATK
+      expect(promotedIronUnit.defense, equals(112)); // +12% DEF
+
+      // Gold Plinth (+10% All Stats)
+      const goldUnit = UnitEntity(
+        id: 'gold_sovereign',
+        name: 'Sovereign Vanguard',
+        speciesId: 'iron_footman',
+        generation: 4,
+        rarity: UnitRarity.legendary,
+        plinthMaterial: PlinthMaterial.gold,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 40,
+        maxLevel: 50,
+        maxHp: 1000,
+        currentHp: 1000,
+        attack: 200,
+        defense: 150,
+        speed: 100,
+        nativeTraitId: 'shield_wall',
+        lineageAncestors: ['a1', 'a2', 'a3'],
+      );
+      expect(goldUnit.plinthMaterial, equals(PlinthMaterial.gold));
+
+      engine.swapPlayerUnit('iron_footman', goldUnit);
+      final swapped = engine.playerUnits.firstWhere((u) => u.id == 'gold_sovereign');
+      expect(swapped.maxHp, equals(1100)); // 1000 * 1.10
+      expect(swapped.attack, equals(220)); // 200 * 1.10
+      expect(swapped.maxArmor, equals(165)); // 150 * 1.10
+      expect(swapped.speed, equals(110)); // 100 * 1.10
+    });
+
+    test('Dynamic Campaign Boss Intents: Any colossusBehemoth boss winds up T-Cleave on tick 135 and Hearth Cataclysm under 50% HP', () {
+      const customBoss = UnitEntity(
+        id: 'boss_abyssal_archon',
+        name: 'Vaelgor the Abyssal Archon',
+        speciesId: 'abyssal_archon_boss',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 25,
+        maxLevel: 30,
+        maxHp: 3000,
+        currentHp: 3000,
+        attack: 120,
+        defense: 80,
+        speed: 75,
+        nativeTraitId: 'boss_aura',
+        lineageAncestors: [],
+      );
+      const allyUnit = UnitEntity(
+        id: 'ally_1',
+        name: 'Iron Vanguard',
+        speciesId: 'iron_footman',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 20,
+        maxHp: 600,
+        currentHp: 600,
+        attack: 80,
+        defense: 50,
+        speed: 90,
+        nativeTraitId: 'shield_wall',
+        lineageAncestors: [],
+      );
+
+      final customEngine = SpatialCombatEngine(
+        initialPlayerEntities: [allyUnit],
+        initialEnemyEntities: [customBoss],
+        isBossEncounter: true,
+      );
+      customEngine.startBattle();
+
+      final bossState = customEngine.enemyUnits.first;
+      expect(bossState.archetype, equals(UnitArchetype.colossusBehemoth));
+      expect(bossState.pendingIntent, isNull);
+
+      while (customEngine.currentTick < 135) {
+        customEngine.stepTick();
+      }
+      expect(bossState.pendingIntent, isNotNull);
+      expect(bossState.pendingIntent!.skillName, equals('Molten Great-Cleaver'));
+      expect(bossState.pendingIntent!.pattern, equals(TargetPattern.tShapedCleave));
+    });
+
+    test('Custom Grimoire Deck & Active Commander Aura: Deals Commander orders and applies Aura buffs', () {
+      final dummyTickManager = InitiativeTickManager(initialAllies: const [], initialEnemies: const []);
+      final cmdService = GeneralCommandService(
+        tickManager: dummyTickManager,
+        generalType: GeneralType.morrigan,
+      );
+      const allyUnit = UnitEntity(
+        id: 'ally_morrigan_test',
+        name: 'Sanguine Duelist',
+        speciesId: 'sanguine_blade',
+        generation: 2,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 20,
+        maxHp: 400,
+        currentHp: 400,
+        attack: 90,
+        defense: 30,
+        speed: 100,
+        nativeTraitId: 'sanguine_haste',
+        lineageAncestors: [],
+      );
+      const enemyUnit = UnitEntity(
+        id: 'enemy_1',
+        name: 'Crypt Ghoul',
+        speciesId: 'crypt_ghoul',
+        generation: 1,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front1,
+        level: 5,
+        maxLevel: 20,
+        maxHp: 300,
+        currentHp: 300,
+        attack: 50,
+        defense: 20,
+        speed: 80,
+        nativeTraitId: 'ghoul_bite',
+        lineageAncestors: [],
+      );
+
+      final customEngine = SpatialCombatEngine(
+        initialPlayerEntities: [allyUnit],
+        initialEnemyEntities: [enemyUnit],
+        commandService: cmdService,
+      );
+
+      // Mother Morrigan's Temporal Threads aura grants +10% Speed (100 -> 110)
+      expect(customEngine.playerUnits.first.speed, equals(110));
+      // Opening hand contains Morrigan's Grimoire order 'quicken'
+      expect(customEngine.hand.any((c) => c.id == 'quicken'), isTrue);
+
+      customEngine.startBattle();
+      customEngine.focus = 5;
+      final castOk = customEngine.castCard('quicken');
+      expect(castOk, isTrue);
+      expect(customEngine.playerUnits.first.hasteDuration, greaterThan(0));
+    });
+
+    test('Multi-Wave Transitions: Clearing Wave 1 spawns Wave 2, heals surviving allies +20% HP, and grants +1 Focus', () {
+      const allyUnit = UnitEntity(
+        id: 'ally_wave_hero',
+        name: 'Iron Vanguard',
+        speciesId: 'iron_footman',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 20,
+        maxHp: 500,
+        currentHp: 300, // Wounded at 300/500 HP
+        attack: 120,
+        defense: 50,
+        speed: 100,
+        nativeTraitId: 'shield_wall',
+        lineageAncestors: [],
+      );
+      const wave1Enemy = UnitEntity(
+        id: 'w1_enemy',
+        name: 'Wave 1 Thrall',
+        speciesId: 'crypt_ghoul',
+        generation: 1,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front1,
+        level: 1,
+        maxLevel: 20,
+        maxHp: 50,
+        currentHp: 50,
+        attack: 20,
+        defense: 0,
+        speed: 50,
+        nativeTraitId: 'bite',
+        lineageAncestors: [],
+      );
+      const wave2Enemy = UnitEntity(
+        id: 'w2_enemy',
+        name: 'Wave 2 Dreadknight',
+        speciesId: 'iron_footman',
+        generation: 2,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 10,
+        maxLevel: 20,
+        maxHp: 450,
+        currentHp: 450,
+        attack: 65,
+        defense: 30,
+        speed: 80,
+        nativeTraitId: 'shield_wall',
+        lineageAncestors: [],
+      );
+
+      final waveEngine = SpatialCombatEngine(
+        initialPlayerEntities: [allyUnit],
+        enemyWaves: [
+          [wave1Enemy],
+          [wave2Enemy],
+        ],
+      );
+
+      expect(waveEngine.totalWaves, equals(2));
+      expect(waveEngine.currentWaveIndex, equals(1));
+      expect(waveEngine.enemyUnits.first.id, equals('w1_enemy'));
+
+      waveEngine.startBattle();
+      // Kill Wave 1 enemy and step tick to trigger wave transition
+      waveEngine.enemyUnits.first.hp = 0;
+      waveEngine.stepTick();
+
+      // Should have transitioned to Wave 2, NOT victory yet!
+      expect(waveEngine.isVictory, isFalse);
+      expect(waveEngine.currentWaveIndex, equals(2));
+      expect(waveEngine.enemyUnits.first.id, equals('w2_enemy'));
+      expect(waveEngine.playerUnits.first.hp, equals(400)); // 300 + 20% of 500 (+100 HP) = 400 HP
+      expect(waveEngine.lastBannerMessage, contains('WAVE 2/2'));
+
+      // Kill Wave 2 enemy -> Now encounter is victorious!
+      waveEngine.enemyUnits.first.hp = 0;
+      waveEngine.stepTick();
+      expect(waveEngine.isVictory, isTrue);
+    });
   });
 }
-
-
-

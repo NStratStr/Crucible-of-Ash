@@ -4,6 +4,7 @@ import 'models/spatial_combat_models.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../core/combat_math.dart';
 import '../relics/relic_service.dart';
+import '../generals/general_command_service.dart';
 
 /// Deterministic 30 Hz Spatial Combat Engine simulating the 3-Row x 5-Col Grid Plane
 class SpatialCombatEngine extends ChangeNotifier {
@@ -12,6 +13,15 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   final List<CombatUnitState> playerUnits = [];
   final List<CombatUnitState> enemyUnits = [];
+
+  // Multi-Wave Encounter State
+  final List<List<UnitEntity>> _allEnemyWaves = [];
+  int currentWaveIndex = 1;
+  int totalWaves = 1;
+  bool isBossEncounterFlag = false;
+
+  // Active Commander & Grimoire Service
+  GeneralCommandService? commandService;
 
   // Commander Focus Economy
   int focus = 3;
@@ -34,8 +44,27 @@ class SpatialCombatEngine extends ChangeNotifier {
   SpatialActionEvent? activeActionEvent;
   bool isActionPauseEnabled = false;
 
-  bool get isVictory => enemyUnits.isNotEmpty && enemyUnits.every((u) => !u.isAlive);
+  bool get isVictory =>
+      currentWaveIndex >= totalWaves &&
+      enemyUnits.isNotEmpty &&
+      enemyUnits.every((u) => !u.isAlive);
   bool get isDefeat => playerUnits.isNotEmpty && playerUnits.every((u) => !u.isAlive);
+
+  /// Active Commander Aura Summary for HUD display
+  String get activeCommanderAuraLabel {
+    final gen = commandService?.activeGeneralType;
+    if (gen == null) return valeriaStance;
+    switch (gen) {
+      case GeneralType.vladislav:
+        return 'Crimson Tithe (+10% Vampiric Siphon vs Wounded)';
+      case GeneralType.valeria:
+        return 'Iron Aegis (+25% Frontline Armor)';
+      case GeneralType.malakor:
+        return 'Carrion Miasma (Blight Detonation on Death)';
+      case GeneralType.morrigan:
+        return 'Temporal Threads (+10% Squad Speed)';
+    }
+  }
 
   /// GDD Section 4.2: Positional Commander Stance Aura for Lady Valeria
   /// Row 0 = Frontline ("Bastion of Cold Iron": Frontline allies gain +25 Armor)
@@ -103,77 +132,99 @@ class SpatialCombatEngine extends ChangeNotifier {
   SpatialCombatEngine({
     List<UnitEntity>? initialPlayerEntities,
     List<UnitEntity>? initialEnemyEntities,
+    List<List<UnitEntity>>? enemyWaves,
     String? title,
     String? description,
     bool isBossEncounter = false,
     RelicService? relicService,
+    this.commandService,
   })  : encounterTitle = title ?? 'The Sunder at Ashen Gate',
         encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
-    if (initialEnemyEntities != null && initialEnemyEntities.isNotEmpty) {
+    final waves = (enemyWaves != null && enemyWaves.isNotEmpty)
+        ? enemyWaves
+        : (initialEnemyEntities != null && initialEnemyEntities.isNotEmpty ? [initialEnemyEntities] : null);
+    if (waves != null && waves.isNotEmpty) {
       setupCampaignEncounter(
         playerEntities: initialPlayerEntities,
-        enemyEntities: initialEnemyEntities,
+        enemyEntities: waves.first,
+        enemyWaves: waves,
         isBoss: isBossEncounter,
         title: title,
         description: description,
         relicService: relicService,
+        activeCommandService: commandService,
       );
     } else {
       setupSunderAtAshenGate();
     }
   }
 
-  /// Maps an Archetype to a tactical UnitArchetype for 2.5D spatial combat
-  static UnitArchetype mapArchetypeToSpatial(Archetype arc, {bool isBoss = false}) {
-    if (isBoss) return UnitArchetype.colossusBehemoth;
-    switch (arc) {
-      case Archetype.juggernaut:
-        return UnitArchetype.vanguardMelee;
-      case Archetype.assassin:
-      case Archetype.skirmisher:
-      case Archetype.marksman:
-        return UnitArchetype.reachMidline;
-      case Archetype.occultist:
-      case Archetype.support:
-        return UnitArchetype.backlineCaster;
+  /// Maps a GeneralOrderDefinition from the active Commander's Grimoire into a SpatialCombatCard
+  static SpatialCombatCard mapGeneralOrderToSpatialCard(GeneralOrderDefinition order) {
+    TargetPattern pattern = TargetPattern.singleTarget;
+    double dmgMult = 1.4;
+    int armorShred = 0;
+    int bleed = 0;
+
+    switch (order.id) {
+      case 'feast_of_ruin':
+      case 'retributive_stride':
+      case 'corpse_burst':
+      case 'virulent_cascade':
+      case 'disrupting_cleave':
+      case 'blood_boil':
+        pattern = TargetPattern.horizontalRowScythe;
+        dmgMult = 1.6;
+        break;
+      case 'smite_the_wicked':
+        pattern = TargetPattern.piercingColumnSkewer;
+        dmgMult = 2.4;
+        armorShred = 40;
+        break;
+      case 'siphon_vitality':
+      case 'rend_flesh':
+      case 'exsanguinating_strike':
+        pattern = TargetPattern.singleTarget;
+        dmgMult = 1.5;
+        bleed = 3;
+        break;
+      case 'sanguine_ward':
+      case 'stand_resolute':
+      case 'rebind_flesh':
+      case 'quicken':
+      case 'echoing_hourglass':
+      case 'iron_bulwark':
+      case 'sanguine_revival':
+        pattern = TargetPattern.singleTarget;
+        dmgMult = 1.0;
+        break;
+      case 'unravel_hex':
+        pattern = TargetPattern.stAshlarCross;
+        dmgMult = 1.5;
+        armorShred = 30;
+        break;
     }
+
+    return SpatialCombatCard(
+      id: order.id,
+      name: order.name,
+      focusCost: order.focusCost,
+      description: order.description,
+      pattern: pattern,
+      damageMultiplier: dmgMult,
+      armorShredPercent: armorShred,
+      bleedStacks: bleed,
+    );
   }
 
-  /// Configures a dynamic 2.5D spatial encounter from Campaign Map entities
-  void setupCampaignEncounter({
-    List<UnitEntity>? playerEntities,
-    required List<UnitEntity> enemyEntities,
-    bool isBoss = false,
-    String? title,
-    String? description,
-    RelicService? relicService,
-  }) {
-    if (title != null) encounterTitle = title;
-    if (description != null) encounterDescription = description;
-    playerUnits.clear();
+  /// Spawns an enemy wave onto the 3x5 enemy spatial grid
+  void _spawnEnemyWaveEntities(List<UnitEntity> waveEntities, {required bool isBossWave}) {
     enemyUnits.clear();
-    drawPile.clear();
-    hand.clear();
-    burnPit.clear();
-    combatLogs.clear();
-    unitDamageDealt.clear();
-    unitDamageTaken.clear();
-    totalDamageDealt = 0;
-    totalDamageTaken = 0;
-    totalHealingDone = 0;
-    bleedDetonationsCount = 0;
-    currentTick = 0;
-    isRunning = false;
-    isPreBattlePhase = true;
-    focus = 3;
-    maxFocus = 7;
-    isBulletTime = false;
+    if (waveEntities.isEmpty) return;
 
-    // --- POPULATE ENEMY UNITS ONTO SPATIAL GRID ---
-    // If Boss encounter, place Boss as 2x2 Colossus or central behemoth
-    if (isBoss) {
-      final bossEntity = enemyEntities.first;
-      final bossFootprint = UnitFootprint.quadColossus2x2;
+    if (isBossWave) {
+      final bossEntity = waveEntities.first;
+      const bossFootprint = UnitFootprint.quadColossus2x2;
       final bossUnit = CombatUnitState(
         id: bossEntity.id,
         name: bossEntity.name,
@@ -199,10 +250,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       );
       enemyUnits.add(bossUnit);
 
-      // Add remaining minions (if any) to flanks
       int minionIdx = 0;
-      for (int i = 1; i < enemyEntities.length; i++) {
-        final minion = enemyEntities[i];
+      for (int i = 1; i < waveEntities.length; i++) {
+        final minion = waveEntities[i];
         final col = (minionIdx % 2 == 0) ? 0 : 4;
         final row = (minionIdx ~/ 2 == 0) ? 0 : 2;
         minionIdx++;
@@ -226,21 +276,30 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     } else {
-      // Standard Skirmish / Elite: Place enemies across columns 0..4
-      for (int i = 0; i < min(5, enemyEntities.length); i++) {
-        final e = enemyEntities[i];
-        final bool isVanguard = e.isFrontlineOverride ?? (e.slot == FormationSlot.front1 || e.slot == FormationSlot.front2 || e.slot == FormationSlot.front3);
+      for (int i = 0; i < min(5, waveEntities.length); i++) {
+        final e = waveEntities[i];
+        final bool isVanguard = e.isFrontlineOverride ??
+            (e.slot == FormationSlot.front1 || e.slot == FormationSlot.front2 || e.slot == FormationSlot.front3);
         final int targetRow = isVanguard ? 0 : (e.archetype == Archetype.support || e.archetype == Archetype.occultist ? 2 : 1);
-        final int targetCol = (i * 2) % 5; // Stagger across columns 0, 2, 4, 1, 3
+        final int targetCol = (i * 2) % 5;
 
         enemyUnits.add(CombatUnitState(
           id: e.id,
           name: e.name,
           templateId: e.speciesId,
           isPlayer: false,
-          footprint: UnitFootprint.single1x1,
-          archetype: mapArchetypeToSpatial(e.archetype),
-          occupiedNodes: [GridNode(column: targetCol, row: targetRow, occupantUnitId: e.id)],
+          footprint: e.isBoss ? UnitFootprint.quadColossus2x2 : UnitFootprint.single1x1,
+          archetype: mapArchetypeToSpatial(e.archetype, isBoss: e.isBoss),
+          occupiedNodes: e.isBoss
+              ? [
+                  GridNode(column: 1, row: 0, occupantUnitId: e.id),
+                  GridNode(column: 2, row: 0, occupantUnitId: e.id),
+                  GridNode(column: 1, row: 1, occupantUnitId: e.id),
+                  GridNode(column: 2, row: 1, occupantUnitId: e.id),
+                ]
+              : [GridNode(column: targetCol, row: targetRow, occupantUnitId: e.id)],
+          isDisplacementImmune: e.isBoss,
+          isSlagCarapaceActive: e.isBoss,
           level: e.level,
           maxHp: e.maxHp,
           hp: e.currentHp,
@@ -252,22 +311,120 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
     }
+  }
+
+  /// Advances the encounter to the next enemy wave when all current enemies are defeated
+  bool advanceToNextWaveIfPending() {
+    if (enemyUnits.isEmpty || enemyUnits.any((u) => u.isAlive)) return false;
+    if (currentWaveIndex >= totalWaves || currentWaveIndex >= _allEnemyWaves.length) return false;
+
+    final nextWaveEntities = _allEnemyWaves[currentWaveIndex];
+    currentWaveIndex++;
+    final isFinalBossWave = isBossEncounterFlag && currentWaveIndex == totalWaves;
+    _spawnEnemyWaveEntities(nextWaveEntities, isBossWave: isFinalBossWave);
+
+    // Recover surviving player squad (+20% Max HP & +15 Aegis Shield & +1 Focus)
+    for (final ally in playerUnits.where((u) => u.isAlive)) {
+      final healAmt = max(25, (ally.maxHp * 0.20).round());
+      ally.hp = min(ally.maxHp, ally.hp + healAmt);
+      ally.aegisShield += 15;
+      totalHealingDone += healAmt;
+    }
+    focus = min(maxFocus, focus + 1);
+
+    lastBannerMessage = '⚔️ WAVE $currentWaveIndex/$totalWaves: ENEMY REINFORCEMENTS APPROACHING! (+20% Squad HP & +1 Focus)';
+    addLog('=== WAVE $currentWaveIndex/$totalWaves ENGAGED: ${enemyUnits.length} hostile vessels entered the arena! Surviving allies restored +20% HP & +1 Focus. ===');
+    notifyListeners();
+    return true;
+  }
+
+  /// Maps an Archetype to a tactical UnitArchetype for 2.5D spatial combat
+  static UnitArchetype mapArchetypeToSpatial(Archetype arc, {bool isBoss = false}) {
+    if (isBoss) return UnitArchetype.colossusBehemoth;
+    switch (arc) {
+      case Archetype.juggernaut:
+        return UnitArchetype.vanguardMelee;
+      case Archetype.assassin:
+      case Archetype.skirmisher:
+      case Archetype.marksman:
+        return UnitArchetype.reachMidline;
+      case Archetype.occultist:
+      case Archetype.support:
+        return UnitArchetype.backlineCaster;
+    }
+  }
+
+  /// Configures a dynamic 2.5D spatial encounter from Campaign Map entities
+  void setupCampaignEncounter({
+    List<UnitEntity>? playerEntities,
+    required List<UnitEntity> enemyEntities,
+    List<List<UnitEntity>>? enemyWaves,
+    bool isBoss = false,
+    String? title,
+    String? description,
+    RelicService? relicService,
+    GeneralCommandService? activeCommandService,
+  }) {
+    if (title != null) encounterTitle = title;
+    if (description != null) encounterDescription = description;
+    if (activeCommandService != null) commandService = activeCommandService;
+    isBossEncounterFlag = isBoss;
+
+    playerUnits.clear();
+    enemyUnits.clear();
+    _allEnemyWaves.clear();
+    if (enemyWaves != null && enemyWaves.isNotEmpty) {
+      _allEnemyWaves.addAll(enemyWaves);
+    } else {
+      _allEnemyWaves.add(enemyEntities);
+    }
+    currentWaveIndex = 1;
+    totalWaves = _allEnemyWaves.length;
+
+    drawPile.clear();
+    hand.clear();
+    burnPit.clear();
+    combatLogs.clear();
+    unitDamageDealt.clear();
+    unitDamageTaken.clear();
+    totalDamageDealt = 0;
+    totalDamageTaken = 0;
+    totalHealingDone = 0;
+    bleedDetonationsCount = 0;
+    currentTick = 0;
+    isRunning = false;
+    isPreBattlePhase = true;
+    focus = 3;
+    maxFocus = 7;
+    isBulletTime = false;
+
+    // --- POPULATE ENEMY UNITS ONTO SPATIAL GRID ---
+    _spawnEnemyWaveEntities(
+      _allEnemyWaves.first,
+      isBossWave: isBoss && totalWaves == 1,
+    );
 
     // --- POPULATE PLAYER SQUAD ONTO SPATIAL GRID ---
     if (playerEntities != null && playerEntities.isNotEmpty) {
+      final activeGen = commandService?.activeGeneralType;
+      final double morriganSpeedMult = activeGen == GeneralType.morrigan ? 1.10 : 1.0;
+      final double valeriaArmorMult = activeGen == GeneralType.valeria ? 1.25 : 1.0;
+
       for (int i = 0; i < min(5, playerEntities.length); i++) {
         final p = playerEntities[i];
-        final bool isFront = p.isFrontlineOverride ?? (p.slot == FormationSlot.front1 || p.slot == FormationSlot.front2 || p.slot == FormationSlot.front3);
-        final int pRow = isFront ? 0 : (p.archetype == Archetype.occultist || p.archetype == Archetype.support ? 2 : 1);
-        final int pCol = p.columnIndexOverride ?? (i % 5);
 
-        // Apply Equipped Relic Bonuses (GDD Pillar 1 & Equipment System)
+        // Apply Equipped Relic Bonuses, Plinth Material Passives, & Active Commander Aura
         final relicBonuses = relicService?.calculateBonuses(p.id) ?? const UnitRelicBonuses();
-        final effectiveAtk = p.attack + relicBonuses.bonusAttack;
-        final effectiveDef = p.defense + relicBonuses.bonusDefense;
-        final effectiveMaxHp = p.maxHp + relicBonuses.bonusHp;
-        final effectiveHp = p.currentHp + relicBonuses.bonusHp;
-        final effectiveSpd = p.speed + relicBonuses.bonusSpeed;
+        final double plinthAllMult = p.plinthMaterial == PlinthMaterial.gold ? 1.10 : 1.0;
+        final double plinthAtkMult = p.plinthMaterial == PlinthMaterial.obsidian ? 1.10 : plinthAllMult;
+        final double plinthDefMult = (p.plinthMaterial == PlinthMaterial.iron ? 1.15 : plinthAllMult) * valeriaArmorMult;
+
+        final effectiveAtk = ((p.attack + relicBonuses.bonusAttack) * plinthAtkMult).round();
+        final effectiveDef = ((p.defense + relicBonuses.bonusDefense) * plinthDefMult).round();
+        final effectiveMaxHp = ((p.maxHp + relicBonuses.bonusHp) * plinthAllMult).round();
+        final effectiveHp = ((p.currentHp + relicBonuses.bonusHp) * plinthAllMult).round();
+        final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult * morriganSpeedMult).round();
+        final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
 
         playerUnits.add(CombatUnitState(
           id: p.id,
@@ -276,7 +433,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           isPlayer: true,
           footprint: UnitFootprint.single1x1,
           archetype: mapArchetypeToSpatial(p.archetype),
-          occupiedNodes: [GridNode(column: pCol, row: pRow, occupantUnitId: p.id)],
+          occupiedNodes: [], // Spawn on Staging Reserve Dock for player tactical placement before battle
           level: p.level,
           maxHp: effectiveMaxHp,
           hp: effectiveHp,
@@ -285,6 +442,8 @@ class SpatialCombatEngine extends ChangeNotifier {
           attack: effectiveAtk,
           speed: effectiveSpd,
           customAssetPath: p.customAvatarAsset,
+          nativeTraitId: p.nativeTraitId,
+          graftedTraitId: effectiveGraftId,
         ));
       }
     } else {
@@ -293,31 +452,78 @@ class SpatialCombatEngine extends ChangeNotifier {
       return;
     }
 
-    // Cards Setup
-    hand.addAll([
-      const SpatialCombatCard(
+    // Cards Setup: Deal Commander's Custom Grimoire Orders alongside Sovereign Tactics!
+    final customGrimoireCards = commandService
+            ?.getActiveGrimoireDeck()
+            .map(mapGeneralOrderToSpatialCard)
+            .toList() ??
+        const <SpatialCombatCard>[];
+
+    if (customGrimoireCards.isNotEmpty) {
+      // Deal up to 2 equipped Commander Grimoire spells directly into opening hand + 1 Sovereign card
+      hand.add(customGrimoireCards.first);
+      if (customGrimoireCards.length > 1) {
+        hand.add(customGrimoireCards[1]);
+      } else {
+        hand.add(const SpatialCombatCard(
+          id: 'phalanx_intercept',
+          name: 'Phalanx Intercept',
+          focusCost: 2,
+          description: 'Fortifies ally in Frontline with +35 Armor & taunt barrier.',
+          pattern: TargetPattern.singleTarget,
+        ));
+      }
+      hand.add(const SpatialCombatCard(
+        id: 'stoke_the_embers',
+        name: 'Stoke the Embers',
+        focusCost: 1,
+        description: 'Exhaust or burn to generate immediate +1 Focus & draw sovereign cards.',
+        pattern: TargetPattern.singleTarget,
+      ));
+      for (int i = 2; i < customGrimoireCards.length; i++) {
+        drawPile.add(customGrimoireCards[i]);
+      }
+      drawPile.add(const SpatialCombatCard(
         id: 'phalanx_intercept',
         name: 'Phalanx Intercept',
         focusCost: 2,
         description: 'Fortifies ally in Frontline with +35 Armor & taunt barrier.',
         pattern: TargetPattern.singleTarget,
-      ),
-      const SpatialCombatCard(
+      ));
+      drawPile.add(const SpatialCombatCard(
         id: 'searing_brand',
         name: 'Searing Brand',
         focusCost: 2,
         description: 'Strikes enemy node and ignites cross pattern for 90 radiant damage.',
         pattern: TargetPattern.stAshlarCross,
         damageMultiplier: 1.2,
-      ),
-      const SpatialCombatCard(
-        id: 'stoke_the_embers',
-        name: 'Stoke the Embers',
-        focusCost: 1,
-        description: 'Exhaust or burn to generate immediate +1 Focus & draw sovereign cards.',
-        pattern: TargetPattern.singleTarget,
-      ),
-    ]);
+      ));
+    } else {
+      hand.addAll([
+        const SpatialCombatCard(
+          id: 'phalanx_intercept',
+          name: 'Phalanx Intercept',
+          focusCost: 2,
+          description: 'Fortifies ally in Frontline with +35 Armor & taunt barrier.',
+          pattern: TargetPattern.singleTarget,
+        ),
+        const SpatialCombatCard(
+          id: 'searing_brand',
+          name: 'Searing Brand',
+          focusCost: 2,
+          description: 'Strikes enemy node and ignites cross pattern for 90 radiant damage.',
+          pattern: TargetPattern.stAshlarCross,
+          damageMultiplier: 1.2,
+        ),
+        const SpatialCombatCard(
+          id: 'stoke_the_embers',
+          name: 'Stoke the Embers',
+          focusCost: 1,
+          description: 'Exhaust or burn to generate immediate +1 Focus & draw sovereign cards.',
+          pattern: TargetPattern.singleTarget,
+        ),
+      ]);
+    }
 
     drawPile.addAll([
       const SpatialCombatCard(
@@ -354,7 +560,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       ),
     ]);
 
-    addLog('Encounter Initialized: $encounterTitle.');
+    if (commandService != null) {
+      addLog('Active Commander Aura: $activeCommanderAuraLabel (${commandService!.currentProfile.name}).');
+    }
+    addLog('Encounter Initialized: $encounterTitle (Wave $currentWaveIndex/$totalWaves).');
     notifyListeners();
   }
 
@@ -498,6 +707,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 55,
       attack: 74,
       speed: 85,
+      ultimateGauge: 40,
     );
 
     // Iron Footman: 1x1 Vanguard in Col 4 Frontline (Col index 3, Row 0)
@@ -517,6 +727,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 45,
       attack: 60,
       speed: 80,
+      ultimateGauge: 40,
     );
 
     // Sanguine Blade: 1x1 Midline in Col 4 Midline (Col index 3, Row 1)
@@ -537,6 +748,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 20,
       attack: 78,
       speed: 120,
+      ultimateGauge: 40,
     );
 
     // Sun-Smith Artificer: 1x1 Arcanum in Col 5 Backline (Col index 4, Row 2)
@@ -556,6 +768,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 15,
       attack: 70,
       speed: 95,
+      ultimateGauge: 40,
     );
 
     playerUnits.addAll([valeria, ironFootman, sanguineBlade, sunSmith]);
@@ -791,13 +1004,19 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
 
-    // Check impending Boss Intents (Gorgoroth winds up Molten Great-Cleaver on tick 135, and cycles every 160 ticks)
-    // GDD §6.2: Under 50% HP, Gorgoroth enters Phase 2 Enkindled: winds up room-wide "Hearth Cataclysm"
-    final gorgoroth = enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
-    if (gorgoroth != null) {
-      final bool isPhase2Enkindled = gorgoroth.hp <= (gorgoroth.maxHp * 0.50);
+    // Check impending Boss Intents (Gorgoroth or any Campaign/Gauntlet Colossus Boss winds up on tick 135, and cycles every 160 ticks)
+    // GDD §6.2: Under 50% HP, Boss enters Phase 2 Enkindled: winds up room-wide "Hearth Cataclysm"
+    final bossUnit = enemyUnits
+        .where((u) =>
+            (u.id == 'gorgoroth_boss' ||
+                u.archetype == UnitArchetype.colossusBehemoth ||
+                u.footprint != UnitFootprint.single1x1) &&
+            u.isAlive)
+        .firstOrNull;
+    if (bossUnit != null) {
+      final bool isPhase2Enkindled = bossUnit.hp <= (bossUnit.maxHp * 0.50);
 
-      if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && gorgoroth.pendingIntent == null) {
+      if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && bossUnit.pendingIntent == null) {
         if (isPhase2Enkindled) {
           // Hearth Cataclysm: 20-tick windup terminal channel hitting all Frontline (row 0) and Midline (row 1) nodes!
           final cataclysmNodes = [
@@ -806,7 +1025,7 @@ class SpatialCombatEngine extends ChangeNotifier {
               GridNode(column: col, row: 1),
             ],
           ];
-          gorgoroth.pendingIntent = SpatialTelegraphIntent(
+          bossUnit.pendingIntent = SpatialTelegraphIntent(
             id: 'hearth_cataclysm_$currentTick',
             skillName: 'Hearth Cataclysm',
             pattern: TargetPattern.horizontalRowScythe,
@@ -815,10 +1034,10 @@ class SpatialCombatEngine extends ChangeNotifier {
             targetNodes: cataclysmNodes,
             triggerTick: currentTick + 20,
             totalWindupTicks: 20,
-            rawDamage: 320,
+            rawDamage: max(220, (bossUnit.attack * 2.8).round()),
           );
           lastBannerMessage = '🔥 ENKINDLED APEX: HEARTH CATACLYSM WINDING UP!';
-          addLog('BOSS APEX: Gorgoroth initiates HEARTH CATACLYSM incinerating Frontline and Midline in 20 ticks! Break with Smite or Retreat to Backline!');
+          addLog('BOSS APEX: ${bossUnit.name} initiates HEARTH CATACLYSM incinerating Frontline and Midline in 20 ticks! Break with Smite or Retreat to Backline!');
         } else {
           // Wind up Apex Intent: Molten Great-Cleaver (Execution 15 ticks later)
           final telegraphNodes = [
@@ -826,7 +1045,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             const GridNode(column: 2, row: 0), // Front Col 3 (lateral splash toward Col 3)
             const GridNode(column: 1, row: 1), // Mid Col 2 (deep shockwave)
           ];
-          gorgoroth.pendingIntent = SpatialTelegraphIntent(
+          bossUnit.pendingIntent = SpatialTelegraphIntent(
             id: 'cleave_intent_$currentTick',
             skillName: 'Molten Great-Cleaver',
             pattern: TargetPattern.tShapedCleave,
@@ -835,22 +1054,22 @@ class SpatialCombatEngine extends ChangeNotifier {
             targetNodes: telegraphNodes,
             triggerTick: currentTick + 15,
             totalWindupTicks: 15,
-            rawDamage: 280,
+            rawDamage: bossUnit.id == 'gorgoroth_boss' ? 280 : max(180, (bossUnit.attack * 2.4).round()),
           );
-          lastBannerMessage = '⚠️ GORGOROTH WINDS UP: MOLTEN GREAT-CLEAVER!';
-          addLog('TELEGRAPH: Gorgoroth prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
+          lastBannerMessage = '⚠️ ${bossUnit.name.toUpperCase()} WINDS UP: MOLTEN GREAT-CLEAVER!';
+          addLog('TELEGRAPH: ${bossUnit.name} prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
         }
       }
 
-      // Check Intent Trigger for Gorgoroth Apex skills
-      if (gorgoroth.pendingIntent != null && currentTick >= gorgoroth.pendingIntent!.triggerTick) {
-        _resolveGorgorothIntent(gorgoroth, gorgoroth.pendingIntent!);
-        gorgoroth.pendingIntent = null;
+      // Check Intent Trigger for Boss Apex skills
+      if (bossUnit.pendingIntent != null && currentTick >= bossUnit.pendingIntent!.triggerTick) {
+        _resolveGorgorothIntent(bossUnit, bossUnit.pendingIntent!);
+        bossUnit.pendingIntent = null;
       }
     }
 
-    // Check Intent Triggers for all enemy units (2-second / 60-tick telegraphed attacks)
-    for (final enemy in enemyUnits.where((u) => u.isAlive && u.id != 'gorgoroth_boss')) {
+    // Check Intent Triggers for all non-boss enemy units (2-second / 60-tick telegraphed attacks)
+    for (final enemy in enemyUnits.where((u) => u.isAlive && u.id != bossUnit?.id)) {
       if (enemy.pendingIntent != null && currentTick >= enemy.pendingIntent!.triggerTick) {
         _resolveEnemyTelegraphedAttack(enemy, enemy.pendingIntent!);
         enemy.pendingIntent = null;
@@ -870,7 +1089,15 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (!unit.isAlive || unit.currentAp < tickThreshold) continue;
       unit.currentAp -= tickThreshold; // Consume turn
       _executeUnitTurn(unit);
+      // If action pause is enabled and this unit just triggered a visual action/skill,
+      // break immediately so all other units' AP and turns freeze while we watch the skill in action!
+      if (isActionPauseEnabled && activeActionEvent != null) {
+        break;
+      }
     }
+
+    // If all current wave enemies are defeated and remaining waves exist, transition to next wave!
+    advanceToNextWaveIfPending();
 
     notifyListeners();
   }
@@ -997,13 +1224,45 @@ class SpatialCombatEngine extends ChangeNotifier {
       );
       lastBannerMessage = '⚠️ CINDER WITCH WINDS UP: CINDER ORB (2.0s)!';
       addLog('${unit.name} begins 2s windup for Cinder Orb targeting Col ${wCol + 1}!');
+    } else if (!unit.isPlayer &&
+        unit.pendingIntent == null &&
+        unit.actionCycleCount % 2 == 1 &&
+        (unit.archetype == UnitArchetype.backlineCaster ||
+            unit.templateId.contains('arbalest') ||
+            unit.templateId.contains('archer') ||
+            unit.templateId.contains('marksman'))) {
+      // Dynamic Campaign Enemy Telegraph: Every 2nd turn, enemy casters & marksmen wind up a 60-tick (2.0s)
+      // telegraphed column/node danger zone so players can tactically dodge or shield!
+      unit.actionCycleCount++;
+      final eCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 2;
+      final eRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 2;
+      final target = _resolveColumnTarget(unitCol: eCol, targetingPlayers: true);
+      final targetNode = target?.occupiedNodes.firstOrNull ?? GridNode(column: eCol, row: 0);
+      final isPiercing = unit.archetype == UnitArchetype.reachMidline;
+      final skillLabel = isPiercing ? 'Deadeye Volley' : 'Abyssal Hex Bolt';
+      unit.pendingIntent = SpatialTelegraphIntent(
+        id: 'telegraph_${currentTick}_${unit.id}',
+        skillName: skillLabel,
+        pattern: isPiercing ? TargetPattern.piercingColumnSkewer : TargetPattern.singleTarget,
+        originCol: eCol,
+        originRow: eRow,
+        targetNodes: [
+          GridNode(column: targetNode.column, row: targetNode.row),
+          if (isPiercing && targetNode.row != 0) GridNode(column: targetNode.column, row: 0),
+        ],
+        triggerTick: currentTick + 60,
+        totalWindupTicks: 60,
+        rawDamage: (unit.effectiveAttack * 1.35).round(),
+      );
+      lastBannerMessage = '⚠️ ${unit.name.toUpperCase()} WINDS UP: ${skillLabel.toUpperCase()} (2.0s)!';
+      addLog('TELEGRAPH: ${unit.name} winds up $skillLabel targeting Col ${targetNode.column + 1} in 2.0s!');
     } else if (unit.archetype == UnitArchetype.reachMidline) {
       _executeReachMidlineAction(unit);
     } else if (unit.archetype == UnitArchetype.vanguardMelee) {
       _executeVanguardAction(unit);
     } else if (unit.archetype == UnitArchetype.backlineCaster) {
       _executeCasterAction(unit);
-    } else if (unit.id == 'gorgoroth_boss') {
+    } else if (unit.id == 'gorgoroth_boss' || unit.archetype == UnitArchetype.colossusBehemoth) {
       // Regular attack if not channeling
       if (unit.pendingIntent == null) {
         final target = _resolveColumnTarget(unitCol: 1, targetingPlayers: true) ??
@@ -1028,6 +1287,213 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
+  /// Applies Crucible Grafted Trait proc & Active Commander Aura on any attack or signature skill
+  String? _applyGraftedTraitProc(CombatUnitState attacker, CombatUnitState target, int damageDealt) {
+    // Active Commander Aura: Lord Vladislav's Crimson Tithe (+10% Vampiric Siphon vs Wounded/Bleeding foes)
+    if (attacker.isPlayer &&
+        commandService?.activeGeneralType == GeneralType.vladislav &&
+        damageDealt > 0 &&
+        (target.bleedStacks > 0 || target.hp < target.maxHp)) {
+      final titheHeal = max(5, (damageDealt * 0.12).round());
+      attacker.hp = min(attacker.maxHp, attacker.hp + titheHeal);
+      totalHealingDone += titheHeal;
+      addLog('  🩸 [AURA: CRIMSON TITHE] ${attacker.name} siphons +$titheHeal HP from wounded ${target.name}!');
+    }
+    // Active Commander Aura: Arch-Lich Malakor's Carrion Miasma (If target died, spread +2 Poison to all enemies)
+    if (attacker.isPlayer &&
+        commandService?.activeGeneralType == GeneralType.malakor &&
+        !target.isAlive) {
+      for (final other in enemyUnits.where((u) => u.isAlive)) {
+        other.poisonStacks += 2;
+      }
+      addLog('  ☠️ [AURA: CARRION MIASMA] Slain ${target.name} erupts, infecting all enemies with +2 Poison!');
+    }
+    final trait = attacker.graftedTraitId;
+    if (trait == null || trait.isEmpty) return null;
+    final t = trait.toLowerCase();
+
+    if (t.contains('vampiric') || t.contains('siphon') || t.contains('leech')) {
+      final healAmt = max(8, (damageDealt * 0.25).round());
+      attacker.hp = min(attacker.maxHp, attacker.hp + healAmt);
+      if (attacker.isPlayer) totalHealingDone += healAmt;
+      addLog('  🧬 [GRAFT: VAMPIRIC CONDUIT] ${attacker.name} siphons +$healAmt HP!');
+      return 'VAMPIRIC CONDUIT (+$healAmt HP)';
+    }
+    if (t.contains('rabid') || t.contains('serrated') || t.contains('bleed') || t.contains('hemorrhage')) {
+      target.bleedStacks += 1;
+      attacker.hasteDuration = max(attacker.hasteDuration, 60); // 2s Haste
+      addLog('  🧬 [GRAFT: SERRATED LINEAGE] ${attacker.name} inflicts +1 Bleed & gains 2s Haste!');
+      return 'SERRATED LINEAGE (+1 BLEED & HASTE)';
+    }
+    if (t.contains('bastion') || t.contains('carapace') || t.contains('bulwark') || t.contains('iron') || t.contains('shield')) {
+      attacker.aegisShield += 20;
+      addLog('  🧬 [GRAFT: IRON BASTION] ${attacker.name} fortifies with +20 Aegis Shield!');
+      return 'IRON BASTION (+20 AEGIS)';
+    }
+    if (t.contains('solar') || t.contains('cinder') || t.contains('pyre') || t.contains('burn') || t.contains('flame')) {
+      target.burnDuration = max(target.burnDuration, 60); // 2s Burn
+      addLog('  🧬 [GRAFT: SOLAR IGNITION] ${attacker.name} ignites ${target.name} for 2s Burn!');
+      return 'SOLAR IGNITION (+2s BURN)';
+    }
+    if (t.contains('miasma') || t.contains('venom') || t.contains('blight') || t.contains('poison') || t.contains('spore')) {
+      target.poisonStacks += 2;
+      addLog('  🧬 [GRAFT: MIASMIC SPORES] ${attacker.name} infects ${target.name} with +2 Poison!');
+      return 'MIASMIC SPORES (+2 POISON)';
+    }
+    if (t.contains('keen') || t.contains('predator') || t.contains('pack') || t.contains('execution')) {
+      final bonusDmg = max(5, (damageDealt * 0.20).round());
+      target.takeDamage(bonusDmg, ignoreArmor: true, isPhysical: true);
+      attacker.currentAp = min(SpatialCombatEngine.tickThreshold, attacker.currentAp + 1200);
+      addLog('  🧬 [GRAFT: PREDATOR INSTINCT] ${attacker.name} deals +$bonusDmg True DMG & gains +1,200 AP!');
+      return 'PREDATOR INSTINCT (+$bonusDmg DMG & AP)';
+    }
+
+    // Default generic Crucible Graft proc
+    final bonusDmg = max(5, (damageDealt * 0.15).round());
+    target.takeDamage(bonusDmg, ignoreArmor: true, isPhysical: true);
+    attacker.aegisShield += 15;
+    final label = attacker.graftedTraitDisplayName?.split(' (').first.toUpperCase() ?? 'CRUCIBLE GRAFT';
+    addLog('  🧬 [GRAFT: $label] ${attacker.name} deals +$bonusDmg True DMG & gains +15 Aegis!');
+    return '$label (+$bonusDmg DMG & +15 AEGIS)';
+  }
+
+  /// Executes a unit's distinct Signature Skill every 3rd action cycle (+25% Ultimate Charge)
+  void _executeSignatureSkill(CombatUnitState unit, CombatUnitState target) {
+    final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}';
+    final skillName = unit.signatureSkillName;
+    int dmg = 0;
+    int appliedBleed = 0;
+    TargetPattern pattern = TargetPattern.singleTarget;
+    final Map<String, int> secondaryHits = {};
+    final friendlySquad = unit.isPlayer ? playerUnits : enemyUnits;
+    final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+
+    if (key.contains('vladislav')) {
+      final rawDmg = (unit.effectiveAttack * 1.60).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      appliedBleed = 2;
+      target.bleedStacks += appliedBleed;
+      final drainHeal = max(15, (dmg * 0.35).round());
+      unit.hp = min(unit.maxHp, unit.hp + drainHeal);
+      if (unit.isPlayer) totalHealingDone += drainHeal;
+      pattern = TargetPattern.horizontalRowScythe;
+      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg DMG (+2 Bleed, +$drainHeal HP drained)!');
+    } else if (key.contains('valeria')) {
+      final rawDmg = (unit.effectiveAttack * 1.45).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      target.sunderArmor(0.25);
+      target.currentAp = max(0, target.currentAp - 1500);
+      for (final ally in friendlySquad.where((u) => u.isAlive && u.currentDepth == RowDepth.front)) {
+        ally.aegisShield += 25;
+      }
+      pattern = TargetPattern.piercingColumnSkewer;
+      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName for $dmg DMG, sunders 25% Armor, and shields Frontline (+25 Aegis)!');
+    } else if (key.contains('malakor')) {
+      final rawDmg = (unit.effectiveAttack * 1.60).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      target.burnDuration = max(target.burnDuration, 90);
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      pattern = TargetPattern.stAshlarCross;
+      addLog('★ SIGNATURE SKILL: ${unit.name} calls down $skillName on ${target.name} for $dmg Holy DMG (3s Burn & Vulnerable)!');
+    } else if (key.contains('morrigan')) {
+      final rawDmg = (unit.effectiveAttack * 1.45).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      target.poisonStacks += 3;
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      pattern = TargetPattern.stAshlarCross;
+      addLog('★ SIGNATURE SKILL: ${unit.name} weaves $skillName on ${target.name} for $dmg DMG (+3 Poison & Vulnerable)!');
+    } else if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      final rawDmg = (unit.effectiveAttack * 1.35).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      target.armor = max(0, target.armor - 15);
+      target.currentAp = max(0, target.currentAp - 1500);
+      unit.aegisShield += 25;
+      addLog('★ SIGNATURE SKILL: ${unit.name} slams ${target.name} with $skillName for $dmg DMG (-15 Armor, -1,500 AP, +25 Aegis)!');
+    } else if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
+      final rawDmg = (unit.effectiveAttack * 1.50).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      appliedBleed = 2;
+      target.bleedStacks += appliedBleed;
+      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2000);
+      pattern = TargetPattern.reachMidToFront;
+      addLog('★ SIGNATURE SKILL: ${unit.name} executes $skillName on ${target.name} for $dmg CRIT DMG (+2 Bleed, +2,000 AP)!');
+    } else if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      final rawDmg = (unit.effectiveAttack * 1.55).round();
+      dmg = target.takeDamage(rawDmg, ignoreArmor: true, isPhysical: true);
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      pattern = TargetPattern.piercingColumnSkewer;
+      addLog('★ SIGNATURE SKILL: ${unit.name} fires $skillName piercing ${target.name} for $dmg True DMG & Vulnerable (3s)!');
+    } else if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
+      final rawDmg = (unit.effectiveAttack * 1.50).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      appliedBleed = 2;
+      target.bleedStacks += appliedBleed;
+      unit.hasteDuration = max(unit.hasteDuration, 90);
+      addLog('★ SIGNATURE SKILL: ${unit.name} mauls ${target.name} with $skillName for $dmg DMG (+2 Bleed & 3s Haste)!');
+    } else if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      final rawDmg = (unit.effectiveAttack * 1.30).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      final allies = friendlySquad.where((u) => u.isAlive).toList()
+        ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
+      final lowestAlly = allies.firstOrNull;
+      if (lowestAlly != null) {
+        lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + 40);
+        lowestAlly.aegisShield += 20;
+        if (unit.isPlayer) totalHealingDone += 40;
+      }
+      if (unit.isPlayer && focus < maxFocus) {
+        focus = min(maxFocus, focus + 1);
+      }
+      pattern = TargetPattern.stAshlarCross;
+      addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName for $dmg DMG and restores +40 HP & +20 Aegis to ${lowestAlly?.name ?? unit.name}!');
+    } else if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
+      final rawDmg = (unit.effectiveAttack * 1.55).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      target.burnDuration = max(target.burnDuration, 60);
+      appliedBleed = 1;
+      target.bleedStacks += appliedBleed;
+      if (unit.isPlayer && focus < maxFocus) {
+        focus = min(maxFocus, focus + 1);
+      }
+      pattern = TargetPattern.piercingColumnSkewer;
+      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg Arcane DMG (+2s Burn, +1 Focus)!');
+    } else {
+      final rawDmg = (unit.effectiveAttack * 1.45).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: unit.archetype != UnitArchetype.backlineCaster);
+      for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id).take(1)) {
+        final splash = neighbor.takeDamage((rawDmg * 0.5).round());
+        secondaryHits[neighbor.id] = splash;
+      }
+      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg DMG!');
+    }
+
+    // Signature Skills accelerate Ultimate Gauge by +25%
+    unit.ultimateGauge = min(100, unit.ultimateGauge + 25);
+    unit.signatureCooldown = 2; // Reset to 2 basic actions until next Signature Skill
+    unit.actionCycleCount++;
+
+    final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+    lastBannerMessage = '★ SIGNATURE SKILL: ${unit.name.toUpperCase()} — ${skillName.toUpperCase()} ($dmg DMG)!';
+
+    dispatchAction(SpatialActionEvent(
+      id: 'sig_${currentTick}_${unit.id}',
+      attackerId: unit.id,
+      attackerName: unit.name,
+      skillName: '★ $skillName',
+      targetId: target.id,
+      targetName: target.name,
+      damage: dmg,
+      bleedStacks: appliedBleed,
+      isCrit: true,
+      isPlayerAttacker: unit.isPlayer,
+      pattern: pattern,
+      secondaryTargetHits: secondaryHits,
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+      isSignatureSkill: true,
+      graftedTraitProc: graftProc,
+    ));
+  }
+
   /// Adaptive Posture System: Resolves action for Reach / Midline Strikers (Skirmishers, Assassins, Marksmen)
   void _executeReachMidlineAction(CombatUnitState unit) {
     if (unit.occupiedNodes.isEmpty) return;
@@ -1037,6 +1503,15 @@ class SpatialCombatEngine extends ChangeNotifier {
         opposingSquad.where((u) => u.isAlive).firstOrNull;
 
     if (target != null) {
+      // Every 3rd action cycle (after 2 basic attacks), unleash distinct Unit Signature Skill!
+      if (unit.isSignatureReady) {
+        _executeSignatureSkill(unit, target);
+        return;
+      }
+
+      unit.actionCycleCount++;
+      unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+
       // Flanking Momentum / Marksman Precision check:
       // Triggered if unit moved this turn cycle, target has active Bleed, or Marksman shooting from Backline
       final bool isBacklineMarksman = unit.currentDepth == RowDepth.back;
@@ -1074,6 +1549,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         addLog('${unit.name} executes $skillName on ${target.name} for $dmg DMG & $appliedBleed BLEED stacks.');
       }
 
+      final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+
       dispatchAction(SpatialActionEvent(
         id: 'act_${currentTick}_${unit.id}',
         attackerId: unit.id,
@@ -1087,6 +1564,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         isPlayerAttacker: unit.isPlayer,
         pattern: isBacklineMarksman ? TargetPattern.piercingColumnSkewer : TargetPattern.reachMidToFront,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
+        graftedTraitProc: graftProc,
       ));
     }
   }
@@ -1115,6 +1593,14 @@ class SpatialCombatEngine extends ChangeNotifier {
         final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
         final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
         if (target != null) {
+          // If Signature Skill is ready (and not overriding a Hold the Line stationary cleave), unleash Signature Skill!
+          if (unit.isSignatureReady && !hasHoldTheLineBonus) {
+            _executeSignatureSkill(unit, target);
+            break;
+          }
+          unit.actionCycleCount++;
+          unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+
           final int baseDmg = hasHoldTheLineBonus ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
           final dmg = target.takeDamage(baseDmg, isPhysical: true);
           final skillName = hasHoldTheLineBonus
@@ -1148,6 +1634,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
           // Basic attack grants +15% Ultimate gauge
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+          final graftProc = _applyGraftedTraitProc(unit, target, dmg);
 
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
@@ -1162,6 +1649,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             pattern: hasHoldTheLineBonus ? TargetPattern.horizontalRowScythe : TargetPattern.singleTarget,
             secondaryTargetHits: lateralHits,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
+            graftedTraitProc: graftProc,
           ));
         }
         break;
@@ -1288,6 +1776,16 @@ class SpatialCombatEngine extends ChangeNotifier {
       final bool isAethericBonus = unit.currentDepth == RowDepth.back;
       final targetCol = unit.occupiedNodes.first.column;
       final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+      final primaryColumnTarget = _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
+          opposingSquad.where((u) => u.isAlive).firstOrNull;
+
+      if (unit.isSignatureReady && primaryColumnTarget != null) {
+        _executeSignatureSkill(unit, primaryColumnTarget);
+        return;
+      }
+
+      unit.actionCycleCount++;
+      unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
 
       if (isAethericBonus) {
         // Piercing strike hitting entire column
@@ -1321,6 +1819,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         lastBannerMessage = '✨ AETHERIC ALIGNMENT: ${unit.name} column beam pierced enemies & granted +1 Focus!';
 
         if (primaryTarget != null) {
+          final graftProc = _applyGraftedTraitProc(unit, primaryTarget, primaryDmg);
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
             attackerId: unit.id,
@@ -1333,6 +1832,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             isPlayerAttacker: unit.isPlayer,
             pattern: TargetPattern.piercingColumnSkewer,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
+            graftedTraitProc: graftProc,
           ));
         }
       } else {
@@ -1341,6 +1841,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           final dmg = target.takeDamage(unit.attack);
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
           addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
+          final graftProc = _applyGraftedTraitProc(unit, target, dmg);
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
             attackerId: unit.id,
@@ -1352,6 +1853,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             isPlayerAttacker: unit.isPlayer,
             pattern: TargetPattern.singleTarget,
             timestampMs: DateTime.now().millisecondsSinceEpoch,
+            graftedTraitProc: graftProc,
           ));
         }
       }
@@ -1548,6 +2050,65 @@ class SpatialCombatEngine extends ChangeNotifier {
     return true;
   }
 
+  /// Swaps an existing player unit with a new unit from the reserve roster during pre-battle deployment
+  bool swapPlayerUnit(String outgoingUnitId, UnitEntity incomingEntity, {RelicService? relicService}) {
+    if (!isPreBattlePhase) {
+      addLog('Roster substitutions can only be executed during Pre-Battle Deployment.');
+      return false;
+    }
+    final index = playerUnits.indexWhere((u) => u.id == outgoingUnitId);
+    if (index == -1) return false;
+
+    final oldUnit = playerUnits[index];
+    // Preserve current grid positioning if oldUnit was placed on the field
+    final preservedNodes = oldUnit.occupiedNodes.map((node) => GridNode(
+      column: node.column,
+      row: node.row,
+      occupantUnitId: incomingEntity.id,
+    )).toList();
+
+    // Compute effective stats including any equipped relics & Plinth Material passives
+    final relicBonuses = relicService?.calculateBonuses(incomingEntity.id) ?? const UnitRelicBonuses();
+    final double plinthAllMult = incomingEntity.plinthMaterial == PlinthMaterial.gold ? 1.10 : 1.0;
+    final double plinthAtkMult = incomingEntity.plinthMaterial == PlinthMaterial.obsidian ? 1.10 : plinthAllMult;
+    final double plinthDefMult = incomingEntity.plinthMaterial == PlinthMaterial.iron ? 1.15 : plinthAllMult;
+
+    final effectiveAtk = ((incomingEntity.attack + relicBonuses.bonusAttack) * plinthAtkMult).round();
+    final effectiveDef = ((incomingEntity.defense + relicBonuses.bonusDefense) * plinthDefMult).round();
+    final effectiveMaxHp = ((incomingEntity.maxHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveHp = ((incomingEntity.currentHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveSpd = ((incomingEntity.speed + relicBonuses.bonusSpeed) * plinthAllMult).round();
+    final effectiveGraftId = incomingEntity.graftedTraitId ??
+        (incomingEntity.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
+
+    final newCombatUnit = CombatUnitState(
+      id: incomingEntity.id,
+      name: incomingEntity.name,
+      templateId: incomingEntity.speciesId,
+      isPlayer: true,
+      footprint: UnitFootprint.single1x1,
+      archetype: mapArchetypeToSpatial(incomingEntity.archetype),
+      occupiedNodes: preservedNodes,
+      level: incomingEntity.level,
+      maxHp: effectiveMaxHp,
+      hp: effectiveHp,
+      maxArmor: effectiveDef,
+      armor: effectiveDef,
+      attack: effectiveAtk,
+      speed: effectiveSpd,
+      customAssetPath: incomingEntity.customAvatarAsset,
+      nativeTraitId: incomingEntity.nativeTraitId,
+      graftedTraitId: effectiveGraftId,
+      ultimateGauge: 40,
+    );
+
+    playerUnits[index] = newCombatUnit;
+    lastBannerMessage = '⚔️ DEPLOYED: ${incomingEntity.name} replaced ${oldUnit.name}';
+    addLog('Substituted ${oldUnit.name} with ${incomingEntity.name} in combat lineup.');
+    notifyListeners();
+    return true;
+  }
+
   /// Tactical Plinth Triage: Player shifts or swaps unit across nodes
   /// In Pre-Battle Deployment Phase: 0 AP cost & anywhere on player grid (Rows 0-2, Cols 0-4), supports swapping
   /// In Live Combat: 50% AP cost & restricted to unit moveRange, supports adjacent formation swaps
@@ -1715,11 +2276,14 @@ class SpatialCombatEngine extends ChangeNotifier {
     hand.remove(card);
     burnPit.add(card);
 
-    if (card.id == 'smite_the_calcified') {
-      final boss = targetUnit ?? enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+    if (card.id == 'smite_the_calcified' || card.id == 'smite_the_wicked') {
+      final boss = targetUnit ??
+          enemyUnits
+              .where((u) => (u.id == 'gorgoroth_boss' || u.archetype == UnitArchetype.colossusBehemoth) && u.isAlive)
+              .firstOrNull ??
           enemyUnits.where((u) => u.isAlive).firstOrNull;
       if (boss != null) {
-        final rawDmg = (74 * 2.5).round(); // 185 damage
+        final rawDmg = (74 * 2.5 * (commandService?.potencyMultiplier ?? 1.0)).round();
         final dmg = boss.takeDamage(rawDmg);
         addLog('SMITE CAST: Dealt $dmg kinetic damage to ${boss.name}!');
 
@@ -1731,14 +2295,16 @@ class SpatialCombatEngine extends ChangeNotifier {
           lastBannerMessage = '⚡ SLAG CARAPACE SHATTERED! ⚡';
           addLog('RESULT: Slag Carapace SHATTERS! Armor halved to ${boss.armor}. Channeled intent interrupted!');
         } else {
-          lastBannerMessage = '⚡ SMITE THE CALCIFIED DEALS $dmg DMG!';
+          boss.sunderArmor(0.35);
+          boss.pendingIntent = null;
+          lastBannerMessage = '⚡ ${card.name.toUpperCase()} DEALS $dmg DMG & SUNDERS ARMOR!';
         }
 
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_smite',
           attackerId: 'player_valeria',
-          attackerName: 'VALERIA',
-          skillName: 'Smite the Calcified',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
           targetId: boss.id,
           targetName: boss.name,
           damage: dmg,
@@ -1747,52 +2313,69 @@ class SpatialCombatEngine extends ChangeNotifier {
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }
-    } else if (card.id == 'phalanx_intercept') {
-      final recipient = targetUnit ?? playerUnits.where((u) => u.isAlive && u.id == 'lady_valeria').firstOrNull ??
-          playerUnits.where((u) => u.isAlive).first;
-      recipient.armor += 35;
-      recipient.aegisShield += 50; // Aegis Barrier absorbs 50 damage
-      lastBannerMessage = '🛡️ PHALANX INTERCEPT: +35 Armor & +50 Aegis Shield to ${recipient.name}!';
-      addLog('CAST: Phalanx Intercept fortified ${recipient.name} (+35 Armor, +50 Aegis Shield)!');
+    } else if (card.id == 'phalanx_intercept' || card.id == 'stand_resolute' || card.id == 'iron_bulwark' || card.id == 'sanguine_ward') {
+      final recipient = targetUnit ??
+          playerUnits.where((u) => u.isAlive && u.currentDepth == RowDepth.front).firstOrNull ??
+          playerUnits.where((u) => u.isAlive).firstOrNull;
+      if (recipient != null) {
+        final armorGain = (35 * (commandService?.potencyMultiplier ?? 1.0)).round();
+        final shieldGain = (50 * (commandService?.potencyMultiplier ?? 1.0)).round();
+        recipient.armor += armorGain;
+        recipient.aegisShield += shieldGain;
+        if (card.id == 'stand_resolute' || card.id == 'iron_bulwark') {
+          for (final ally in playerUnits.where((u) => u.isAlive && u.id != recipient.id && u.currentDepth == RowDepth.front)) {
+            ally.armor += 20;
+            ally.aegisShield += 30;
+          }
+        }
+        lastBannerMessage = '🛡️ ${card.name.toUpperCase()}: +$armorGain Armor & +$shieldGain Aegis Shield to ${recipient.name}!';
+        addLog('CAST: ${card.name} fortified ${recipient.name} (+$armorGain Armor, +$shieldGain Aegis Shield)!');
 
-      dispatchAction(SpatialActionEvent(
-        id: 'card_${currentTick}_phalanx',
-        attackerId: 'player_valeria',
-        attackerName: 'VALERIA',
-        skillName: 'Phalanx Intercept',
-        targetId: recipient.id,
-        targetName: recipient.name,
-        damage: 0,
-        isHeal: true,
-        isPlayerAttacker: true,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      ));
-    } else if (card.id == 'searing_brand') {
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_phalanx',
+          attackerId: 'player_valeria',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
+          targetId: recipient.id,
+          targetName: recipient.name,
+          damage: 0,
+          isHeal: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'searing_brand' || card.id == 'unravel_hex') {
       final target = targetUnit ??
           (targetCol != null && targetRow != null
               ? enemyUnits.where((u) => u.isAlive && u.occupies(targetCol, targetRow)).firstOrNull
               : null) ??
-          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits
+              .where((u) => (u.id == 'gorgoroth_boss' || u.archetype == UnitArchetype.colossusBehemoth) && u.isAlive)
+              .firstOrNull ??
           enemyUnits.where((u) => u.isAlive).firstOrNull;
 
       if (target != null) {
         final dmg = target.takeDamage(105);
-        lastBannerMessage = '🔥 SEARING BRAND: Radiant strike ignites ${target.name} for $dmg DMG!';
-        addLog('CAST: Searing Brand struck ${target.name} for $dmg Holy damage.');
+        if (card.id == 'unravel_hex') {
+          target.sunderArmor(0.35);
+          target.vulnerableDuration = max(target.vulnerableDuration, 90);
+        }
+        lastBannerMessage = '🔥 ${card.name.toUpperCase()}: Strikes ${target.name} for $dmg DMG!';
+        addLog('CAST: ${card.name} struck ${target.name} for $dmg damage.');
 
         // Splash on other alive enemies
         final Map<String, int> splashHits = {};
         for (final other in enemyUnits.where((u) => u.isAlive && u.id != target.id)) {
           final splash = other.takeDamage(45);
           splashHits[other.id] = splash;
-          addLog('  Splash: ${other.name} took $splash Holy damage.');
+          addLog('  Splash: ${other.name} took $splash damage.');
         }
 
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_searing',
           attackerId: 'sun_smith',
-          attackerName: 'SUN-SMITH',
-          skillName: 'Searing Brand',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SUN-SMITH',
+          skillName: card.name,
           targetId: target.id,
           targetName: target.name,
           damage: dmg,
@@ -1813,7 +2396,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         }).toList();
 
         if (splashTargets.isNotEmpty) {
-          lastBannerMessage = '🔥 SEARING BRAND: Ground detonation ignited ${splashTargets.length} enemy targets!';
+          lastBannerMessage = '🔥 ${card.name.toUpperCase()}: Ground detonation ignited ${splashTargets.length} enemy targets!';
           final primary = splashTargets.first;
           final primaryDmg = primary.takeDamage(75);
           final Map<String, int> otherSplashes = {};
@@ -1828,7 +2411,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             id: 'card_${currentTick}_searing',
             attackerId: 'sun_smith',
             attackerName: 'SUN-SMITH',
-            skillName: 'Searing Brand',
+            skillName: card.name,
             targetId: primary.id,
             targetName: primary.name,
             damage: primaryDmg,
@@ -1838,14 +2421,14 @@ class SpatialCombatEngine extends ChangeNotifier {
             timestampMs: DateTime.now().millisecondsSinceEpoch,
           ));
         } else {
-          lastBannerMessage = '🔥 SEARING BRAND: Ground detonation struck empty stone.';
-          addLog('CAST: Searing Brand detonated on empty stone ($targetCol, $targetRow).');
+          lastBannerMessage = '🔥 ${card.name.toUpperCase()}: Ground detonation struck empty stone.';
+          addLog('CAST: ${card.name} detonated on empty stone ($targetCol, $targetRow).');
 
           dispatchAction(SpatialActionEvent(
             id: 'card_${currentTick}_searing',
             attackerId: 'sun_smith',
             attackerName: 'SUN-SMITH',
-            skillName: 'Searing Brand',
+            skillName: card.name,
             targetId: 'ground_tile_${targetCol}_$targetRow',
             targetName: 'Ground Target ($targetCol, $targetRow)',
             damage: 0,
@@ -1855,7 +2438,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       }
-    } else if (card.id == 'stoke_the_embers') {
+    } else if (card.id == 'stoke_the_embers' || card.id == 'quicken' || card.id == 'echoing_hourglass') {
       focus = min(maxFocus, focus + 2);
       String drawMsg = '';
       if (drawPile.isNotEmpty) {
@@ -1863,15 +2446,21 @@ class SpatialCombatEngine extends ChangeNotifier {
         hand.add(drawn);
         drawMsg = ' & drew ${drawn.name}';
       }
-      lastBannerMessage = '✨ STOKE THE EMBERS: +2 Focus generated$drawMsg!';
-      addLog('CAST: Stoke the Embers restored 2 Focus$drawMsg.');
+      if (card.id == 'quicken' || card.id == 'echoing_hourglass') {
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.currentAp = min(tickThreshold, ally.currentAp + 3500);
+          ally.hasteDuration = max(ally.hasteDuration, 90);
+        }
+      }
+      lastBannerMessage = '✨ ${card.name.toUpperCase()}: +2 Focus generated$drawMsg!';
+      addLog('CAST: ${card.name} restored 2 Focus$drawMsg.');
 
-      final recipient = playerUnits.where((u) => u.isAlive).first;
+      final recipient = targetUnit ?? playerUnits.where((u) => u.isAlive).first;
       dispatchAction(SpatialActionEvent(
         id: 'card_${currentTick}_stoke',
         attackerId: 'sun_smith',
-        attackerName: 'SUN-SMITH',
-        skillName: 'Stoke the Embers',
+        attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SUN-SMITH',
+        skillName: card.name,
         targetId: recipient.id,
         targetName: recipient.name,
         damage: 0,
@@ -1879,27 +2468,30 @@ class SpatialCombatEngine extends ChangeNotifier {
         isPlayerAttacker: true,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
-    } else if (card.id == 'sun_ashlar_wrath') {
+    } else if (card.id == 'sun_ashlar_wrath' || card.id == 'virulent_cascade' || card.id == 'corpse_burst') {
       final livingEnemies = enemyUnits.where((u) => u.isAlive).toList();
       int totalDmg = 0;
       final Map<String, int> enemyHits = {};
 
       for (final enemy in livingEnemies) {
         final dmg = enemy.takeDamage(110);
+        if (card.id == 'virulent_cascade' || card.id == 'corpse_burst') {
+          enemy.poisonStacks += 3;
+        }
         totalDmg += dmg;
         enemyHits[enemy.id] = dmg;
-        addLog('RADIANT BURST: ${enemy.name} took $dmg Holy damage.');
+        addLog('AOE BURST: ${enemy.name} took $dmg damage.');
       }
 
       final boss = livingEnemies.firstOrNull;
-      lastBannerMessage = '☀️ WRATH OF ASHLAR: Radiant Cross strikes all enemies for $totalDmg total DMG!';
+      lastBannerMessage = '☀️ ${card.name.toUpperCase()}: Strikes all enemies for $totalDmg total DMG!';
       if (boss != null) {
         final bossDmg = enemyHits.remove(boss.id) ?? 110;
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_wrath',
           attackerId: 'sun_smith',
-          attackerName: 'SUN-SMITH',
-          skillName: 'Wrath of Ashlar',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SUN-SMITH',
+          skillName: card.name,
           targetId: boss.id,
           targetName: boss.name,
           damage: bossDmg,
@@ -1913,7 +2505,9 @@ class SpatialCombatEngine extends ChangeNotifier {
     } else if (card.id == 'sun_king_cataclysm') {
       // APEX RITE: Pierces through chosen enemy column (or boss) for 260 Holy Damage & interrupts any active telegraph!
       final target = targetUnit ??
-          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits
+              .where((u) => (u.id == 'gorgoroth_boss' || u.archetype == UnitArchetype.colossusBehemoth) && u.isAlive)
+              .firstOrNull ??
           enemyUnits.where((u) => u.isAlive).firstOrNull;
 
       if (target != null) {
@@ -1952,7 +2546,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }
-    } else if (card.id == 'revive_vitae') {
+    } else if (card.id == 'revive_vitae' || card.id == 'rebind_flesh' || card.id == 'sanguine_revival') {
       // SOVEREIGN SLIP: Resurrects downed unit (GDD §3.6 / §4.4)
       // 1. Scales from Caster Attack (Sun-Smith = 88) + Generation bonus (G1 = +15%)
       // 2. Incurs stacking -20% Max HP penalty (Soul Fracture) based on baseline Max HP
@@ -1993,8 +2587,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_revive',
           attackerId: 'vital_wellspring',
-          attackerName: 'INFUSED VITAE',
-          skillName: 'Infused Vitae Resurgence',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'INFUSED VITAE',
+          skillName: card.name,
           targetId: downedTarget.id,
           targetName: downedTarget.name,
           damage: 0,
@@ -2009,13 +2603,13 @@ class SpatialCombatEngine extends ChangeNotifier {
           final target = lowestAlly.first;
           target.hp = min(target.maxHp, target.hp + 120);
           target.aegisShield += 40;
-          lastBannerMessage = '✨ INFUSED VITAE: +120 HP & +40 Shield to ${target.name}!';
-          addLog('CAST: Infused Vitae invigorated ${target.name} (+120 HP, +40 Shield).');
+          lastBannerMessage = '✨ ${card.name.toUpperCase()}: +120 HP & +40 Shield to ${target.name}!';
+          addLog('CAST: ${card.name} invigorated ${target.name} (+120 HP, +40 Shield).');
           dispatchAction(SpatialActionEvent(
             id: 'card_${currentTick}_vital_mend',
             attackerId: 'vital_wellspring',
-            attackerName: 'INFUSED VITAE',
-            skillName: 'Vital Mend',
+            attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'INFUSED VITAE',
+            skillName: card.name,
             targetId: target.id,
             targetName: target.name,
             damage: 0,
@@ -2025,14 +2619,21 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       }
-    } else if (card.id == 'sanguine_siphon') {
-      // Sanguine Siphon: Drains 85 HP from enemy, applies 3 Bleed stacks, and heals lowest ally
+    } else if (card.id == 'sanguine_siphon' ||
+        card.id == 'siphon_vitality' ||
+        card.id == 'rend_flesh' ||
+        card.id == 'exsanguinating_strike') {
+      // Sanguine Siphon / Siphon Vitality / Rend Flesh / Exsanguinating Strike:
+      // Drains HP from enemy, applies 3 Bleed stacks, and heals lowest ally
       final target = targetUnit ??
-          enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
+          enemyUnits
+              .where((u) => (u.id == 'gorgoroth_boss' || u.archetype == UnitArchetype.colossusBehemoth) && u.isAlive)
+              .firstOrNull ??
           enemyUnits.where((u) => u.isAlive).firstOrNull;
 
       if (target != null) {
-        final dmg = target.takeDamage(85, isPhysical: false);
+        final baseRaw = card.id == 'exsanguinating_strike' ? (105 + target.bleedStacks * 25) : 85;
+        final dmg = target.takeDamage(baseRaw, isPhysical: false);
         target.bleedStacks += 3;
 
         // Heal lowest living player ally for 100% of damage dealt
@@ -2043,14 +2644,14 @@ class SpatialCombatEngine extends ChangeNotifier {
           addLog('  Siphon Transfusion: Restored $dmg HP to ${lowestAlly.name} (${lowestAlly.hp}/${lowestAlly.maxHp}).');
         }
 
-        lastBannerMessage = '🩸 SANGUINE SIPHON: Drained $dmg HP from ${target.name} & applied 3 Bleed stacks!';
-        addLog('CAST: Sanguine Siphon drained $dmg HP from ${target.name} and healed ${lowestAlly?.name ?? "ally"}.');
+        lastBannerMessage = '🩸 ${card.name.toUpperCase()}: Drained $dmg HP from ${target.name} & applied 3 Bleed stacks!';
+        addLog('CAST: ${card.name} drained $dmg HP from ${target.name} and healed ${lowestAlly?.name ?? "ally"}.');
 
         dispatchAction(SpatialActionEvent(
           id: 'card_${currentTick}_siphon',
           attackerId: 'sanguine_blade',
-          attackerName: 'SANGUINE BLADE',
-          skillName: 'Sanguine Siphon',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SANGUINE BLADE',
+          skillName: card.name,
           targetId: target.id,
           targetName: target.name,
           damage: dmg,
@@ -2060,9 +2661,30 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
+
+        if (lowestAlly != null) {
+          dispatchAction(SpatialActionEvent(
+            id: 'card_${currentTick}_siphon_heal',
+            attackerId: 'sanguine_blade',
+            attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SANGUINE BLADE',
+            skillName: 'Siphon Transfusion',
+            targetId: lowestAlly.id,
+            targetName: lowestAlly.name,
+            damage: dmg,
+            isHeal: true,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        }
       }
-    } else if (card.id == 'vitae_eruption') {
-      // Vitae Eruption: Bloodnova across entire enemy frontline row: 120 DMG + 20 bonus damage per bleed stack!
+    } else if (card.id == 'vitae_eruption' ||
+        card.id == 'feast_of_ruin' ||
+        card.id == 'retributive_stride' ||
+        card.id == 'disrupting_cleave' ||
+        card.id == 'blood_boil') {
+      // Vitae Eruption / Feast of Ruin / Retributive Stride / Disrupting Cleave / Blood Boil:
+      // Bloodnova across entire enemy frontline row: 120 DMG + 20 bonus damage per bleed stack!
       int totalDmg = 0;
       int enemiesHit = 0;
       final frontEnemies = enemyUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
@@ -2073,22 +2695,35 @@ class SpatialCombatEngine extends ChangeNotifier {
         final int bleedBonus = enemy.bleedStacks * 20;
         final int rawHit = 120 + bleedBonus;
         final dmg = enemy.takeDamage(rawHit, isPhysical: false);
+        if (card.id == 'disrupting_cleave') {
+          enemy.currentAp = max(0, enemy.currentAp - 2500);
+          enemy.pendingIntent = null;
+        } else if (card.id == 'blood_boil') {
+          enemy.burnDuration = max(enemy.burnDuration, 90);
+        }
         totalDmg += dmg;
         enemiesHit++;
         eruptionHits[enemy.id] = dmg;
-        addLog('  Vitae Nova: ${enemy.name} struck for $dmg DMG (Base 120 + $bleedBonus Bleed Detonation)!');
+        addLog('  ${card.name}: ${enemy.name} struck for $dmg DMG (Base 120 + $bleedBonus Bleed Detonation)!');
+      }
+
+      if (card.id == 'feast_of_ruin' || card.id == 'retributive_stride') {
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.hp = min(ally.maxHp, ally.hp + 35);
+          ally.aegisShield += 25;
+        }
       }
 
       final primary = affectedEnemies.firstOrNull ?? enemyUnits.first;
       final primaryDmg = eruptionHits.remove(primary.id) ?? totalDmg;
-      lastBannerMessage = '💥 VITAE ERUPTION: Detonated $totalDmg total damage across $enemiesHit frontline enemies!';
-      addLog('APEX NOVA: Vitae Eruption cleaved through enemy line for $totalDmg total DMG.');
+      lastBannerMessage = '💥 ${card.name.toUpperCase()}: Detonated $totalDmg total damage across $enemiesHit frontline enemies!';
+      addLog('APEX NOVA: ${card.name} cleaved through enemy line for $totalDmg total DMG.');
 
       dispatchAction(SpatialActionEvent(
         id: 'card_${currentTick}_vitae_eruption',
         attackerId: 'sanguine_blade',
-        attackerName: 'SANGUINE BLADE',
-        skillName: 'Vitae Eruption',
+        attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'SANGUINE BLADE',
+        skillName: card.name,
         targetId: primary.id,
         targetName: primary.name,
         damage: primaryDmg,
@@ -2099,6 +2734,9 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
     }
+
+    // Check if casting this card cleared the current wave and remaining waves exist
+    advanceToNextWaveIfPending();
 
     notifyListeners();
     return true;
@@ -2317,6 +2955,9 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
         break;
     }
+
+    // Check if this Ultimate cleared the current enemy wave and remaining waves exist
+    advanceToNextWaveIfPending();
 
     notifyListeners();
     return true;

@@ -103,7 +103,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
   int get _requiredIchorCost {
     if (_progenitorA == null || _progenitorB == null) return 0;
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
     switch (nextGen) {
       case 2:
         return 150;
@@ -111,6 +111,10 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         return 300;
       case 4:
         return 500;
+      case 5:
+        return 800;
+      case 6:
+        return 1200;
       default:
         return 150;
     }
@@ -118,8 +122,17 @@ class _CrucibleScreenState extends State<CrucibleScreen>
 
   int get _requiredSigilsCost {
     if (_progenitorA == null || _progenitorB == null) return 0;
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
-    return nextGen >= 4 ? 1 : 0;
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
+    switch (nextGen) {
+      case 4:
+        return 1;
+      case 5:
+        return 2;
+      case 6:
+        return 3;
+      default:
+        return 0;
+    }
   }
 
   bool get _hasSufficientIchor => widget.totalIchor >= _requiredIchorCost;
@@ -196,13 +209,17 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     setState(() => _isPerformingRitual = true);
     await _shakeController.forward(from: 0.0);
 
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
-    final isHoundLineage = _progenitorA!.speciesId.contains('hound');
-    final String childName = nextGen >= 4
-        ? (isHoundLineage ? 'Pureblood Cerberus Sovereign' : '${_progenitorA!.name} Pureblood Sovereign')
-        : (isHoundLineage
-            ? 'Cerberus Progenitor G$nextGen'
-            : '${_progenitorA!.name} Descendant G$nextGen');
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
+    final isHoundLineage = _progenitorA!.speciesId.contains('hound') || _progenitorA!.speciesId.contains('cerberus');
+    final String childName = nextGen >= 6
+        ? (isHoundLineage ? 'Apex Sovereign Cerberus Prime' : '${_progenitorA!.name.replaceAll(RegExp(r" G\d+.*| Pureblood.*"), "")} Apex Sovereign')
+        : (nextGen == 5
+            ? (isHoundLineage ? 'Ascended Cerberus Sovereign' : '${_progenitorA!.name.replaceAll(RegExp(r" G\d+.*| Pureblood.*"), "")} Ascended Sovereign')
+            : (nextGen == 4
+                ? (isHoundLineage ? 'Pureblood Cerberus Sovereign' : '${_progenitorA!.name.replaceAll(RegExp(r" G\d+.*"), "")} Pureblood Sovereign')
+                : (isHoundLineage
+                    ? 'Cerberus Progenitor G$nextGen'
+                    : '${_progenitorA!.name.replaceAll(RegExp(r" G\d+.*"), "")} Descendant G$nextGen')));
     final String childSpeciesId = isHoundLineage
         ? 'cerberus_hound'
         : _progenitorA!.speciesId;
@@ -432,6 +449,28 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
                   ),
+                  if (_progenitorA!.speciesId == _progenitorB!.speciesId && _progenitorA!.canAscendRarityWithDuplicate) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: !_isPerformingRitual ? _executeDuplicateRarityAscension : null,
+                      icon: const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFFFD54F)),
+                      label: Text(
+                        '★ DUPLICATE ASCENSION: PROMOTE ${_progenitorA!.name.toUpperCase()} (${_progenitorA!.rarityLabel.toUpperCase()} ➔ ${_progenitorA!.nextRarityLabel.toUpperCase()})',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10.5,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
+                        backgroundColor: const Color(0xFF261E0A),
+                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                 ],
 
@@ -496,7 +535,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   }
 
   Widget _buildResourceCostCard() {
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 4);
+    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
     final isPureblood = nextGen >= 4;
 
     return Container(
@@ -858,10 +897,87 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                         ),
                       ),
                     ),
+                  )
+                else if (unit.isMaxLevel && unit.canPromoteRarity && widget.onUnitLeveled != null)
+                  InkWell(
+                    onTap: () => _handleProgenitorRarityPromote(unit),
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.9),
+                      ),
+                      child: Text(
+                        '★ PROMOTE (${unit.nextRarityLabel.toUpperCase()})',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
     );
+  }
+
+  void _handleProgenitorRarityPromote(UnitEntity unit) {
+    if (!unit.canPromoteRarity) return;
+    final cost = unit.rarityPromotionIchorCost;
+    if (widget.totalIchor < cost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Insufficient Ichor! Requires $cost Ichor to consecrate ${unit.name} to ${unit.nextRarityLabel}.'),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
+    final promoted = unit.promoteRarity();
+    setState(() {
+      if (_progenitorA?.id == unit.id) {
+        _progenitorA = promoted;
+      }
+      if (_progenitorB?.id == unit.id) {
+        _progenitorB = promoted;
+      }
+    });
+
+    widget.onUnitLeveled?.call(promoted, cost);
+  }
+
+  Future<void> _executeDuplicateRarityAscension() async {
+    if (_progenitorA == null || _progenitorB == null) return;
+    if (_progenitorA!.speciesId != _progenitorB!.speciesId || !_progenitorA!.canAscendRarityWithDuplicate) return;
+
+    final parentAId = _progenitorA!.id;
+    final parentBId = _progenitorB!.id;
+    setState(() => _isPerformingRitual = true);
+    await _shakeController.forward(from: 0.0);
+
+    final promoted = _progenitorA!.promoteRarity(
+      newGraftedTraitId: _selectedGraftTraitId ?? _progenitorA!.graftedTraitId ?? _progenitorB!.nativeTraitId,
+    );
+
+    if (widget.onFusionExecuted != null) {
+      widget.onFusionExecuted!(promoted, [parentAId, parentBId]);
+    } else {
+      widget.onFusionComplete(promoted);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isPerformingRitual = false;
+        _progenitorA = null;
+        _progenitorB = null;
+        _selectedGraftTraitId = null;
+      });
+      _showFusionSuccessModal(promoted);
+    }
   }
 
   void _handleProgenitorInfuse(UnitEntity unit) {
@@ -984,6 +1100,18 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               const SizedBox(width: 6),
               _buildFilterChip('GEN III', _selectedGenFilter == 3, () {
                 setState(() => _selectedGenFilter = _selectedGenFilter == 3 ? null : 3);
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GEN IV', _selectedGenFilter == 4, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 4 ? null : 4);
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GEN V', _selectedGenFilter == 5, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 5 ? null : 5);
+              }),
+              const SizedBox(width: 6),
+              _buildFilterChip('GEN VI', _selectedGenFilter == 6, () {
+                setState(() => _selectedGenFilter = _selectedGenFilter == 6 ? null : 6);
               }),
             ],
           ),

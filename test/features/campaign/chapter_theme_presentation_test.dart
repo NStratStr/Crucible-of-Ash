@@ -22,8 +22,8 @@ void main() {
         ),
       );
 
-      expect(find.text('CH. II: SUNKEN NECROPOLIS'), findsOneWidget);
-      expect(find.text('The Submerged Tombs • Depths 0–5'), findsOneWidget);
+      expect(find.text('CH. II: SMOLDERING BARRICADE'), findsOneWidget);
+      expect(find.text('Scavenger Checkpoint • Depth 1–10'), findsOneWidget);
     });
 
     testWidgets('Tapping Chapter World Titan node displays Boss Presentation Card', (tester) async {
