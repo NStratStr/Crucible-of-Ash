@@ -5011,7 +5011,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             final String headerTitle = targetUnit != null
                 ? 'SWAP OUT: ${targetUnit.name.toUpperCase()}'
-                : 'SELECT RESERVE CHAMPION TO DEPLOY';
+                : (_engine.playerUnits.length < 5
+                    ? 'DEPLOY REINFORCEMENT (${_engine.playerUnits.length}/5 IN SQUAD)'
+                    : 'SELECT RESERVE CHAMPION TO SWAP');
 
             return SafeArea(
               child: Container(
@@ -5175,8 +5177,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       ),
                                       ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFFB3261E),
-                                          foregroundColor: Colors.white,
+                                          backgroundColor: (targetUnit == null && _engine.playerUnits.length < 5)
+                                              ? const Color(0xFF00E5FF)
+                                              : const Color(0xFFB3261E),
+                                          foregroundColor: (targetUnit == null && _engine.playerUnits.length < 5)
+                                              ? Colors.black
+                                              : Colors.white,
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           minimumSize: Size.zero,
                                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -5185,7 +5191,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                           Navigator.pop(sheetCtx);
                                           _executeUnitSubstitution(targetUnit, candidate);
                                         },
-                                        child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                        child: Text(
+                                          (targetUnit == null && _engine.playerUnits.length < 5) ? '+ ADD UNIT' : 'SWAP',
+                                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -5227,6 +5236,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _executeUnitSubstitution(CombatUnitState? outgoingUnit, UnitEntity incomingUnit) {
+    // If outgoingUnit is null AND we have open squad slots (under max 5), ADD the unit to the squad
+    if (outgoingUnit == null && _engine.playerUnits.length < 5) {
+      if (_engine.playerUnits.any((u) => u.id == incomingUnit.id)) return;
+
+      _currentSquadUnits.add(incomingUnit);
+      _reserveUnits.removeWhere((u) => u.id == incomingUnit.id);
+
+      final success = _engine.addPlayerUnitFromReserve(incomingUnit, relicService: widget.relicService);
+      if (success) {
+        _playSfx('sfx_summon.wav');
+        widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+        setState(() {
+          _selectedUnitId = incomingUnit.id;
+        });
+      }
+      return;
+    }
+
     final outgoingId = outgoingUnit?.id ?? _engine.playerUnits.firstOrNull?.id;
     if (outgoingId == null) return;
 
@@ -5383,28 +5410,47 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     GestureDetector(
                       onTap: () {
                         _playSfx('sfx_card.wav');
-                        final target = _selectedUnitId != null
-                            ? _engine.playerUnits.where((u) => u.id == _selectedUnitId).firstOrNull
-                            : _engine.playerUnits.firstOrNull;
-                        if (target != null) {
-                          _openRosterSwapSheet(target);
-                        } else {
+                        // If we have open slots (<5 units in squad), tapping the button opens the deployment sheet to ADD a unit
+                        if (_engine.playerUnits.length < 5) {
                           _openRosterSwapSheet(null);
+                        } else {
+                          final target = _selectedUnitId != null
+                              ? _engine.playerUnits.where((u) => u.id == _selectedUnitId).firstOrNull
+                              : _engine.playerUnits.firstOrNull;
+                          _openRosterSwapSheet(target);
                         }
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE5A93C).withValues(alpha: 0.18),
+                          color: _engine.playerUnits.length < 5
+                              ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
+                              : const Color(0xFFE5A93C).withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.7), width: 0.8),
+                          border: Border.all(
+                            color: _engine.playerUnits.length < 5
+                                ? const Color(0xFF00E5FF).withValues(alpha: 0.8)
+                                : const Color(0xFFE5A93C).withValues(alpha: 0.7),
+                            width: 0.8,
+                          ),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.swap_horiz_rounded, size: 11, color: Color(0xFFFFD54F)),
-                            SizedBox(width: 3),
-                            Text('ROSTER SWAP', style: TextStyle(fontSize: 8, color: Color(0xFFFFD54F), fontWeight: FontWeight.w900)),
+                            Icon(
+                              _engine.playerUnits.length < 5 ? Icons.person_add_rounded : Icons.swap_horiz_rounded,
+                              size: 11,
+                              color: _engine.playerUnits.length < 5 ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              _engine.playerUnits.length < 5 ? '+ ADD TO SQUAD' : 'ROSTER SWAP',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: _engine.playerUnits.length < 5 ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F),
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -5439,16 +5485,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
               const SizedBox(height: 5),
 
-              // Unit Cards Horizontal Carousel
+              // Unit Cards Horizontal Carousel + Add Reinforcement Slot
               SizedBox(
                 height: dockHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: livingAllies.length,
+                  itemCount: livingAllies.length + ((livingAllies.length < 5 && _reserveUnits.isNotEmpty) ? 1 : 0),
                   separatorBuilder: (context, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    final unit = livingAllies[index];
-                    return _buildPreBattleBenchUnitCard(unit, isLandscapeMobile: isLandscapeMobile);
+                    if (index < livingAllies.length) {
+                      final unit = livingAllies[index];
+                      return _buildPreBattleBenchUnitCard(unit, isLandscapeMobile: isLandscapeMobile);
+                    }
+                    // Plus Card: Open Squad Slot (up to 5 max)
+                    return _buildAddHeroBenchCard(isLandscapeMobile: isLandscapeMobile);
                   },
                 ),
               ),
@@ -5456,6 +5506,74 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Open squad slot "+" card to add a hero from the reserve roster
+  Widget _buildAddHeroBenchCard({bool isLandscapeMobile = false}) {
+    return GestureDetector(
+      onTap: () {
+        _playSfx('sfx_card.wav');
+        _openRosterSwapSheet(null);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: isLandscapeMobile ? 110 : 125,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1520),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+              blurRadius: 6,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Color(0xFF00E5FF),
+                size: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '+ ADD HERO',
+              style: TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF00E5FF),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              '${_engine.playerUnits.length}/5 DEPLOYED',
+              style: const TextStyle(
+                fontSize: 6.5,
+                color: Colors.white54,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

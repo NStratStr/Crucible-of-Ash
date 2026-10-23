@@ -2109,6 +2109,61 @@ class SpatialCombatEngine extends ChangeNotifier {
     return true;
   }
 
+  /// Adds a new unit from reserve into an open squad slot (up to max 5 units) during pre-battle deployment
+  bool addPlayerUnitFromReserve(UnitEntity incomingEntity, {RelicService? relicService}) {
+    if (!isPreBattlePhase) {
+      addLog('Roster deployment can only be executed during Pre-Battle Deployment.');
+      return false;
+    }
+    if (playerUnits.length >= 5) {
+      addLog('Maximum squad capacity reached (5/5 deployed).');
+      return false;
+    }
+    if (playerUnits.any((u) => u.id == incomingEntity.id)) {
+      return false;
+    }
+
+    final relicBonuses = relicService?.calculateBonuses(incomingEntity.id) ?? const UnitRelicBonuses();
+    final double plinthAllMult = incomingEntity.plinthMaterial == PlinthMaterial.gold ? 1.10 : 1.0;
+    final double plinthAtkMult = incomingEntity.plinthMaterial == PlinthMaterial.obsidian ? 1.10 : plinthAllMult;
+    final double plinthDefMult = incomingEntity.plinthMaterial == PlinthMaterial.iron ? 1.15 : plinthAllMult;
+
+    final effectiveAtk = ((incomingEntity.attack + relicBonuses.bonusAttack) * plinthAtkMult).round();
+    final effectiveDef = ((incomingEntity.defense + relicBonuses.bonusDefense) * plinthDefMult).round();
+    final effectiveMaxHp = ((incomingEntity.maxHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveHp = ((incomingEntity.currentHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveSpd = ((incomingEntity.speed + relicBonuses.bonusSpeed) * plinthAllMult).round();
+    final effectiveGraftId = incomingEntity.graftedTraitId ??
+        (incomingEntity.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
+
+    final newCombatUnit = CombatUnitState(
+      id: incomingEntity.id,
+      name: incomingEntity.name,
+      templateId: incomingEntity.speciesId,
+      isPlayer: true,
+      footprint: UnitFootprint.single1x1,
+      archetype: mapArchetypeToSpatial(incomingEntity.archetype),
+      occupiedNodes: [], // Staged on reserve bench, ready to drag onto grid or auto-deploy
+      level: incomingEntity.level,
+      maxHp: effectiveMaxHp,
+      hp: effectiveHp,
+      maxArmor: effectiveDef,
+      armor: effectiveDef,
+      attack: effectiveAtk,
+      speed: effectiveSpd,
+      customAssetPath: incomingEntity.customAvatarAsset,
+      nativeTraitId: incomingEntity.nativeTraitId,
+      graftedTraitId: effectiveGraftId,
+      ultimateGauge: 40,
+    );
+
+    playerUnits.add(newCombatUnit);
+    lastBannerMessage = '⚔️ REINFORCEMENT: ${incomingEntity.name} joined the squad!';
+    addLog('Added ${incomingEntity.name} to active squad.');
+    notifyListeners();
+    return true;
+  }
+
   /// Tactical Plinth Triage: Player shifts or swaps unit across nodes
   /// In Pre-Battle Deployment Phase: 0 AP cost & anywhere on player grid (Rows 0-2, Cols 0-4), supports swapping
   /// In Live Combat: 50% AP cost & restricted to unit moveRange, supports adjacent formation swaps
