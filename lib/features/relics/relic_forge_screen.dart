@@ -10,6 +10,8 @@ class RelicForgeScreen extends StatefulWidget {
   final int cursedOre;
   final ValueChanged<int>? onIchorChanged;
   final ValueChanged<int>? onOreChanged;
+  final int currentChapter;
+  final int completedLinearStages;
 
   const RelicForgeScreen({
     super.key,
@@ -19,6 +21,8 @@ class RelicForgeScreen extends StatefulWidget {
     this.cursedOre = 0,
     this.onIchorChanged,
     this.onOreChanged,
+    this.currentChapter = 1,
+    this.completedLinearStages = 0,
   });
 
   @override
@@ -73,7 +77,10 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
 
     widget.onIchorChanged?.call(widget.totalIchor - ichorCost);
     widget.onOreChanged?.call(widget.cursedOre - oreCost);
-    final forged = widget.relicService.forgeRandomRelic();
+    final forged = widget.relicService.forgeRandomRelic(
+      chapter: widget.currentChapter,
+      stageDepth: widget.completedLinearStages + 1,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -345,11 +352,14 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   }
 
   void _refineRelic(RelicEntity relic) {
-    if (!relic.canUpgrade) {
+    final maxTier = RelicEntity.maxRefinementTierForChapter(widget.currentChapter);
+    if (!relic.canUpgradeForChapter(widget.currentChapter)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Relic has reached maximum refinement tier (+5).'),
-          backgroundColor: Color(0xFFE5A93C),
+        SnackBar(
+          content: Text(
+            'Refinement capped at +\! Conquer Chapter \ World Titan to promote the realm and unlock higher refinement.',
+          ),
+          backgroundColor: const Color(0xFFE5A93C),
         ),
       );
       return;
@@ -611,7 +621,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 ),
                 child: const Text('EQUIP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
-              if (relic.canUpgrade) ...[
+              if (relic.canUpgradeForChapter(widget.currentChapter)) ...[
                 const SizedBox(height: 4),
                 OutlinedButton(
                   onPressed: () => _refineRelic(relic),

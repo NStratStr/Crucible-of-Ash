@@ -57,8 +57,43 @@ class RelicEntity {
   });
 
   String get displayName => upgradeLevel > 0 ? '$name +$upgradeLevel' : name;
+
+  /// World promotion refinement cap (Tied to unlocked Chapter / World tier):
+  /// - Chapter 1: Refinement Cap +2
+  /// - Chapter 2: Refinement Cap +3
+  /// - Chapter 3+: Refinement Cap +5 (Master Refinement)
+  static int maxRefinementTierForChapter(int chapter) {
+    if (chapter <= 1) return 2;
+    if (chapter == 2) return 3;
+    return 5;
+  }
+
+  bool canUpgradeForChapter(int chapter) => upgradeLevel < maxRefinementTierForChapter(chapter);
   bool get canUpgrade => upgradeLevel < 5;
   int get upgradeCostIchor => (upgradeLevel + 1) * 75;
+  int get upgradeCostOre => (upgradeLevel + 1) * 10;
+
+  /// Mission-specific Relic Sets (different equipment sets themed to each mission / region):
+  /// - Mission 1 (Ashen Perimeter): Ironclad (+DEF) & Tempest (+SPD)
+  /// - Mission 2 (Smoldering Barricade): Bloodleech (+Lifesteal) & Shadowstalker (+CRIT/SPD)
+  /// - Mission 3+ (Sanctuary Frontier / Caldera): Executioner, Blightweaver, Dreadnought
+  static List<RelicSetType> setsForChapter(int chapter) {
+    switch (chapter) {
+      case 1:
+        return const [RelicSetType.ironclad, RelicSetType.tempest];
+      case 2:
+        return const [RelicSetType.bloodleech, RelicSetType.shadowstalker, RelicSetType.ironclad];
+      case 3:
+      default:
+        return const [
+          RelicSetType.executioner,
+          RelicSetType.blightweaver,
+          RelicSetType.dreadnought,
+          RelicSetType.bloodleech,
+          RelicSetType.shadowstalker,
+        ];
+    }
+  }
 
   RelicEntity copyWith({
     String? id,

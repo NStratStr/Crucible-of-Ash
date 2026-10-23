@@ -680,7 +680,7 @@ class _AppShellState extends State<AppShell> {
 
       _tickManager.updateSquads(allies: sacrificedAllies);
 
-      final epicRelic = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
+      final epicRelic = _relicService.forgeRandomRelic(rarity: RelicRarity.epic, chapter: _currentChapter, stageDepth: _completedLinearStages);
       _markNodeCompleted(node.id);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -734,7 +734,7 @@ class _AppShellState extends State<AppShell> {
     if (choice == DefiledCryptChoice.desecrateTomb) {
       final isSuccess = Random().nextDouble() < 0.60;
       if (isSuccess) {
-        final relic = _relicService.forgeRandomRelic(rarity: RelicRarity.rare);
+        final relic = _relicService.forgeRandomRelic(rarity: RelicRarity.rare, chapter: _currentChapter, stageDepth: _completedLinearStages);
         setState(() {
           _totalIchor += 250;
         });
@@ -936,10 +936,22 @@ class _AppShellState extends State<AppShell> {
       final bool shouldDropRelic = isFirstClear || (DateTime.now().millisecond % 100) < (_activeNode?.type == CampaignNodeType.boss ? 30 : 15);
       if (shouldDropRelic) {
         if (_activeNode?.type == CampaignNodeType.elite) {
-          final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
+          // Early elites drop Rare; deeper elites drop Epic
+          final dropRarity = (_completedLinearStages <= 5 && _currentChapter == 1) ? RelicRarity.rare : RelicRarity.epic;
+          final drop = _relicService.forgeRandomRelic(
+            rarity: dropRarity,
+            chapter: _currentChapter,
+            stageDepth: _completedLinearStages,
+          );
           relicDrop = drop.displayName;
         } else if (_activeNode?.type == CampaignNodeType.boss) {
-          final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
+          // Chapter Bosses drop Epic in Chapter 1 or Legendary on Boss Climax
+          final dropRarity = (_currentChapter >= 2 || _completedLinearStages >= 9) ? RelicRarity.legendary : RelicRarity.epic;
+          final drop = _relicService.forgeRandomRelic(
+            rarity: dropRarity,
+            chapter: _currentChapter,
+            stageDepth: _completedLinearStages,
+          );
           relicDrop = drop.displayName;
         }
       }
@@ -1872,6 +1884,8 @@ class _AppShellState extends State<AppShell> {
                     cursedOre: _cursedOre,
                     onIchorChanged: (val) => setState(() => _totalIchor = val),
                     onOreChanged: (val) => setState(() => _cursedOre = val),
+                    currentChapter: _currentChapter,
+                    completedLinearStages: _completedLinearStages,
                   ),
                   // Tab 4: Brigade Roster
                   _buildRosterScreen(allPlayerUnits),

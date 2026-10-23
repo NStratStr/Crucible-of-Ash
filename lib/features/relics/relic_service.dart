@@ -183,22 +183,43 @@ class RelicService extends ChangeNotifier {
     );
   }
 
-  /// Forges a new random relic from Crucible Ichor
-  RelicEntity forgeRandomRelic({RelicRarity rarity = RelicRarity.rare}) {
+  /// Forges a new random relic from Crucible Ichor with Mission-specific Sets & World Tier depth gating.
+  RelicEntity forgeRandomRelic({
+    RelicRarity? rarity,
+    int chapter = 1,
+    int stageDepth = 1,
+  }) {
     final slots = RelicSlot.values;
-    final sets = RelicSetType.values;
+    // Mission-specific equipment sets: each chapter features distinct thematic gear
+    final allowedSets = RelicEntity.setsForChapter(chapter);
 
     final slot = slots[_rng.nextInt(slots.length)];
-    final setType = sets[_rng.nextInt(sets.length)];
+    final setType = allowedSets[_rng.nextInt(allowedSets.length)];
 
-    final int roll = _rng.nextInt(100);
-    final RelicRarity rollRarity = rarity != RelicRarity.rare
-        ? rarity
-        : (roll < 55 ? RelicRarity.rare : (roll < 85 ? RelicRarity.epic : RelicRarity.legendary));
+    RelicRarity rollRarity;
+    if (rarity != null) {
+      rollRarity = rarity;
+    } else {
+      // Depth-gated rarity progression:
+      // Early depth (1-4): 75% Common, 25% Rare, 0% Epic, 0% Legendary
+      // Mid depth (5-8): 35% Common, 50% Rare, 15% Epic, 0% Legendary
+      // Deep depth (9-10): 10% Common, 40% Rare, 35% Epic, 15% Legendary
+      final int roll = _rng.nextInt(100);
+      if (chapter == 1 && stageDepth <= 4) {
+        rollRarity = roll < 75 ? RelicRarity.common : RelicRarity.rare;
+      } else if (chapter == 1 && stageDepth <= 8) {
+        rollRarity = roll < 35 ? RelicRarity.common : (roll < 85 ? RelicRarity.rare : RelicRarity.epic);
+      } else if (chapter == 1) {
+        rollRarity = roll < 15 ? RelicRarity.common : (roll < 55 ? RelicRarity.rare : (roll < 85 ? RelicRarity.epic : RelicRarity.legendary));
+      } else {
+        // Later chapters naturally bias towards high-tier relics
+        rollRarity = roll < 10 ? RelicRarity.common : (roll < 45 ? RelicRarity.rare : (roll < 80 ? RelicRarity.epic : RelicRarity.legendary));
+      }
+    }
 
     final multiplier = rollRarity == RelicRarity.legendary
         ? 2.2
-        : (rollRarity == RelicRarity.epic ? 1.6 : 1.0);
+        : (rollRarity == RelicRarity.epic ? 1.6 : (rollRarity == RelicRarity.rare ? 1.0 : 0.65));
 
     int atk = 0;
     int def = 0;
