@@ -157,38 +157,109 @@ class RelicEntity {
   static String setBonusDescription(RelicSetType type) {
     switch (type) {
       case RelicSetType.bloodleech:
-        return '2-Piece: +15% Lifesteal on all strikes';
+        return '2-Piece: +15% Lifesteal on all physical & skill strikes';
       case RelicSetType.ironclad:
-        return '2-Piece: +20% Squad Armor defense';
+        return '2-Piece: +20% Armor Defense & +25 Flat Defense';
       case RelicSetType.tempest:
-        return '2-Piece: +12 Initiative Speed';
-      case RelicSetType.executioner:
-        return '4-Piece: +30% Crit Damage & +10% Crit Rate';
-      case RelicSetType.blightweaver:
-        return '4-Piece: Strikes inflict Blight; +30% damage vs Blighted foes';
-      case RelicSetType.dreadnought:
-        return '4-Piece: +30% Max HP; reflects 20% damage to attackers';
+        return '2-Piece: +12 Initiative Speed for faster turn ticks';
       case RelicSetType.shadowstalker:
-        return '2-Piece: +15% Crit Rate & +10 Speed';
+        return '2-Piece: +15% Critical Strike Chance & +10 Initiative Speed';
+      case RelicSetType.executioner:
+        return '4-Piece: +30% Critical Damage & +10% Critical Strike Chance';
+      case RelicSetType.blightweaver:
+        return '4-Piece: +15% ATK (+20 Flat); strikes inflict 3-turn Blight poison; +30% damage vs Blighted foes';
+      case RelicSetType.dreadnought:
+        return '4-Piece: +30% Maximum HP (+150 Flat); reflects 20% incoming damage back to attacker';
     }
   }
 
   static String setName(RelicSetType type) {
     switch (type) {
       case RelicSetType.bloodleech:
-        return 'Bloodleech Set';
+        return 'Bloodleech (2-Piece)';
       case RelicSetType.ironclad:
-        return 'Ironclad Bastion';
+        return 'Ironclad Bastion (2-Piece)';
       case RelicSetType.tempest:
-        return 'Tempest Weaver';
-      case RelicSetType.executioner:
-        return 'Executioner Set';
-      case RelicSetType.blightweaver:
-        return 'Blightweaver Set';
-      case RelicSetType.dreadnought:
-        return 'Dreadnought Bastion';
+        return 'Tempest Weaver (2-Piece)';
       case RelicSetType.shadowstalker:
-        return 'Shadowstalker Set';
+        return 'Shadowstalker (2-Piece)';
+      case RelicSetType.executioner:
+        return 'Executioner (4-Piece)';
+      case RelicSetType.blightweaver:
+        return 'Blightweaver (4-Piece)';
+      case RelicSetType.dreadnought:
+        return 'Dreadnought Bastion (4-Piece)';
+    }
+  }
+
+  static int setRequiredPieces(RelicSetType type) {
+    switch (type) {
+      case RelicSetType.bloodleech:
+      case RelicSetType.ironclad:
+      case RelicSetType.tempest:
+      case RelicSetType.shadowstalker:
+        return 2;
+      case RelicSetType.executioner:
+      case RelicSetType.blightweaver:
+      case RelicSetType.dreadnought:
+        return 4;
+    }
+  }
+
+  static String setTacticalRole(RelicSetType type) {
+    switch (type) {
+      case RelicSetType.bloodleech:
+        return 'Sustain & Brawling (ideal for Frontline Skirmishers & Warriors)';
+      case RelicSetType.ironclad:
+        return 'Damage Mitigation (ideal for Juggernauts & Guardian Tanks)';
+      case RelicSetType.tempest:
+        return 'Turn Acceleration (ideal for Supports & Fast Disrupters)';
+      case RelicSetType.shadowstalker:
+        return 'Precision & First Strike (ideal for Assassins & Marksmen)';
+      case RelicSetType.executioner:
+        return 'Burst Lethality (ideal for Crit-focused DPS & Assassins)';
+      case RelicSetType.blightweaver:
+        return 'Attritional Damage & DoT (ideal for Occultists & Mages)';
+      case RelicSetType.dreadnought:
+        return 'Thorns & Mega Tanking (ideal for pure High-HP Juggernauts)';
+    }
+  }
+
+  static Color setAccentColor(RelicSetType type) {
+    switch (type) {
+      case RelicSetType.bloodleech:
+        return const Color(0xFFEF5350);
+      case RelicSetType.ironclad:
+        return const Color(0xFF42A5F5);
+      case RelicSetType.tempest:
+        return const Color(0xFF26C6DA);
+      case RelicSetType.shadowstalker:
+        return const Color(0xFFFFB300);
+      case RelicSetType.executioner:
+        return const Color(0xFFAB47BC);
+      case RelicSetType.blightweaver:
+        return const Color(0xFF66BB6A);
+      case RelicSetType.dreadnought:
+        return const Color(0xFF7E57C2);
+    }
+  }
+
+  static IconData setIcon(RelicSetType type) {
+    switch (type) {
+      case RelicSetType.bloodleech:
+        return Icons.water_drop;
+      case RelicSetType.ironclad:
+        return Icons.shield;
+      case RelicSetType.tempest:
+        return Icons.air;
+      case RelicSetType.shadowstalker:
+        return Icons.flash_on;
+      case RelicSetType.executioner:
+        return Icons.colorize;
+      case RelicSetType.blightweaver:
+        return Icons.bubble_chart;
+      case RelicSetType.dreadnought:
+        return Icons.security;
     }
   }
 

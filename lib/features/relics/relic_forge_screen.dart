@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../shared/models/relic_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import 'relic_service.dart';
+import 'relic_set_codex_dialog.dart';
 
 class RelicForgeScreen extends StatefulWidget {
   final RelicService relicService;
@@ -115,6 +116,11 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline, color: Color(0xFFFFD54F), size: 20),
+            tooltip: 'Relic & Set Guide',
+            onPressed: () => RelicSetCodexDialog.show(context, currentChapter: widget.currentChapter),
+          ),
           Container(
             margin: const EdgeInsets.only(right: 14),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -168,13 +174,45 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'ANVIL OF BLOOD & OBSIDIAN',
-                        style: TextStyle(color: Color(0xFFE5A93C), fontWeight: FontWeight.bold, fontSize: 12),
+                      Row(
+                        children: [
+                          const Text(
+                            'ANVIL OF BLOOD & OBSIDIAN',
+                            style: TextStyle(color: Color(0xFFE5A93C), fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => RelicSetCodexDialog.show(context, currentChapter: widget.currentChapter),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD4AF37).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFD4AF37), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.info_outline, color: Color(0xFFFFD54F), size: 11),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'SET CODEX',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFD54F),
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Transmute Ichor & Cursed Ore into rare armaments with 2-piece and 4-piece set synergies.',
+                        'Refine & equip 4 relic types (Weapon, Armor, Talisman, Sigil). Form 2-pc or 4-pc set synergies.',
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10),
                       ),
                     ],
@@ -404,73 +442,107 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   }) {
     final bool hasRelic = relic != null;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF181820),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: hasRelic ? relic.rarityColor : const Color(0xFF2B2B36),
-          width: hasRelic ? 1.5 : 1.0,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(slot == RelicSlot.weapon
-                  ? Icons.colorize
-                  : (slot == RelicSlot.armor
-                      ? Icons.shield
-                      : (slot == RelicSlot.talisman ? Icons.auto_awesome : Icons.token)),
-                  size: 14,
-                  color: hasRelic ? relic.rarityColor : Colors.white38),
-              Text(
-                hasRelic && relic.upgradeLevel > 0
-                    ? '+${relic.upgradeLevel}'
-                    : slot.name.substring(0, 3).toUpperCase(),
-                style: TextStyle(
-                  color: hasRelic && relic.upgradeLevel > 0 ? const Color(0xFFE5A93C) : const Color(0xFF8E8EA0),
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                ),
+    return GestureDetector(
+      onTap: () {
+        if (hasRelic) {
+          // Quick view of equipped relic details and set bonus
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${relic.displayName} (${relic.rarity.name.toUpperCase()}): ${_formatRelicStats(relic)}\n'
+                'Set: ${RelicEntity.setName(relic.setType)} — ${RelicEntity.setBonusDescription(relic.setType)}',
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            hasRelic ? relic.displayName : 'EMPTY',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: hasRelic ? Colors.white : Colors.white30,
-              fontWeight: FontWeight.bold,
-              fontSize: 9.5,
+              backgroundColor: const Color(0xFF1E1E2C),
+              duration: const Duration(seconds: 4),
             ),
+          );
+        } else {
+          setState(() => _slotFilter = slot);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF181820),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: hasRelic ? relic.rarityColor : const Color(0xFF2B2B36),
+            width: hasRelic ? 1.5 : 1.0,
           ),
-          const SizedBox(height: 4),
-          if (hasRelic)
+        ),
+        child: Column(
+          children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (relic.canUpgrade)
-                  GestureDetector(
-                    onTap: () => _refineRelic(relic),
-                    child: const Text('REFINE',
-                        style: TextStyle(color: Color(0xFFE5A93C), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                Icon(
+                  slot == RelicSlot.weapon
+                      ? Icons.colorize
+                      : (slot == RelicSlot.armor
+                          ? Icons.shield
+                          : (slot == RelicSlot.talisman ? Icons.auto_awesome : Icons.token)),
+                  size: 14,
+                  color: hasRelic ? relic.rarityColor : Colors.white38,
+                ),
+                Text(
+                  hasRelic && relic.upgradeLevel > 0
+                      ? '+${relic.upgradeLevel}'
+                      : slot.name.substring(0, 3).toUpperCase(),
+                  style: TextStyle(
+                    color: hasRelic && relic.upgradeLevel > 0 ? const Color(0xFFE5A93C) : const Color(0xFF8E8EA0),
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
                   ),
-                GestureDetector(
-                  onTap: () => widget.relicService.unequipRelic(relic.id),
-                  child: const Text('REMOVE',
-                      style: TextStyle(color: Color(0xFFEF5350), fontSize: 7.5, fontWeight: FontWeight.bold)),
                 ),
               ],
-            )
-          else
-            const Text('UNSLOTTED', style: TextStyle(color: Colors.white24, fontSize: 8)),
-        ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hasRelic ? relic.displayName : 'EMPTY',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: hasRelic ? Colors.white : Colors.white30,
+                fontWeight: FontWeight.bold,
+                fontSize: 9.5,
+              ),
+            ),
+            if (hasRelic) ...[
+              const SizedBox(height: 2),
+              Text(
+                RelicEntity.setName(relic.setType).split(' ').first,
+                style: TextStyle(
+                  color: RelicEntity.setAccentColor(relic.setType),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 4),
+            if (hasRelic)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  if (relic.canUpgrade)
+                    GestureDetector(
+                      onTap: () => _refineRelic(relic),
+                      child: const Text('REFINE',
+                          style: TextStyle(color: Color(0xFFE5A93C), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                    ),
+                  GestureDetector(
+                    onTap: () => widget.relicService.unequipRelic(relic.id),
+                    child: const Text('REMOVE',
+                        style: TextStyle(color: Color(0xFFEF5350), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              )
+            else
+              const Text('UNSLOTTED', style: TextStyle(color: Colors.white24, fontSize: 8)),
+          ],
+        ),
       ),
     );
   }
@@ -594,14 +666,27 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Set: ${RelicEntity.setName(relic.setType)} (${RelicEntity.setBonusDescription(relic.setType)})',
-                  style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 9.5),
+                Row(
+                  children: [
+                    Icon(RelicEntity.setIcon(relic.setType), size: 11, color: const Color(0xFFE5A93C)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Set: ${RelicEntity.setName(relic.setType)}',
+                        style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 9.5, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
+                Text(
+                  RelicEntity.setBonusDescription(relic.setType),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 9.0),
+                ),
+                const SizedBox(height: 3),
                 Text(
                   _formatRelicStats(relic),
-                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
+                  style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 9.5, fontWeight: FontWeight.w600),
                 ),
               ],
             ),

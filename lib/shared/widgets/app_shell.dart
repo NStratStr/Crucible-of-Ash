@@ -2660,7 +2660,7 @@ class _AppShellState extends State<AppShell> {
             }),
             const SizedBox(height: 16),
             const Text(
-              'RELIC SET SYNERGY MATRIX (SPEC 9.2)',
+              'RELIC SET SYNERGY MATRIX & EQUIPMENT ROLES',
               style: TextStyle(
                 color: Color(0xFFE5A93C),
                 fontWeight: FontWeight.bold,
@@ -2668,14 +2668,20 @@ class _AppShellState extends State<AppShell> {
                 letterSpacing: 1.2,
               ),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Units have 4 slots (Weapon, Armor, Talisman, Sigil). Equip two 2-piece sets or one 4-piece set to activate game-changing synergies.',
+              style: TextStyle(color: Colors.white70, fontSize: 10),
+            ),
             const SizedBox(height: 8),
-            _buildCodexRelicSetItem('Bloodleech (2-Piece)', '+15% Lifesteal on all physical and skill strikes.', const Color(0xFFE53935), Icons.water_drop),
-            _buildCodexRelicSetItem('Ironclad (2-Piece)', '+20% Armor defense (+25 flat Defense bonus).', const Color(0xFF1E88E5), Icons.shield),
-            _buildCodexRelicSetItem('Tempest (2-Piece)', '+12 Speed initiative acceleration.', const Color(0xFF00ACC1), Icons.air),
-            _buildCodexRelicSetItem('Shadowstalker (2-Piece)', '+15% Critical Strike Rate, +10 Speed.', const Color(0xFF8E24AA), Icons.flash_on),
-            _buildCodexRelicSetItem('Executioner (4-Piece)', '+30% Critical Damage, +10% Critical Strike Rate.', const Color(0xFFFFB300), Icons.colorize),
-            _buildCodexRelicSetItem('Blightweaver (4-Piece)', '+15% ATK (+20 flat); all strikes inflict 3-turn Blight; +30% DMG vs Blighted.', const Color(0xFF43A047), Icons.bubble_chart),
-            _buildCodexRelicSetItem('Dreadnought (4-Piece)', '+30% Maximum HP (+150 flat); reflects 20% incoming damage back to attacker.', const Color(0xFF78909C), Icons.security),
+            ...RelicSetType.values.map((st) {
+              return _buildCodexRelicSetItem(
+                RelicEntity.setName(st),
+                '${RelicEntity.setBonusDescription(st)}\nRole: ${RelicEntity.setTacticalRole(st)}',
+                RelicEntity.setAccentColor(st),
+                RelicEntity.setIcon(st),
+              );
+            }),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
