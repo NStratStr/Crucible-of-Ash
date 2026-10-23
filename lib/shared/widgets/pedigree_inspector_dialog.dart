@@ -1054,6 +1054,26 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                       Row(
                         children: [
                           _buildStatCell(
+                            'ARMOR PEN',
+                            '${(relicBonuses.bonusArmorPenetration * 100).toStringAsFixed(1)}%',
+                            const Color(0xFFE040FB),
+                          ),
+                          _buildStatCell(
+                            'ULT CHARGE RATE',
+                            '+${(relicBonuses.bonusUltimateCharge * 100).toStringAsFixed(1)}%',
+                            const Color(0xFFFFD54F),
+                          ),
+                          _buildStatCell(
+                            'ULT DMG BOOST',
+                            '+${(relicBonuses.bonusUltimateDamage * 100).toStringAsFixed(1)}%',
+                            const Color(0xFFFF5252),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _buildStatCell(
                             'SOUL FRACTURE',
                             unit.reviveCount > 0
                                 ? '-${(100 - pow(0.80, unit.reviveCount) * 100).round()}% Max HP'

@@ -312,45 +312,96 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Column(
               children: [
-                _buildHeroStatPill(
-                  label: 'TOTAL HP',
-                  baseVal: selectedUnit.maxHp,
-                  bonusVal: bonuses.bonusHp,
-                  color: const Color(0xFF81C784),
-                  icon: Icons.favorite,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildHeroStatPill(
+                      label: 'TOTAL HP',
+                      baseVal: selectedUnit.maxHp,
+                      bonusVal: bonuses.bonusHp,
+                      color: const Color(0xFF81C784),
+                      icon: Icons.favorite,
+                    ),
+                    _buildHeroStatPill(
+                      label: 'TOTAL ATK',
+                      baseVal: selectedUnit.attack,
+                      bonusVal: bonuses.bonusAttack,
+                      color: const Color(0xFFFF8A65),
+                      icon: Icons.colorize,
+                    ),
+                    _buildHeroStatPill(
+                      label: 'TOTAL DEF',
+                      baseVal: selectedUnit.armor,
+                      bonusVal: bonuses.bonusDefense,
+                      color: const Color(0xFF64B5F6),
+                      icon: Icons.shield,
+                    ),
+                    _buildHeroStatPill(
+                      label: 'TOTAL SPD',
+                      baseVal: selectedUnit.speed,
+                      bonusVal: bonuses.bonusSpeed,
+                      color: const Color(0xFFFFD54F),
+                      icon: Icons.speed,
+                    ),
+                    _buildHeroStatPill(
+                      label: 'CRIT RATE',
+                      baseVal: (selectedUnit.critRate * 100).toInt(),
+                      bonusVal: (bonuses.bonusCritRate * 100).toInt(),
+                      isPercent: true,
+                      color: const Color(0xFFBA68C8),
+                      icon: Icons.flash_on,
+                    ),
+                  ],
                 ),
-                _buildHeroStatPill(
-                  label: 'TOTAL ATK',
-                  baseVal: selectedUnit.attack,
-                  bonusVal: bonuses.bonusAttack,
-                  color: const Color(0xFFFF8A65),
-                  icon: Icons.colorize,
-                ),
-                _buildHeroStatPill(
-                  label: 'TOTAL DEF',
-                  baseVal: selectedUnit.armor,
-                  bonusVal: bonuses.bonusDefense,
-                  color: const Color(0xFF64B5F6),
-                  icon: Icons.shield,
-                ),
-                _buildHeroStatPill(
-                  label: 'TOTAL SPD',
-                  baseVal: selectedUnit.speed,
-                  bonusVal: bonuses.bonusSpeed,
-                  color: const Color(0xFFFFD54F),
-                  icon: Icons.speed,
-                ),
-                _buildHeroStatPill(
-                  label: 'CRIT RATE',
-                  baseVal: (selectedUnit.critRate * 100).toInt(),
-                  bonusVal: (bonuses.bonusCritRate * 100).toInt(),
-                  isPercent: true,
-                  color: const Color(0xFFBA68C8),
-                  icon: Icons.flash_on,
-                ),
+                if (bonuses.bonusCritDamage > 0 ||
+                    bonuses.bonusArmorPenetration > 0 ||
+                    bonuses.bonusUltimateCharge > 0 ||
+                    bonuses.bonusUltimateDamage > 0 ||
+                    bonuses.bonusLifesteal > 0) ...[
+                  const SizedBox(height: 6),
+                  const Divider(color: Colors.white12, height: 1),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (bonuses.bonusCritDamage > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'CRIT DMG',
+                            val: '+${(bonuses.bonusCritDamage * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFFFF7043),
+                          ),
+                        if (bonuses.bonusArmorPenetration > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'ARMOR PEN',
+                            val: '+${(bonuses.bonusArmorPenetration * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFFE040FB),
+                          ),
+                        if (bonuses.bonusUltimateCharge > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'ULT CHARGE',
+                            val: '+${(bonuses.bonusUltimateCharge * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFFFFD54F),
+                          ),
+                        if (bonuses.bonusUltimateDamage > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'ULT DMG',
+                            val: '+${(bonuses.bonusUltimateDamage * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFFFF5252),
+                          ),
+                        if (bonuses.bonusLifesteal > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'LIFESTEAL',
+                            val: '+${(bonuses.bonusLifesteal * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFFEF5350),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -874,5 +925,35 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     if (r.bonusSpeed > 0) parts.add('+${r.bonusSpeed} SPD');
     if (r.bonusCritRate > 0) parts.add('+${(r.bonusCritRate * 100).toInt()}% CRIT');
     return parts.isEmpty ? 'Pristine vessel' : parts.join(' • ');
+  }
+
+  Widget _buildSpecialAffixBadge({
+    required String label,
+    required String val,
+    required Color color,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: color, fontSize: 7.5, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            val,
+            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -8,13 +8,16 @@ enum RelicSlot {
 }
 
 enum RelicSubStatType {
-  critRate,   // +3% to +6% Crit Rate
-  critDamage, // +10% to +20% Crit Damage
-  speed,      // +3 to +6 Speed
-  lifesteal,  // +4% to +8% Lifesteal
-  attack,     // +15 to +30 ATK
-  defense,    // +15 to +30 DEF
-  hp,         // +60 to +120 HP
+  critRate,        // +3% to +6% Crit Rate
+  critDamage,      // +10% to +20% Crit Damage
+  speed,           // +3 to +6 Speed
+  lifesteal,       // +4% to +8% Lifesteal
+  armorPenetration,// +5% to +10% Armor Piercing
+  ultimateCharge,  // +8% to +16% Ultimate Charge Rate
+  ultimateDamage,  // +12% to +25% Ultimate Ability Damage
+  attack,          // +15 to +30 ATK
+  defense,         // +15 to +30 DEF
+  hp,              // +60 to +120 HP
 }
 
 @immutable
@@ -37,6 +40,12 @@ class RelicSubStat {
         return '+${value.toInt()} SPD';
       case RelicSubStatType.lifesteal:
         return '+${(value * 100).toStringAsFixed(1)}% Lifesteal';
+      case RelicSubStatType.armorPenetration:
+        return '+${(value * 100).toStringAsFixed(1)}% Armor Pen';
+      case RelicSubStatType.ultimateCharge:
+        return '+${(value * 100).toStringAsFixed(1)}% Ult Charge';
+      case RelicSubStatType.ultimateDamage:
+        return '+${(value * 100).toStringAsFixed(1)}% Ult DMG';
       case RelicSubStatType.attack:
         return '+${value.toInt()} ATK';
       case RelicSubStatType.defense:
@@ -56,6 +65,12 @@ class RelicSubStat {
         return const Color(0xFF26C6DA);
       case RelicSubStatType.lifesteal:
         return const Color(0xFFEF5350);
+      case RelicSubStatType.armorPenetration:
+        return const Color(0xFFE040FB);
+      case RelicSubStatType.ultimateCharge:
+        return const Color(0xFFFFD54F);
+      case RelicSubStatType.ultimateDamage:
+        return const Color(0xFFFF5252);
       case RelicSubStatType.attack:
         return const Color(0xFFFF8A65);
       case RelicSubStatType.defense:
@@ -165,6 +180,39 @@ class RelicEntity {
       }
     }
     return ls;
+  }
+
+  /// Total Armor Penetration provided by sub-stats
+  double get totalArmorPenetration {
+    double pen = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.armorPenetration) {
+        pen += s.value;
+      }
+    }
+    return pen;
+  }
+
+  /// Total Ultimate Charge Rate provided by sub-stats
+  double get totalUltimateCharge {
+    double charge = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.ultimateCharge) {
+        charge += s.value;
+      }
+    }
+    return charge;
+  }
+
+  /// Total Ultimate Damage bonus provided by sub-stats
+  double get totalUltimateDamage {
+    double ultDmg = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.ultimateDamage) {
+        ultDmg += s.value;
+      }
+    }
+    return ultDmg;
   }
 
   /// Total Attack including sub-stats

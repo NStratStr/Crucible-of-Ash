@@ -561,6 +561,11 @@ class CombatResolutionService {
     if (target.isBleeding) {
       effectiveDefense = (effectiveDefense * 0.70).round();
     }
+    // Sub-stat & Relic Armor Penetration: ignores a percentage of enemy defense (capped at 85%)
+    if (attackerRelics.bonusArmorPenetration > 0.0) {
+      final double penMult = (1.0 - attackerRelics.bonusArmorPenetration).clamp(0.15, 1.0);
+      effectiveDefense = (effectiveDefense * penMult).round();
+    }
     final double mitigation = CombatMath.calculateMitigation(effectiveDefense);
 
     // 4. Compute Base and Final Damage
@@ -635,6 +640,11 @@ class CombatResolutionService {
 
     // GDD v2.6 Sec 13.1: The Ashen Reckoning Phase 1/2 Damage Amplification (2.0x)
     totalDamage *= tickManager.reckoningDamageMultiplier;
+
+    // Limit Burst / Ultimate Ability Damage Scaling from Relics
+    if (skill.isLimitBurst && attackerRelics.bonusUltimateDamage > 0.0) {
+      totalDamage *= (1.0 + attackerRelics.bonusUltimateDamage);
+    }
 
     if (isGlancing) {
       totalDamage *= 0.70;
@@ -779,10 +789,11 @@ class CombatResolutionService {
       bonusTmFromCrit += 25.0;
     }
 
-    // 7. Update Cooldowns and Ultimate Charge
+    // 7. Update Cooldowns and Ultimate Charge (Accelerated by Relic Ultimate Charge Rate)
+    final double ultGainRate = 1.0 + attackerRelics.bonusUltimateCharge;
     final double newUltimate = skill.isLimitBurst
         ? 0.0
-        : (attacker.ultimateCharge + 25.0).clamp(0.0, 100.0);
+        : (attacker.ultimateCharge + (25.0 * ultGainRate)).clamp(0.0, 100.0);
 
     final List<SkillEntity> updatedSkills = attacker.resolvedSkills.map((s) {
       if (s.id == skill.id) {

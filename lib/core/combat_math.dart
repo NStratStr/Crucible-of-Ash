@@ -83,16 +83,28 @@ class CombatMath {
     required Archetype defenderRole,
     required double critRate,
     required double critDamage,
+    double armorPenetration = 0.0,
+    double ultimateDamageBonus = 0.0,
+    bool isLimitBurst = false,
     int attackerLevel = 1,
     int flatAbsorb = 0,
     bool useHyperbolicPrr = false,
     Random? rng,
   }) {
     final Random activeRng = rng ?? _rng;
+    int effectiveDefense = defense;
+    if (armorPenetration > 0.0) {
+      final double penMult = (1.0 - armorPenetration).clamp(0.15, 1.0);
+      effectiveDefense = (effectiveDefense * penMult).round();
+    }
+
     final double mitigation = useHyperbolicPrr
-        ? (1.0 - calculatePrr(defense, attackerLevel: attackerLevel))
-        : calculateMitigation(defense);
-    final double baseDamage = attack * skillCoefficient * mitigation;
+        ? (1.0 - calculatePrr(effectiveDefense, attackerLevel: attackerLevel))
+        : calculateMitigation(effectiveDefense);
+    double baseDamage = attack * skillCoefficient * mitigation;
+    if (isLimitBurst && ultimateDamageBonus > 0.0) {
+      baseDamage *= (1.0 + ultimateDamageBonus);
+    }
 
     final double affinityMod = getAffinityMultiplier(attackerRole, defenderRole);
     final bool glancing = isGlancingBlow(attackerRole, defenderRole, activeRng);

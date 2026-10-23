@@ -11,6 +11,9 @@ class UnitRelicBonuses {
   final double bonusCritRate;
   final double bonusCritDamage;
   final double bonusLifesteal;
+  final double bonusArmorPenetration;
+  final double bonusUltimateCharge;
+  final double bonusUltimateDamage;
   final List<RelicSetType> activeSetBonuses;
 
   const UnitRelicBonuses({
@@ -21,6 +24,9 @@ class UnitRelicBonuses {
     this.bonusCritRate = 0.0,
     this.bonusCritDamage = 0.0,
     this.bonusLifesteal = 0.0,
+    this.bonusArmorPenetration = 0.0,
+    this.bonusUltimateCharge = 0.0,
+    this.bonusUltimateDamage = 0.0,
     this.activeSetBonuses = const [],
   });
 }
@@ -148,6 +154,15 @@ class RelicService extends ChangeNotifier {
       case RelicSubStatType.lifesteal:
         // +4.0% to +8.0% Lifesteal
         return 0.04 + (_rng.nextInt(41) / 1000.0);
+      case RelicSubStatType.armorPenetration:
+        // +5.0% to +10.0% Armor Penetration
+        return 0.05 + (_rng.nextInt(51) / 1000.0);
+      case RelicSubStatType.ultimateCharge:
+        // +8.0% to +16.0% Ultimate Charge Rate
+        return 0.08 + (_rng.nextInt(81) / 1000.0);
+      case RelicSubStatType.ultimateDamage:
+        // +12.0% to +25.0% Ultimate Ability Damage
+        return 0.12 + (_rng.nextInt(131) / 1000.0);
       case RelicSubStatType.attack:
         // +15 to +30 ATK
         return (15 + _rng.nextInt(16)).toDouble();
@@ -176,6 +191,9 @@ class RelicService extends ChangeNotifier {
     double critRate = 0.0;
     double critDmg = 0.0;
     double lifesteal = 0.0;
+    double armorPen = 0.0;
+    double ultCharge = 0.0;
+    double ultDmg = 0.0;
 
     final Map<RelicSetType, int> setCounts = {};
 
@@ -187,6 +205,9 @@ class RelicService extends ChangeNotifier {
       critRate += relic.totalCritRate;
       critDmg += relic.totalCritDamage;
       lifesteal += relic.totalSubLifesteal;
+      armorPen += relic.totalArmorPenetration;
+      ultCharge += relic.totalUltimateCharge;
+      ultDmg += relic.totalUltimateDamage;
 
       setCounts[relic.setType] = (setCounts[relic.setType] ?? 0) + 1;
     }
@@ -234,6 +255,9 @@ class RelicService extends ChangeNotifier {
       bonusCritRate: critRate,
       bonusCritDamage: critDmg,
       bonusLifesteal: lifesteal,
+      bonusArmorPenetration: armorPen,
+      bonusUltimateCharge: ultCharge,
+      bonusUltimateDamage: ultDmg,
       activeSetBonuses: activeSets,
     );
   }
