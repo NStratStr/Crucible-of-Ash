@@ -154,10 +154,12 @@ class RelicSetCodexDialog extends StatelessWidget {
 
   Widget _buildEquipmentSlotGuide() {
     final slots = [
-      {'name': 'WEAPON', 'icon': Icons.colorize, 'focus': 'Attack & Critical Hit Chance', 'color': const Color(0xFFEF5350)},
-      {'name': 'ARMOR', 'icon': Icons.shield, 'focus': 'Defense & Maximum Health', 'color': const Color(0xFF42A5F5)},
-      {'name': 'TALISMAN', 'icon': Icons.auto_awesome, 'focus': 'Speed, Turn-Meter & Health', 'color': const Color(0xFFFFD54F)},
-      {'name': 'SIGIL', 'icon': Icons.token, 'focus': 'Hybrid Offensive & Defensive Affixes', 'color': const Color(0xFFAB47BC)},
+      {'name': 'WEAPON', 'icon': Icons.colorize, 'focus': 'Fixed Flat Attack Power', 'color': const Color(0xFFEF5350)},
+      {'name': 'ARMOR', 'icon': Icons.shield, 'focus': 'Fixed Flat Health Pool', 'color': const Color(0xFF81C784)},
+      {'name': 'OFF-HAND', 'icon': Icons.security, 'focus': 'Fixed Flat Armor Defense', 'color': const Color(0xFF42A5F5)},
+      {'name': 'BOOTS', 'icon': Icons.directions_walk, 'focus': 'Speed, Health, Defense', 'color': const Color(0xFF26C6DA)},
+      {'name': 'TALISMAN', 'icon': Icons.auto_awesome, 'focus': 'Crit Rate, Crit DMG, Attack', 'color': const Color(0xFFFFD54F)},
+      {'name': 'SIGIL', 'icon': Icons.token, 'focus': 'Attack, Health, Defense Scaling', 'color': const Color(0xFFAB47BC)},
     ];
 
     return Container(
@@ -174,8 +176,8 @@ class RelicSetCodexDialog extends StatelessWidget {
               final color = s['color'] as Color;
               return Expanded(
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -183,17 +185,19 @@ class RelicSetCodexDialog extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      Icon(s['icon'] as IconData, color: color, size: 20),
+                      Icon(s['icon'] as IconData, color: color, size: 18),
                       const SizedBox(height: 4),
                       Text(
                         s['name'] as String,
-                        style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: color, fontSize: 8.5, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         s['focus'] as String,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white60, fontSize: 8),
+                        style: const TextStyle(color: Colors.white60, fontSize: 7.5),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -203,7 +207,7 @@ class RelicSetCodexDialog extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            '💡 Pro-Tip: Because every hero has 4 slots, you can equip two different 2-piece sets (e.g. Ironclad + Tempest) OR one powerful 4-piece set (e.g. Blightweaver or Executioner).',
+            '💡 Pro-Tip: Because heroes have 6 slots, you can combine a 4-Piece + 2-Piece set (e.g. Blightweaver + Tempest) OR run three different 2-Piece sets simultaneously (e.g. Ironclad + Bloodleech + Bonepiercer)!',
             style: TextStyle(color: Color(0xFFFFE082), fontSize: 9.5, fontStyle: FontStyle.italic),
           ),
         ],

@@ -682,6 +682,8 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
     final equippedRelics = widget.relicService?.getRelicsForUnit(unit.id) ?? const <RelicEntity>[];
     final weaponRelic = equippedRelics.where((r) => r.slot == RelicSlot.weapon).firstOrNull;
     final armorRelic = equippedRelics.where((r) => r.slot == RelicSlot.armor).firstOrNull;
+    final offhandRelic = equippedRelics.where((r) => r.slot == RelicSlot.offhand).firstOrNull;
+    final bootsRelic = equippedRelics.where((r) => r.slot == RelicSlot.boots).firstOrNull;
     final talismanRelic = equippedRelics.where((r) => r.slot == RelicSlot.talisman).firstOrNull;
     final sigilRelic = equippedRelics.where((r) => r.slot == RelicSlot.sigil).firstOrNull;
 
@@ -899,29 +901,18 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
               height: cardHeight * 0.405,
               child: Column(
                 children: [
-                  // Row 1 (Sockets 1, 2, 3)
+                  // Row 1 (Sockets 1, 2, 3: Weapon, Armor, Off-Hand)
                   Expanded(
                     child: Row(
                       children: [
                         Expanded(
                           child: _buildEquipmentSocket(
-                            title: weaponRelic?.name ?? 'Main Hand',
+                            title: weaponRelic?.name ?? 'Main Blade',
                             subtitle: 'WEAPON',
                             icon: Icons.colorize,
                             accentColor: weaponRelic?.rarityColor ?? const Color(0xFFFFB300),
                             relic: weaponRelic,
-                            defaultLore: 'Forged iron blade with jagged edges tailored to sever sinew.',
-                            cardWidth: cardWidth,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _buildEquipmentSocket(
-                            title: 'Shield / Ward',
-                            subtitle: 'OFF-HAND',
-                            icon: Icons.shield,
-                            accentColor: const Color(0xFF42A5F5),
-                            defaultLore: 'Reinforced heavy kite shield bearing heraldic sigils of warding.',
+                            defaultLore: 'Forged iron blade tailored to sever sinew and bone.',
                             cardWidth: cardWidth,
                           ),
                         ),
@@ -930,10 +921,22 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           child: _buildEquipmentSocket(
                             title: armorRelic?.name ?? 'Heavy Plate',
                             subtitle: 'ARMOR',
-                            icon: Icons.security,
+                            icon: Icons.shield,
                             accentColor: armorRelic?.rarityColor ?? const Color(0xFF81C784),
                             relic: armorRelic,
                             defaultLore: 'Segmented iron plate armor forged to deflect crushing impacts.',
+                            cardWidth: cardWidth,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: _buildEquipmentSocket(
+                            title: offhandRelic?.name ?? 'Kite Shield',
+                            subtitle: 'OFF-HAND',
+                            icon: Icons.security,
+                            accentColor: offhandRelic?.rarityColor ?? const Color(0xFF42A5F5),
+                            relic: offhandRelic,
+                            defaultLore: 'Reinforced heavy shield bearing heraldic sigils of warding.',
                             cardWidth: cardWidth,
                           ),
                         ),
@@ -941,17 +944,18 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Row 2 (Sockets 4, 5, 6)
+                  // Row 2 (Sockets 4, 5, 6: Boots, Talisman, Sigil)
                   Expanded(
                     child: Row(
                       children: [
                         Expanded(
                           child: _buildEquipmentSocket(
-                            title: unit.plinthMaterialTitle.split(' ').first,
-                            subtitle: 'PLINTH',
-                            icon: Icons.view_in_ar,
-                            accentColor: const Color(0xFFB0BEC5),
-                            defaultLore: 'Imbued cold iron pedestal conferring permanent armor and poise stability.',
+                            title: bootsRelic?.name ?? 'War Sabatons',
+                            subtitle: 'BOOTS',
+                            icon: Icons.directions_walk,
+                            accentColor: bootsRelic?.rarityColor ?? const Color(0xFF26C6DA),
+                            relic: bootsRelic,
+                            defaultLore: 'Hardened iron greaves granting stride and tactical velocity.',
                             cardWidth: cardWidth,
                           ),
                         ),
@@ -959,11 +963,11 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                         Expanded(
                           child: _buildEquipmentSocket(
                             title: talismanRelic?.name ?? 'Talisman',
-                            subtitle: 'AMULET',
-                            icon: Icons.circle,
+                            subtitle: 'TALISMAN',
+                            icon: Icons.auto_awesome,
                             accentColor: talismanRelic?.rarityColor ?? const Color(0xFFFFD54F),
                             relic: talismanRelic,
-                            defaultLore: 'Sun-warmed amber talisman channeling restorative radiant focus.',
+                            defaultLore: 'Sun-warmed amber talisman channeling deadly focus.',
                             cardWidth: cardWidth,
                           ),
                         ),
@@ -972,10 +976,10 @@ class _GothicCharacterSheetCardState extends State<GothicCharacterSheetCard> wit
                           child: _buildEquipmentSocket(
                             title: sigilRelic?.name ?? 'Blood Crest',
                             subtitle: 'SIGIL',
-                            icon: Icons.dangerous,
+                            icon: Icons.token,
                             accentColor: sigilRelic?.rarityColor ?? const Color(0xFFE53935),
                             relic: sigilRelic,
-                            defaultLore: 'Skull-embossed cindershell warding the unit against lethal execution.',
+                            defaultLore: 'Skull-embossed cindershell warding the unit against lethal blows.',
                             cardWidth: cardWidth,
                           ),
                         ),

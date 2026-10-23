@@ -689,27 +689,31 @@ class CombatResolutionService {
 
     // 5. Apply Damage to Defender & Status Effects
     final int newTargetHp = max(0, target.currentHp - finalDamage);
-    if (skill.appliedStatus != null && !isGlancing && newTargetHp > 0) {
+    // Debuff Accuracy Check: Base 100% + Attacker Accuracy - Defender ERR (Floor 15% guaranteed minimum application chance)
+    final double debuffLandChance = (1.0 + attackerRelics.bonusDebuffAccuracy - CombatMath.calculateErr(target.resist)).clamp(0.15, 1.0);
+    final bool debuffLands = !isGlancing && newTargetHp > 0 && (_rng.nextDouble() < debuffLandChance);
+
+    if (skill.appliedStatus != null && debuffLands) {
       targetEffects.add(skill.appliedStatus!);
     }
 
     // Relic Set: Blightweaver (4-pc: Strikes inflict Blight)
-    if (attackerRelics.activeSetBonuses.contains(RelicSetType.blightweaver) && !isGlancing && newTargetHp > 0) {
+    if (attackerRelics.activeSetBonuses.contains(RelicSetType.blightweaver) && debuffLands) {
       targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 3, value: 45));
     }
 
     // Battle Modifier: Void Corruption (Occultist strikes inflict Blight)
-    if (battleModifier == BattleModifier.voidCorruption && attacker.archetype == Archetype.occultist && !isGlancing && newTargetHp > 0) {
+    if (battleModifier == BattleModifier.voidCorruption && attacker.archetype == Archetype.occultist && debuffLands) {
       targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 2, value: 40));
     }
 
     // Trait: Rend Flesh / Rend (Applies Bleed on hit)
-    if ((attackerTraits.contains('rend_flesh') || attackerTraits.contains('rend')) && !isGlancing && newTargetHp > 0) {
+    if ((attackerTraits.contains('rend_flesh') || attackerTraits.contains('rend')) && debuffLands) {
       targetEffects.add(const StatusEffect(type: StatusEffectType.bleed, durationTurns: 2, value: 50));
     }
 
     // Trait: Virulent Hex (Applies Blight on hit)
-    if (attackerTraits.contains('plague_hex') && !isGlancing && newTargetHp > 0) {
+    if (attackerTraits.contains('plague_hex') && debuffLands) {
       targetEffects.add(const StatusEffect(type: StatusEffectType.blight, durationTurns: 3, value: 40));
     }
 

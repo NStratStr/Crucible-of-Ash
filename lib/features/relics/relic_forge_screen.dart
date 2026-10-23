@@ -392,6 +392,12 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                             val: '+${(bonuses.bonusUltimateDamage * 100).toStringAsFixed(1)}%',
                             color: const Color(0xFFFF5252),
                           ),
+                        if (bonuses.bonusDebuffAccuracy > 0)
+                          _buildSpecialAffixBadge(
+                            label: 'ACCURACY',
+                            val: '+${(bonuses.bonusDebuffAccuracy * 100).toStringAsFixed(1)}%',
+                            color: const Color(0xFF7C4DFF),
+                          ),
                         if (bonuses.bonusLifesteal > 0)
                           _buildSpecialAffixBadge(
                             label: 'LIFESTEAL',
@@ -458,9 +464,13 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 _buildSetFilterChip('IRON (2)', RelicSetType.ironclad, const Color(0xFF90A4AE)),
                 _buildSetFilterChip('TEMP (2)', RelicSetType.tempest, const Color(0xFF29B6F6)),
                 _buildSetFilterChip('SHADOW (2)', RelicSetType.shadowstalker, const Color(0xFFFFB300)),
+                _buildSetFilterChip('PIERCE (2)', RelicSetType.bonepiercer, const Color(0xFFE040FB)),
+                _buildSetFilterChip('SOUL (2)', RelicSetType.soulbinder, const Color(0xFFFFD54F)),
+                _buildSetFilterChip('HEX (2)', RelicSetType.hexseeker, const Color(0xFF7C4DFF)),
                 _buildSetFilterChip('EXEC (4)', RelicSetType.executioner, const Color(0xFFAB47BC)),
                 _buildSetFilterChip('BLIGHT (4)', RelicSetType.blightweaver, const Color(0xFF66BB6A)),
                 _buildSetFilterChip('DREAD (4)', RelicSetType.dreadnought, const Color(0xFF7E57C2)),
+                _buildSetFilterChip('CATACLYSM (4)', RelicSetType.cataclysm, const Color(0xFFFF5252)),
               ],
             ),
           ),
@@ -591,11 +601,16 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(
-                  slot == RelicSlot.weapon
-                      ? Icons.colorize
-                      : (slot == RelicSlot.armor
-                          ? Icons.shield
-                          : (slot == RelicSlot.talisman ? Icons.auto_awesome : Icons.token)),
+                  relic?.slotIcon ??
+                      (slot == RelicSlot.weapon
+                          ? Icons.colorize
+                          : (slot == RelicSlot.armor
+                              ? Icons.shield
+                              : (slot == RelicSlot.offhand
+                                  ? Icons.security
+                                  : (slot == RelicSlot.boots
+                                      ? Icons.directions_walk
+                                      : (slot == RelicSlot.talisman ? Icons.auto_awesome : Icons.token))))),
                   size: 14,
                   color: hasRelic ? relic.rarityColor : Colors.white38,
                 ),

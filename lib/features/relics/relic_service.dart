@@ -14,6 +14,7 @@ class UnitRelicBonuses {
   final double bonusArmorPenetration;
   final double bonusUltimateCharge;
   final double bonusUltimateDamage;
+  final double bonusDebuffAccuracy;
   final List<RelicSetType> activeSetBonuses;
 
   const UnitRelicBonuses({
@@ -27,6 +28,7 @@ class UnitRelicBonuses {
     this.bonusArmorPenetration = 0.0,
     this.bonusUltimateCharge = 0.0,
     this.bonusUltimateDamage = 0.0,
+    this.bonusDebuffAccuracy = 0.0,
     this.activeSetBonuses = const [],
   });
 }
@@ -151,6 +153,9 @@ class RelicService extends ChangeNotifier {
       case RelicSubStatType.speed:
         // +3 to +6 Speed
         return (3 + _rng.nextInt(4)).toDouble();
+      case RelicSubStatType.debuffAccuracy:
+        // +6.0% to +12.0% Debuff Infliction Accuracy
+        return 0.06 + (_rng.nextInt(61) / 1000.0);
       case RelicSubStatType.lifesteal:
         // +4.0% to +8.0% Lifesteal
         return 0.04 + (_rng.nextInt(41) / 1000.0);
@@ -194,6 +199,7 @@ class RelicService extends ChangeNotifier {
     double armorPen = 0.0;
     double ultCharge = 0.0;
     double ultDmg = 0.0;
+    double accuracy = 0.0;
 
     final Map<RelicSetType, int> setCounts = {};
 
@@ -208,6 +214,7 @@ class RelicService extends ChangeNotifier {
       armorPen += relic.totalArmorPenetration;
       ultCharge += relic.totalUltimateCharge;
       ultDmg += relic.totalUltimateDamage;
+      accuracy += relic.totalDebuffAccuracy;
 
       setCounts[relic.setType] = (setCounts[relic.setType] ?? 0) + 1;
     }
@@ -232,6 +239,18 @@ class RelicService extends ChangeNotifier {
       spd += 10;
       activeSets.add(RelicSetType.shadowstalker);
     }
+    if ((setCounts[RelicSetType.bonepiercer] ?? 0) >= 2) {
+      armorPen += 0.20;
+      activeSets.add(RelicSetType.bonepiercer);
+    }
+    if ((setCounts[RelicSetType.soulbinder] ?? 0) >= 2) {
+      ultCharge += 0.25;
+      activeSets.add(RelicSetType.soulbinder);
+    }
+    if ((setCounts[RelicSetType.hexseeker] ?? 0) >= 2) {
+      accuracy += 0.20;
+      activeSets.add(RelicSetType.hexseeker);
+    }
     // Check 4-piece sets
     if ((setCounts[RelicSetType.executioner] ?? 0) >= 4) {
       critDmg += 0.30;
@@ -246,6 +265,10 @@ class RelicService extends ChangeNotifier {
       hp += (hp * 0.30).round() + 150;
       activeSets.add(RelicSetType.dreadnought);
     }
+    if ((setCounts[RelicSetType.cataclysm] ?? 0) >= 4) {
+      ultDmg += 0.40;
+      activeSets.add(RelicSetType.cataclysm);
+    }
 
     return UnitRelicBonuses(
       bonusAttack: atk,
@@ -258,6 +281,7 @@ class RelicService extends ChangeNotifier {
       bonusArmorPenetration: armorPen,
       bonusUltimateCharge: ultCharge,
       bonusUltimateDamage: ultDmg,
+      bonusDebuffAccuracy: accuracy,
       activeSetBonuses: activeSets,
     );
   }
@@ -308,21 +332,49 @@ class RelicService extends ChangeNotifier {
 
     switch (slot) {
       case RelicSlot.weapon:
-        atk = (35 * multiplier).round();
-        crit = (0.05 * multiplier);
+        // Slot 1: Fixed Flat ATK
+        atk = (40 * multiplier).round();
         break;
       case RelicSlot.armor:
-        def = (30 * multiplier).round();
-        hp = (180 * multiplier).round();
+        // Slot 2: Fixed Flat HP
+        hp = (240 * multiplier).round();
+        break;
+      case RelicSlot.offhand:
+        // Slot 3: Fixed Flat DEF
+        def = (35 * multiplier).round();
+        break;
+      case RelicSlot.boots:
+        // Slot 4: Speed (Flat) or HP or DEF
+        final opt = _rng.nextInt(3);
+        if (opt == 0) {
+          spd = (8 * multiplier).round();
+        } else if (opt == 1) {
+          hp = (180 * multiplier).round();
+        } else {
+          def = (25 * multiplier).round();
+        }
         break;
       case RelicSlot.talisman:
-        spd = (8 * multiplier).round();
-        hp = (120 * multiplier).round();
+        // Slot 5: Crit Rate% or Crit DMG% (stored via critRate/subStats) or ATK
+        final opt = _rng.nextInt(3);
+        if (opt == 0) {
+          crit = 0.06 * multiplier;
+        } else if (opt == 1) {
+          atk = (30 * multiplier).round();
+        } else {
+          hp = (180 * multiplier).round();
+        }
         break;
       case RelicSlot.sigil:
-        atk = (20 * multiplier).round();
-        def = (15 * multiplier).round();
-        spd = (5 * multiplier).round();
+        // Slot 6: ATK or HP or DEF
+        final opt = _rng.nextInt(3);
+        if (opt == 0) {
+          atk = (30 * multiplier).round();
+        } else if (opt == 1) {
+          hp = (180 * multiplier).round();
+        } else {
+          def = (25 * multiplier).round();
+        }
         break;
     }
 
@@ -371,6 +423,10 @@ class RelicService extends ChangeNotifier {
         return 'Blade';
       case RelicSlot.armor:
         return 'Cuirass';
+      case RelicSlot.offhand:
+        return 'Ward';
+      case RelicSlot.boots:
+        return 'Greaves';
       case RelicSlot.talisman:
         return 'Pendant';
       case RelicSlot.sigil:
@@ -434,8 +490,8 @@ class RelicService extends ChangeNotifier {
       ),
       const RelicEntity(
         id: 'starter_relic_05',
-        name: 'Zephyr Stride Talisman',
-        slot: RelicSlot.talisman,
+        name: 'Zephyr Stride Boots',
+        slot: RelicSlot.boots,
         rarity: RelicRarity.rare,
         setType: RelicSetType.tempest,
         bonusSpeed: 10,
@@ -443,7 +499,19 @@ class RelicService extends ChangeNotifier {
         subStats: [
           RelicSubStat(type: RelicSubStatType.critDamage, value: 0.12),
         ],
-        description: 'Feathered relic pulsing with gale winds.',
+        description: 'Feathered sabatons pulsing with gale winds.',
+      ),
+      const RelicEntity(
+        id: 'starter_relic_06',
+        name: 'Aegis of the Justiciar',
+        slot: RelicSlot.offhand,
+        rarity: RelicRarity.rare,
+        setType: RelicSetType.ironclad,
+        bonusDefense: 30,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.defense, value: 15.0),
+        ],
+        description: 'Hardened pavise shield engraved with protective hymns.',
       ),
     ];
   }

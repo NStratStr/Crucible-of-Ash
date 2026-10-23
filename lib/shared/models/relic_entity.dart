@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 enum RelicSlot {
-  weapon,
-  armor,
-  talisman,
-  sigil,
+  weapon,    // Slot 1: Fixed Flat ATK
+  armor,     // Slot 2: Fixed Flat HP
+  offhand,   // Slot 3: Fixed Flat DEF
+  boots,     // Slot 4: Speed (Flat), HP%, DEF%
+  talisman,  // Slot 5: Crit Rate%, Crit DMG%, ATK%
+  sigil,     // Slot 6: ATK%, HP%, DEF%
 }
 
 enum RelicSubStatType {
   critRate,        // +3% to +6% Crit Rate
   critDamage,      // +10% to +20% Crit Damage
   speed,           // +3 to +6 Speed
+  debuffAccuracy,  // +6% to +12% Debuff Infliction Accuracy
   lifesteal,       // +4% to +8% Lifesteal
   armorPenetration,// +5% to +10% Armor Piercing
   ultimateCharge,  // +8% to +16% Ultimate Charge Rate
@@ -38,6 +41,8 @@ class RelicSubStat {
         return '+${(value * 100).toStringAsFixed(1)}% CRIT DMG';
       case RelicSubStatType.speed:
         return '+${value.toInt()} SPD';
+      case RelicSubStatType.debuffAccuracy:
+        return '+${(value * 100).toStringAsFixed(1)}% Accuracy';
       case RelicSubStatType.lifesteal:
         return '+${(value * 100).toStringAsFixed(1)}% Lifesteal';
       case RelicSubStatType.armorPenetration:
@@ -63,6 +68,8 @@ class RelicSubStat {
         return const Color(0xFFFF7043);
       case RelicSubStatType.speed:
         return const Color(0xFF26C6DA);
+      case RelicSubStatType.debuffAccuracy:
+        return const Color(0xFF7C4DFF);
       case RelicSubStatType.lifesteal:
         return const Color(0xFFEF5350);
       case RelicSubStatType.armorPenetration:
@@ -98,12 +105,16 @@ class RelicSubStat {
 
 enum RelicSetType {
   bloodleech,    // 2-pc: +15% Lifesteal
-  ironclad,      // 2-pc: +20% Defense
+  ironclad,      // 2-pc: +20% Defense (+25 Flat)
   tempest,       // 2-pc: +12 Speed
+  shadowstalker, // 2-pc: +15% Crit Rate, +10 Speed
+  bonepiercer,   // 2-pc: +20% Armor Penetration
+  soulbinder,    // 2-pc: +25% Ultimate Charge Rate
+  hexseeker,     // 2-pc: +20% Debuff Infliction Accuracy
   executioner,   // 4-pc: +30% Crit DMG, +10% Crit Rate
   blightweaver,  // 4-pc: Attacks inflict Blight; +30% DMG vs Blighted foes
   dreadnought,   // 4-pc: +30% Max HP; reflects 20% damage back to attackers
-  shadowstalker, // 2-pc: +15% Crit Rate, +10 Speed
+  cataclysm,     // 4-pc: +40% Ultimate Ability Damage
 }
 
 enum RelicRarity {
@@ -215,6 +226,17 @@ class RelicEntity {
     return ultDmg;
   }
 
+  /// Total Debuff Accuracy provided by sub-stats
+  double get totalDebuffAccuracy {
+    double acc = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.debuffAccuracy) {
+        acc += s.value;
+      }
+    }
+    return acc;
+  }
+
   /// Total Attack including sub-stats
   int get totalAttack {
     int atk = bonusAttack;
@@ -281,17 +303,31 @@ class RelicEntity {
   static List<RelicSetType> setsForChapter(int chapter) {
     switch (chapter) {
       case 1:
-        return const [RelicSetType.ironclad, RelicSetType.tempest];
+        return const [
+          RelicSetType.ironclad,
+          RelicSetType.tempest,
+          RelicSetType.soulbinder,
+        ];
       case 2:
-        return const [RelicSetType.bloodleech, RelicSetType.shadowstalker, RelicSetType.ironclad];
+        return const [
+          RelicSetType.bloodleech,
+          RelicSetType.shadowstalker,
+          RelicSetType.bonepiercer,
+          RelicSetType.hexseeker,
+          RelicSetType.ironclad,
+        ];
       case 3:
       default:
         return const [
           RelicSetType.executioner,
           RelicSetType.blightweaver,
           RelicSetType.dreadnought,
+          RelicSetType.cataclysm,
           RelicSetType.bloodleech,
           RelicSetType.shadowstalker,
+          RelicSetType.bonepiercer,
+          RelicSetType.soulbinder,
+          RelicSetType.hexseeker,
         ];
     }
   }
@@ -350,6 +386,10 @@ class RelicEntity {
         return Icons.colorize;
       case RelicSlot.armor:
         return Icons.shield;
+      case RelicSlot.offhand:
+        return Icons.security;
+      case RelicSlot.boots:
+        return Icons.directions_walk;
       case RelicSlot.talisman:
         return Icons.auto_awesome;
       case RelicSlot.sigil:
@@ -367,12 +407,20 @@ class RelicEntity {
         return '2-Piece: +12 Initiative Speed for faster turn ticks';
       case RelicSetType.shadowstalker:
         return '2-Piece: +15% Critical Strike Chance & +10 Initiative Speed';
+      case RelicSetType.bonepiercer:
+        return '2-Piece: +20% Armor Penetration against enemy defenses';
+      case RelicSetType.soulbinder:
+        return '2-Piece: +25% Ultimate / Limit Burst charge rate';
+      case RelicSetType.hexseeker:
+        return '2-Piece: +20% Debuff Infliction Accuracy';
       case RelicSetType.executioner:
         return '4-Piece: +30% Critical Damage & +10% Critical Strike Chance';
       case RelicSetType.blightweaver:
         return '4-Piece: +15% ATK (+20 Flat); strikes inflict 3-turn Blight poison; +30% damage vs Blighted foes';
       case RelicSetType.dreadnought:
         return '4-Piece: +30% Maximum HP (+150 Flat); reflects 20% incoming damage back to attacker';
+      case RelicSetType.cataclysm:
+        return '4-Piece: +40% Ultimate Ability / Limit Burst strike damage';
     }
   }
 
@@ -386,12 +434,20 @@ class RelicEntity {
         return 'Tempest Weaver (2-Piece)';
       case RelicSetType.shadowstalker:
         return 'Shadowstalker (2-Piece)';
+      case RelicSetType.bonepiercer:
+        return 'Bonepiercer (2-Piece)';
+      case RelicSetType.soulbinder:
+        return 'Soulbinder (2-Piece)';
+      case RelicSetType.hexseeker:
+        return 'Hexseeker (2-Piece)';
       case RelicSetType.executioner:
         return 'Executioner (4-Piece)';
       case RelicSetType.blightweaver:
         return 'Blightweaver (4-Piece)';
       case RelicSetType.dreadnought:
         return 'Dreadnought Bastion (4-Piece)';
+      case RelicSetType.cataclysm:
+        return 'Cataclysm (4-Piece)';
     }
   }
 
@@ -401,10 +457,14 @@ class RelicEntity {
       case RelicSetType.ironclad:
       case RelicSetType.tempest:
       case RelicSetType.shadowstalker:
+      case RelicSetType.bonepiercer:
+      case RelicSetType.soulbinder:
+      case RelicSetType.hexseeker:
         return 2;
       case RelicSetType.executioner:
       case RelicSetType.blightweaver:
       case RelicSetType.dreadnought:
+      case RelicSetType.cataclysm:
         return 4;
     }
   }
@@ -419,12 +479,20 @@ class RelicEntity {
         return 'Turn Acceleration (ideal for Supports & Fast Disrupters)';
       case RelicSetType.shadowstalker:
         return 'Precision & First Strike (ideal for Assassins & Marksmen)';
+      case RelicSetType.bonepiercer:
+        return 'Armor Shredding (ideal for high-defense boss encounters)';
+      case RelicSetType.soulbinder:
+        return 'Energy Generation (ideal for rapid Limit Burst cyclers)';
+      case RelicSetType.hexseeker:
+        return 'Affliction Dominance (ideal for Occultists & Blight spreaders)';
       case RelicSetType.executioner:
         return 'Burst Lethality (ideal for Crit-focused DPS & Assassins)';
       case RelicSetType.blightweaver:
         return 'Attritional Damage & DoT (ideal for Occultists & Mages)';
       case RelicSetType.dreadnought:
         return 'Thorns & Mega Tanking (ideal for pure High-HP Juggernauts)';
+      case RelicSetType.cataclysm:
+        return 'Ultimate Decimation (ideal for devastating Limit Burst finish)';
     }
   }
 
@@ -438,12 +506,20 @@ class RelicEntity {
         return const Color(0xFF26C6DA);
       case RelicSetType.shadowstalker:
         return const Color(0xFFFFB300);
+      case RelicSetType.bonepiercer:
+        return const Color(0xFFE040FB);
+      case RelicSetType.soulbinder:
+        return const Color(0xFFFFD54F);
+      case RelicSetType.hexseeker:
+        return const Color(0xFF7C4DFF);
       case RelicSetType.executioner:
         return const Color(0xFFAB47BC);
       case RelicSetType.blightweaver:
         return const Color(0xFF66BB6A);
       case RelicSetType.dreadnought:
         return const Color(0xFF7E57C2);
+      case RelicSetType.cataclysm:
+        return const Color(0xFFFF5252);
     }
   }
 
@@ -457,12 +533,20 @@ class RelicEntity {
         return Icons.air;
       case RelicSetType.shadowstalker:
         return Icons.flash_on;
+      case RelicSetType.bonepiercer:
+        return Icons.colorize;
+      case RelicSetType.soulbinder:
+        return Icons.auto_awesome;
+      case RelicSetType.hexseeker:
+        return Icons.visibility;
       case RelicSetType.executioner:
         return Icons.colorize;
       case RelicSetType.blightweaver:
         return Icons.bubble_chart;
       case RelicSetType.dreadnought:
         return Icons.security;
+      case RelicSetType.cataclysm:
+        return Icons.whatshot;
     }
   }
 

@@ -1074,12 +1074,27 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                       Row(
                         children: [
                           _buildStatCell(
+                            'DEBUFF ACCURACY',
+                            '+${(relicBonuses.bonusDebuffAccuracy * 100).toStringAsFixed(1)}%',
+                            const Color(0xFF7C4DFF),
+                          ),
+                          _buildStatCell(
+                            'LIFESTEAL',
+                            '+${(relicBonuses.bonusLifesteal * 100).toStringAsFixed(1)}%',
+                            const Color(0xFFEF5350),
+                          ),
+                          _buildStatCell(
                             'SOUL FRACTURE',
                             unit.reviveCount > 0
                                 ? '-${(100 - pow(0.80, unit.reviveCount) * 100).round()}% Max HP'
                                 : 'NONE (Pristine)',
                             unit.reviveCount > 0 ? const Color(0xFFEF5350) : const Color(0xFF81C784),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
                           _buildStatCell(
                             'TACTICAL ROLE',
                             unit.isVanguard ? 'VANGUARD (FRONT)' : 'ARCANUM (REAR)',
@@ -1090,16 +1105,16 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             unit.factionName,
                             const Color(0xFFB39DDB),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
                           _buildStatCell(
                             'PLINTH MATERIAL',
                             unit.plinthMaterialTitle,
                             Color(unit.plinthRimBorderColorValue),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
                           _buildStatCell(
                             'BASE COMPOSITION',
                             unit.plinthMaterial == PlinthMaterial.gold
