@@ -64,6 +64,8 @@ class _AppShellState extends State<AppShell> {
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
   int _completedLinearStages = 0;
+  final Map<String, int> _stageStars = {};
+  final Set<String> _claimedThreeStarStages = {};
   bool _hasCompletedAwakening = false;
   bool _isSpatialCombatActive = true;
 
@@ -132,6 +134,10 @@ class _AppShellState extends State<AppShell> {
       _currentAscension = saved.currentAscension;
       _maxUnlockedAscension = saved.maxUnlockedAscension;
       _completedLinearStages = saved.completedLinearStages;
+      _stageStars.clear();
+      _stageStars.addAll(saved.stageStars);
+      _claimedThreeStarStages.clear();
+      _claimedThreeStarStages.addAll(saved.claimedThreeStarStages);
       _hasCompletedAwakening = saved.hasCompletedAwakening;
       _clearedGauntletTrials.clear();
       _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
@@ -160,6 +166,10 @@ class _AppShellState extends State<AppShell> {
           _currentAscension = saved.currentAscension;
           _maxUnlockedAscension = saved.maxUnlockedAscension;
           _completedLinearStages = saved.completedLinearStages;
+          _stageStars.clear();
+          _stageStars.addAll(saved.stageStars);
+          _claimedThreeStarStages.clear();
+          _claimedThreeStarStages.addAll(saved.claimedThreeStarStages);
           _hasCompletedAwakening = saved.hasCompletedAwakening;
           _clearedGauntletTrials.clear();
           _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
@@ -224,6 +234,8 @@ class _AppShellState extends State<AppShell> {
         currentAscension: _currentAscension,
         maxUnlockedAscension: _maxUnlockedAscension,
         completedLinearStages: _completedLinearStages,
+        stageStars: _stageStars,
+        claimedThreeStarStages: _claimedThreeStarStages,
         hasCompletedAwakening: _hasCompletedAwakening,
         allies: _tickManager.allies,
         reserveInventory: _inventory,
@@ -803,29 +815,63 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onCombatVictory() {
-    final reward = _activeNode?.rewardIchor ?? 150;
-    final oreReward = _activeNode?.rewardOre ?? 15;
-    final sigilsReward = _activeNode?.rewardSigils ?? 0;
+    final isLinearStage = _activeNode?.id.startsWith('linear_') == true;
+    final String? stageCode = isLinearStage ? _activeNode!.id.replaceFirst('linear_', '') : null;
+    final stageNum = _activeNode?.depth ?? 1;
+
+    // Check if this is a first clear or repeat farm run
+    final bool isFirstClear = isLinearStage
+        ? stageNum > _completedLinearStages
+        : (_activeNode == null || !_activeNode!.isVisited);
+
+    // Compute star rating based on casualty count (0 casualties = 3 stars)
+    final casualties = _tickManager.allies.where((u) => !u.isAlive).length;
+    final int currentStarRating = casualties == 0 ? 3 : (casualties <= 1 ? 2 : 1);
+
+    // 3-Star Mastery logic: Award 1 bonus Bloodline Sigil on the first time 3 stars are achieved!
+    bool isThreeStarRewardUnlocked = false;
+    if (stageCode != null) {
+      final prevBestStars = _stageStars[stageCode] ?? 0;
+      if (currentStarRating > prevBestStars) {
+        _stageStars[stageCode] = currentStarRating;
+      }
+      if (currentStarRating == 3 && !_claimedThreeStarStages.contains(stageCode)) {
+        _claimedThreeStarStages.add(stageCode);
+        isThreeStarRewardUnlocked = true;
+      }
+    }
+
+    // Economy Balance: Base rewards are full on First Clear or First 3-Star Unlock;
+    // Repeat runs suffer diminishing returns (25% Ichor, 20% Ore, 0 Sigils) to prevent infinite boss farming.
+    final int baseIchor = _activeNode?.rewardIchor ?? 150;
+    final int baseOre = _activeNode?.rewardOre ?? 15;
+    final int baseSigils = _activeNode?.rewardSigils ?? 0;
+
+    final int earnedIchor = isFirstClear ? baseIchor : max(15, (baseIchor * 0.25).round());
+    final int earnedOre = isFirstClear ? baseOre : max(3, (baseOre * 0.20).round());
+    // Bloodline Sigils are strictly capped: only granted on First Clear or 3-Star Mastery unlock
+    final int earnedSigils = (isFirstClear ? baseSigils : 0) + (isThreeStarRewardUnlocked ? 1 : 0);
+
     final xpReward = _activeNode == null
         ? 350
         : (_activeNode!.type == CampaignNodeType.boss
-            ? 1000
-            : (_activeNode!.type == CampaignNodeType.elite ? 500 : 250));
+            ? (isFirstClear ? 1000 : 400)
+            : (_activeNode!.type == CampaignNodeType.elite ? (isFirstClear ? 500 : 250) : (isFirstClear ? 250 : 120)));
     final levelUps = _grantBrigadeXp(xpReward);
 
     setState(() {
-      _totalIchor += reward;
-      _cursedOre += oreReward;
-      _bloodlineSigils += sigilsReward;
+      _totalIchor += earnedIchor;
+      _cursedOre += earnedOre;
+      _bloodlineSigils += earnedSigils;
 
       // Track accumulated loot for this delve run
-      _dungeonDelveIchor += reward;
-      _dungeonDelveOre += oreReward;
-      _dungeonDelveSigils += sigilsReward;
+      _dungeonDelveIchor += earnedIchor;
+      _dungeonDelveOre += earnedOre;
+      _dungeonDelveSigils += earnedSigils;
     });
+
     if (_activeNode != null) {
-      if (_activeNode!.id.startsWith('linear_')) {
-        final stageNum = _activeNode!.depth;
+      if (isLinearStage) {
         if (stageNum > _completedLinearStages) {
           setState(() {
             _completedLinearStages = stageNum;
@@ -885,25 +931,29 @@ class _AppShellState extends State<AppShell> {
         _activeGauntletTrial = null;
       }
 
+      // Relic Drops are guaranteed on first clear; on repeat farm runs, chance is 15% (elite) / 30% (boss)
       String? relicDrop;
-      if (_activeNode?.type == CampaignNodeType.elite) {
-        final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
-        relicDrop = drop.displayName;
-      } else if (_activeNode?.type == CampaignNodeType.boss) {
-        final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
-        relicDrop = drop.displayName;
+      final bool shouldDropRelic = isFirstClear || (DateTime.now().millisecond % 100) < (_activeNode?.type == CampaignNodeType.boss ? 30 : 15);
+      if (shouldDropRelic) {
+        if (_activeNode?.type == CampaignNodeType.elite) {
+          final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.epic);
+          relicDrop = drop.displayName;
+        } else if (_activeNode?.type == CampaignNodeType.boss) {
+          final drop = _relicService.forgeRandomRelic(rarity: RelicRarity.legendary);
+          relicDrop = drop.displayName;
+        }
       }
 
     // GDD v2.8 Section 1 & 2: Ascension multiplier scaling & target-farmed Vitae
     final ascData = _currentAscension > 0 ? AscensionTierData.forTier(_currentAscension) : null;
     final double dropMult = ascData?.resourceDropMultiplier ?? 1.0;
-    final int scaledAsh = ((reward + (isFirstConquest ? 500 : 0)) * dropMult).round();
-    final int scaledOre = (oreReward * dropMult).round();
+    final int scaledAsh = ((earnedIchor + (isFirstConquest ? 500 : 0)) * dropMult).round();
+    final int scaledOre = (earnedOre * dropMult).round();
     // Distilled Vitae: Primary alchemical fluid extracted from slain mineral vascular channels
-    final int distilledVitae = ((reward * 0.45 + (_activeNode?.type == CampaignNodeType.boss ? 350 : (_activeNode?.type == CampaignNodeType.elite ? 120 : 40))) * dropMult).round();
+    final int distilledVitae = ((earnedIchor * 0.45 + (_activeNode?.type == CampaignNodeType.boss ? (isFirstClear ? 350 : 100) : (_activeNode?.type == CampaignNodeType.elite ? (isFirstClear ? 120 : 35) : 15))) * dropMult).round();
 
     String? bossReagent;
-    if (_activeNode?.type == CampaignNodeType.boss) {
+    if (_activeNode?.type == CampaignNodeType.boss && (isFirstClear || isThreeStarRewardUnlocked)) {
       switch (_currentChapter) {
         case 1:
           bossReagent = 'Calcified Heart of Gorgoroth (G1 Progenitor Core)';
@@ -923,7 +973,7 @@ class _AppShellState extends State<AppShell> {
       isVictory: true,
       rawAsh: scaledAsh,
       emberShards: scaledOre,
-      cryptKeys: sigilsReward + (isFirstConquest ? 1 : 0),
+      cryptKeys: earnedSigils + (isFirstConquest ? 1 : 0),
       distilledVitae: distilledVitae,
       xpGained: xpReward,
       levelUps: levelUps,
@@ -933,6 +983,9 @@ class _AppShellState extends State<AppShell> {
       ascensionTier: _currentAscension,
       resourceDropMultiplier: dropMult,
       bossReagentDrop: bossReagent,
+      starRating: currentStarRating,
+      isFirstClear: isFirstClear,
+      isThreeStarRewardUnlocked: isThreeStarRewardUnlocked,
     );
 
       if (_ftueService.currentStage == FtueStage.encounter1) {
@@ -1618,6 +1671,8 @@ class _AppShellState extends State<AppShell> {
       _currentAscension = 0;
       _maxUnlockedAscension = 0;
       _completedLinearStages = 0;
+      _stageStars.clear();
+      _claimedThreeStarStages.clear();
       _hasCompletedAwakening = false;
       _clearedGauntletTrials.clear();
       _currentIndex = 0; // Return to Campaign / Home
@@ -1726,6 +1781,7 @@ class _AppShellState extends State<AppShell> {
                       _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(ch);
                     }),
                     completedLinearStages: _completedLinearStages,
+                    stageStars: _stageStars,
                   ),
                   // Tab 1: Tactical Arena (2.5D Spatial Node Battlefield)
                   _isSpatialCombatActive

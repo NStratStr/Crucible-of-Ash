@@ -204,6 +204,7 @@ class CampaignMapScreen extends StatefulWidget {
   final Set<ExpeditionBoon> activeBoons;
   final CampaignViewMode initialViewMode;
   final int completedLinearStages;
+  final Map<String, int> stageStars;
 
   const CampaignMapScreen({
     super.key,
@@ -226,6 +227,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.activeBoons = const {},
     this.initialViewMode = CampaignViewMode.linearLadder,
     this.completedLinearStages = 0,
+    this.stageStars = const {},
   });
 
   static String chapterTitle(int ch) {
@@ -950,26 +952,46 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                     ),
                   ),
                 ),
-                // Status Tag (COMPLETED / ACTIVE / LOCKED)
+                // Status Tag & Star Rating (COMPLETED / ACTIVE / LOCKED)
                 Positioned(
                   top: 8,
                   right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? const Color(0xFF2E7D32)
-                          : (isCurrent ? const Color(0xFFC62828) : Colors.black54),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      isCompleted ? 'CLEARED' : (isCurrent ? 'ENGAGE' : 'LOCKED'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 8.5,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isCompleted) ...[
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(3, (starIdx) {
+                            final starsEarned = widget.stageStars[stage.stageCode] ?? (isCompleted ? 3 : 0);
+                            final filled = starIdx < starsEarned;
+                            return Icon(
+                              filled ? Icons.star : Icons.star_border,
+                              color: filled ? const Color(0xFFFFD54F) : Colors.white24,
+                              size: 13,
+                            );
+                          }),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isCompleted
+                              ? const Color(0xFF2E7D32)
+                              : (isCurrent ? const Color(0xFFC62828) : Colors.black54),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isCompleted ? 'CLEARED' : (isCurrent ? 'ENGAGE' : 'LOCKED'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],

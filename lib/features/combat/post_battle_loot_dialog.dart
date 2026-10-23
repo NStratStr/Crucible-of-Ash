@@ -15,6 +15,9 @@ class CombatRewardsData {
   final int ascensionTier;
   final double resourceDropMultiplier;
   final String? bossReagentDrop;
+  final int starRating;
+  final bool isFirstClear;
+  final bool isThreeStarRewardUnlocked;
 
   const CombatRewardsData({
     required this.isVictory,
@@ -30,6 +33,9 @@ class CombatRewardsData {
     this.ascensionTier = 0,
     this.resourceDropMultiplier = 1.0,
     this.bossReagentDrop,
+    this.starRating = 3,
+    this.isFirstClear = true,
+    this.isThreeStarRewardUnlocked = false,
   });
 }
 
@@ -203,6 +209,45 @@ class PostBattleLootDialog extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 14),
+
+                        // Star Rating Badge & Mastery Header
+                        if (isVictory) ...[
+                          Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(3, (i) {
+                                final filled = i < rewards.starRating;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Icon(
+                                    filled ? Icons.star : Icons.star_border,
+                                    color: filled ? const Color(0xFFFFD54F) : Colors.white24,
+                                    size: 26,
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Center(
+                            child: Text(
+                              rewards.isThreeStarRewardUnlocked
+                                  ? '★ 3-STAR MASTERY UNLOCKED: BLOODLINE SIGIL CACHE ★'
+                                  : (rewards.isFirstClear
+                                      ? 'FIRST CLEAR BONUS SECURED'
+                                      : 'STAGE REPEAT RUN (STANDARD SALVAGE)'),
+                              style: TextStyle(
+                                color: rewards.isThreeStarRewardUnlocked
+                                    ? const Color(0xFFFFD54F)
+                                    : (rewards.isFirstClear ? const Color(0xFF81C784) : const Color(0xFF9E9E9E)),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
 
                         // Ascension Bonus/Scarcity Notification Pill
                         if (rewards.ascensionTier > 0) ...[

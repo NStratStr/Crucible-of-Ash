@@ -23,6 +23,8 @@ class GameSaveData {
   final List<RelicEntity> relics;
   final Set<EndgameTrialType> clearedGauntletTrials;
   final Map<GeneralType, List<String>> customGrimoires;
+  final Map<String, int> stageStars;
+  final Set<String> claimedThreeStarStages;
   final int lastSavedTimestamp;
 
   const GameSaveData({
@@ -42,6 +44,8 @@ class GameSaveData {
     required this.relics,
     required this.clearedGauntletTrials,
     this.customGrimoires = const {},
+    this.stageStars = const {},
+    this.claimedThreeStarStages = const {},
     required this.lastSavedTimestamp,
   });
 
@@ -64,6 +68,8 @@ class GameSaveData {
       'relics': relics.map((r) => r.toJson()).toList(),
       'clearedGauntletTrials': clearedGauntletTrials.map((t) => t.name).toList(),
       'customGrimoires': customGrimoires.map((k, v) => MapEntry(k.name, v)),
+      'stageStars': stageStars,
+      'claimedThreeStarStages': claimedThreeStarStages.toList(),
       'lastSavedTimestamp': lastSavedTimestamp,
     };
   }
@@ -133,6 +139,13 @@ class GameSaveData {
       relics: relics,
       clearedGauntletTrials: clearedTrials,
       customGrimoires: customGrimoires,
+      stageStars: (json['stageStars'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(k, (v as num).toInt()),
+          ) ??
+          const {},
+      claimedThreeStarStages: ((json['claimedThreeStarStages'] as List<dynamic>?) ?? [])
+          .map((e) => e.toString())
+          .toSet(),
       lastSavedTimestamp: (json['lastSavedTimestamp'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );
