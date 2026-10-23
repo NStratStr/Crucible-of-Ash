@@ -252,7 +252,12 @@ class RelicSetCodexDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text(
                   'Each Refinement level increases all base stats by +25% and grants +2 Speed. Maximum refinement tiers are gated by continental progression:\n'
-                  '• Chapter 1: Cap at +2 • Chapter 2: Cap at +3 • Chapter 3+: Cap at +5 (Master Refinement)',
+                  '• Chapter 1: Cap at +2 • Chapter 2: Cap at +3 • Chapter 3+: Cap at +5 (Master Refinement)\n\n'
+                  '★ SUB-STARS & REFINEMENT AFFIXES:\n'
+                  'At refinement milestones (+2, +4, and +5), relics roll or enhance rare Sub-Stats:\n'
+                  '• CRIT Rate (+3% to +6%) • CRIT DMG (+10% to +20%)\n'
+                  '• Speed (+3 to +6) • Lifesteal (+4% to +8%)\n'
+                  '• Attack (+15 to +30) • Defense (+15 to +30) • Health (+60 to +120)',
                   style: TextStyle(color: Colors.white70, fontSize: 9.5, height: 1.35),
                 ),
               ],

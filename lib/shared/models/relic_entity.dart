@@ -7,6 +7,80 @@ enum RelicSlot {
   sigil,
 }
 
+enum RelicSubStatType {
+  critRate,   // +3% to +6% Crit Rate
+  critDamage, // +10% to +20% Crit Damage
+  speed,      // +3 to +6 Speed
+  lifesteal,  // +4% to +8% Lifesteal
+  attack,     // +15 to +30 ATK
+  defense,    // +15 to +30 DEF
+  hp,         // +60 to +120 HP
+}
+
+@immutable
+class RelicSubStat {
+  final RelicSubStatType type;
+  final double value;
+
+  const RelicSubStat({
+    required this.type,
+    required this.value,
+  });
+
+  String get displayLabel {
+    switch (type) {
+      case RelicSubStatType.critRate:
+        return '+${(value * 100).toStringAsFixed(1)}% CRIT Rate';
+      case RelicSubStatType.critDamage:
+        return '+${(value * 100).toStringAsFixed(1)}% CRIT DMG';
+      case RelicSubStatType.speed:
+        return '+${value.toInt()} SPD';
+      case RelicSubStatType.lifesteal:
+        return '+${(value * 100).toStringAsFixed(1)}% Lifesteal';
+      case RelicSubStatType.attack:
+        return '+${value.toInt()} ATK';
+      case RelicSubStatType.defense:
+        return '+${value.toInt()} DEF';
+      case RelicSubStatType.hp:
+        return '+${value.toInt()} HP';
+    }
+  }
+
+  Color get displayColor {
+    switch (type) {
+      case RelicSubStatType.critRate:
+        return const Color(0xFFFFB300);
+      case RelicSubStatType.critDamage:
+        return const Color(0xFFFF7043);
+      case RelicSubStatType.speed:
+        return const Color(0xFF26C6DA);
+      case RelicSubStatType.lifesteal:
+        return const Color(0xFFEF5350);
+      case RelicSubStatType.attack:
+        return const Color(0xFFFF8A65);
+      case RelicSubStatType.defense:
+        return const Color(0xFF90CAF9);
+      case RelicSubStatType.hp:
+        return const Color(0xFFA5D6A7);
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'value': value,
+  };
+
+  factory RelicSubStat.fromJson(Map<String, dynamic> json) {
+    return RelicSubStat(
+      type: RelicSubStatType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => RelicSubStatType.critRate,
+      ),
+      value: (json['value'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
 enum RelicSetType {
   bloodleech,    // 2-pc: +15% Lifesteal
   ironclad,      // 2-pc: +20% Defense
@@ -36,6 +110,7 @@ class RelicEntity {
   final int bonusHp;
   final int bonusSpeed;
   final double bonusCritRate;
+  final List<RelicSubStat> subStats;
   final String description;
   final String? equippedUnitId;
   final int upgradeLevel; // 0 to 5
@@ -51,12 +126,90 @@ class RelicEntity {
     this.bonusHp = 0,
     this.bonusSpeed = 0,
     this.bonusCritRate = 0.0,
+    this.subStats = const [],
     required this.description,
     this.equippedUnitId,
     this.upgradeLevel = 0,
   });
 
   String get displayName => upgradeLevel > 0 ? '$name +$upgradeLevel' : name;
+
+  /// Effective Crit Rate including both base weapon/item crit and all sub-stat rolls
+  double get totalCritRate {
+    double crit = bonusCritRate;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.critRate) {
+        crit += s.value;
+      }
+    }
+    return crit;
+  }
+
+  /// Total Crit Damage provided by sub-stats
+  double get totalCritDamage {
+    double critDmg = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.critDamage) {
+        critDmg += s.value;
+      }
+    }
+    return critDmg;
+  }
+
+  /// Total Lifesteal provided by sub-stats
+  double get totalSubLifesteal {
+    double ls = 0.0;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.lifesteal) {
+        ls += s.value;
+      }
+    }
+    return ls;
+  }
+
+  /// Total Attack including sub-stats
+  int get totalAttack {
+    int atk = bonusAttack;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.attack) {
+        atk += s.value.toInt();
+      }
+    }
+    return atk;
+  }
+
+  /// Total Defense including sub-stats
+  int get totalDefense {
+    int def = bonusDefense;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.defense) {
+        def += s.value.toInt();
+      }
+    }
+    return def;
+  }
+
+  /// Total HP including sub-stats
+  int get totalHp {
+    int hp = bonusHp;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.hp) {
+        hp += s.value.toInt();
+      }
+    }
+    return hp;
+  }
+
+  /// Total Speed including sub-stats
+  int get totalSpeed {
+    int spd = bonusSpeed;
+    for (final s in subStats) {
+      if (s.type == RelicSubStatType.speed) {
+        spd += s.value.toInt();
+      }
+    }
+    return spd;
+  }
 
   /// World promotion refinement cap (Tied to unlocked Chapter / World tier):
   /// - Chapter 1: Refinement Cap +2
@@ -106,6 +259,7 @@ class RelicEntity {
     int? bonusHp,
     int? bonusSpeed,
     double? bonusCritRate,
+    List<RelicSubStat>? subStats,
     String? description,
     String? equippedUnitId,
     bool clearEquipped = false,
@@ -122,6 +276,7 @@ class RelicEntity {
       bonusHp: bonusHp ?? this.bonusHp,
       bonusSpeed: bonusSpeed ?? this.bonusSpeed,
       bonusCritRate: bonusCritRate ?? this.bonusCritRate,
+      subStats: subStats ?? this.subStats,
       description: description ?? this.description,
       equippedUnitId: clearEquipped ? null : (equippedUnitId ?? this.equippedUnitId),
       upgradeLevel: upgradeLevel ?? this.upgradeLevel,
@@ -275,6 +430,7 @@ class RelicEntity {
       'bonusHp': bonusHp,
       'bonusSpeed': bonusSpeed,
       'bonusCritRate': bonusCritRate,
+      'subStats': subStats.map((s) => s.toJson()).toList(),
       'description': description,
       'equippedUnitId': equippedUnitId,
       'upgradeLevel': upgradeLevel,
@@ -302,6 +458,10 @@ class RelicEntity {
       bonusHp: (json['bonusHp'] as num?)?.toInt() ?? 0,
       bonusSpeed: (json['bonusSpeed'] as num?)?.toInt() ?? 0,
       bonusCritRate: (json['bonusCritRate'] as num?)?.toDouble() ?? 0.0,
+      subStats: (json['subStats'] as List<dynamic>?)
+              ?.map((e) => RelicSubStat.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
       description: json['description'] as String? ?? '',
       equippedUnitId: json['equippedUnitId'] as String?,
       upgradeLevel: (json['upgradeLevel'] as num?)?.toInt() ?? 0,

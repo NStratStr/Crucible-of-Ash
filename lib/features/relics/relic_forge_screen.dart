@@ -427,9 +427,15 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     widget.onIchorChanged?.call(widget.totalIchor - cost);
     widget.onOreChanged?.call(widget.cursedOre - oreCost);
     final upgraded = widget.relicService.upgradeRelic(relic.id);
+
+    final bool rolledMilestone = upgraded.upgradeLevel == 2 || upgraded.upgradeLevel == 4 || upgraded.upgradeLevel == 5;
+    final String milestoneMsg = rolledMilestone && upgraded.subStats.isNotEmpty
+        ? ' ★ SUB-STAR UNLOCKED: ${upgraded.subStats.last.displayLabel}!'
+        : '';
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Refined to ${upgraded.displayName}! Attributes increased by +25%.'),
+        content: Text('Refined to ${upgraded.displayName}! Attributes increased by +25%.$milestoneMsg'),
         backgroundColor: upgraded.rarityColor,
       ),
     );
@@ -446,11 +452,15 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
       onTap: () {
         if (hasRelic) {
           // Quick view of equipped relic details and set bonus
+          final subStatsText = relic.subStats.isNotEmpty
+              ? '\nSub-Stars: ${relic.subStats.map((s) => "★ ${s.displayLabel}").join(" • ")}'
+              : '';
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '${relic.displayName} (${relic.rarity.name.toUpperCase()}): ${_formatRelicStats(relic)}\n'
+                '${relic.displayName} (${relic.rarity.name.toUpperCase()}): ${_formatRelicStats(relic)}'
+                '$subStatsText\n'
                 'Set: ${RelicEntity.setName(relic.setType)} — ${RelicEntity.setBonusDescription(relic.setType)}',
               ),
               backgroundColor: const Color(0xFF1E1E2C),
@@ -688,6 +698,31 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                   _formatRelicStats(relic),
                   style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 9.5, fontWeight: FontWeight.w600),
                 ),
+                if (relic.subStats.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: relic.subStats.map((s) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: s.displayColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: s.displayColor.withValues(alpha: 0.5), width: 0.8),
+                        ),
+                        child: Text(
+                          '★ ${s.displayLabel}',
+                          style: TextStyle(
+                            color: s.displayColor,
+                            fontSize: 8.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),

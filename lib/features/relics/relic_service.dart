@@ -83,7 +83,9 @@ class RelicService extends ChangeNotifier {
     }
   }
 
-  /// Upgrades / Refines an existing relic (+1 to +5), increasing its base stats by 25% per tier.
+  /// Upgrades / Refines an existing relic (+1 to +5).
+  /// - Base stats scale by +25% per refinement tier.
+  /// - At refinement milestones (+2, +4, and +5), unlocks or boosts a Sub-Stat / Sub-Star (e.g. Crit Rate, Crit DMG, Speed, Lifesteal).
   RelicEntity upgradeRelic(String relicId) {
     final int idx = _relics.indexWhere((r) => r.id == relicId);
     if (idx == -1) {
@@ -94,17 +96,68 @@ class RelicService extends ChangeNotifier {
       throw StateError('Relic has reached maximum refinement tier (+5).');
     }
 
+    final int nextLevel = current.upgradeLevel + 1;
+    final updatedSubStats = List<RelicSubStat>.from(current.subStats);
+
+    // Roll or boost sub-stats at milestones +2, +4, and +5
+    if (nextLevel == 2 || nextLevel == 4 || nextLevel == 5) {
+      final rollType = _randomSubStatType();
+      final rollVal = _randomSubStatValue(rollType);
+
+      final existingIdx = updatedSubStats.indexWhere((s) => s.type == rollType);
+      if (existingIdx != -1) {
+        // Boost existing sub-stat
+        final prev = updatedSubStats[existingIdx];
+        updatedSubStats[existingIdx] = RelicSubStat(type: rollType, value: prev.value + rollVal);
+      } else {
+        // Unlock new sub-stat slot
+        updatedSubStats.add(RelicSubStat(type: rollType, value: rollVal));
+      }
+    }
+
     final upgraded = current.copyWith(
-      upgradeLevel: current.upgradeLevel + 1,
+      upgradeLevel: nextLevel,
       bonusAttack: (current.bonusAttack * 1.25).round(),
       bonusDefense: (current.bonusDefense * 1.25).round(),
       bonusHp: (current.bonusHp * 1.25).round(),
       bonusSpeed: current.bonusSpeed > 0 ? current.bonusSpeed + 2 : 0,
+      subStats: updatedSubStats,
     );
 
     _relics[idx] = upgraded;
     notifyListeners();
     return upgraded;
+  }
+
+  RelicSubStatType _randomSubStatType() {
+    final types = RelicSubStatType.values;
+    return types[_rng.nextInt(types.length)];
+  }
+
+  double _randomSubStatValue(RelicSubStatType type) {
+    switch (type) {
+      case RelicSubStatType.critRate:
+        // +3.0% to +6.0% Crit Rate
+        return 0.03 + (_rng.nextInt(31) / 1000.0);
+      case RelicSubStatType.critDamage:
+        // +10.0% to +20.0% Crit Damage
+        return 0.10 + (_rng.nextInt(101) / 1000.0);
+      case RelicSubStatType.speed:
+        // +3 to +6 Speed
+        return (3 + _rng.nextInt(4)).toDouble();
+      case RelicSubStatType.lifesteal:
+        // +4.0% to +8.0% Lifesteal
+        return 0.04 + (_rng.nextInt(41) / 1000.0);
+      case RelicSubStatType.attack:
+        // +15 to +30 ATK
+        return (15 + _rng.nextInt(16)).toDouble();
+      case RelicSubStatType.defense:
+        // +15 to +30 DEF
+        return (15 + _rng.nextInt(16)).toDouble();
+      case RelicSubStatType.hp:
+        // +60 to +120 HP
+        return (60 + _rng.nextInt(61)).toDouble();
+    }
   }
 
   /// Computes all stat bonuses and active set effects for a given unit
@@ -127,11 +180,13 @@ class RelicService extends ChangeNotifier {
     final Map<RelicSetType, int> setCounts = {};
 
     for (final relic in equipped) {
-      atk += relic.bonusAttack;
-      def += relic.bonusDefense;
-      hp += relic.bonusHp;
-      spd += relic.bonusSpeed;
-      critRate += relic.bonusCritRate;
+      atk += relic.totalAttack;
+      def += relic.totalDefense;
+      hp += relic.totalHp;
+      spd += relic.totalSpeed;
+      critRate += relic.totalCritRate;
+      critDmg += relic.totalCritDamage;
+      lifesteal += relic.totalSubLifesteal;
 
       setCounts[relic.setType] = (setCounts[relic.setType] ?? 0) + 1;
     }
@@ -247,6 +302,25 @@ class RelicService extends ChangeNotifier {
         break;
     }
 
+    // Generate initial sub-stats based on relic rarity:
+    // Common: 0, Rare: 1, Epic: 2, Legendary: 3
+    final int initialSubStatCount = rollRarity == RelicRarity.legendary
+        ? 3
+        : (rollRarity == RelicRarity.epic ? 2 : (rollRarity == RelicRarity.rare ? 1 : 0));
+
+    final List<RelicSubStat> initialSubStats = [];
+    final Set<RelicSubStatType> usedTypes = {};
+    for (int i = 0; i < initialSubStatCount; i++) {
+      RelicSubStatType type;
+      int attempts = 0;
+      do {
+        type = _randomSubStatType();
+        attempts++;
+      } while (usedTypes.contains(type) && attempts < 10);
+      usedTypes.add(type);
+      initialSubStats.add(RelicSubStat(type: type, value: _randomSubStatValue(type)));
+    }
+
     final newRelic = RelicEntity(
       id: 'relic_${DateTime.now().millisecondsSinceEpoch}_${_rng.nextInt(9999)}',
       name: '${rollRarity.name.toUpperCase()} ${_slotPrefix(slot)} of ${RelicEntity.setName(setType)}',
@@ -258,6 +332,7 @@ class RelicService extends ChangeNotifier {
       bonusHp: hp,
       bonusSpeed: spd,
       bonusCritRate: crit,
+      subStats: initialSubStats,
       description: 'Forged in the Ashen Crucible from concentrated ichor.',
     );
 
@@ -289,6 +364,9 @@ class RelicService extends ChangeNotifier {
         setType: RelicSetType.bloodleech,
         bonusAttack: 40,
         bonusCritRate: 0.05,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.critRate, value: 0.04),
+        ],
         description: 'Jagged bone knife saturated with dark vampiric ichor.',
       ),
       const RelicEntity(
@@ -299,6 +377,9 @@ class RelicService extends ChangeNotifier {
         setType: RelicSetType.bloodleech,
         bonusHp: 160,
         bonusSpeed: 6,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.speed, value: 3.0),
+        ],
         description: 'Vessel humming with ancestral essence.',
       ),
       const RelicEntity(
@@ -309,6 +390,9 @@ class RelicService extends ChangeNotifier {
         setType: RelicSetType.ironclad,
         bonusDefense: 35,
         bonusHp: 200,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.defense, value: 18.0),
+        ],
         description: 'Heavy beaten iron forged to withstand crushing strikes.',
       ),
       const RelicEntity(
@@ -319,6 +403,9 @@ class RelicService extends ChangeNotifier {
         setType: RelicSetType.ironclad,
         bonusDefense: 25,
         bonusAttack: 15,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.hp, value: 80.0),
+        ],
         description: 'Embossed insignia of the Iron Justiciar.',
       ),
       const RelicEntity(
@@ -329,6 +416,9 @@ class RelicService extends ChangeNotifier {
         setType: RelicSetType.tempest,
         bonusSpeed: 10,
         bonusHp: 100,
+        subStats: [
+          RelicSubStat(type: RelicSubStatType.critDamage, value: 0.12),
+        ],
         description: 'Feathered relic pulsing with gale winds.',
       ),
     ];
