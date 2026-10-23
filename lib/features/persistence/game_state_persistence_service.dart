@@ -16,6 +16,8 @@ class GameSaveData {
   final int maxUnlockedChapter;
   final int currentAscension;
   final int maxUnlockedAscension;
+  final int completedLinearStages;
+  final bool hasCompletedAwakening;
   final List<UnitEntity> allies;
   final List<UnitEntity> reserveInventory;
   final List<RelicEntity> relics;
@@ -33,6 +35,8 @@ class GameSaveData {
     required this.maxUnlockedChapter,
     this.currentAscension = 0,
     this.maxUnlockedAscension = 0,
+    this.completedLinearStages = 0,
+    this.hasCompletedAwakening = false,
     required this.allies,
     required this.reserveInventory,
     required this.relics,
@@ -53,6 +57,8 @@ class GameSaveData {
       'maxUnlockedChapter': maxUnlockedChapter,
       'currentAscension': currentAscension,
       'maxUnlockedAscension': maxUnlockedAscension,
+      'completedLinearStages': completedLinearStages,
+      'hasCompletedAwakening': hasCompletedAwakening,
       'allies': allies.map((u) => u.toJson()).toList(),
       'reserveInventory': reserveInventory.map((u) => u.toJson()).toList(),
       'relics': relics.map((r) => r.toJson()).toList(),
@@ -120,6 +126,8 @@ class GameSaveData {
       maxUnlockedChapter: (json['maxUnlockedChapter'] as num?)?.toInt() ?? 1,
       currentAscension: (json['currentAscension'] as num?)?.toInt() ?? 0,
       maxUnlockedAscension: (json['maxUnlockedAscension'] as num?)?.toInt() ?? 0,
+      completedLinearStages: (json['completedLinearStages'] as num?)?.toInt() ?? 0,
+      hasCompletedAwakening: (json['hasCompletedAwakening'] as bool?) ?? false,
       allies: allies,
       reserveInventory: reserveInventory,
       relics: relics,

@@ -64,6 +64,7 @@ class _AppShellState extends State<AppShell> {
   int _currentAscension = 0;
   int _maxUnlockedAscension = 0;
   int _completedLinearStages = 0;
+  bool _hasCompletedAwakening = false;
   bool _isSpatialCombatActive = true;
 
   late InitiativeTickManager _tickManager;
@@ -95,14 +96,6 @@ class _AppShellState extends State<AppShell> {
     _inventory = StarterBrigades.createReserveInventory();
     _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
 
-    // Equip starter weapon to lead frontliner
-    if (_tickManager.allies.isNotEmpty && _relicService.unequippedRelics.isNotEmpty) {
-      _relicService.equipRelic(
-        relicId: _relicService.unequippedRelics.first.id,
-        unitId: _tickManager.allies.first.id,
-      );
-    }
-
     _ftueService.addListener(() {
       if (mounted) setState(() {});
     });
@@ -117,7 +110,14 @@ class _AppShellState extends State<AppShell> {
       });
     });
 
-    _loadPersistedState();
+    _loadPersistedState().then((_) {
+      // If the player hasn't completed Awakening yet, prompt the Awakening Prologue & selection dialog
+      if (mounted && !_hasCompletedAwakening) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showAwakeningDialog();
+        });
+      }
+    });
   }
 
   void _restoreSaveData(GameSaveData saved) {
@@ -131,6 +131,8 @@ class _AppShellState extends State<AppShell> {
       _maxUnlockedChapter = saved.maxUnlockedChapter;
       _currentAscension = saved.currentAscension;
       _maxUnlockedAscension = saved.maxUnlockedAscension;
+      _completedLinearStages = saved.completedLinearStages;
+      _hasCompletedAwakening = saved.hasCompletedAwakening;
       _clearedGauntletTrials.clear();
       _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
@@ -157,6 +159,8 @@ class _AppShellState extends State<AppShell> {
           _maxUnlockedChapter = saved.maxUnlockedChapter;
           _currentAscension = saved.currentAscension;
           _maxUnlockedAscension = saved.maxUnlockedAscension;
+          _completedLinearStages = saved.completedLinearStages;
+          _hasCompletedAwakening = saved.hasCompletedAwakening;
           _clearedGauntletTrials.clear();
           _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
@@ -219,6 +223,8 @@ class _AppShellState extends State<AppShell> {
         maxUnlockedChapter: _maxUnlockedChapter,
         currentAscension: _currentAscension,
         maxUnlockedAscension: _maxUnlockedAscension,
+        completedLinearStages: _completedLinearStages,
+        hasCompletedAwakening: _hasCompletedAwakening,
         allies: _tickManager.allies,
         reserveInventory: _inventory,
         relics: _relicService.allRelics,
@@ -429,6 +435,8 @@ class _AppShellState extends State<AppShell> {
       _activeGeneralType = chosen;
       _commandService.setActiveGeneral(chosen);
       _tickManager.updateSquads(allies: soloStarter);
+      _inventory = []; // Solo start: reserve thralls are unlocked via rescues/conquests
+      _hasCompletedAwakening = true;
       if (_ftueService.currentStage == FtueStage.awakening) {
         _ftueService.advanceStage();
       }
@@ -1577,6 +1585,7 @@ class _AppShellState extends State<AppShell> {
       _currentAscension = 0;
       _maxUnlockedAscension = 0;
       _completedLinearStages = 0;
+      _hasCompletedAwakening = false;
       _clearedGauntletTrials.clear();
       _currentIndex = 0; // Return to Campaign / Home
 

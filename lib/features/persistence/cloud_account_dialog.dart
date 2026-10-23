@@ -439,6 +439,8 @@ class _CloudAccountDialogState extends State<CloudAccountDialog> {
                           phylacteryRanks: {},
                           currentChapter: 1,
                           maxUnlockedChapter: 1,
+                          completedLinearStages: 0,
+                          hasCompletedAwakening: false,
                           allies: [],
                           reserveInventory: [],
                           relics: [],
