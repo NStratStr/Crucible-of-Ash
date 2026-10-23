@@ -1368,18 +1368,44 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                         ...equippedRelics.map((r) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(r.slotIcon, size: 14, color: r.rarityColor),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${r.slot.name.toUpperCase()}: ',
-                                  style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                                Row(
+                                  children: [
+                                    Icon(r.slotIcon, size: 14, color: r.rarityColor),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${r.slot.name.toUpperCase()}: ',
+                                      style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      r.displayName,
+                                      style: TextStyle(color: r.rarityColor, fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '(${RelicEntity.setName(r.setType)})',
+                                      style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 9),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  r.name,
-                                  style: TextStyle(color: r.rarityColor, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
+                                if (r.subStats.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 22),
+                                    child: Wrap(
+                                      spacing: 4,
+                                      runSpacing: 2,
+                                      children: r.subStats.map((s) {
+                                        return Text(
+                                          '★ ${s.displayLabel}',
+                                          style: TextStyle(color: s.displayColor, fontSize: 8.5, fontWeight: FontWeight.w600),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           );

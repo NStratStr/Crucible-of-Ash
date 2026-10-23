@@ -303,6 +303,58 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             ),
           ),
 
+          // Total Unit Combat Attributes & Gear Loadout Overview
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161622),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildHeroStatPill(
+                  label: 'TOTAL HP',
+                  baseVal: selectedUnit.maxHp,
+                  bonusVal: bonuses.bonusHp,
+                  color: const Color(0xFF81C784),
+                  icon: Icons.favorite,
+                ),
+                _buildHeroStatPill(
+                  label: 'TOTAL ATK',
+                  baseVal: selectedUnit.attack,
+                  bonusVal: bonuses.bonusAttack,
+                  color: const Color(0xFFFF8A65),
+                  icon: Icons.colorize,
+                ),
+                _buildHeroStatPill(
+                  label: 'TOTAL DEF',
+                  baseVal: selectedUnit.armor,
+                  bonusVal: bonuses.bonusDefense,
+                  color: const Color(0xFF64B5F6),
+                  icon: Icons.shield,
+                ),
+                _buildHeroStatPill(
+                  label: 'TOTAL SPD',
+                  baseVal: selectedUnit.speed,
+                  bonusVal: bonuses.bonusSpeed,
+                  color: const Color(0xFFFFD54F),
+                  icon: Icons.speed,
+                ),
+                _buildHeroStatPill(
+                  label: 'CRIT RATE',
+                  baseVal: (selectedUnit.critRate * 100).toInt(),
+                  bonusVal: (bonuses.bonusCritRate * 100).toInt(),
+                  isPercent: true,
+                  color: const Color(0xFFBA68C8),
+                  icon: Icons.flash_on,
+                ),
+              ],
+            ),
+          ),
+
           // Active Set Bonuses Banner
           if (bonuses.activeSetBonuses.isNotEmpty)
             Container(
@@ -761,6 +813,56 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHeroStatPill({
+    required String label,
+    required int baseVal,
+    required int bonusVal,
+    required Color color,
+    required IconData icon,
+    bool isPercent = false,
+  }) {
+    final int total = baseVal + bonusVal;
+    final String suffix = isPercent ? '%' : '';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 10, color: color),
+            const SizedBox(width: 3),
+            Text(
+              '$total$suffix',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 10.5,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold),
+            ),
+            if (bonusVal > 0) ...[
+              const SizedBox(width: 2),
+              Text(
+                '(+$bonusVal$suffix)',
+                style: const TextStyle(color: Color(0xFF81C784), fontSize: 7.0, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
