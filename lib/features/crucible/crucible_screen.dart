@@ -981,7 +981,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   }
 
   void _handleProgenitorInfuse(UnitEntity unit) {
-    final cost = unit.xpNeededForNextLevel;
+    final cost = unit.ichorCostForNextLevel;
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

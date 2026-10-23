@@ -84,11 +84,12 @@ void main() {
 
       expect(updatedReceived, isNotNull);
       expect(updatedReceived!.level, equals(2));
-      expect(costReceived, equals(100));
+      // Rebalanced Ichor-to-XP training: 100 XP to reach Lv 2 costs 40 Ichor
+      expect(costReceived, equals(40));
 
-      // Dialog should now display updated level and remaining Ichor
+      // Dialog should now display updated level and remaining Ichor (1000 - 40 = 960)
       expect(find.text('Lv. 2/10'), findsWidgets);
-      expect(find.text('Available: 900 Ichor'), findsOneWidget);
+      expect(find.text('Available: 960 Ichor'), findsOneWidget);
     });
 
     testWidgets('CrucibleScreen allows progenitor infusion before fusion', (tester) async {

@@ -712,26 +712,28 @@ class StarterBrigades {
     if (chapter == 1) {
       switch (stageNumber) {
         // Stage 1-1: Ashen Outpost (Ashen Trail Desolation)
-        // FTUE 1v1 encounter for the solo Commander: 1x Feral Ash-Scavenger Ghoul
+        // FTUE 1v1 encounter for the solo Commander: Rotting Husk (Vanguard)
+        // A resilient frontline vessel whose life-spark you stabilize through battle,
+        // rescuing them to become the player's core tank/protector companion for any chosen Commander.
         case 1:
           return [
             const UnitEntity(
-              id: 's1_ghoul_01',
-              speciesId: 'decayed_ghoul',
-              name: 'Feral Ash-Scavenger',
+              id: 's1_husk_01',
+              speciesId: 'rotting_husk',
+              name: 'Captive Rotting Husk',
               generation: 1,
-              archetype: Archetype.skirmisher,
+              archetype: Archetype.juggernaut,
               slot: FormationSlot.front1,
               level: 1,
               maxLevel: 10,
-              currentHp: 280,
-              maxHp: 280,
-              attack: 42,
-              defense: 25,
-              speed: 80,
-              nativeTraitId: 'claw_slash',
+              currentHp: 320,
+              maxHp: 320,
+              attack: 38,
+              defense: 32,
+              speed: 75,
+              nativeTraitId: 'iron_bastion',
               lineageAncestors: [],
-              customAvatarAsset: 'assets/images/ghoul_base.png',
+              customAvatarAsset: 'assets/images/rotting_husk_g1.png',
             ),
           ];
 

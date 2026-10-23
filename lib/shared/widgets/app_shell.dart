@@ -848,7 +848,29 @@ class _AppShellState extends State<AppShell> {
         });
       }
 
-      final captured = _captureThrallAfterBattle(scoutedAffinities: _activeNode?.scoutedAffinities);
+      UnitEntity? captured;
+      final isStage1_1 = _activeNode?.id == 'linear_1-1' || _activeNode?.name.contains('Ashen Outpost') == true;
+      final isEliteNode = _activeNode?.type == CampaignNodeType.elite;
+      final isBossNode = _activeNode?.type == CampaignNodeType.boss;
+
+      // Deterministic early pacing: Stage 1-1 guarantees rescuing the captive vanguard husk.
+      // Other skirmishes have a balanced 25% capture rate; elites have 60%; bosses drop high-tier rewards.
+      bool shouldCapture = false;
+      if (isStage1_1) {
+        shouldCapture = true;
+      } else if (isEliteNode) {
+        shouldCapture = (DateTime.now().millisecond % 100) < 60;
+      } else if (!isBossNode) {
+        shouldCapture = (DateTime.now().millisecond % 100) < 25;
+      }
+
+      if (shouldCapture) {
+        captured = _captureThrallAfterBattle(
+          scoutedAffinities: isStage1_1 ? [Archetype.juggernaut] : _activeNode?.scoutedAffinities,
+          fixedName: isStage1_1 ? 'Rescued Vanguard Husk' : null,
+          fixedSpeciesId: isStage1_1 ? 'rotting_husk' : null,
+        );
+      }
 
       bool isFirstConquest = false;
       if (_activeGauntletTrial != null) {
@@ -1298,12 +1320,23 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  UnitEntity _captureThrallAfterBattle({List<Archetype>? scoutedAffinities}) {
+  UnitEntity _captureThrallAfterBattle({
+    List<Archetype>? scoutedAffinities,
+    String? fixedName,
+    String? fixedSpeciesId,
+  }) {
     Archetype? targetRole;
     if (scoutedAffinities != null && scoutedAffinities.isNotEmpty) {
       targetRole = scoutedAffinities[DateTime.now().millisecond % scoutedAffinities.length];
     }
-    final newThrall = StarterBrigades.createCapturedThrall(archetype: targetRole);
+    UnitEntity newThrall = StarterBrigades.createCapturedThrall(archetype: targetRole);
+    if (fixedName != null || fixedSpeciesId != null) {
+      newThrall = newThrall.copyWith(
+        name: fixedName ?? newThrall.name,
+        speciesId: fixedSpeciesId ?? newThrall.speciesId,
+        customAvatarAsset: fixedSpeciesId == 'rotting_husk' ? 'assets/images/rotting_husk_g1.png' : newThrall.customAvatarAsset,
+      );
+    }
 
     setState(() {
       _inventory.insert(0, newThrall);

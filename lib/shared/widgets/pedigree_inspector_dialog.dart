@@ -70,36 +70,37 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
   }
 
   void _handleLevelUp({int levels = 1}) {
-    final cost = _currentUnit.xpNeededForNextLevel;
-    if (_currentIchor < cost) return;
+    final ichorCost = _currentUnit.ichorCostForNextLevel;
+    if (_currentIchor < ichorCost) return;
     final updated = _currentUnit.levelUp(levels: levels);
     setState(() {
       _currentUnit = updated;
-      _currentIchor -= cost;
+      _currentIchor -= ichorCost;
     });
-    widget.onLevelUp?.call(updated, cost);
+    widget.onLevelUp?.call(updated, ichorCost);
   }
 
   void _handleMaxLevel() {
-    final cost = _currentUnit.xpNeededForMaxLevel;
-    if (_currentIchor < cost) return;
-    final updated = _currentUnit.addXp(cost);
+    final ichorCost = _currentUnit.ichorCostForMaxLevel;
+    final xpNeeded = _currentUnit.xpNeededForMaxLevel;
+    if (_currentIchor < ichorCost) return;
+    final updated = _currentUnit.addXp(xpNeeded);
     setState(() {
       _currentUnit = updated;
-      _currentIchor -= cost;
+      _currentIchor -= ichorCost;
     });
-    widget.onLevelUp?.call(updated, cost);
+    widget.onLevelUp?.call(updated, ichorCost);
   }
 
   void _handleInfuseXp(int xp) {
-    final cost = xp;
-    if (_currentIchor < cost) return;
+    final ichorCost = UnitEntity.xpToIchorCost(xp);
+    if (_currentIchor < ichorCost) return;
     final updated = _currentUnit.addXp(xp);
     setState(() {
       _currentUnit = updated;
-      _currentIchor -= cost;
+      _currentIchor -= ichorCost;
     });
-    widget.onLevelUp?.call(updated, cost);
+    widget.onLevelUp?.call(updated, ichorCost);
   }
 
   void _handlePromoteRarity() {
@@ -724,8 +725,8 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             Expanded(
                               child: _buildInfusionButton(
                                 label: '+1 LEVEL',
-                                cost: unit.xpNeededForNextLevel,
-                                onPressed: _currentIchor >= unit.xpNeededForNextLevel
+                                cost: unit.ichorCostForNextLevel,
+                                onPressed: _currentIchor >= unit.ichorCostForNextLevel
                                     ? () => _handleLevelUp(levels: 1)
                                     : null,
                               ),
@@ -734,9 +735,9 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             Expanded(
                               child: _buildInfusionButton(
                                 label: 'MAX LEVEL',
-                                cost: unit.xpNeededForMaxLevel,
+                                cost: unit.ichorCostForMaxLevel,
                                 isHighlight: true,
-                                onPressed: _currentIchor >= unit.xpNeededForMaxLevel
+                                onPressed: _currentIchor >= unit.ichorCostForMaxLevel
                                     ? () => _handleMaxLevel()
                                     : null,
                               ),
@@ -745,8 +746,8 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                             Expanded(
                               child: _buildInfusionButton(
                                 label: '+100 XP',
-                                cost: min(100, unit.xpNeededForNextLevel),
-                                onPressed: _currentIchor >= min(100, unit.xpNeededForNextLevel)
+                                cost: UnitEntity.xpToIchorCost(min(100, unit.xpNeededForNextLevel)),
+                                onPressed: _currentIchor >= UnitEntity.xpToIchorCost(min(100, unit.xpNeededForNextLevel))
                                     ? () => _handleInfuseXp(min(100, unit.xpNeededForNextLevel))
                                     : null,
                               ),

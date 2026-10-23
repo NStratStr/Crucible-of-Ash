@@ -166,6 +166,16 @@ class UnitEntity {
   int get xpToNextLevel => level * 100;
   int get xpNeededForNextLevel => isMaxLevel ? 0 : (xpToNextLevel - currentXp);
 
+  /// Economic balance: Direct Ichor cost to level up or infuse XP.
+  /// 1 Ichor yields 2.5 XP (e.g. 100 XP to reach Lv 2 costs 40 Ichor).
+  static int xpToIchorCost(int xp) => max(1, (xp / 2.5).ceil());
+
+  /// Ichor cost to advance directly to the next level.
+  int get ichorCostForNextLevel => isMaxLevel ? 0 : xpToIchorCost(xpNeededForNextLevel);
+
+  /// Ichor cost to max out the current generation level cap.
+  int get ichorCostForMaxLevel => isMaxLevel ? 0 : xpToIchorCost(xpNeededForMaxLevel);
+
   int get xpNeededForMaxLevel {
     if (isMaxLevel) return 0;
     int needed = xpNeededForNextLevel;
