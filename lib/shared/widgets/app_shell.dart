@@ -1897,76 +1897,85 @@ class _AppShellState extends State<AppShell> {
           ],
         ),
       ),
+      extendBody: true,
       bottomNavigationBar: hideBottomBar
           ? null
-          : BottomNavigationBar(
-              currentIndex: _currentIndex + 1,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: const Color(0xFF14141B),
-              selectedItemColor: const Color(0xFFB3261E),
-              unselectedItemColor: const Color(0xFF8E8EA0),
-              selectedFontSize: 10,
-              unselectedFontSize: 9,
-              onTap: (index) {
-                if (index == 0) {
-                  _showHomeModal();
-                  return;
-                }
-                setState(() => _currentIndex = index - 1);
-              },
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.home, color: Color(0xFFFFD54F)),
-                  label: 'Citadel Home',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.map),
-                  label: 'Campaign Map',
-                ),
-                BottomNavigationBarItem(
-                  icon: Image.asset(
-                    'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
-                    width: 21,
-                    height: 21,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.shield),
-                  ),
-                  label: 'Battle Arena',
-                ),
-                BottomNavigationBarItem(
-                  icon: Image.asset(
-                    'assets/images/UI/Flame Shield icon Transparent.png',
-                    width: 21,
-                    height: 21,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.fireplace),
-                  ),
-                  label: 'Crucible Altar',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.auto_awesome),
-                  label: 'Relic Forge',
-                ),
-                BottomNavigationBarItem(
-                  icon: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      const Icon(Icons.people_alt, size: 21, color: Colors.transparent),
-                      IgnorePointer(
-                        child: Image.asset(
-                          'assets/images/UI/Skull Shield Icon Transparent.png',
-                          width: 21,
-                          height: 21,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.people_alt),
-                        ),
+          : Container(
+              color: Colors.transparent,
+              padding: const EdgeInsets.only(bottom: 4, left: 8, right: 8),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: BottomNavigationBar(
+                  currentIndex: _currentIndex + 1,
+                  type: BottomNavigationBarType.fixed,
+                  elevation: 0,
+                  backgroundColor: const Color(0xD9101018), // Glassmorphic translucent backdrop overlay
+                  selectedItemColor: const Color(0xFFD4AF37),
+                  unselectedItemColor: const Color(0xFF8E8EA0),
+                  selectedFontSize: 10,
+                  unselectedFontSize: 9,
+                  onTap: (index) {
+                    if (index == 0) {
+                      _showHomeModal();
+                      return;
+                    }
+                    setState(() => _currentIndex = index - 1);
+                  },
+                  items: [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.home, color: Color(0xFFFFD54F)),
+                      label: 'Citadel Home',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.map),
+                      label: 'Campaign Map',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Image.asset(
+                        'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
+                        width: 21,
+                        height: 21,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.shield),
                       ),
-                    ],
-                  ),
-                  label: 'Brigade Roster',
+                      label: 'Battle Arena',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Image.asset(
+                        'assets/images/UI/Flame Shield icon Transparent.png',
+                        width: 21,
+                        height: 21,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.fireplace),
+                      ),
+                      label: 'Crucible Altar',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.auto_awesome),
+                      label: 'Relic Forge',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(Icons.people_alt, size: 21, color: Colors.transparent),
+                          IgnorePointer(
+                            child: Image.asset(
+                              'assets/images/UI/Skull Shield Icon Transparent.png',
+                              width: 21,
+                              height: 21,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.people_alt),
+                            ),
+                          ),
+                        ],
+                      ),
+                      label: 'Brigade Roster',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.menu_book),
+                      label: 'Affinity Codex',
+                    ),
+                  ],
                 ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.menu_book),
-                  label: 'Affinity Codex',
-                ),
-              ],
+              ),
             ),
     );
   }

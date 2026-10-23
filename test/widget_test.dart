@@ -102,7 +102,7 @@ void main() {
 
     // Verify Home Screen modal opened
     expect(find.text('COMMAND CITADEL • CHAPTER HEADQUARTERS'), findsOneWidget);
-    expect(find.text('RESONANCE BEACON'), findsOneWidget);
+    expect(find.text('BRIGADE BARRACKS'), findsOneWidget);
     expect(find.text('THE CRUCIBLE ALTAR'), findsWidgets);
     expect(find.text('THE RELIC FORGE'), findsWidgets);
 

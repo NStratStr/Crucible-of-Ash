@@ -352,6 +352,45 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
+
+          // Affinity Codex Button in Header
+          InkWell(
+            onTap: widget.onOpenAffinityCodex,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2C),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF26A69A).withValues(alpha: 0.6),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF26A69A).withValues(alpha: 0.15),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.menu_book, color: Color(0xFF80CBC4), size: 16),
+                  SizedBox(width: 5),
+                  Text(
+                    'CODEX',
+                    style: TextStyle(
+                      color: Color(0xFF80CBC4),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
           if (widget.showCloseButton) ...[
             const SizedBox(width: 8),
@@ -483,15 +522,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 1. RESONANCE BEACON / SPIRE (High Cliff Top-Center Overlook)
+            // 1. BRIGADE BARRACKS & ROSTER (High Cliff Top-Center Overlook)
             // Sits right on the raised bluff overlooking the entire volcanic crater
             Positioned(
               top: h * 0.16,
               left: w * 0.44 - (85 * buildingScale),
               child: _buildSanctuaryBuildingNode(
                 id: 'beacon',
-                title: 'RESONANCE BEACON',
-                subtitle: 'Signals & Roster Archives',
+                title: 'BRIGADE BARRACKS',
+                subtitle: 'Lineage Roster & Formations',
                 imageAsset: 'assets/images/UI/building_resonance_beacon.png',
                 glowColor: const Color(0xFFAB47BC),
                 width: 140 * buildingScale,
@@ -502,7 +541,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 2. THE CRUCIBLE FURNACE (Bottom-Left Magma River Bank)
+            // 2. THE CRUCIBLE ALTAR (Bottom-Left Magma River Bank)
             // Sits right along the fiery lava channel to channel raw thermal ash
             Positioned(
               bottom: h * 0.13,
@@ -540,7 +579,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 4. SANCTUARY HOSPICE & SUMMONING GATES (Central Basin Ground Level)
+            // 4. SANCTUARY HOSPICE & SUMMONING ALTAR (Central Basin Ground Level)
             // Sits squarely in the center gathering ground of the settlement
             Positioned(
               top: h * 0.50,
@@ -548,8 +587,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildInteractiveWaypointNode(
                 id: 'hospice',
                 title: 'SUMMONING ALTAR',
-                subtitle: 'Welcome Calcified Survivors',
-                icon: Icons.local_hospital_outlined,
+                subtitle: 'Thrall Convocation & Rites',
+                icon: Icons.person_add_alt_1,
                 badgeColor: const Color(0xFFFFD54F),
                 shieldAsset: 'assets/images/UI/Flame Shield icon Transparent.png',
                 scale: buildingScale,
@@ -557,15 +596,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 5. CAMPAIGN EXPEDITION PASS (Right Mountain Gorge Trail)
-            // Points to the road leading out of the haven towards the continent
+            // 5. CAMPAIGN EXPEDITION GATE (Right Mountain Gorge Trail)
+            // Points to the road leading out of the haven towards the continent & gauntlets
             Positioned(
-              top: h * 0.42,
+              top: h * 0.38,
               right: w * 0.10,
               child: _buildInteractiveWaypointNode(
                 id: 'expeditions',
-                title: 'CAMPAIGN JOURNEY',
-                subtitle: '100-Battle Continental War',
+                title: 'CAMPAIGN EXPEDITION',
+                subtitle: 'Overworld & Titan Gauntlet',
                 icon: Icons.explore_outlined,
                 badgeColor: const Color(0xFFE5A93C),
                 shieldAsset: 'assets/images/UI/Campaign Map Shield Icon Transpartent.png',
@@ -574,62 +613,33 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 6. SPATIAL BATTLE ARENA (Bottom-Right Ground Waypoint)
+            // Floating Quick Action Dock Overlay over Sanctuary background
             Positioned(
-              bottom: h * 0.12,
-              right: w * 0.24,
-              child: _buildInteractiveWaypointNode(
-                id: 'arena',
-                title: 'SPATIAL BATTLE ARENA',
-                subtitle: '30 Hz Combat Calibration',
-                icon: Icons.sports_kabaddi_outlined,
-                badgeColor: const Color(0xFFEF5350),
-                shieldAsset: 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
-                scale: buildingScale,
-                onTap: widget.onOpenBattleArena,
-              ),
-            ),
-
-            // 7. ENDGAME GAUNTLET (Upper-Right Volcanic Smolder Pass)
-            Positioned(
-              top: h * 0.20,
-              right: w * 0.05,
-              child: _buildInteractiveWaypointNode(
-                id: 'gauntlet',
-                title: 'ENDGAME GAUNTLET',
-                subtitle: 'World Titan Trials',
-                icon: Icons.shield_moon_outlined,
-                badgeColor: const Color(0xFFAB47BC),
-                shieldAsset: 'assets/images/UI/Dungeon Shield Icon Transparent.png',
-                scale: buildingScale,
-                onTap: widget.onOpenEndgameGauntlet,
-              ),
-            ),
-
-            // Bottom Quick Action Bar to ensure easy access to all features
-            Positioned(
-              left: 16,
-              right: 16,
+              left: 24,
+              right: 24,
               bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xEE0D0D14),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.4)),
-                  boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFE5A93C), widget.onOpenCampaign),
-                    _buildQuickActionBtn('ARENA', Icons.flash_on, const Color(0xFFEF5350), widget.onOpenBattleArena),
-                    _buildQuickActionBtn('CRUCIBLE', Icons.bloodtype_outlined, const Color(0xFFFF7043), widget.onOpenCrucible),
-                    _buildQuickActionBtn('SUMMON', Icons.person_add_alt_1, const Color(0xFFFFD54F), widget.onOpenSummoning),
-                    _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
-                    _buildQuickActionBtn('GAUNTLET', Icons.shield_outlined, const Color(0xFFAB47BC), widget.onOpenEndgameGauntlet),
-                    _buildQuickActionBtn('CODEX', Icons.menu_book, const Color(0xFF26A69A), widget.onOpenAffinityCodex),
-                  ],
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xDD0D0D14),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1.2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black87, blurRadius: 16, spreadRadius: 2),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFE5A93C), widget.onOpenCampaign),
+                      _buildQuickActionBtn('CRUCIBLE', Icons.bloodtype_outlined, const Color(0xFFFF7043), widget.onOpenCrucible),
+                      _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
+                      _buildQuickActionBtn('SUMMON', Icons.person_add_alt_1, const Color(0xFFFFD54F), widget.onOpenSummoning),
+                      _buildQuickActionBtn('ROSTER', Icons.people_alt_outlined, const Color(0xFFAB47BC), widget.onOpenBrigadeRoster),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1144,22 +1154,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildModesGrid(BuildContext context, bool isCompact) {
     final List<Map<String, dynamic>> modes = [
       {
-        'title': 'CAMPAIGN JOURNEY',
-        'subtitle': 'Overworld nodes, bosses & Ascensions A0–A10',
-        'badge': 'MAIN EXPEDITION',
+        'title': 'CAMPAIGN EXPEDITION',
+        'subtitle': 'Linear stage progression, boss encounters & Titan Gauntlet',
+        'badge': 'MAIN JOURNEY',
         'badgeColor': const Color(0xFFE5A93C),
         'iconAsset': 'assets/images/UI/Campaign Map Shield Icon Transpartent.png',
         'action': widget.onOpenCampaign,
         'borderColor': const Color(0xFFE5A93C),
-      },
-      {
-        'title': 'SPATIAL BATTLE ARENA',
-        'subtitle': '30 Hz real-time ticks, 2.5D nodes & 3-wave skirmish',
-        'badge': 'TACTICAL COMBAT',
-        'badgeColor': const Color(0xFFEF5350),
-        'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
-        'action': widget.onOpenBattleArena,
-        'borderColor': const Color(0xFFB3261E),
       },
       {
         'title': 'THE CRUCIBLE ALTAR',
@@ -1171,6 +1172,15 @@ class _HomeScreenState extends State<HomeScreen> {
         'borderColor': const Color(0xFFFF7043),
       },
       {
+        'title': 'THE RELIC FORGE',
+        'subtitle': 'Equipment crafting, refinement, sockets & sets',
+        'badge': 'ARSENAL ENCHANT',
+        'badgeColor': const Color(0xFF42A5F5),
+        'iconAsset': 'assets/images/UI/Relic Forge Shield Icon Transparent.png',
+        'action': widget.onOpenRelicForge,
+        'borderColor': const Color(0xFF1976D2),
+      },
+      {
         'title': 'SUMMONING ALTAR',
         'subtitle': 'Convoke Gen 1-3 thralls, pact rites & bloodline sigils',
         'badge': 'SOUL RECRUIT',
@@ -1180,31 +1190,13 @@ class _HomeScreenState extends State<HomeScreen> {
         'borderColor': const Color(0xFFD4AF37),
       },
       {
-        'title': 'THE RELIC FORGE',
-        'subtitle': 'Equipment crafting, sockets & runic affixes',
-        'badge': 'ARSENAL ENCHANT',
-        'badgeColor': const Color(0xFF42A5F5),
-        'iconAsset': 'assets/images/UI/Relic Forge Shield Icon Transparent.png',
-        'action': widget.onOpenRelicForge,
-        'borderColor': const Color(0xFF1976D2),
-      },
-      {
-        'title': 'ENDGAME GAUNTLET',
-        'subtitle': 'World Titan, Void Herald & Colossus trials',
-        'badge': 'CHALLENGE TRIAL',
+        'title': 'BRIGADE BARRACKS',
+        'subtitle': 'Lineage roster, skill inspection & combat formations',
+        'badge': 'UNIT INSPECTION',
         'badgeColor': const Color(0xFFAB47BC),
-        'iconAsset': 'assets/images/UI/Dungeon Shield Icon Transparent.png',
-        'action': widget.onOpenEndgameGauntlet,
-        'borderColor': const Color(0xFF9C27B0),
-      },
-      {
-        'title': 'AFFINITY CODEX',
-        'subtitle': 'Hexagonal affinity wheel & combat mechanics',
-        'badge': 'LORE & MECHANICS',
-        'badgeColor': const Color(0xFF26A69A),
         'iconAsset': 'assets/images/UI/Skull Shield Icon Transparent.png',
-        'action': widget.onOpenAffinityCodex,
-        'borderColor': const Color(0xFF00897B),
+        'action': widget.onOpenBrigadeRoster,
+        'borderColor': const Color(0xFF9C27B0),
       },
     ];
 
