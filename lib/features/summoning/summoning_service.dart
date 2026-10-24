@@ -59,10 +59,10 @@ class SummoningService {
   static final Map<SummonBannerType, BannerConfig> banners = {
     SummonBannerType.ashenBloodline: const BannerConfig(
       type: SummonBannerType.ashenBloodline,
-      title: 'ASHEN BLOODLINE RITE',
-      subtitle: 'Standard Thrall Convocation',
+      title: 'OUTSKIRTS REFUGEE INTAKE',
+      subtitle: 'Rescuing Petrified Wanderer Husks',
       loreDescription:
-          'Feed raw Ichor into the central crucible to awaken unshaped souls and standard line thralls. Excellent for Crucible donor stock.',
+          'Infuse concentrated Ichor into brittle chalk husks recovered from the perimeter roads. Shatter the calcified crust to awaken viable frontline thralls.',
       currencyName: 'Ichor',
       singleCost: 100,
       multiCost: 900, // 10 pulls for 900 (10% discount)
@@ -70,15 +70,15 @@ class SummoningService {
       gen1Rate: 0.82,
       gen2Rate: 0.15,
       gen3Rate: 0.03,
-      bannerBadge: 'BASIC PACT',
+      bannerBadge: 'HOSPICE TRIAGE',
       themeColorHex: '#E5A93C',
     ),
     SummonBannerType.consecratedSigil: const BannerConfig(
       type: SummonBannerType.consecratedSigil,
-      title: 'CONSECRATED COVENANT',
-      subtitle: 'Pureblood Lineage Manifestation',
+      title: 'CONSECRATED SANGUINE REVIVAL',
+      subtitle: 'Ancient Lineage Extraction',
       loreDescription:
-          'Spend ancestral Bloodline Sigils to compel ancient progenitors and high-generation champions from the crypts of old.',
+          'Spend ancestral Bloodline Sigils to excavate deep pre-cataclysm sarcophagi and revive hardened veteran champions from the imperial era.',
       currencyName: 'Bloodline Sigils',
       singleCost: 1,
       multiCost: 9, // 10 pulls for 9 sigils (10% discount)
@@ -86,15 +86,15 @@ class SummoningService {
       gen1Rate: 0.40,
       gen2Rate: 0.45,
       gen3Rate: 0.15,
-      bannerBadge: 'ELITE RITE',
+      bannerBadge: 'SANCTUARY CRYPTS',
       themeColorHex: '#D4AF37',
     ),
     SummonBannerType.cryptCovenant: const BannerConfig(
       type: SummonBannerType.cryptCovenant,
-      title: 'CRYPT STALKER SUMMONS',
-      subtitle: 'Undead & Occult Vanguard Focus',
+      title: 'CATACOMB EXCAVATION',
+      subtitle: 'Occult Vanguard & Ghoul Extraction',
       loreDescription:
-          'Attune the altar with necrotic resonance to summon ghouls, skeletons, husks, and blight spellweavers with heightened affinity.',
+          'Mine the ancient subterranean catacombs to unearth bone archers, spectral stalkers, and calcified blight spellweavers with heightened affinity.',
       currencyName: 'Ichor',
       singleCost: 120,
       multiCost: 1000,
@@ -102,15 +102,15 @@ class SummoningService {
       gen1Rate: 0.75,
       gen2Rate: 0.20,
       gen3Rate: 0.05,
-      bannerBadge: 'FOCUS BATCH',
+      bannerBadge: 'MINERAL SINUS',
       themeColorHex: '#9C27B0',
     ),
     SummonBannerType.commanderCovenant: const BannerConfig(
       type: SummonBannerType.commanderCovenant,
-      title: 'PROGENITOR ARCHONS',
-      subtitle: 'Legendary Commander Manifestation',
+      title: 'PROGENITOR AWAKENING RITE',
+      subtitle: 'Sovereign Faction Progenitor Calling',
       loreDescription:
-          'Invoke the primal bloodline of high commanders: Lord Vladislav, Lady Valeria, High Inquisitor Malakor, and Mother Morrigan with boosted pull rates.',
+          'Inject primordial Vitae into noble imperial relics to awaken high faction progenitors: Lord Vladislav, Lady Valeria, High Inquisitor Malakor, or Mother Morrigan.',
       currencyName: 'Bloodline Sigils',
       singleCost: 2,
       multiCost: 18,
@@ -118,7 +118,7 @@ class SummoningService {
       gen1Rate: 0.20,
       gen2Rate: 0.50,
       gen3Rate: 0.30,
-      bannerBadge: 'COMMANDER RATE-UP',
+      bannerBadge: 'PROGENITOR COVENANT',
       themeColorHex: '#FF1744',
     ),
   };

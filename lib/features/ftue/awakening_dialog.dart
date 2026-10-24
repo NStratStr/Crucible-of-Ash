@@ -32,31 +32,44 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
 
   final List<Map<String, dynamic>> _prologueSlides = [
     {
-      'title': 'THE WHITE ASH CATACLYSM',
+      'scene': 'SCENE 1: THE WHITE PLAIN',
+      'title': 'THE WHITE RAIN CATACLYSM',
       'subtitle': 'The Petrification of the Known World',
       'icon': Icons.terrain_outlined,
       'color': const Color(0xFFCFD8DC),
       'body':
-          'A suffocating white ash drifts from the shattered firmament. Where it settles, flesh calcifies into brittle, silent stone. The ancient empires have shuttered their citadel gates, leaving thousands of dying wanderers to freeze into statues along the barren roads.',
-      'quote': '"We did not pray for salvation. We prayed that our joints would bend for one more hour."',
+          'A suffocating white ash drifts from the shattered firmament—the fallout of an artificial sun drilling through the planetary mantle. Millions stand frozen mid-scream along crumbling roads: brittle chalk statues whose souls drift like hollow embers through the storm.',
+      'quote': '"We did not pray for salvation. We prayed that our knuckles would bend for one more hour."',
     },
     {
+      'scene': 'SCENE 2: THE MOBILE WORKBENCH',
       'title': 'THE ITINERANT PHYSICIAN',
-      'subtitle': 'Forbidden Ash-Transmutation',
+      'subtitle': 'The Lone Wanderer with Pack Mule & Scalpel',
       'icon': Icons.auto_fix_high,
       'color': const Color(0xFFE5A93C),
       'body':
-          'You were no prophesied deity—only a traveling alchemist carrying a single pack mule and a battered mobile workbench. While orthodox doctors watched patients turn to marble, your experiments uncovered a dangerous miracle: by binding volatile catalysts into infected tissue, you could halt calcification and harness the ash, turning the curse into supernatural combat resilience.',
-      'quote': '"The ash takes your blood, but in return, it gives you the strength to shatter mountains."',
+          'You were no prophesied king or warlord. You were an itinerant doctor pulling a lone pack mule strapped with bubbling copper retorts, iron needles, and glowing Vitae vials. Where imperial hospitals slammed their gates, your needles pierced calcifying chests to discover the impossible.',
+      'quote': '"They called it an incurable plague. We called it living stone."',
     },
     {
-      'title': 'FOUNDING THE SANCTUARY',
-      'subtitle': 'The Call Across the Wastes',
-      'icon': Icons.fort,
-      'color': const Color(0xFFFF7043),
+      'scene': 'SCENE 3: THE TRANSMUTATION',
+      'title': 'MINERAL SINEW & THE CRUCIBLE',
+      'subtitle': 'Flesh of Stone, Capillaries of Quicksilver',
+      'icon': Icons.colorize,
+      'color': const Color(0xFFEF5350),
       'body':
-          'Word spread across the crags: An alchemist walks the wastes who does not let you die, but crafts you into an immortal soldier. Rogue warriors, deserting knights, and dying sorcerers follow your workbench trail. To shelter them, you have claimed an ancient volcanic basin: The Ashen Sanctuary. Now, you must choose your first stabilized Commander to guard the gates.',
-      'quote': '"Give us your dying, and the Crucible will return an army."',
+          'Injecting hot, pressurized Ichor directly into calcifying heart muscle triggers a violent phase change: the ash does not leave, but weaves with muscle fibers into mineral sinew—possessing the density of granite, but the lightning elasticity of living muscle. Your patients rise as immortal Thralls.',
+      'quote': '"The White Ash took their mortal breath. The Crucible gave them an eternal vanguard."',
+    },
+    {
+      'scene': 'SCENE 4: THE ASHEN SANCTUARY',
+      'title': 'FOUNDING THE CITADEL',
+      'subtitle': 'The Caldera of the Living Flame',
+      'icon': Icons.fort,
+      'color': const Color(0xFFFFD54F),
+      'body':
+          'Dying legionnaires, deserting knights, and infected witches followed your workbench trail across the wasteland. Together, you claimed a geothermal volcanic basin where subterranean Vitae springs hold back the ash: The Citadel Sanctuary. Now, bind covenant with your first Progenitor Champion to lead your vanguard.',
+      'quote': '"They called it an extinction. We called it a harvest. Welcome to the Crucible."',
     },
   ];
 
@@ -262,6 +275,25 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
                           child: Icon(slide['icon'] as IconData, color: accent, size: 34),
                         ),
                         const SizedBox(height: 16),
+                        if (slide['scene'] != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: accent.withValues(alpha: 0.4), width: 1.0),
+                            ),
+                            child: Text(
+                              slide['scene'] as String,
+                              style: TextStyle(
+                                color: accent,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
                         Text(
                           slide['title'] as String,
                           textAlign: TextAlign.center,

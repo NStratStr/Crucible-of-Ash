@@ -173,7 +173,7 @@ class _SummoningScreenState extends State<SummoningScreen> {
             mainAxisSize: MainAxisSize.min,
             children: const [
               Text(
-                'SUMMONING CONVOCATION',
+                'THE HOSPICE INTAKE GATES',
                 style: TextStyle(
                   color: Color(0xFFFFD54F),
                   fontFamily: 'serif',
@@ -183,7 +183,7 @@ class _SummoningScreenState extends State<SummoningScreen> {
                 ),
               ),
               Text(
-                'THE OCCULT ALTAR • AWAKEN BLOODLINE THRALLS',
+                'TRIAGE PETRIFIED REFUGEES • AWAKEN WITH LIVING VITAE',
                 style: TextStyle(
                   color: Colors.white54,
                   fontSize: 8.5,

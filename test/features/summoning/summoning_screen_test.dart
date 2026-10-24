@@ -104,20 +104,20 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Header & Title
-      expect(find.text('SUMMONING CONVOCATION'), findsOneWidget);
+      expect(find.text('THE HOSPICE INTAKE GATES'), findsOneWidget);
       expect(find.text('1200'), findsOneWidget);
       expect(find.text('15'), findsOneWidget);
 
       // Verify Banners
-      expect(find.text('ASHEN BLOODLINE RITE'), findsWidgets);
-      expect(find.text('CONSECRATED COVENANT'), findsOneWidget);
-      expect(find.text('CRYPT STALKER SUMMONS'), findsOneWidget);
+      expect(find.text('OUTSKIRTS REFUGEE INTAKE'), findsWidgets);
+      expect(find.text('CONSECRATED SANGUINE REVIVAL'), findsOneWidget);
+      expect(find.text('CATACOMB EXCAVATION'), findsOneWidget);
 
       // Verify Rates info icon
       await tester.tap(find.byIcon(Icons.info_outline));
       await tester.pumpAndSettle();
       expect(find.text('CONVOCATION PROBABILITIES'), findsOneWidget);
-      expect(find.text('ASHEN BLOODLINE RITE'), findsWidgets);
+      expect(find.text('OUTSKIRTS REFUGEE INTAKE'), findsWidgets);
 
       // Dismiss dialog
       await tester.tap(find.text('DISMISS'));
@@ -154,7 +154,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to Consecrated Covenant tab
-      await tester.tap(find.text('CONSECRATED COVENANT'));
+      await tester.tap(find.text('CONSECRATED SANGUINE REVIVAL'));
       await tester.pumpAndSettle();
 
       expect(find.text('9 Bloodline Sigils'), findsOneWidget);
@@ -202,7 +202,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Summoning screen modal opened
-      expect(find.text('SUMMONING CONVOCATION'), findsOneWidget);
+      expect(find.text('THE HOSPICE INTAKE GATES'), findsOneWidget);
     });
   });
 }
