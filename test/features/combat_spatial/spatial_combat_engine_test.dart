@@ -138,7 +138,7 @@ void main() {
       final validMove = engine.movePlayerUnit('lady_valeria', 0, 0);
       expect(validMove, isTrue);
       expect(valeria.occupiedNodes.first.column, equals(0));
-      expect(valeria.currentAp, equals(1000)); // 6000 - 5000 (50% AP cost) = 1000 AP
+      expect(valeria.currentAp, equals(3500)); // Rank & Rite Spec Sec 2: 6000 - 2500 (25% AP cost) = 3500 AP
     });
 
     test('Adaptive Posture System: Vanguard in Midline performs Shockwave Tremor and advances forward', () {
@@ -284,7 +284,7 @@ void main() {
       expect(liveSwap, isTrue);
       expect(valeria.occupiedNodes.first.row, equals(1));
       expect(sanguine.occupiedNodes.first.row, equals(0));
-      expect(valeria.currentAp, equals(1000)); // 6000 - 5000 = 1000 AP
+      expect(valeria.currentAp, equals(3500)); // Rank & Rite Spec Sec 2: 6000 - 2500 = 3500 AP
     });
 
     test('Multi-Target Trajectory Projection: Resolves secondary cleave targets when Hold the Line is active', () {

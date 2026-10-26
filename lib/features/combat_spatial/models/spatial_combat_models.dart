@@ -19,6 +19,13 @@ enum TargetPattern {
   flankShadowLeap,
 }
 
+/// Attack Trajectory for Line of Sight & Cover calculations (Rank & Rite Spec Sec 1 & Sec 3)
+enum AttackTrajectory {
+  directPhysical, // Direct frontal attack: targets Frontline first, blocked by Cover
+  lobbedMagic,    // Arc / Magic: can target any coordinate (ignores frontline LoS and Vanguard cover)
+  flanking,       // Originates from same row: ignores Vanguard Cover
+}
+
 /// Visual combat action event dispatched by the simulation engine
 class SpatialActionEvent {
   final String id;
@@ -206,7 +213,15 @@ class CombatUnitState {
   final bool isDisplacementImmune;
   final int moveRange;
   final int level;
-  int currentAp; // 0 to 10,000 threshold
+  int currentAp; // 0 to 10,000 threshold (Turn Meter / Action Point)
+  int get currentTm => currentAp;
+  set currentTm(int val) => currentAp = val;
+
+  /// Petrified Stone Plinth state (Rank & Rite Spec Sec 5)
+  /// At 0 HP, unit petrifies into a solid stone obstacle with 3 durability hits.
+  bool isPetrifiedPlinth;
+  int plinthDurability; // 3 hits durability until shattered
+  bool isShattered; // True when plinth durability reaches 0
   int maxHp;
   int hp;
   int maxArmor;
@@ -272,6 +287,9 @@ class CombatUnitState {
     this.invulnerabilityTicks = 0,
     this.ultimateGauge = 0,
     this.isSlagCarapaceActive = false,
+    this.isPetrifiedPlinth = false,
+    this.plinthDurability = 3,
+    this.isShattered = false,
     this.pendingIntent,
     StanceType? activeStance,
     this.customAssetPath,
@@ -332,8 +350,9 @@ class CombatUnitState {
     return 'Standard Stance';
   }
 
-  bool get isAlive => hp > 0;
-  bool get isDowned => hp <= 0;
+  bool get isAlive => hp > 0 && !isPetrifiedPlinth;
+  bool get isDowned => hp <= 0 || isPetrifiedPlinth;
+  bool get isSolidObstacle => isPetrifiedPlinth && !isShattered;
   bool get isTurnReady => currentAp >= 10000;
   bool get isStunned => stunDuration > 0;
   bool get isFrozen => freezeDuration > 0;
@@ -358,8 +377,10 @@ class CombatUnitState {
     return max(1, (speed * mult).round());
   }
 
-  /// Minimum AP requirement to reposition (50% of 10,000 threshold = 5,000 AP)
-  static const int moveApCost = 5000;
+  /// Reposition Action Cost (Rank & Rite Spec Sec 2)
+  /// 1-tile shift costs 25% TM (2,500 AP), resetting unit TM to 7,500 so unit acts again soon.
+  static const int moveApCost = 2500;
+  static const int moveRetainedTm = 7500;
   bool get canAffordMovement => currentAp >= moveApCost;
 
   /// Checks if unit can move to target coordinates based on its moveRange and AP cost
@@ -384,7 +405,11 @@ class CombatUnitState {
     if (isDisplacementImmune || currentAp < apPenalty) return false;
     occupiedNodes.clear();
     occupiedNodes.addAll(newNodes);
-    currentAp -= apPenalty;
+    if (apPenalty == moveApCost && currentAp >= 10000) {
+      currentAp = moveRetainedTm; // Reset to 7,500 TM per Rank & Rite Sec 2
+    } else {
+      currentAp = max(0, currentAp - apPenalty);
+    }
     movedSinceLastTurn = true;
     consecutiveTurnsStationary = 0;
     if (activeStance == StanceType.holdTheLine) {
@@ -731,7 +756,11 @@ class CombatUnitState {
 
     hp = max(0, hp - applied);
     if (hp == 0) {
-      // Transitioning into Downed State (Inert Vessel)
+      // Transitioning into Petrified Plinth State (Rank & Rite Spec Sec 5)
+      // Solid stone obstacle with 3 durability hits blocking passage & LoS
+      isPetrifiedPlinth = true;
+      plinthDurability = 3;
+      isShattered = false;
       currentAp = 0;
       pendingIntent = null;
       hasStanceBonusReady = false;
@@ -755,5 +784,16 @@ class CombatUnitState {
     if (armor <= 0) {
       isSlagCarapaceActive = false;
     }
+  }
+  /// Damages a petrified stone plinth (1 hit decrement). Shatters at 0 durability.
+  bool strikePlinth() {
+    if (!isPetrifiedPlinth || isShattered) return false;
+    plinthDurability = max(0, plinthDurability - 1);
+    if (plinthDurability == 0) {
+      isShattered = true;
+      occupiedNodes.clear(); // Clears obstruction from grid
+      return true; // Shattered
+    }
+    return false;
   }
 }

@@ -23,9 +23,16 @@ class SpatialCombatEngine extends ChangeNotifier {
   // Active Commander & Grimoire Service
   GeneralCommandService? commandService;
 
-  // Commander Focus Economy
+  // Commander Focus Economy (Rank & Rite Spec Sec 6: Sculptor Tray / Shared Team Vitae pool max 7)
   int focus = 3;
   int maxFocus = 7;
+  int get teamVitae => focus;
+  set teamVitae(int val) => focus = val.clamp(0, maxFocus);
+
+  /// Rank & Rite Spec Sec 2 & Sec 6: Active Unit awaiting turn execution during pause
+  CombatUnitState? activeActingUnit;
+  bool isTurnExecutionPaused = false;
+  bool hasCastTuningSlipThisTurn = false;
 
   // Deck & Hand Management
   final List<SpatialCombatCard> drawPile = [];
@@ -1179,6 +1186,161 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
+  /// --- RANK & RITE COMBAT SPECIFICATION METHODS ---
+
+  /// Rank & Rite Spec Sec 3: Vanguard Cover Rule
+  /// If an ally sits in the direct vertical column behind a living Vanguard:
+  /// - Ally gains Cover: -25% damage from direct frontal attacks.
+  /// - Vanguard takes 0 redirected damage (Passive Deflection).
+  /// - Attacks originating from the same row ignore Cover (Flanking).
+    /// Applies damage factoring Vanguard Cover (-25% from direct frontal attacks if behind living Vanguard).
+  int applyDamageToTarget(
+    CombatUnitState target,
+    int rawDamage, {
+    AttackTrajectory trajectory = AttackTrajectory.directPhysical,
+    int? attackerRow,
+    bool ignoreArmor = false,
+    bool isPhysical = true,
+  }) {
+    double finalDmg = rawDamage.toDouble();
+    if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: attackerRow)) {
+      finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
+      addLog('🛡️ VANGUARD COVER: ${target.name} takes -25% damage behind Vanguard line!');
+    }
+    return target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
+  }
+
+  bool isCoveredByVanguard(CombatUnitState target, {required AttackTrajectory trajectory, int? attackerRow}) {
+    if (trajectory == AttackTrajectory.lobbedMagic) return false;
+    if (trajectory == AttackTrajectory.flanking) return false;
+    if (target.occupiedNodes.isEmpty) return false;
+    final tCol = target.occupiedNodes.first.column;
+    final tRow = target.occupiedNodes.first.row;
+
+    // Attacks originating from the same row ignore Cover (Flanking)
+    if (attackerRow != null && attackerRow == tRow) return false;
+
+    // Check if target is behind Row 0 (i.e. Row 1 Midline or Row 2 Backline)
+    if (tRow <= 0) return false;
+
+    // Check if a living Vanguard exists in Row 0 of the exact same column
+    final squad = target.isPlayer ? playerUnits : enemyUnits;
+    final vanguard = squad.where((u) =>
+        u.isAlive &&
+        u.archetype == UnitArchetype.vanguardMelee &&
+        u.occupies(tCol, 0)).firstOrNull;
+
+    return vanguard != null;
+  }
+
+  /// Line of sight check (Rank & Rite Spec Sec 1 & 5)
+  /// Checks whether a direct physical attack can reach target or is blocked by Frontline / Petrified Plinth.
+  bool hasLineOfSight(CombatUnitState attacker, CombatUnitState target, {required AttackTrajectory trajectory}) {
+    if (trajectory == AttackTrajectory.lobbedMagic) return true;
+    if (attacker.occupiedNodes.isEmpty || target.occupiedNodes.isEmpty) return true;
+    final tCol = target.occupiedNodes.first.column;
+    final tRow = target.occupiedNodes.first.row;
+    final opposingSquad = target.isPlayer ? playerUnits : enemyUnits;
+
+    // Check for any solid stone plinths or frontline units between clash line and target
+    for (int r = 0; r < tRow; r++) {
+      final blocking = opposingSquad.where((u) => (u.isAlive || u.isSolidObstacle) && u.occupies(tCol, r)).firstOrNull;
+      if (blocking != null) return false;
+    }
+    return true;
+  }
+
+  /// Rank & Rite Spec Sec 4: Displacement & Collision Physics (Knockback & Kinetic Splat)
+  /// Knockback displaces a unit backward along their column lane (increasing row index).
+  /// If path is blocked by ally, enemy, stone plinth, or back wall:
+  /// - Unit stops immediately before the obstacle.
+  /// - Kinetic Splat: Moving unit and stationary obstacle both take 50% bonus collision damage.
+  void applyKnockback(CombatUnitState unit, int distanceRows, {int baseImpactDamage = 50}) {
+    if (unit.isDisplacementImmune || unit.occupiedNodes.isEmpty) return;
+    final uCol = unit.occupiedNodes.first.column;
+    final startRow = unit.occupiedNodes.first.row;
+    final friendlySquad = unit.isPlayer ? playerUnits : enemyUnits;
+    final allObstacles = [...playerUnits, ...enemyUnits].where((u) => u.id != unit.id && (u.isAlive || u.isSolidObstacle)).toList();
+
+    int currentRow = startRow;
+    bool hadCollision = false;
+    CombatUnitState? hitObstacle;
+
+    for (int step = 1; step <= distanceRows; step++) {
+      final nextRow = currentRow + 1;
+      if (nextRow > 2) {
+        // Back Wall Collision!
+        hadCollision = true;
+        break;
+      }
+      final blocking = allObstacles.where((o) => o.occupies(uCol, nextRow)).firstOrNull;
+      if (blocking != null) {
+        hadCollision = true;
+        hitObstacle = blocking;
+        break;
+      }
+      currentRow = nextRow;
+    }
+
+    // Move unit up to collision point
+    if (currentRow != startRow) {
+      unit.occupiedNodes.clear();
+      unit.occupiedNodes.add(GridNode(column: uCol, row: currentRow, occupantUnitId: unit.id));
+      addLog('${unit.name} knocked back along Col ${uCol + 1} to Row $currentRow.');
+    }
+
+    // Kinetic Splat Resolution
+    if (hadCollision) {
+      final collisionDmg = max(10, (baseImpactDamage * 0.50).round());
+      final splatVictimDmg = unit.takeDamage(collisionDmg, ignoreArmor: true, isPhysical: true);
+      addLog('💥 KINETIC SPLAT: ${unit.name} collided! Suffers $splatVictimDmg true impact damage.');
+
+      if (hitObstacle != null) {
+        if (hitObstacle.isSolidObstacle) {
+          final shattered = hitObstacle.strikePlinth();
+          addLog('💥 KINETIC SPLAT: Petrified Plinth ${hitObstacle.name} struck! (Durability: ${hitObstacle.plinthDurability}/3)${shattered ? " - SHATTERED TO DUST!" : ""}');
+        } else {
+          final obstDmg = hitObstacle.takeDamage(collisionDmg, ignoreArmor: true, isPhysical: true);
+          addLog('💥 KINETIC SPLAT: Obstacle ${hitObstacle.name} struck for $obstDmg collision damage!');
+        }
+      } else {
+        addLog('💥 KINETIC SPLAT: ${unit.name} crashed violently into the Citadel Back Wall!');
+      }
+    }
+  }
+
+  /// Rank & Rite Spec Sec 6: Cast 1 Tuning Slip from hand during active ally turn
+  bool castTuningSlip(String cardId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) {
+    if (hasCastTuningSlipThisTurn) {
+      addLog('Tuning Slip limit reached! Only 1 Tuning Slip can be cast per active ally turn.');
+      lastBannerMessage = '⚠️ 1 TUNING SLIP PER TURN: Select unit action or end turn!';
+      return false;
+    }
+    final success = castCard(cardId, targetUnit: targetUnit, targetCol: targetCol, targetRow: targetRow);
+    if (success) {
+      hasCastTuningSlipThisTurn = true;
+      addLog('TUNING SLIP: Cast slip from Sculptor Tray (Vitae Remaining: $focus/7).');
+    }
+    return success;
+  }
+
+  /// Rank & Rite Spec Sec 2: Turn Meter Action Cost Resolution
+  /// - Skill / Attack: TM resets to 0.
+  /// - Reposition (1 tile shift): TM resets to 7,500 (25% cost). Unit acts again soon.
+  void executeUnitAction(CombatUnitState unit, {bool isReposition = false, int? shiftCol, int? shiftRow}) {
+    if (isReposition && shiftCol != null && shiftRow != null) {
+      movePlayerUnit(unit.id, shiftCol, shiftRow);
+      unit.currentAp = CombatUnitState.moveRetainedTm; // 7,500 TM
+      addLog('TACTICAL SHIFT: ${unit.name} repositioned (TM retained: 7,500 / 25% cost).');
+    } else {
+      _executeUnitTurn(unit);
+      unit.currentAp = 0; // Skill / Attack consumes full TM
+    }
+    hasCastTuningSlipThisTurn = false;
+    activeActingUnit = null;
+    isTurnExecutionPaused = false;
+  }
+
   void _executeUnitTurn(CombatUnitState unit) {
     if (unit.id == 'pyre_zealot') {
       // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down its column
@@ -1742,16 +1904,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         final dmg = (unit.effectiveAttack * 1.1).round();
         target.takeDamage(dmg, isPhysical: false);
         unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-        // Push target back 1 row if target is displaceable and space is open
-        if (!target.isDisplacementImmune && target.occupiedNodes.isNotEmpty) {
-          final tCol = target.occupiedNodes.first.column;
-          final tRow = target.occupiedNodes.first.row;
-          if (tRow < 2 && !enemySquad.any((u) => u.isAlive && u.occupies(tCol, tRow + 1))) {
-            target.occupiedNodes.clear();
-            target.occupiedNodes.add(GridNode(column: tCol, row: tRow + 1, occupantUnitId: target.id));
-            addLog('${unit.name} [PANIC DISCHARGE] knocks ${target.name} back to Row ${tRow + 1}!');
-          }
-        }
+        // Rank & Rite Spec Sec 4: Apply 1-row Knockback with Kinetic Splat
+        applyKnockback(target, 1, baseImpactDamage: dmg);
         addLog('${unit.name} [PANIC DISCHARGE] point-blank detonation blasts ${target.name} for $dmg DMG!');
         lastBannerMessage = '💥 PANIC DISCHARGE: ${unit.name} blasted enemy away!';
         dispatchAction(SpatialActionEvent(
@@ -2629,6 +2783,9 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
 
         downedTarget.hp = max(1, restoredHp);
+        downedTarget.isPetrifiedPlinth = false;
+        downedTarget.plinthDurability = 3;
+        downedTarget.isShattered = false;
         downedTarget.currentAp = 0;
         downedTarget.bleedStacks = 0;
         downedTarget.burnDuration = 0;
