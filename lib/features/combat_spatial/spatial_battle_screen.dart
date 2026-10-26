@@ -1314,7 +1314,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        'FOCUS ${_engine.focus}/${_engine.maxFocus}',
+                        'TEAM VITAE ${_engine.teamVitae}/${_engine.maxFocus}',
                         style: const TextStyle(
                           color: Color(0xFF00E5FF),
                           fontWeight: FontWeight.bold,
@@ -4552,7 +4552,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           child: const Text('CARAPACE', style: TextStyle(fontSize: 6.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold)),
                         ));
                       }
-                      if (unit.isDowned) {
+                      if (unit.isPetrifiedPlinth) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF263238),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                          ),
+                          child: Text('🪨PLINTH (${unit.plinthDurability}/3)', style: const TextStyle(fontSize: 5.5, color: Color(0xFFFFCC80), fontWeight: FontWeight.w900)),
+                        ));
+                      } else if (unit.isDowned) {
                         statusBadges.add(Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
                           decoration: BoxDecoration(
@@ -4561,6 +4571,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
                           ),
                           child: const Text('🪨DOWN', style: TextStyle(fontSize: 6.0, color: Color(0xFFCFD8DC), fontWeight: FontWeight.w900)),
+                        ));
+                      }
+                      if (unit.isAlive && _engine.isCoveredByVanguard(unit, trajectory: AttackTrajectory.directPhysical)) {
+                        statusBadges.add(Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B5E20),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFF81C784), width: 0.6),
+                          ),
+                          child: const Text('🛡️COVER -25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFA5D6A7), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.reviveCount > 0) {
