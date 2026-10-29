@@ -10,6 +10,7 @@ import '../relics/relic_service.dart';
 import '../generals/general_command_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
+import 'rank_and_rite_2d_battlefield.dart';
 
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
@@ -70,6 +71,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   int? _hoveredTileCol;
   bool _showAllTrajectories = false;
   bool _isZenMode = false;
+  bool _is2DGridView = true;
+  int? _hovered2DRow;
+  bool? _isHovered2DPlayerSide;
   double _tickAccumulator = 0.0;
   double _dashPhase = 0.0;
 
@@ -811,12 +815,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                  // Stationary 2.5D Battlefield Arena Plane (Only units move/drag, screen does not pan or bounce)
+                  // Battlefield Arena Plane: Supports clean 2D Landscape Lanes or 2.5D Isometric Grid
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final bool isDesktop = constraints.maxWidth >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
                       final double tileHeight = isDesktop ? 85.0 : 59.0;
+
+                      final double tile2DWidth = isDesktop ? 92.0 : 72.0;
+                      final double tile2DHeight = isDesktop ? 66.0 : 52.0;
 
                       return Center(
                         child: FittedBox(
@@ -826,10 +833,91 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               horizontal: isDesktop ? 28.0 : 12.0,
                               vertical: isDesktop ? 24.0 : 12.0,
                             ),
-                            child: _buildUnifiedIsometricBattlefield(
-                              tileWidth: tileWidth,
-                              tileHeight: tileHeight,
-                            ),
+                            child: _is2DGridView
+                                ? RankAndRite2DBattlefield(
+                                    engine: _engine,
+                                    selectedUnitId: _selectedUnitId,
+                                    selectedEnemyUnitId: _selectedEnemyUnitId,
+                                    draggedUnitId: _draggedUnitId,
+                                    selectedCardId: _selectedCardId,
+                                    draggedUltimateUnitId: _draggedUltimateUnitId,
+                                    selectedUltimateUnitId: _selectedUltimateUnitId,
+                                    hoveredTileCol: _hoveredTileCol,
+                                    hoveredTileRow: _hovered2DRow,
+                                    isHoveredPlayerSide: _isHovered2DPlayerSide,
+                                    tileWidth: tile2DWidth,
+                                    tileHeight: tile2DHeight,
+                                    onSelectPlayerUnit: (id) {
+                                      setState(() {
+                                        _selectedUnitId = (_selectedUnitId == id) ? null : id;
+                                        _selectedEnemyUnitId = null;
+                                        _selectedCardId = null;
+                                      });
+                                    },
+                                    onSelectEnemyUnit: (id) {
+                                      setState(() {
+                                        _selectedEnemyUnitId = (_selectedEnemyUnitId == id) ? null : id;
+                                        _selectedUnitId = null;
+                                        _selectedCardId = null;
+                                      });
+                                    },
+                                    onMovePlayerUnit: (id, col, row) {
+                                      _engine.movePlayerUnit(id, col, row);
+                                      setState(() {
+                                        _selectedUnitId = id;
+                                        _hoveredTileCol = null;
+                                        _hovered2DRow = null;
+                                        _isHovered2DPlayerSide = null;
+                                      });
+                                    },
+                                    onCastCard: (cardId, {targetUnit, targetCol, targetRow}) {
+                                      _engine.castCard(cardId, targetUnit: targetUnit, targetCol: targetCol, targetRow: targetRow);
+                                      setState(() {
+                                        _draggedCard = null;
+                                        _selectedCardId = null;
+                                        _hoveredTileCol = null;
+                                        _hovered2DRow = null;
+                                        _isHovered2DPlayerSide = null;
+                                      });
+                                    },
+                                    onCastUltimate: (ultId, {targetUnit, targetCol, targetRow}) {
+                                      _engine.castUltimate(ultId, targetUnit: targetUnit, targetCol: targetCol, targetRow: targetRow);
+                                      setState(() {
+                                        _draggedUltimateUnitId = null;
+                                        _selectedUltimateUnitId = null;
+                                        _hoveredTileCol = null;
+                                        _hovered2DRow = null;
+                                        _isHovered2DPlayerSide = null;
+                                      });
+                                    },
+                                    onTileHover: (col, row, isPlayer) {
+                                      setState(() {
+                                        _hoveredTileCol = col;
+                                        _hovered2DRow = row;
+                                        _isHovered2DPlayerSide = isPlayer;
+                                      });
+                                    },
+                                    onClearHover: () {
+                                      setState(() {
+                                        _hoveredTileCol = null;
+                                        _hovered2DRow = null;
+                                        _isHovered2DPlayerSide = null;
+                                      });
+                                    },
+                                    buildUnitMiniature: (unit, {required double tileWidth, required double tileHeight, required double colGap, bool isSelected = false}) {
+                                      return _buildUnitMiniatureWidget(
+                                        unit,
+                                        tileWidth: tileWidth,
+                                        tileHeight: tileHeight,
+                                        colGap: colGap,
+                                        isSelected: isSelected,
+                                      );
+                                    },
+                                  )
+                                : _buildUnifiedIsometricBattlefield(
+                                    tileWidth: tileWidth,
+                                    tileHeight: tileHeight,
+                                  ),
                           ),
                         ),
                       );
@@ -1405,6 +1493,48 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           _engine.isAutoBattleMode ? 'AUTO-BATTLE' : 'TACTICAL TURNS',
                           style: TextStyle(
                             color: _engine.isAutoBattleMode ? const Color(0xFFFFB74D) : const Color(0xFF80D8FF),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9.5,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 1c. 2D / 2.5D View Mode Toggle
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _is2DGridView = !_is2DGridView;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _is2DGridView
+                          ? const Color(0xFF7C4DFF).withValues(alpha: 0.3)
+                          : const Color(0xFF263238),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _is2DGridView ? const Color(0xFFB388FF) : Colors.white24,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _is2DGridView ? Icons.view_column : Icons.layers,
+                          color: _is2DGridView ? const Color(0xFFD1C4E9) : Colors.white70,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _is2DGridView ? '2D LANES' : '2.5D ISO',
+                          style: TextStyle(
+                            color: _is2DGridView ? const Color(0xFFD1C4E9) : Colors.white70,
                             fontWeight: FontWeight.w900,
                             fontSize: 9.5,
                             letterSpacing: 0.5,
