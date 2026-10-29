@@ -51,6 +51,22 @@ class SpatialCombatEngine extends ChangeNotifier {
   SpatialActionEvent? activeActionEvent;
   bool isActionPauseEnabled = false;
 
+  /// Rank & Rite Spec Sec 2: Turn Loop Mode
+  /// When false (default), execution pauses at 10,000 TM on ally turns for tactical decisions.
+  /// When true, acts as continuous autobattler.
+  bool isAutoBattleMode = false;
+
+  void toggleAutoBattleMode() {
+    isAutoBattleMode = !isAutoBattleMode;
+    if (isAutoBattleMode && isTurnExecutionPaused && activeActingUnit != null) {
+      // Auto-execute current paused unit's action and resume simulation
+      final u = activeActingUnit!;
+      executeUnitAction(u, isReposition: false);
+      isRunning = true;
+    }
+    notifyListeners();
+  }
+
   bool get isVictory =>
       currentWaveIndex >= totalWaves &&
       enemyUnits.isNotEmpty &&
@@ -884,6 +900,12 @@ class SpatialCombatEngine extends ChangeNotifier {
       return;
     }
 
+    // Rank & Rite Spec Sec 2: If execution is paused awaiting player tactical decision, pause simulation!
+    if (isTurnExecutionPaused && activeActingUnit != null && !isAutoBattleMode) {
+      isRunning = false;
+      return;
+    }
+
     // If a skill or attack cut-in is currently resolving on screen, pause tick progression
     // so players and enemies have kinetic focus and readability!
     if (isActionPauseEnabled && activeActionEvent != null) {
@@ -1094,10 +1116,21 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     for (final unit in readyUnits) {
       if (!unit.isAlive || unit.currentAp < tickThreshold) continue;
+
+      // Rank & Rite Spec Sec 2: When an ally reaches 10,000 TM, pause execution for player decision (unless Auto is on)
+      if (unit.isPlayer && !isAutoBattleMode) {
+        activeActingUnit = unit;
+        isTurnExecutionPaused = true;
+        hasCastTuningSlipThisTurn = false;
+        isRunning = false;
+        addLog('⚡ TURN READY: ${unit.name} reached 10,000 TM! Tactical decision required.');
+        notifyListeners();
+        return; // Halt stepTick immediately!
+      }
+
+      // Automated resolution for enemies (and for allies in Auto mode)
       unit.currentAp -= tickThreshold; // Consume turn
       _executeUnitTurn(unit);
-      // If action pause is enabled and this unit just triggered a visual action/skill,
-      // break immediately so all other units' AP and turns freeze while we watch the skill in action!
       if (isActionPauseEnabled && activeActionEvent != null) {
         break;
       }
@@ -1320,6 +1353,9 @@ class SpatialCombatEngine extends ChangeNotifier {
     if (success) {
       hasCastTuningSlipThisTurn = true;
       addLog('TUNING SLIP: Cast slip from Sculptor Tray (Vitae Remaining: $focus/7).');
+      if (isTurnExecutionPaused) {
+        isRunning = false;
+      }
     }
     return success;
   }
@@ -1330,15 +1366,17 @@ class SpatialCombatEngine extends ChangeNotifier {
   void executeUnitAction(CombatUnitState unit, {bool isReposition = false, int? shiftCol, int? shiftRow}) {
     if (isReposition && shiftCol != null && shiftRow != null) {
       movePlayerUnit(unit.id, shiftCol, shiftRow);
-      unit.currentAp = CombatUnitState.moveRetainedTm; // 7,500 TM
+      unit.currentAp = CombatUnitState.moveRetainedTm; // 7,500 TM (25% cost per Spec Sec 2)
       addLog('TACTICAL SHIFT: ${unit.name} repositioned (TM retained: 7,500 / 25% cost).');
     } else {
       _executeUnitTurn(unit);
-      unit.currentAp = 0; // Skill / Attack consumes full TM
+      unit.currentAp = 0; // Skill / Attack consumes full TM (100% cost per Spec Sec 2)
     }
     hasCastTuningSlipThisTurn = false;
     activeActingUnit = null;
     isTurnExecutionPaused = false;
+    isRunning = true; // Resume simulation
+    notifyListeners();
   }
 
   void _executeUnitTurn(CombatUnitState unit) {

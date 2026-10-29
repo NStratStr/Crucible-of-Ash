@@ -1260,10 +1260,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             if (_engine.isPreBattlePhase)
               _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
             else ...[
+              // Rank & Rite Spec Sec 2: Turn Action Decision Tray (When Turn Meter reaches 10,000 TM)
+              if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
+                _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile),
+
               // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
               _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
 
-              // Tactical Card Hand & Burn Pit
+              // Tactical Card Hand & Burn Pit (Sculptor Tray)
               _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
             ],
 
@@ -1366,6 +1370,48 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         }),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 1b. Rank & Rite Turn Mode Toggle: TACTICAL TURN PAUSE vs AUTO BATTLE
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _engine.toggleAutoBattleMode();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _engine.isAutoBattleMode
+                          ? const Color(0xFFEF6C00).withValues(alpha: 0.3)
+                          : const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _engine.isAutoBattleMode ? const Color(0xFFFF9800) : const Color(0xFF00E5FF),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _engine.isAutoBattleMode ? Icons.auto_mode : Icons.touch_app,
+                          color: _engine.isAutoBattleMode ? const Color(0xFFFFB74D) : const Color(0xFF80D8FF),
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _engine.isAutoBattleMode ? 'AUTO-BATTLE' : 'TACTICAL TURNS',
+                          style: TextStyle(
+                            color: _engine.isAutoBattleMode ? const Color(0xFFFFB74D) : const Color(0xFF80D8FF),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9.5,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -6808,6 +6854,245 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Rank & Rite Spec Sec 2: Turn Action Decision Tray
+  /// Triggered whenever an ally reaches 10,000 TM. Execution pauses so player can:
+  /// 1. Cast 1 Tuning Slip from Sculptor Tray (Vitae pool <= 7).
+  /// 2. Attack / Cast Signature Skill (100% TM cost -> 0 TM).
+  /// 3. Reposition (1-tile shift, 25% TM cost -> 7,500 TM retained).
+  Widget _buildTurnActionDecisionTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
+    final double trayHeight = isLandscapeMobile ? 64.0 : 86.0;
+    final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
+    final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1926),
+        border: Border(
+          top: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
+          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Unit Avatar & Turn Ready Indicator
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F0F1A),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.asset(
+                    unit.assetPath,
+                    width: isLandscapeMobile ? 28 : 38,
+                    height: isLandscapeMobile ? 28 : 38,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 24),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD54F),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: const Text(
+                            'TURN READY (10,000 TM)',
+                            style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        if (_engine.hasCastTuningSlipThisTurn) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text(
+                              'SLIP CAST',
+                              style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      unit.name.toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'Col ${curCol + 1}, Row ${curRow == 0 ? "Front" : (curRow == 1 ? "Mid" : "Back")}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 8.5),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Action 1: ATTACK / SKILL (100% TM Cost -> 0 TM)
+          Expanded(
+            child: ElevatedButton.icon(
+              icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.sports_mma, size: 16),
+              label: Text(
+                unit.isSignatureReady
+                    ? 'SIGNATURE SKILL\n(0 TM / 100% Cost)'
+                    : 'ATTACK & ABILITY\n(0 TM / 100% Cost)',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, height: 1.15),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFFB3261E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  side: BorderSide(
+                    color: unit.isSignatureReady ? const Color(0xFFEA80FC) : const Color(0xFFFF8A80),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+              onPressed: () {
+                setState(() {
+                  _engine.executeUnitAction(unit, isReposition: false);
+                });
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Action 2: REPOSITION / SHIFT (25% TM Cost -> 7,500 TM retained)
+          Expanded(
+            child: PopupMenuButton<String>(
+              tooltip: 'Shift 1 tile along rank or column',
+              color: const Color(0xFF1E1E2C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+              ),
+              onSelected: (dir) {
+                int targetCol = curCol;
+                int targetRow = curRow;
+                if (dir == 'front' && curRow > 0) targetRow--;
+                if (dir == 'back' && curRow < 2) targetRow++;
+                if (dir == 'left' && curCol > 0) targetCol--;
+                if (dir == 'right' && curCol < 4) targetCol++;
+
+                setState(() {
+                  _engine.executeUnitAction(
+                    unit,
+                    isReposition: true,
+                    shiftCol: targetCol,
+                    shiftRow: targetRow,
+                  );
+                });
+              },
+              itemBuilder: (context) => [
+                if (curRow > 0)
+                  const PopupMenuItem(
+                    value: 'front',
+                    child: Row(
+                      children: [
+                        Icon(Icons.arrow_upward, color: Color(0xFF00E5FF), size: 14),
+                        SizedBox(width: 8),
+                        Text('Advance to Frontline', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                if (curRow < 2)
+                  const PopupMenuItem(
+                    value: 'back',
+                    child: Row(
+                      children: [
+                        Icon(Icons.arrow_downward, color: Color(0xFF00E5FF), size: 14),
+                        SizedBox(width: 8),
+                        Text('Fall Back 1 Rank', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                if (curCol > 0)
+                  const PopupMenuItem(
+                    value: 'left',
+                    child: Row(
+                      children: [
+                        Icon(Icons.arrow_back, color: Color(0xFF00E5FF), size: 14),
+                        SizedBox(width: 8),
+                        Text('Shift Left (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                if (curCol < 4)
+                  const PopupMenuItem(
+                    value: 'right',
+                    child: Row(
+                      children: [
+                        Icon(Icons.arrow_forward, color: Color(0xFF00E5FF), size: 14),
+                        SizedBox(width: 8),
+                        Text('Shift Right (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+              ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF006064),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'TACTICAL SHIFT',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFE0F7FA)),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '(7,500 TM / 25% Cost)',
+                      style: TextStyle(fontSize: 8.5, color: Color(0xFF80DEEA), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
