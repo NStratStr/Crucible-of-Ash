@@ -8,10 +8,7 @@ import 'spatial_combat_engine.dart';
 /// - Neutral Clash Buffer in the Center
 /// - Enemy Host on the Right (Frontline Col 0-4, Midline Col 0-4, Backline Col 0-4)
 ///
-/// Features:
-/// - Crystal clear Line-of-Sight and Vanguard Cover visualization
-/// - Crisp, unskewed 2D character standing tokens
-/// - Direct horizontal trajectory & knockback splat visual alignment
+/// Fully responsive: expands dynamically on large PC/desktop displays and scales gracefully on smaller screens.
 class RankAndRite2DBattlefield extends StatelessWidget {
   final SpatialCombatEngine engine;
   final String? selectedUnitId;
@@ -61,59 +58,50 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 5 Columns (lanes, 0 to 4 from top to bottom)
-    // Ranks:
-    // Player Side (Left):
-    //   Rank 2 (Backline), Rank 1 (Midline), Rank 0 (Frontline)
-    // Center:
-    //   Clash / No-Man's Land Divider
-    // Enemy Side (Right):
-    //   Rank 0 (Frontline), Rank 1 (Midline), Rank 2 (Backline)
-
-    const int laneCount = 5; // Columns 0..4
+    // 3 ranks per side: Backline, Midline, Frontline
     final double colWidth = tileWidth;
     final double rowHeight = tileHeight;
-    final double clashDividerWidth = 24.0;
+    final double clashDividerWidth = (tileWidth * 0.28).clamp(24.0, 48.0);
     final double sideWidth = colWidth * 3 + 12; // 3 ranks per side
     final double totalBoardWidth = sideWidth * 2 + clashDividerWidth + 32;
-    final double totalBoardHeight = rowHeight * laneCount + 40;
 
     return Container(
       width: totalBoardWidth,
-      height: totalBoardHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0F14).withValues(alpha: 0.88),
+        color: const Color(0xFF0D0F14).withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF2E3244), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.7),
-            blurRadius: 20,
+            color: Colors.black.withValues(alpha: 0.75),
+            blurRadius: 22,
             spreadRadius: 4,
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Header: Rank Indicator Labels
           _buildRankHeaderLabels(sideWidth, clashDividerWidth),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           // Main 2D Grid: Lanes (Columns 0 to 4)
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Left: Player Territory (Back -> Mid -> Front)
-                _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Left: Player Territory (Back -> Mid -> Front)
+              _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
-                // Center: Clash Buffer Lane
-                _buildClashBuffer(clashDividerWidth),
+              // Center: Clash Buffer Lane
+              _buildClashBuffer(clashDividerWidth, height: rowHeight * 5 + 24),
 
-                // Right: Enemy Territory (Front -> Mid -> Back)
-                _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
-              ],
-            ),
+              // Right: Enemy Territory (Front -> Mid -> Back)
+              _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
+            ],
           ),
         ],
       ),
@@ -124,6 +112,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     return SizedBox(
       height: 20,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Player ranks
@@ -161,9 +150,10 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     );
   }
 
-  Widget _buildClashBuffer(double width) {
+  Widget _buildClashBuffer(double width, {required double height}) {
     return Container(
       width: width,
+      height: height,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF1B1926).withValues(alpha: 0.6),
@@ -186,11 +176,12 @@ class RankAndRite2DBattlefield extends StatelessWidget {
 
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: rankOrder.map((row) {
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 2),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisSize: MainAxisSize.min,
             children: List.generate(5, (col) {
               return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
             }),
@@ -244,18 +235,18 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
         Color tileBg = isPlayer
-            ? const Color(0xFF13192B).withValues(alpha: 0.7)
-            : const Color(0xFF281418).withValues(alpha: 0.7);
+            ? const Color(0xFF13192B).withValues(alpha: 0.75)
+            : const Color(0xFF281418).withValues(alpha: 0.75);
 
         Color tileBorder = isPlayer
-            ? const Color(0xFF2A4365).withValues(alpha: 0.7)
-            : const Color(0xFF6B2129).withValues(alpha: 0.7);
+            ? const Color(0xFF2A4365).withValues(alpha: 0.75)
+            : const Color(0xFF6B2129).withValues(alpha: 0.75);
 
         if (isDropCandidate || isHovered) {
-          tileBg = const Color(0xFF00E5FF).withValues(alpha: 0.25);
+          tileBg = const Color(0xFF00E5FF).withValues(alpha: 0.28);
           tileBorder = const Color(0xFF00E5FF);
         } else if (isMoveReachable) {
-          tileBg = const Color(0xFF00E676).withValues(alpha: 0.22);
+          tileBg = const Color(0xFF00E676).withValues(alpha: 0.24);
           tileBorder = const Color(0xFF00E676);
         } else if (isSelected) {
           tileBorder = const Color(0xFFFFD54F);
@@ -264,18 +255,18 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         return Container(
           width: tileWidth,
           height: tileHeight,
-          margin: const EdgeInsets.symmetric(vertical: 2),
+          margin: const EdgeInsets.symmetric(vertical: 2.5),
           decoration: BoxDecoration(
             color: tileBg,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: tileBorder,
-              width: (isSelected || isDropCandidate || isHovered) ? 2.0 : 1.0,
+              width: (isSelected || isDropCandidate || isHovered) ? 2.0 : 1.1,
             ),
             boxShadow: (isSelected || isDropCandidate)
                 ? [
                     BoxShadow(
-                      color: (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.4),
+                      color: (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.45),
                       blurRadius: 8,
                     )
                   ]

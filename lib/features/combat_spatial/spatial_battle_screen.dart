@@ -820,20 +820,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   // Battlefield Arena Plane: Supports clean 2D Landscape Lanes or 2.5D Isometric Grid
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final bool isDesktop = constraints.maxWidth >= 700;
+                      final double availW = constraints.maxWidth;
+                      final double availH = constraints.maxHeight;
+
+                      // Dynamically calculate optimal tile dimensions to fill large PC screens
+                      // and scale down gracefully on mobile/tablet screens.
+                      // 2D board has 6 ranks + clash buffer (approx 6.5 tile widths + padding)
+                      // and 5 lane rows (5 tile heights + padding).
+                      final double target2DWidth = (availW / 7.8).clamp(68.0, 150.0);
+                      final double target2DHeight = (availH / 6.2).clamp(52.0, 115.0);
+
+                      final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
                       final double tileHeight = isDesktop ? 85.0 : 59.0;
 
-                      final double tile2DWidth = isDesktop ? 92.0 : 72.0;
-                      final double tile2DHeight = isDesktop ? 66.0 : 52.0;
+                      final double tile2DWidth = target2DWidth;
+                      final double tile2DHeight = target2DHeight;
 
                       return Center(
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 28.0 : 12.0,
-                              vertical: isDesktop ? 24.0 : 12.0,
+                              horizontal: isDesktop ? 20.0 : 8.0,
+                              vertical: isDesktop ? 12.0 : 6.0,
                             ),
                             child: _is2DGridView
                                 ? RankAndRite2DBattlefield(
@@ -4632,7 +4642,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   columns: 3,
                                   rows: 2,
                                   totalFrames: 6,
-                                  duration: const Duration(milliseconds: 650),
+                                  duration: const Duration(milliseconds: 950),
                                   loop: false,
                                   fit: BoxFit.contain,
                                 )
@@ -5181,7 +5191,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         columns: 8,
                         rows: 5,
                         totalFrames: 40,
-                        duration: const Duration(milliseconds: 650),
+                        duration: const Duration(milliseconds: 800),
                         loop: false,
                         fit: BoxFit.contain,
                       ),
