@@ -810,13 +810,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           alignment: Alignment.center,
                           errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                         ),
-                        // Layer 3: Foreground Battlefield Field, Trenches & Debris
-                        Image.asset(
-                          'assets/images/backgrounds/foreground parallax.png',
-                          fit: BoxFit.cover,
-                          alignment: Alignment.bottomCenter,
-                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                        ),
                       ],
                     ),
                   ),
@@ -955,6 +948,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       );
                     },
+                  ),
+
+                  // Layer 3: Foreground Battlefield Parallax (Trenches, briars, mud & fog in front of ground)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 90,
+                    child: IgnorePointer(
+                      child: Image.asset(
+                        'assets/images/backgrounds/foreground parallax.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.bottomCenter,
+                        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                      ),
+                    ),
                   ),
 
                   // Floating Tactical Prompt & Unit Combat Triad Overlays (Non-shifting Stack overlays!)
