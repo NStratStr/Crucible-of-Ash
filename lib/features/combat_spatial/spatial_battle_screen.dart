@@ -791,7 +791,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   // Atmospheric Battlefield Arena Backdrop
                   Positioned.fill(
                     child: Image.asset(
-                      widget.backdropAsset ?? 'assets/images/volcanic_chasm_battlefield.jpg',
+                      widget.backdropAsset ?? 'assets/images/backgrounds/battlefield_ashen_plains.png',
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
                       errorBuilder: (context, error, stackTrace) => Container(
@@ -846,12 +846,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               vertical: isDesktop ? 12.0 : 6.0,
                             ),
                             child: _is2DGridView
-                                ? Transform(
-                                    alignment: Alignment.center,
-                                    transform: Matrix4.identity()
-                                      ..setEntry(3, 2, 0.0012) // 3D Camera depth field-of-view perspective
-                                      ..rotateX(0.24), // Tilted back into horizon (classic Unity 2.5D perspective ground plane)
-                                    child: RankAndRite2DBattlefield(
+                                ? RankAndRite2DBattlefield(
                                     engine: _engine,
                                     selectedUnitId: _selectedUnitId,
                                     selectedEnemyUnitId: _selectedEnemyUnitId,
@@ -930,8 +925,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                         isSelected: isSelected,
                                       );
                                     },
-                                  ),
-                                )
+                                  )
                                 : _buildUnifiedIsometricBattlefield(
                                     tileWidth: tileWidth,
                                     tileHeight: tileHeight,
