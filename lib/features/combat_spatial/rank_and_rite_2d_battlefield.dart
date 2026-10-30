@@ -3,12 +3,11 @@ import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
 /// Rank & Rite 2D Tactical Battlefield Board
-/// Provides a direct, high-readability 2D landscape presentation:
-/// - Player Squad on the Left (Backline Col 0-4, Midline Col 0-4, Frontline Col 0-4)
-/// - Neutral Clash Buffer in the Center
-/// - Enemy Host on the Right (Frontline Col 0-4, Midline Col 0-4, Backline Col 0-4)
-///
-/// Fully responsive: expands dynamically on large PC/desktop displays and scales gracefully on smaller screens.
+/// Provides an authentic open-ground dark fantasy tactical presentation:
+/// - Replaces artificial square box borders with tactile perspective ground plinths
+/// - Field-of-vision visual depth: Frontline plinths are prominent, tapering subtly towards Backline
+/// - Soft battlefield terrain footprint with clean column alignments
+/// - Fully fixed header alignments eliminating right-edge / backline truncation
 class RankAndRite2DBattlefield extends StatelessWidget {
   final SpatialCombatEngine engine;
   final String? selectedUnitId;
@@ -57,25 +56,20 @@ class RankAndRite2DBattlefield extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 5 Columns (lanes, 0 to 4 from top to bottom)
-    // 3 ranks per side: Backline, Midline, Frontline
     final double colWidth = tileWidth;
     final double rowHeight = tileHeight;
-    final double clashDividerWidth = (tileWidth * 0.28).clamp(24.0, 48.0);
-    final double sideWidth = colWidth * 3 + 12; // 3 ranks per side
-    final double totalBoardWidth = sideWidth * 2 + clashDividerWidth + 32;
+    final double clashDividerWidth = (tileWidth * 0.22).clamp(20.0, 36.0);
 
     return Container(
-      width: totalBoardWidth,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0F14).withValues(alpha: 0.90),
+        color: const Color(0xFF07090E).withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2E3244), width: 1.5),
+        border: Border.all(color: const Color(0xFF232738), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.75),
-            blurRadius: 22,
+            color: Colors.black.withValues(alpha: 0.80),
+            blurRadius: 24,
             spreadRadius: 4,
           ),
         ],
@@ -83,9 +77,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header: Rank Indicator Labels
-          _buildRankHeaderLabels(sideWidth, clashDividerWidth),
-          const SizedBox(height: 6),
+          // Header: Perfectly matched Rank Indicator Labels (Backline -> Midline -> Frontline)
+          _buildRankHeaderLabels(colWidth, clashDividerWidth),
+          const SizedBox(height: 8),
 
           // Main 2D Grid: Lanes (Columns 0 to 4)
           Row(
@@ -93,13 +87,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Left: Player Territory (Back -> Mid -> Front)
+              // Left: Player Territory (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
               _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
-              // Center: Clash Buffer Lane
-              _buildClashBuffer(clashDividerWidth, height: rowHeight * 5 + 24),
+              // Center: Subtle Clash Line / No-Man's Land Divider
+              _buildClashBuffer(clashDividerWidth, height: rowHeight * 5 + 16),
 
-              // Right: Enemy Territory (Front -> Mid -> Back)
+              // Right: Enemy Territory (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
               _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
             ],
           ),
@@ -108,45 +102,66 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     );
   }
 
-  Widget _buildRankHeaderLabels(double sideWidth, double clashWidth) {
-    return SizedBox(
-      height: 20,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Player ranks
-          SizedBox(
-            width: sideWidth,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text('BACKLINE (R2)', style: TextStyle(color: Color(0xFF64B5F6), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                Text('MIDLINE (R1)', style: TextStyle(color: Color(0xFF81D4FA), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                Text('FRONTLINE (R0)', style: TextStyle(color: Color(0xFFFFD54F), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-              ],
+  /// Perfectly aligned rank headers matching each column width exactly
+  Widget _buildRankHeaderLabels(double colWidth, double clashWidth) {
+    Widget buildRankBadge(String label, Color color) {
+      return SizedBox(
+        width: colWidth,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: color.withValues(alpha: 0.40), width: 0.8),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(color: color, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.4),
             ),
           ),
-          SizedBox(
-            width: clashWidth,
-            child: const Center(
-              child: Icon(Icons.compare_arrows, color: Color(0xFFFFD54F), size: 14),
-            ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Player Ranks: Row 2 (Back), Row 1 (Mid), Row 0 (Front)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              buildRankBadge('BACKLINE (R2)', const Color(0xFF64B5F6)),
+              buildRankBadge('MIDLINE (R1)', const Color(0xFF81D4FA)),
+              buildRankBadge('FRONTLINE (R0)', const Color(0xFFFFD54F)),
+            ],
           ),
-          // Enemy ranks
-          SizedBox(
-            width: sideWidth,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text('FRONTLINE (R0)', style: TextStyle(color: Color(0xFFFF8A80), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                Text('MIDLINE (R1)', style: TextStyle(color: Color(0xFFFFAB91), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                Text('BACKLINE (R2)', style: TextStyle(color: Color(0xFFE57373), fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-              ],
-            ),
+        ),
+
+        // Neutral Clash Divider
+        SizedBox(
+          width: clashWidth,
+          child: const Center(
+            child: Icon(Icons.compare_arrows, color: Color(0xFFFFD54F), size: 14),
           ),
-        ],
-      ),
+        ),
+
+        // Enemy Ranks: Row 0 (Front), Row 1 (Mid), Row 2 (Back)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              buildRankBadge('FRONTLINE (R0)', const Color(0xFFFF8A80)),
+              buildRankBadge('MIDLINE (R1)', const Color(0xFFFFAB91)),
+              buildRankBadge('BACKLINE (R2)', const Color(0xFFE57373)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -156,9 +171,12 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       height: height,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B1926).withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.3), width: 1.0),
+        color: const Color(0xFF14131D).withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(4),
+        border: Border(
+          left: BorderSide(color: const Color(0xFFFFD54F).withValues(alpha: 0.25), width: 1.0),
+          right: BorderSide(color: const Color(0xFFFFD54F).withValues(alpha: 0.25), width: 1.0),
+        ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -167,7 +185,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           (i) => Icon(
             Icons.flash_on,
             color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
-            size: 14,
+            size: 13,
           ),
         ),
       ),
@@ -178,8 +196,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: rankOrder.map((row) {
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
+        return SizedBox(
+          width: tileWidth,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(5, (col) {
@@ -201,14 +219,21 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     final bool isSelected = occupant != null && (isPlayer ? (selectedUnitId == occupant.id) : (selectedEnemyUnitId == occupant.id));
     final bool isHovered = hoveredTileCol == col && hoveredTileRow == row && isHoveredPlayerSide == isPlayer;
 
-    // Vanguard Cover check (Rank & Rite Spec Sec 3: Direct physical attacks)
+    // Vanguard Cover check (Rank & Rite Spec Sec 3)
     final bool hasVanguardCover = isPlayer && occupant != null && engine.isCoveredByVanguard(occupant, trajectory: AttackTrajectory.directPhysical);
 
     // Movement validity for selected ally
     final selectedAlly = selectedUnitId != null ? engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull : null;
     final bool isMoveReachable = isPlayer && selectedAlly != null && occupant == null && selectedAlly.canMoveTo(col, row, ignoreApCost: engine.isPreBattlePhase);
 
-    // Drop target for dragged cards or units
+    // Natural Field-of-Vision Depth Scaling:
+    // Row 0 (Frontline, closest to clash): Plinths are larger and wider (1.0 scale)
+    // Row 1 (Midline): Scale 0.94
+    // Row 2 (Backline, deeper in terrain): Scale 0.88
+    final double depthScale = row == 0 ? 1.0 : (row == 1 ? 0.94 : 0.88);
+    final double plinthW = (tileWidth * 0.88 * depthScale).clamp(44.0, 160.0);
+    final double plinthH = (tileHeight * 0.30 * depthScale).clamp(14.0, 40.0);
+
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
         onTileHover(col, row, isPlayer);
@@ -234,120 +259,105 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       builder: (context, candidateData, rejectedData) {
         final bool isDropCandidate = candidateData.isNotEmpty;
 
-        Color tileBg = isPlayer
-            ? const Color(0xFF13192B).withValues(alpha: 0.75)
-            : const Color(0xFF281418).withValues(alpha: 0.75);
+        // Ground Plinth Border & Glow Colors
+        Color plinthRimColor;
+        Color plinthGlowColor;
 
-        Color tileBorder = isPlayer
-            ? const Color(0xFF2A4365).withValues(alpha: 0.75)
-            : const Color(0xFF6B2129).withValues(alpha: 0.75);
-
-        if (isDropCandidate || isHovered) {
-          tileBg = const Color(0xFF00E5FF).withValues(alpha: 0.28);
-          tileBorder = const Color(0xFF00E5FF);
+        if (isSelected || isDropCandidate || isHovered) {
+          plinthRimColor = const Color(0xFF00E5FF);
+          plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.6);
         } else if (isMoveReachable) {
-          tileBg = const Color(0xFF00E676).withValues(alpha: 0.24);
-          tileBorder = const Color(0xFF00E676);
-        } else if (isSelected) {
-          tileBorder = const Color(0xFFFFD54F);
+          plinthRimColor = const Color(0xFF00E676);
+          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.4);
+        } else if (occupant != null) {
+          plinthRimColor = isPlayer
+              ? const Color(0xFF64B5F6).withValues(alpha: 0.70)
+              : const Color(0xFFE57373).withValues(alpha: 0.65);
+          plinthGlowColor = (isPlayer ? const Color(0xFF2196F3) : const Color(0xFFF44336)).withValues(alpha: 0.25);
+        } else {
+          // Empty ground coordinate
+          plinthRimColor = isPlayer
+              ? const Color(0xFF37474F).withValues(alpha: 0.35)
+              : const Color(0xFF4E342E).withValues(alpha: 0.30);
+          plinthGlowColor = Colors.transparent;
         }
-
-        final double plinthW = tileWidth * 0.88;
-        final double plinthH = (tileHeight * 0.32).clamp(16.0, 36.0);
 
         return Container(
           width: tileWidth,
           height: tileHeight,
-          margin: const EdgeInsets.symmetric(vertical: 2.5),
-          decoration: BoxDecoration(
-            color: tileBg,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: tileBorder,
-              width: (isSelected || isDropCandidate || isHovered) ? 2.0 : 1.1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.50),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-              if (isSelected || isDropCandidate)
-                BoxShadow(
-                  color: (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.45),
-                  blurRadius: 8,
-                ),
-            ],
-          ),
+          // Open battlefield: transparent background instead of square bounding box!
+          color: Colors.transparent,
           child: Stack(
             alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
-              // Tactical Ground Base Plinth (Gives 3D depth to 2D standing units)
+              // 1. Natural Flat Battlefield Ground Plinth (Tabletop Perspective Base)
               Positioned(
-                bottom: 6,
+                bottom: 8,
                 child: Container(
                   width: plinthW,
                   height: plinthH,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
                     gradient: RadialGradient(
-                      center: const Alignment(0, -0.2),
+                      center: const Alignment(0, -0.15),
                       radius: 0.85,
                       colors: isPlayer
                           ? [
-                              const Color(0xFF1E3A5F).withValues(alpha: 0.95), // Solid slate stone core
-                              const Color(0xFF0B192C),
-                              const Color(0xFF020610).withValues(alpha: 0.8),
+                              const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.60),
+                              const Color(0xFF0B1420).withValues(alpha: 0.90),
+                              Colors.transparent,
                             ]
                           : [
-                              const Color(0xFF4A151C).withValues(alpha: 0.95), // Red-tinged volcanic stone core
-                              const Color(0xFF240A0E),
-                              const Color(0xFF090203).withValues(alpha: 0.8),
+                              const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.60),
+                              const Color(0xFF1B0709).withValues(alpha: 0.90),
+                              Colors.transparent,
                             ],
                     ),
                     border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFFFFD54F)
-                          : (isPlayer
-                              ? const Color(0xFF42A5F5).withValues(alpha: 0.65)
-                              : const Color(0xFFEF5350).withValues(alpha: 0.60)),
-                      width: isSelected ? 2.0 : 1.2,
+                      color: plinthRimColor,
+                      width: (isSelected || isDropCandidate || isHovered) ? 1.8 : 1.0,
                     ),
                     boxShadow: [
+                      // Ground contact shadow
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.85),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
+                        color: Colors.black.withValues(alpha: 0.75),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
                       ),
-                      if (isSelected)
-                        const BoxShadow(
-                          color: Color(0x66FFD54F),
-                          blurRadius: 10,
+                      if (plinthGlowColor != Colors.transparent)
+                        BoxShadow(
+                          color: plinthGlowColor,
+                          blurRadius: isSelected ? 12 : 6,
+                          spreadRadius: isSelected ? 2 : 0,
                         ),
                     ],
                   ),
                 ),
               ),
 
-              // Coordinate tag in corner
+              // 2. Subtle Coordinate Marker (Faintly etched into stone surface)
               Positioned(
-                top: 2,
-                left: 3,
-                child: Text(
-                  'C$col:R$row',
-                  style: TextStyle(
-                    fontSize: 7.5,
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontFamily: 'monospace',
+                bottom: 11,
+                child: Opacity(
+                  opacity: (occupant != null || isHovered || isMoveReachable) ? 0.0 : 0.28,
+                  child: Text(
+                    'C$col:R$row',
+                    style: const TextStyle(
+                      fontSize: 7.5,
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
 
-              // Vanguard Cover Badge (Rank & Rite Spec Sec 3)
+              // 3. Vanguard Cover Badge (Rank & Rite Spec Sec 3)
               if (hasVanguardCover)
                 Positioned(
-                  top: 2,
-                  right: 3,
+                  top: 4,
+                  right: 4,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                     decoration: BoxDecoration(
@@ -362,12 +372,12 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
-              // Petrified Stone Plinth Indicator (Rank & Rite Spec Sec 5)
+              // 4. Petrified Stone Plinth Indicator (Rank & Rite Spec Sec 5)
               if (occupant != null && occupant.isPetrifiedPlinth)
                 Positioned(
                   bottom: 2,
-                  left: 3,
-                  right: 3,
+                  left: 4,
+                  right: 4,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 1),
                     decoration: BoxDecoration(
@@ -384,7 +394,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
-              // Tile Center: Occupant Unit or Move Button
+              // 5. Standing Unit Miniature (Grounded on the perspective plinth)
               if (occupant != null)
                 Center(
                   child: GestureDetector(
@@ -415,13 +425,16 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.3),
+                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: const Color(0xFF00E676), width: 1.0),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x6600E676), blurRadius: 6),
+                        ],
                       ),
                       child: const Text(
                         'SHIFT',
-                        style: TextStyle(fontSize: 7.5, color: Color(0xFF00E676), fontWeight: FontWeight.w900),
+                        style: TextStyle(fontSize: 7.5, color: Color(0xFFE8F5E9), fontWeight: FontWeight.w900),
                       ),
                     ),
                   ),
