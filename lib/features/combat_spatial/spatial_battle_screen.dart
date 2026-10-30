@@ -788,15 +788,36 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Atmospheric Battlefield Arena Backdrop
+                  // Atmospheric Multi-Layer Parallax Battlefield Arena Backdrop
                   Positioned.fill(
-                    child: Image.asset(
-                      widget.backdropAsset ?? 'assets/images/backgrounds/battlefield_ashen_plains.png',
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFF0D0D14),
-                      ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Layer 1: Distant Sky & Atmosphere
+                        Image.asset(
+                          'assets/images/backgrounds/sky parallax.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                          errorBuilder: (context, error, stackTrace) => Image.asset(
+                            widget.backdropAsset ?? 'assets/images/backgrounds/battlefield_ashen_plains.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        // Layer 2: Distant Ruined Gothic Citadel & Ash Peaks
+                        Image.asset(
+                          'assets/images/backgrounds/mountain parallax.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                        ),
+                        // Layer 3: Foreground Battlefield Field, Trenches & Debris
+                        Image.asset(
+                          'assets/images/backgrounds/foreground parallax.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.bottomCenter,
+                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -4538,10 +4559,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           children: [
             // 1. Tabletop 2.5D Contact Drop Shadow & Soft Ground Glow
             Positioned(
-              bottom: 4,
+              bottom: 2,
               child: Container(
                 width: baseWidth,
-                height: baseHeight,
+                height: baseHeight + (_is2DGridView ? 4 : 0),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, baseHeight / 2)),
                   gradient: RadialGradient(
