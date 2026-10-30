@@ -842,7 +842,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       // 2D board has 6 ranks + clash buffer (approx 6.5 tile widths + padding)
                       // and 5 lane rows (5 tile heights + padding).
                       final double target2DWidth = (availW / 7.8).clamp(68.0, 150.0);
-                      final double target2DHeight = (availH / 6.2).clamp(52.0, 115.0);
+                      // Compact vertical row height so all 5 lanes sit naturally in the ground terrain
+                      final double target2DHeight = (availH / 9.5).clamp(36.0, 72.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
@@ -851,13 +852,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final double tile2DWidth = target2DWidth;
                       final double tile2DHeight = target2DHeight;
 
-                      return Center(
+                      return Align(
+                        alignment: const Alignment(0.0, 0.60), // Grounded in the lower plains terrain
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: isDesktop ? 20.0 : 8.0,
-                              vertical: isDesktop ? 12.0 : 6.0,
+                              vertical: 4.0,
                             ),
                             child: _is2DGridView
                                 ? RankAndRite2DBattlefield(
@@ -955,7 +957,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    height: 90,
+                    height: 65,
                     child: IgnorePointer(
                       child: Image.asset(
                         'assets/images/backgrounds/foreground parallax.png',
