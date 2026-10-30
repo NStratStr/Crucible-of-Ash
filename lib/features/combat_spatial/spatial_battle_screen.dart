@@ -11,6 +11,7 @@ import '../generals/general_command_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import 'rank_and_rite_2d_battlefield.dart';
+import '../../shared/widgets/sprite_sheet_animation.dart';
 
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
@@ -93,6 +94,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
   final List<_GroundShockwaveRipple> _groundRipples = [];
+  final List<_ActiveCombatSpriteVfx> _activeSpriteVfx = [];
   Offset _screenShakeOffset = Offset.zero;
   double _shakeIntensity = 0.0;
 
@@ -4624,17 +4626,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       BlendMode.srcATop,
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
-                          child: Image.asset(
-                            unit.assetPath,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.bottomCenter,
-                            filterQuality: FilterQuality.medium,
-                            errorBuilder: (context, error, stackTrace) => Icon(
-                              unit.isPlayer ? Icons.shield : Icons.dangerous,
-                              color: factionColor,
-                              size: isBoss ? 48 : 36,
-                            ),
-                          ),
+                          child: (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
+                              ? SpriteSheetAnimation(
+                                  assetPath: 'assets/animations/valeria_slash_sheet.png',
+                                  columns: 3,
+                                  rows: 2,
+                                  totalFrames: 6,
+                                  duration: const Duration(milliseconds: 650),
+                                  loop: false,
+                                  fit: BoxFit.contain,
+                                )
+                              : Image.asset(
+                                  unit.assetPath,
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.bottomCenter,
+                                  filterQuality: FilterQuality.medium,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    unit.isPlayer ? Icons.shield : Icons.dangerous,
+                                    color: factionColor,
+                                    size: isBoss ? 48 : 36,
+                                  ),
+                                ),
                         ),
 
                         // Ash Dissolve Floating Embers for Downed / Inert Vessels
@@ -5155,6 +5167,28 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
             ),
+
+            // 6. Active Ability Hit Sprite Sheet VFX (e.g. Fire / Sun Magic Circle Hit)
+            if (isDamaged && (floatingPop == null || !floatingPop.contains('+')))
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Center(
+                    child: SizedBox(
+                      width: isBoss ? bossSpanWidth * 1.3 : tileWidth * 1.5,
+                      height: isBoss ? (tileHeight * 2.6) : (tileHeight * 2.2),
+                      child: SpriteSheetAnimation(
+                        assetPath: 'assets/animations/vfx/sun_burst_circle_sheet.png',
+                        columns: 8,
+                        rows: 5,
+                        totalFrames: 40,
+                        duration: const Duration(milliseconds: 650),
+                        loop: false,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -8005,6 +8039,32 @@ class _FloatingCombatText {
 }
 
 /// Dynamic ground ripple shockwave originating from high-impact strikes
+class _ActiveCombatSpriteVfx {
+  final String id;
+  final Offset position;
+  final String assetPath;
+  final int columns;
+  final int rows;
+  final int totalFrames;
+  final int durationMs;
+  final double width;
+  final double height;
+  final BlendMode? blendMode;
+
+  const _ActiveCombatSpriteVfx({
+    required this.id,
+    required this.position,
+    required this.assetPath,
+    required this.columns,
+    required this.rows,
+    required this.totalFrames,
+    required this.durationMs,
+    required this.width,
+    required this.height,
+    this.blendMode,
+  });
+}
+
 class _GroundShockwaveRipple {
   final String id;
   final Offset origin;
