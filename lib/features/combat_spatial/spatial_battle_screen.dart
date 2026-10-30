@@ -527,7 +527,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _animTimers.add(tVfx);
 
     // Reset visual lunge & floating pops after 1100ms
-    final t1 = Timer(const Duration(milliseconds: 1100), () {
+    final t1 = Timer(const Duration(milliseconds: 1600), () {
       if (mounted) {
         setState(() {
           _attackingUnitId = null;
@@ -4489,7 +4489,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final String? floatingPop = _unitFloatingPops[unit.id];
 
     // Lunge forward across clash line during attack
-    final double lungeY = isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0;
+        final double lungeY = _is2DGridView ? 0.0 : (isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0);
+    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 16.0 : -16.0) : 0.0;
     final double hitShakeX = isDamaged ? 4.0 : 0.0;
 
     // Normalization multipliers:
@@ -4527,7 +4528,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
-      transform: Matrix4.translationValues(hitShakeX, lungeY, 0),
+      transform: Matrix4.translationValues(hitShakeX + lungeX, lungeY, 0),
       child: SizedBox(
         width: isBoss ? bossSpanWidth : tileWidth,
         height: isBoss ? (tileHeight * 2.0) : tileHeight,
@@ -4642,7 +4643,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   columns: 3,
                                   rows: 2,
                                   totalFrames: 6,
-                                  duration: const Duration(milliseconds: 950),
+                                  duration: const Duration(milliseconds: 1400),
                                   loop: false,
                                   fit: BoxFit.contain,
                                 )

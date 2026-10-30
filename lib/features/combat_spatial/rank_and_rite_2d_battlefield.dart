@@ -252,6 +252,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           tileBorder = const Color(0xFFFFD54F);
         }
 
+        final double plinthW = tileWidth * 0.88;
+        final double plinthH = (tileHeight * 0.32).clamp(16.0, 36.0);
+
         return Container(
           width: tileWidth,
           height: tileHeight,
@@ -263,17 +266,69 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               color: tileBorder,
               width: (isSelected || isDropCandidate || isHovered) ? 2.0 : 1.1,
             ),
-            boxShadow: (isSelected || isDropCandidate)
-                ? [
-                    BoxShadow(
-                      color: (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.45),
-                      blurRadius: 8,
-                    )
-                  ]
-                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.50),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+              if (isSelected || isDropCandidate)
+                BoxShadow(
+                  color: (isDropCandidate ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)).withValues(alpha: 0.45),
+                  blurRadius: 8,
+                ),
+            ],
           ),
           child: Stack(
+            alignment: Alignment.center,
             children: [
+              // Tactical Ground Base Plinth (Gives 3D depth to 2D standing units)
+              Positioned(
+                bottom: 6,
+                child: Container(
+                  width: plinthW,
+                  height: plinthH,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
+                    gradient: RadialGradient(
+                      center: const Alignment(0, -0.2),
+                      radius: 0.85,
+                      colors: isPlayer
+                          ? [
+                              const Color(0xFF1E3A5F).withValues(alpha: 0.95), // Solid slate stone core
+                              const Color(0xFF0B192C),
+                              const Color(0xFF020610).withValues(alpha: 0.8),
+                            ]
+                          : [
+                              const Color(0xFF4A151C).withValues(alpha: 0.95), // Red-tinged volcanic stone core
+                              const Color(0xFF240A0E),
+                              const Color(0xFF090203).withValues(alpha: 0.8),
+                            ],
+                    ),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFFFFD54F)
+                          : (isPlayer
+                              ? const Color(0xFF42A5F5).withValues(alpha: 0.65)
+                              : const Color(0xFFEF5350).withValues(alpha: 0.60)),
+                      width: isSelected ? 2.0 : 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                      if (isSelected)
+                        const BoxShadow(
+                          color: Color(0x66FFD54F),
+                          blurRadius: 10,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
               // Coordinate tag in corner
               Positioned(
                 top: 2,

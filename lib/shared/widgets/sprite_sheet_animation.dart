@@ -36,6 +36,7 @@ class SpriteSheetAnimation extends StatefulWidget {
 }
 
 class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with SingleTickerProviderStateMixin {
+  static final Map<String, ui.Image> _globalImageCache = {};
   late final AnimationController _controller;
   ui.Image? _image;
   bool _isLoading = true;
@@ -48,6 +49,17 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
       duration: widget.duration,
     );
 
+    final cached = _globalImageCache[widget.assetPath];
+    if (cached != null) {
+      _image = cached;
+      _isLoading = false;
+      _startPlayback();
+    } else {
+      _loadSpriteSheet();
+    }
+  }
+
+  void _startPlayback() {
     if (widget.loop) {
       _controller.repeat();
     } else {
@@ -57,8 +69,6 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
         }
       });
     }
-
-    _loadSpriteSheet();
   }
 
   Future<void> _loadSpriteSheet() async {
@@ -66,11 +76,13 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
       final ByteData data = await rootBundle.load(widget.assetPath);
       final ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
       final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      _globalImageCache[widget.assetPath] = frameInfo.image;
       if (mounted) {
         setState(() {
           _image = frameInfo.image;
           _isLoading = false;
         });
+        _startPlayback();
       }
     } catch (e) {
       debugPrint('Failed to load sprite sheet: ${widget.assetPath}, error: $e');
