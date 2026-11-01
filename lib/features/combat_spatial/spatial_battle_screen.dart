@@ -846,8 +846,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       // Dynamically calculate optimal tile dimensions for 3 Ranks x 3 Lanes
                       // Total board has 6 ranks + clash buffer (~6.5 tile widths) and 3 lanes (3 tile heights).
                       final double target2DWidth = (availW / 7.2).clamp(70.0, 160.0);
-                      // Exactly 3 lanes: sized so all 3 lanes fit with generous breathing room
-                      final double target2DHeight = (availH / 3.8).clamp(55.0, 115.0);
+                      // Exactly 3 lanes: sized cleanly along the terrain ground plane, preserving the epic skyline!
+                      final double target2DHeight = (availH / 4.4).clamp(48.0, 95.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
@@ -4546,10 +4546,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double baseWidth = isBoss ? bossSpanWidth * 0.70 : (tileWidth - 12) * unitScaleMultiplier;
     final double baseHeight = isBoss ? 44 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.05 * unitScaleMultiplier).clamp(48.0, 320.0);
+    // Elegant Wartune-style stage proportions:
+    // Characters stand handsomely grounded on their plinths without dwarfing the battlefield landscape!
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.10 : tileWidth * 0.88 * unitScaleMultiplier).clamp(40.0, 260.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 3.5).clamp(160.0, 320.0)
-        : (tileHeight * 1.85 * unitScaleMultiplier).clamp(58.0, 220.0));
+        ? (tileHeight * 2.8).clamp(140.0, 280.0)
+        : (tileHeight * 1.28 * unitScaleMultiplier).clamp(44.0, 130.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
