@@ -65,29 +65,19 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Colors.transparent,
       ),
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Header: Perfectly matched Rank Indicator Labels (Backline -> Midline -> Frontline)
-          _buildRankHeaderLabels(colWidth, clashDividerWidth),
-          const SizedBox(height: 8),
+          // Left: Player Squad (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
+          _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
-          // Main 2D Grid: Lanes (Columns 0 to 4)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left: Player Territory (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
-              _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
+          // Center: Natural open clash spacing (no artificial vertical divider line!)
+          SizedBox(width: (tileWidth * 0.35).clamp(24.0, 60.0)),
 
-              // Center: Subtle Clash Line / No-Man's Land Divider
-              _buildClashBuffer(clashDividerWidth, height: rowHeight * 3 + 12),
-
-              // Right: Enemy Territory (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
-              _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
-            ],
-          ),
+          // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
+          _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
         ],
       ),
     );
@@ -186,14 +176,24 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: rankOrder.map((row) {
-        return SizedBox(
-          width: tileWidth,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(3, (col) {
-              return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
-            }),
+        // Natural 2.5D Wartune Stage Depth Staggering:
+        // Frontline (Row 0): at bottom ground baseline (offset 0)
+        // Midline (Row 1): stepped back into terrain (-12px)
+        // Backline (Row 2): stepped deepest into horizon (-24px)
+        final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -12.0 : -24.0);
+
+        return Transform.translate(
+          offset: Offset(0, rankDepthOffsetY),
+          child: SizedBox(
+            width: tileWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (col) {
+                return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
+              }),
+            ),
           ),
         );
       }).toList(),
