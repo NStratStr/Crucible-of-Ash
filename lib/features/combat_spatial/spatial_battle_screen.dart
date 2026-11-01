@@ -847,7 +847,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       // Total board has 6 ranks + clash buffer (~6.5 tile widths) and 3 lanes (3 tile heights).
                       final double target2DWidth = (availW / 7.2).clamp(70.0, 160.0);
                       // Exactly 3 lanes: sized cleanly along the terrain ground plane, preserving the epic skyline!
-                      final double target2DHeight = (availH / 4.4).clamp(48.0, 95.0);
+                      final double target2DHeight = (availH / 3.9).clamp(54.0, 110.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
@@ -1382,7 +1382,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Combat Docks (Ultimates & Grimoire Hand)
             if (_engine.isPreBattlePhase)
-              _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
+              Transform.translate(
+                offset: const Offset(0, -10.0),
+                child: _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile),
+              )
             else ...[
               // Rank & Rite Spec Sec 2: Turn Action Decision Tray (When Turn Meter reaches 10,000 TM)
               if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
@@ -1391,8 +1394,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
               _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
 
-              // Tactical Card Hand & Burn Pit (Sculptor Tray)
-              _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
+              // Tactical Card Hand & Burn Pit (Sculptor Tray) - overlaps battlefield slightly for tabletop feel
+              Transform.translate(
+                offset: const Offset(0, -10.0),
+                child: _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
+              ),
             ],
 
             // Live 30 Hz Combat Event Log (Hidden in Zen Mode and Mobile Landscape)
@@ -4548,10 +4554,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Units scale dynamically with tile size for commanding visual presence
     // Elegant Wartune-style stage proportions:
     // Slightly enlarged characters stand handsomely grounded on their plinths with heroic presence!
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 0.96 * unitScaleMultiplier).clamp(48.0, 280.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.25 : tileWidth * 1.08 * unitScaleMultiplier).clamp(52.0, 300.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 3.0).clamp(150.0, 300.0)
-        : (tileHeight * 1.45 * unitScaleMultiplier).clamp(52.0, 150.0));
+        ? (tileHeight * 3.2).clamp(160.0, 320.0)
+        : (tileHeight * 1.62 * unitScaleMultiplier).clamp(58.0, 175.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
