@@ -627,10 +627,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D12),
-      appBar: AppBar(
+      appBar: isLandscapeMobile ? null : AppBar(
         backgroundColor: const Color(0xFF14141E),
         elevation: 0,
-        toolbarHeight: isLandscapeMobile ? 42 : null,
         leading: widget.onBackToStandardCombat != null
             ? IconButton(
                 icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
@@ -967,7 +966,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
 
                   // Floating Tactical Prompt & Unit Combat Triad Overlays (Non-shifting Stack overlays!)
-                  if (!_isZenMode &&
+                  // Hidden on landscape mobile so it doesn't block the battlefield view!
+                  if (!_isZenMode && !isLandscapeMobile &&
                       (_engine.lastBannerMessage != null ||
                           _draggedUnitId != null ||
                           _selectedCardId != null ||
@@ -4529,31 +4529,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     double unitScaleMultiplier = 1.0;
     final path = unit.assetPath.toLowerCase();
     if (unit.id == 'lady_valeria' || path.contains('valeria')) {
-      unitScaleMultiplier = 0.88; // Full-bleed canvas normalization for 1:1 tile footprint
+      unitScaleMultiplier = 0.95; // Crisp full-bleed canvas
     } else if (path.contains('ghoul')) {
-      unitScaleMultiplier = 1.45; // Ghoul crouches low; scale up plinth & figure
-    } else if (path.contains('sentinel') || path.contains('juggernaut')) {
-      unitScaleMultiplier = 1.35; // Bulky armored frontline
-    } else if (path.contains('crimson_inquisitor') || path.contains('inquisitor') || path.contains('footman')) {
-      unitScaleMultiplier = 1.35; // Tabletop knight plinths
-    } else if (path.contains('sanguine_flayer') || path.contains('blade') || path.contains('scourge')) {
-      unitScaleMultiplier = 1.35;
-    } else if (path.contains('sun_smith') || path.contains('alchemist') || path.contains('scribe') || path.contains('priestess')) {
-      unitScaleMultiplier = 1.25;
+      unitScaleMultiplier = 1.15; // Low crouch
+    } else if (path.contains('alchemist')) {
+      // 2752x1536 wide canvas with narrow 31% center content; scale up so figure matches standard height!
+      unitScaleMultiplier = 1.65;
+    } else if (path.contains('sentinel') || path.contains('juggernaut') || path.contains('inquisitor') || path.contains('footman')) {
+      unitScaleMultiplier = 1.10;
+    } else if (path.contains('sanguine_flayer') || path.contains('blade') || path.contains('scourge') || path.contains('vladislav')) {
+      unitScaleMultiplier = 1.05;
+    } else if (path.contains('sun_smith') || path.contains('scribe') || path.contains('priestess')) {
+      unitScaleMultiplier = 1.10;
     } else if (path.contains('cinder_witch') || path.contains('blood_initiate') || path.contains('sorcerer') || path.contains('archon') || path.contains('matron')) {
-      unitScaleMultiplier = 1.30; // Tall casters
+      unitScaleMultiplier = 1.15;
     } else if (path.contains('warhound') || path.contains('golem')) {
-      unitScaleMultiplier = 1.30;
+      unitScaleMultiplier = 1.15;
     }
 
     final double bossSpanWidth = isBoss ? (tileWidth * 2.2) : tileWidth;
     final double baseWidth = isBoss ? bossSpanWidth * 0.70 : (tileWidth - 12) * unitScaleMultiplier;
     final double baseHeight = isBoss ? 44 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.05 * unitScaleMultiplier).clamp(80.0, 320.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.05 * unitScaleMultiplier).clamp(48.0, 320.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 3.8).clamp(200.0, 320.0)
-        : (tileHeight * 2.3 * unitScaleMultiplier).clamp(110.0, 220.0));
+        ? (tileHeight * 3.5).clamp(160.0, 320.0)
+        : (tileHeight * 1.85 * unitScaleMultiplier).clamp(58.0, 220.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -5561,7 +5562,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
     final int deployedCount = livingAllies.where((u) => u.occupiedNodes.isNotEmpty).length;
     final int totalCount = livingAllies.length;
-    final double dockHeight = isLandscapeMobile ? 62.0 : 78.0;
+    final double dockHeight = isLandscapeMobile ? 48.0 : 78.0;
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) => details.data.startsWith('unit:'),
@@ -5891,8 +5892,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           Stack(
             children: [
               Container(
-                width: isLandscapeMobile ? 32 : 40,
-                height: isLandscapeMobile ? 44 : 56,
+                width: isLandscapeMobile ? 26 : 40,
+                height: isLandscapeMobile ? 36 : 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: Colors.white24, width: 0.8),
