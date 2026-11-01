@@ -837,13 +837,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final double availW = constraints.maxWidth;
                       final double availH = constraints.maxHeight;
 
-                      // Dynamically calculate optimal tile dimensions to fill large PC screens
-                      // and scale down gracefully on mobile/tablet screens.
-                      // 2D board has 6 ranks + clash buffer (approx 6.5 tile widths + padding)
-                      // and 5 lane rows (5 tile heights + padding).
-                      final double target2DWidth = (availW / 7.8).clamp(68.0, 150.0);
-                      // Compact vertical row height so all 5 lanes sit naturally in the ground terrain
-                      final double target2DHeight = (availH / 9.5).clamp(36.0, 72.0);
+                      // Dynamically calculate optimal tile dimensions for 3 Ranks x 3 Lanes
+                      // Total board has 6 ranks + clash buffer (~6.5 tile widths) and 3 lanes (3 tile heights).
+                      final double target2DWidth = (availW / 7.5).clamp(80.0, 160.0);
+                      // 3 Lanes allow generous, handsome character height without climbing up into the sky!
+                      final double target2DHeight = (availH / 5.2).clamp(60.0, 115.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;

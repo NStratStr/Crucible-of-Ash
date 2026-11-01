@@ -82,7 +82,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
               // Center: Subtle Clash Line / No-Man's Land Divider
-              _buildClashBuffer(clashDividerWidth, height: rowHeight * 5 + 16),
+              _buildClashBuffer(clashDividerWidth, height: rowHeight * 3 + 12),
 
               // Right: Enemy Territory (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
               _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
@@ -172,7 +172,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(
-          5,
+          3,
           (i) => Icon(
             Icons.flash_on,
             color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
@@ -191,7 +191,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           width: tileWidth,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(5, (col) {
+            children: List.generate(3, (col) {
               return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
             }),
           ),
@@ -221,9 +221,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     // Row 0 (Frontline, closest to clash): Plinths are larger and wider (1.0 scale)
     // Row 1 (Midline): Scale 0.94
     // Row 2 (Backline, deeper in terrain): Scale 0.88
-    final double depthScale = row == 0 ? 1.0 : (row == 1 ? 0.94 : 0.88);
+    // 3x3 Staggered Depth Perspective Scaling
+    // Row 0 (Frontline, closest to clash): 1.06 scale (heroic frontline presence)
+    // Row 1 (Midline): 0.95 scale
+    // Row 2 (Backline, deeper in the field): 0.84 scale (recedes into the distance)
+    final double depthScale = row == 0 ? 1.06 : (row == 1 ? 0.95 : 0.84);
     final double plinthW = (tileWidth * 0.88 * depthScale).clamp(44.0, 160.0);
-    final double plinthH = (tileHeight * 0.30 * depthScale).clamp(14.0, 40.0);
+    final double plinthH = (tileHeight * 0.28 * depthScale).clamp(14.0, 38.0);
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {

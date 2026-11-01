@@ -276,7 +276,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       int minionIdx = 0;
       for (int i = 1; i < waveEntities.length; i++) {
         final minion = waveEntities[i];
-        final col = (minionIdx % 2 == 0) ? 0 : 4;
+        final col = (minionIdx % 2 == 0) ? 0 : 2;
         final row = (minionIdx ~/ 2 == 0) ? 0 : 2;
         minionIdx++;
 
@@ -304,7 +304,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         final bool isVanguard = e.isFrontlineOverride ??
             (e.slot == FormationSlot.front1 || e.slot == FormationSlot.front2 || e.slot == FormationSlot.front3);
         final int targetRow = isVanguard ? 0 : (e.archetype == Archetype.support || e.archetype == Archetype.occultist ? 2 : 1);
-        final int targetCol = (i * 2) % 5;
+        final int targetCol = i % 3;
 
         enemyUnits.add(CombatUnitState(
           id: e.id,
@@ -700,7 +700,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 4, row: 0, occupantUnitId: 'pyre_zealot'),
+        const GridNode(column: 2, row: 0, occupantUnitId: 'pyre_zealot'),
       ],
       maxHp: 410,
       hp: 410,
@@ -742,7 +742,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 3, row: 0, occupantUnitId: 'iron_footman'),
+        const GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'),
       ],
       maxHp: 450,
       hp: 450,
@@ -762,7 +762,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.reachMidline,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 3, row: 1, occupantUnitId: 'sanguine_blade'),
+        const GridNode(column: 1, row: 1, occupantUnitId: 'sanguine_blade'),
       ],
       moveRange: 2,
       maxHp: 310,
@@ -783,7 +783,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.backlineCaster,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 4, row: 2, occupantUnitId: 'sun_smith'),
+        const GridNode(column: 2, row: 2, occupantUnitId: 'sun_smith'),
       ],
       maxHp: 280,
       hp: 280,
@@ -1049,7 +1049,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (isPhase2Enkindled) {
           // Hearth Cataclysm: 20-tick windup terminal channel hitting all Frontline (row 0) and Midline (row 1) nodes!
           final cataclysmNodes = [
-            for (int col = 0; col < 5; col++) ...[
+            for (int col = 0; col < 3; col++) ...[
               GridNode(column: col, row: 0),
               GridNode(column: col, row: 1),
             ],
@@ -2063,7 +2063,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     // Adjacency Fallback
     for (int dist = 1; dist <= 4; dist++) {
       for (final col in [unitCol - dist, unitCol + dist]) {
-        if (col >= 0 && col <= 4) {
+        if (col >= 0 && col <= 2) {
           for (int r = 0; r <= 2; r++) {
             final occupant = squad.where((u) => u.isAlive && u.occupies(col, r)).firstOrNull;
             if (occupant != null) return occupant;

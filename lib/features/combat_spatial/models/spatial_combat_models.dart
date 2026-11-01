@@ -387,7 +387,7 @@ class CombatUnitState {
   bool canMoveTo(int targetCol, int targetRow, {bool ignoreApCost = false}) {
     if (isDisplacementImmune) return false;
     if (!ignoreApCost && currentAp < moveApCost) return false;
-    if (targetCol < 0 || targetCol > 4 || targetRow < 0 || targetRow > 2) return false;
+    if (targetCol < 0 || targetCol > 2 || targetRow < 0 || targetRow > 2) return false;
     if (occupiedNodes.isEmpty) {
       return ignoreApCost; // In pre-battle deployment, unplaced units can be freely deployed onto any tile!
     }
