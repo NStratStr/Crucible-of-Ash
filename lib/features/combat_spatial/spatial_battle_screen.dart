@@ -299,11 +299,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       secondaryColor = const Color(0xFF00E5FF);
       durationMs = 800;
       _playSfx('sfx_block.wav'); // Heavy armor crack / shield shatter
-    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt')) {
-      vfxType = 'beam';
-      primaryColor = event.isPlayerAttacker ? const Color(0xFFFFD54F) : const Color(0xFFFF7043);
-      secondaryColor = const Color(0xFFFFEB3B);
-      durationMs = 600;
+    } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.archetype == UnitArchetype.marksmanRanged)) {
+      vfxType = 'arrow';
+      primaryColor = const Color(0xFFFFD54F);
+      secondaryColor = const Color(0xFFFF8A80);
+      durationMs = 550;
+      _playSfx('sfx_hit.wav');
+    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.casterAoe)) {
+      vfxType = 'firebolt';
+      primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
+      secondaryColor = const Color(0xFFFFD54F);
+      durationMs = 650;
       _playSfx('sfx_spell.wav'); // Magic surge
     } else if (event.isHeal || event.skillName.contains('Phalanx')) {
       vfxType = 'shockwave';
@@ -4566,7 +4572,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     // Lunge forward across clash line during attack
     final double lungeY = _is2DGridView ? 0.0 : (isAttacking ? (unit.isPlayer ? -16.0 : 16.0) : 0.0);
-    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 24.0 : -24.0) : 0.0;
+    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 34.0 : -34.0) : 0.0;
     // Directional knockback recoil when taking a hit (pushed backward away from enemy strike)
     final double hitRecoilX = isDamaged ? (unit.isPlayer ? -8.0 : 8.0) : 0.0;
     final double hitShakeY = isDamaged ? -3.0 : 0.0;
@@ -7625,6 +7631,12 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         case 'beam':
           _drawBeam(canvas, vfx, progress);
           break;
+        case 'arrow':
+          _drawProjectile(canvas, vfx, progress, isArrow: true);
+          break;
+        case 'firebolt':
+          _drawProjectile(canvas, vfx, progress, isArrow: false);
+          break;
         case 'shockwave':
         case 'shatter':
           _drawShockwave(canvas, vfx, progress);
@@ -7746,6 +7758,94 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         ..color = Colors.white.withAlpha(((1.0 - (progress / 0.4)) * 200).round())
         ..style = PaintingStyle.fill;
       canvas.drawCircle(target, flashRadius, flashPaint);
+    }
+  }
+
+  void _drawProjectile(Canvas canvas, _CombatVfx vfx, double progress, {required bool isArrow}) {
+    final start = vfx.startOffset;
+    final target = vfx.targetOffset;
+
+    // Ballistic / direct projectile flight interpolation
+    final double flightT = (progress / 0.82).clamp(0.0, 1.0);
+    // Slight parabolic arc
+    final double arcHeight = isArrow ? -28.0 : -18.0;
+    final double currentX = start.dx + (target.dx - start.dx) * flightT;
+    final double currentY = start.dy + (target.dy - start.dy) * flightT + sin(flightT * 3.14159) * arcHeight;
+    final currentPos = Offset(currentX, currentY);
+
+    // Calculate heading angle
+    final double dx = target.dx - start.dx;
+    final double dy = target.dy - start.dy + (cos(flightT * 3.14159) * arcHeight);
+    final double angle = atan2(dy, dx);
+
+    final int alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+
+    if (flightT < 1.0) {
+      if (isArrow) {
+        // High-velocity arrow / bolt with tracer tail
+        final double tailLength = 22.0;
+        final tailPos = Offset(currentX - cos(angle) * tailLength, currentY - sin(angle) * tailLength);
+
+        // Motion trail
+        final trailPaint = Paint()
+          ..color = vfx.primaryColor.withAlpha((alpha * 0.45).round())
+          ..strokeWidth = 2.5
+          ..strokeCap = StrokeCap.round;
+        canvas.drawLine(tailPos, currentPos, trailPaint);
+
+        // Arrow shaft & glowing tip
+        final arrowPaint = Paint()
+          ..color = Colors.white.withAlpha(alpha)
+          ..strokeWidth = 1.8
+          ..strokeCap = StrokeCap.round;
+        canvas.drawLine(tailPos, currentPos, arrowPaint);
+
+        // Arrow head spark
+        final headPaint = Paint()
+          ..color = vfx.primaryColor.withAlpha(alpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(currentPos, 3.2, headPaint);
+      } else {
+        // Glowing magic firebolt / orb with smoke embers
+        final orbRadius = 6.5;
+        // Outer fiery halo
+        final haloPaint = Paint()
+          ..color = vfx.primaryColor.withAlpha((alpha * 0.55).round())
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+        canvas.drawCircle(currentPos, orbRadius * 1.6, haloPaint);
+
+        // Core bolt
+        final corePaint = Paint()
+          ..color = vfx.secondaryColor.withAlpha(alpha)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(currentPos, orbRadius, corePaint);
+
+        // Center white-hot spark
+        canvas.drawCircle(currentPos, orbRadius * 0.45, Paint()..color = Colors.white.withAlpha(alpha));
+
+        // Trailing particles
+        final trailOffset = Offset(currentX - cos(angle) * 14.0, currentY - sin(angle) * 14.0);
+        canvas.drawCircle(trailOffset, orbRadius * 0.5, Paint()..color = vfx.primaryColor.withAlpha((alpha * 0.4).round()));
+      }
+    } else {
+      // Impact burst at target location when projectile lands!
+      final burstP = ((progress - 0.82) / 0.18).clamp(0.0, 1.0);
+      final burstRadius = (isArrow ? 18.0 : 28.0) * burstP;
+      final burstAlpha = ((1.0 - burstP) * 240).round().clamp(0, 255);
+
+      final burstPaint = Paint()
+        ..color = vfx.primaryColor.withAlpha(burstAlpha)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (3.0 * (1.0 - burstP)).clamp(1.0, 3.5);
+      canvas.drawCircle(target, burstRadius, burstPaint);
+
+      // Core flash
+      if (burstP < 0.5) {
+        final coreFlashPaint = Paint()
+          ..color = Colors.white.withAlpha(((1.0 - burstP / 0.5) * 220).round())
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(target, burstRadius * 0.6, coreFlashPaint);
+      }
     }
   }
 
