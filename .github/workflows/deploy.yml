@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/rank-and-rite-combat
   workflow_dispatch: # Allows manual trigger whenever needed
 
 permissions:
