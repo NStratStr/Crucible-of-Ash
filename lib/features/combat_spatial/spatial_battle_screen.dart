@@ -443,14 +443,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           popBorder = const Color(0xFFB71C1C);
           popSize = 12.0;
         } else if (event.isCrit) {
-          popText = '💥 -${event.damage} CRIT!';
+          popText = '★ -${event.damage} CRIT!';
           popColor = const Color(0xFFFFD54F);
-          popBorder = const Color(0xFFFF1744);
-          popSize = 13.5;
+          popBorder = const Color(0xFFFF9100);
+          popSize = 14.0;
         } else if (event.bleedStacks > 0) {
-          popText = '-${event.damage} (🩸+${event.bleedStacks})';
-          popColor = const Color(0xFFFF5252);
-          popBorder = const Color(0xFFB71C1C);
+          popText = '🩸 -${event.damage} (+${event.bleedStacks} Bleed)';
+          popColor = const Color(0xFFFF3D00);
+          popBorder = const Color(0xFFDD2C00);
         } else {
           popText = '-${event.damage}';
           popColor = const Color(0xFFFF8A80);
@@ -4565,9 +4565,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final String? floatingPop = _unitFloatingPops[unit.id];
 
     // Lunge forward across clash line during attack
-        final double lungeY = _is2DGridView ? 0.0 : (isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0);
-    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 16.0 : -16.0) : 0.0;
-    final double hitShakeX = isDamaged ? 4.0 : 0.0;
+    final double lungeY = _is2DGridView ? 0.0 : (isAttacking ? (unit.isPlayer ? -16.0 : 16.0) : 0.0);
+    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 24.0 : -24.0) : 0.0;
+    // Directional knockback recoil when taking a hit (pushed backward away from enemy strike)
+    final double hitRecoilX = isDamaged ? (unit.isPlayer ? -8.0 : 8.0) : 0.0;
+    final double hitShakeY = isDamaged ? -3.0 : 0.0;
 
     // Normalization multipliers:
     // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
@@ -4607,7 +4609,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
-      transform: Matrix4.translationValues(hitShakeX + lungeX, lungeY, 0),
+      transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
       child: SizedBox(
         width: isBoss ? bossSpanWidth : tileWidth,
         height: isBoss ? (tileHeight * 2.0) : tileHeight,
@@ -4711,8 +4713,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               : (isDamaged
                                   ? ColorFilter.mode(
                                       (floatingPop != null && floatingPop.contains('CRIT'))
-                                          ? const Color(0x99FFFFFF)
-                                          : const Color(0x66FF1744), // Translucent crimson flash so miniature artwork remains clear
+                                          ? const Color(0xCCFFFFFF) // Blinding white crit flash
+                                          : const Color(0x99FF3D00), // Fiery crimson-amber impact flash
                                       BlendMode.srcATop,
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
