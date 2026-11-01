@@ -61,7 +61,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     final double clashDividerWidth = (tileWidth * 0.22).clamp(20.0, 36.0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: const BoxDecoration(
         color: Colors.transparent,
       ),
@@ -73,8 +73,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           // Left: Player Squad (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
           _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
-          // Center: Natural open clash spacing (no artificial vertical divider line!)
-          SizedBox(width: (tileWidth * 0.35).clamp(24.0, 60.0)),
+          // Center: Intimate clash spacing (armies face off in close tactical confrontation)
+          SizedBox(width: (tileWidth * 0.16).clamp(10.0, 32.0)),
 
           // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
           _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
@@ -174,25 +174,41 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   }
 
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
+    // Slight rank-to-rank horizontal overlap so formations look tight and compact like Wartune
+    final double rankOverlapMargin = -(tileWidth * 0.16).clamp(8.0, 24.0);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
-      children: rankOrder.map((row) {
+      children: rankOrder.asMap().entries.map((entry) {
+        final int index = entry.key;
+        final int row = entry.value;
+
         // Natural 2.5D Wartune Stage Depth Staggering:
         // Frontline (Row 0): at bottom ground baseline (offset 0)
-        // Midline (Row 1): stepped back into terrain (-12px)
-        // Backline (Row 2): stepped deepest into horizon (-24px)
-        final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -12.0 : -24.0);
+        // Midline (Row 1): stepped back into terrain (-14px)
+        // Backline (Row 2): stepped deepest into horizon (-28px)
+        final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -14.0 : -28.0);
+
+        // Z-Index ordering so Frontline units paint in front of Midline/Backline units
+        // Row 0 = priority 3 (drawn on top), Row 1 = priority 2, Row 2 = priority 1
+        final int rankZIndex = (row == 0 ? 3 : (row == 1 ? 2 : 1));
 
         return Transform.translate(
           offset: Offset(0, rankDepthOffsetY),
-          child: SizedBox(
-            width: tileWidth,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (col) {
-                return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
-              }),
+          child: Container(
+            margin: EdgeInsets.only(
+              left: index > 0 ? (isPlayer ? 0 : rankOverlapMargin) : 0,
+              right: index > 0 ? (isPlayer ? rankOverlapMargin : 0) : 0,
+            ),
+            child: SizedBox(
+              width: tileWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(3, (col) {
+                  return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
+                }),
+              ),
             ),
           ),
         );

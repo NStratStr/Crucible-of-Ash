@@ -4547,11 +4547,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double baseHeight = isBoss ? 44 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
     // Elegant Wartune-style stage proportions:
-    // Characters stand handsomely grounded on their plinths without dwarfing the battlefield landscape!
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.10 : tileWidth * 0.88 * unitScaleMultiplier).clamp(40.0, 260.0);
+    // Slightly enlarged characters stand handsomely grounded on their plinths with heroic presence!
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 0.96 * unitScaleMultiplier).clamp(48.0, 280.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 2.8).clamp(140.0, 280.0)
-        : (tileHeight * 1.28 * unitScaleMultiplier).clamp(44.0, 130.0));
+        ? (tileHeight * 3.0).clamp(150.0, 300.0)
+        : (tileHeight * 1.45 * unitScaleMultiplier).clamp(52.0, 150.0));
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
