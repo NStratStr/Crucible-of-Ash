@@ -850,13 +850,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final double tile2DHeight = target2DHeight;
 
                       return Align(
-                        alignment: const Alignment(0.0, 0.60), // Grounded in the lower plains terrain
+                        alignment: Alignment.bottomCenter, // Grounded firmly onto the bottom terrain baseline like Wartune
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
+                          alignment: Alignment.bottomCenter,
                           child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 20.0 : 8.0,
-                              vertical: 4.0,
+                              horizontal: isDesktop ? 20.0 : 6.0,
+                              vertical: 0.0,
                             ),
                             child: _is2DGridView
                                 ? RankAndRite2DBattlefield(
@@ -954,7 +955,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    height: 65,
+                    height: isLandscapeMobile ? 24 : 50,
                     child: IgnorePointer(
                       child: Image.asset(
                         'assets/images/backgrounds/foreground parallax.png',
@@ -1422,10 +1423,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     });
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 2 : 5),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 1 : 5),
       decoration: const BoxDecoration(
         color: Color(0xFF161622),
-        border: Border(bottom: BorderSide(color: Color(0xFF282838), width: 1.5)),
+        border: Border(bottom: BorderSide(color: Color(0xFF282838), width: 1.0)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1789,8 +1790,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           const SizedBox(height: 4),
 
           // 4. Live Initiative Action Timeline (ATB Sequence Preview)
+          if (!isLandscapeMobile)
           Container(
-            height: isLandscapeMobile ? 26 : 30,
+            height: 30,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFF0F0F16),
