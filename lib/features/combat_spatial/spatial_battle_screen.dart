@@ -3838,36 +3838,81 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
 
-            // 1. Basic Action (Automated)
-            const Icon(Icons.gps_fixed, size: 12, color: Color(0xFF00E5FF)),
-            const SizedBox(width: 4),
-            Text(
-              'BASIC: $basicDesc',
-              style: const TextStyle(
-                fontSize: 8.5,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            // 1. Basic Attack Action Badge / RPG Button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0D2538), Color(0xFF143750)],
+                ),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x3300E5FF), blurRadius: 4, offset: Offset(0, 1)),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sports_mma, size: 12, color: Color(0xFF80D8FF)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'BASIC ATTACK: $basicDesc',
+                    style: const TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // 1b. Distinct Unit Signature Skill (Every 3rd Action Cycle)
-            Icon(
-              Icons.stars_rounded,
-              size: 13,
-              color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              unit.isSignatureReady
-                  ? '★ SKILL READY: ${unit.signatureSkillName}'
-                  : 'SKILL: ${unit.signatureSkillName} (${unit.signatureCooldown} turns)',
-              style: TextStyle(
-                fontSize: 8.5,
-                fontWeight: FontWeight.w900,
-                color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFCC80),
+            // 1b. Distinct Signature Skill Attack Button / Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: unit.isSignatureReady
+                      ? [const Color(0xFF381C08), const Color(0xFF6B3B0A)]
+                      : [const Color(0xFF221A16), const Color(0xFF30241E)],
+                ),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFF6E5630),
+                  width: unit.isSignatureReady ? 1.2 : 0.8,
+                ),
+                boxShadow: unit.isSignatureReady
+                    ? const [
+                        BoxShadow(color: Color(0x66FFD54F), blurRadius: 6, spreadRadius: 0.5),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 12,
+                    color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    unit.isSignatureReady
+                        ? '★ SKILL READY: ${unit.signatureSkillName.toUpperCase()}'
+                        : 'SKILL: ${unit.signatureSkillName.toUpperCase()} (${unit.signatureCooldown} turns)',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFCC80),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 12),

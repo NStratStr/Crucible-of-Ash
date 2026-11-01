@@ -74,7 +74,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
           // Center: Intimate clash spacing (armies face off in close tactical confrontation)
-          SizedBox(width: (tileWidth * 0.16).clamp(10.0, 32.0)),
+          SizedBox(width: (tileWidth * 0.38).clamp(32.0, 68.0)),
 
           // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
           _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
