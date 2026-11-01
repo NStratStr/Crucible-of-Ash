@@ -809,6 +809,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           alignment: Alignment.center,
                           errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                         ),
+                        // Layer 3: Foreground Battlefield Field (Cleanly seated in backdrop)
+                        Image.asset(
+                          'assets/images/backgrounds/foreground parallax.png',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.bottomCenter,
+                          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                        ),
                       ],
                     ),
                   ),
@@ -838,9 +845,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                       // Dynamically calculate optimal tile dimensions for 3 Ranks x 3 Lanes
                       // Total board has 6 ranks + clash buffer (~6.5 tile widths) and 3 lanes (3 tile heights).
-                      final double target2DWidth = (availW / 7.5).clamp(80.0, 160.0);
-                      // 3 Lanes allow generous, handsome character height without climbing up into the sky!
-                      final double target2DHeight = (availH / 5.2).clamp(60.0, 115.0);
+                      final double target2DWidth = (availW / 7.2).clamp(70.0, 160.0);
+                      // Exactly 3 lanes: sized so all 3 lanes fit with generous breathing room
+                      final double target2DHeight = (availH / 3.8).clamp(55.0, 115.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
@@ -950,21 +957,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     },
                   ),
 
-                  // Layer 3: Foreground Battlefield Parallax (Trenches, briars, mud & fog in front of ground)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: isLandscapeMobile ? 24 : 50,
-                    child: IgnorePointer(
-                      child: Image.asset(
-                        'assets/images/backgrounds/foreground parallax.png',
-                        fit: BoxFit.cover,
-                        alignment: Alignment.bottomCenter,
-                        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
+// Layer 3 moved to backdrop so it never obscures bottom row tiles
 
                   // Floating Tactical Prompt & Unit Combat Triad Overlays (Non-shifting Stack overlays!)
                   // Hidden on landscape mobile so it doesn't block the battlefield view!
