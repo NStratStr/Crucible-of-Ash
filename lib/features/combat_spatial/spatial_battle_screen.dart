@@ -12,6 +12,7 @@ import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
+import '../../shared/widgets/pedigree_inspector_dialog.dart';
 
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
@@ -56,6 +57,66 @@ class SpatialBattleScreen extends StatefulWidget {
 }
 
 class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
+  void _openUnitInspectorDialog(CombatUnitState unit) {
+    UnitEntity? entity = _currentSquadUnits.where((u) => u.id == unit.id).firstOrNull ??
+        _reserveUnits.where((u) => u.id == unit.id).firstOrNull;
+
+    if (entity == null) {
+      Archetype mappedRole;
+      switch (unit.archetype) {
+        case UnitArchetype.vanguardMelee:
+          mappedRole = Archetype.juggernaut;
+          break;
+        case UnitArchetype.reachMidline:
+          mappedRole = Archetype.assassin;
+          break;
+        case UnitArchetype.backlineCaster:
+          mappedRole = Archetype.occultist;
+          break;
+        case UnitArchetype.colossusBehemoth:
+          mappedRole = Archetype.juggernaut;
+          break;
+      }
+      entity = UnitEntity(
+        id: unit.id,
+        speciesId: unit.templateId,
+        name: unit.name,
+        generation: 1,
+        archetype: mappedRole,
+        slot: FormationSlot.front1,
+        level: unit.level,
+        maxLevel: 30,
+        currentHp: unit.hp,
+        maxHp: unit.maxHp,
+        attack: unit.attack,
+        defense: unit.armor,
+        speed: unit.speed,
+        nativeTraitId: unit.nativeTraitId ?? 'iron_will',
+        graftedTraitId: unit.graftedTraitId,
+        lineageAncestors: const [],
+        customAvatarAsset: unit.customAssetPath,
+      );
+    }
+
+    final bool wasRunning = _engine.isRunning;
+    if (wasRunning) {
+      _engine.isRunning = false;
+    }
+
+    PedigreeInspectorDialog.show(
+      context,
+      entity,
+      isEnemy: !unit.isPlayer,
+      relicService: widget.relicService,
+      initialShowCharacterSheet: true,
+    ).then((_) {
+      if (mounted && wasRunning && !_engine.isTurnExecutionPaused) {
+        setState(() {
+          _engine.isRunning = true;
+        });
+      }
+    });
+  }
   late final SpatialCombatEngine _engine;
   List<UnitEntity> _currentSquadUnits = [];
   List<UnitEntity> _reserveUnits = [];
@@ -995,6 +1056,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                         _hovered2DRow = null;
                                         _isHovered2DPlayerSide = null;
                                       });
+                                    },
+                                    onLongPressUnit: (unit) {
+                                      _openUnitInspectorDialog(unit);
                                     },
                                     buildUnitMiniature: (unit, {required double tileWidth, required double tileHeight, required double colGap, bool isSelected = false}) {
                                       return _buildUnitMiniatureWidget(
@@ -4796,32 +4860,36 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 1b. Stance Mastery Runic Plinth Aura (Tabletop visual condition cue)
-            if (!unit.isDowned && (unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1)))
+            // 1b. Turn Active Aura OR Stance Mastery Runic Plinth Aura (Tabletop visual condition cue)
+            if (!unit.isDowned && (_engine.activeActingUnit?.id == unit.id || unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1)))
               Positioned(
                 bottom: 3,
                 child: Container(
-                  width: baseWidth + 6,
-                  height: baseHeight + 4,
+                  width: baseWidth + 8,
+                  height: baseHeight + 6,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(Radius.elliptical((baseWidth + 6) / 2, (baseHeight + 4) / 2)),
+                    borderRadius: BorderRadius.all(Radius.elliptical((baseWidth + 8) / 2, (baseHeight + 6) / 2)),
                     border: Border.all(
-                      color: unit.activeStance == StanceType.holdTheLine
-                          ? const Color(0xFFFFD54F) // Amber/Gold rune ring for Hold the Line
-                          : (unit.activeStance == StanceType.flankingMomentum
-                              ? const Color(0xFFFF1744) // Crimson trail for Flanking Momentum
-                              : const Color(0xFF00E5FF)), // Cyan star for Aetheric Alignment
-                      width: 1.8,
+                      color: (_engine.activeActingUnit?.id == unit.id)
+                          ? const Color(0xFFFFD54F) // Luminous Golden/Amber ring for active unit acting now
+                          : (unit.activeStance == StanceType.holdTheLine
+                              ? const Color(0xFFFFD54F) // Amber/Gold rune ring for Hold the Line
+                              : (unit.activeStance == StanceType.flankingMomentum
+                                  ? const Color(0xFFFF1744) // Crimson trail for Flanking Momentum
+                                  : const Color(0xFF00E5FF))), // Cyan star for Aetheric Alignment
+                      width: (_engine.activeActingUnit?.id == unit.id) ? 2.4 : 1.8,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: unit.activeStance == StanceType.holdTheLine
-                            ? const Color(0xFFFFD54F).withValues(alpha: 0.65)
-                            : (unit.activeStance == StanceType.flankingMomentum
-                                ? const Color(0xFFFF1744).withValues(alpha: 0.65)
-                                : const Color(0xFF00E5FF).withValues(alpha: 0.65)),
-                        blurRadius: 8,
-                        spreadRadius: 1,
+                        color: (_engine.activeActingUnit?.id == unit.id)
+                            ? const Color(0xFFFFD54F).withValues(alpha: 0.85)
+                            : (unit.activeStance == StanceType.holdTheLine
+                                ? const Color(0xFFFFD54F).withValues(alpha: 0.65)
+                                : (unit.activeStance == StanceType.flankingMomentum
+                                    ? const Color(0xFFFF1744).withValues(alpha: 0.65)
+                                    : const Color(0xFF00E5FF).withValues(alpha: 0.65))),
+                        blurRadius: (_engine.activeActingUnit?.id == unit.id) ? 14 : 8,
+                        spreadRadius: (_engine.activeActingUnit?.id == unit.id) ? 3 : 1,
                       ),
                     ],
                   ),
@@ -6255,9 +6323,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       },
       feedback: Material(
         color: Colors.transparent,
-        child: Transform.scale(
-          scale: 1.15,
-          child: Opacity(opacity: 0.90, child: cardWidget),
+        child: _buildUnitMiniatureWidget(
+          unit,
+          tileWidth: 88,
+          tileHeight: 64,
+          colGap: 0,
+          isDragging: true,
         ),
       ),
       childWhenDragging: Opacity(
@@ -6271,6 +6342,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             _selectedEnemyUnitId = null;
             _selectedCardId = null;
           });
+        },
+        onLongPress: () {
+          _openUnitInspectorDialog(unit);
         },
         child: cardWidget,
       ),
@@ -7366,40 +7440,134 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Action 1: ATTACK / SKILL (100% TM Cost -> 0 TM)
+          // Targeted enemy lookup
+          final explicitTarget = _selectedEnemyUnitId != null
+              ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
+              : null;
+
+          // Action 1: BASIC ATTACK (Always Ready / Standard TM Cost)
           Expanded(
             child: ElevatedButton.icon(
-              icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.sports_mma, size: 16),
+              icon: const Icon(Icons.sports_mma, size: 14),
               label: Text(
-                unit.isSignatureReady
-                    ? 'SIGNATURE SKILL\n(0 TM / 100% Cost)'
-                    : 'ATTACK & ABILITY\n(0 TM / 100% Cost)',
+                'BASIC ATTACK\n${explicitTarget != null ? "Target: " + explicitTarget.name.split(" ").first : "Default Target"}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, height: 1.15),
+                style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.15),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFFB3261E),
+                backgroundColor: const Color(0xFFB3261E),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
-                  side: BorderSide(
-                    color: unit.isSignatureReady ? const Color(0xFFEA80FC) : const Color(0xFFFF8A80),
-                    width: 1.2,
-                  ),
+                  side: const BorderSide(color: Color(0xFFFF8A80), width: 1.2),
                 ),
               ),
               onPressed: () {
                 setState(() {
-                  _engine.executeUnitAction(unit, isReposition: false);
+                  _engine.executeUnitAction(
+                    unit,
+                    isReposition: false,
+                    explicitTarget: explicitTarget,
+                    actionType: 'basic',
+                  );
                 });
               },
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
-          // Action 2: REPOSITION / SHIFT (25% TM Cost -> 7,500 TM retained)
+          // Action 2: SIGNATURE SKILL (With cooldown tracking)
           Expanded(
+            child: ElevatedButton.icon(
+              icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
+              label: Text(
+                unit.isSignatureReady
+                    ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
+                    : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                  color: unit.isSignatureReady ? Colors.white : Colors.white54,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  side: BorderSide(
+                    color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
+                    width: 1.2,
+                  ),
+                ),
+              ),
+              onPressed: unit.isSignatureReady
+                  ? () {
+                      setState(() {
+                        _engine.executeUnitAction(
+                          unit,
+                          isReposition: false,
+                          explicitTarget: explicitTarget,
+                          actionType: 'signature',
+                        );
+                      });
+                    }
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          // Action 3: ULTIMATE ABILITY (With Gauge / Ready state)
+          Expanded(
+            child: ElevatedButton.icon(
+              icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.battery_charging_full, size: 14),
+              label: Text(
+                unit.isUltimateReady
+                    ? '⚡ ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
+                    : '⚡ ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateGauge}% Gauge)',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                  color: unit.isUltimateReady ? const Color(0xFF212121) : Colors.white54,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: unit.isUltimateReady ? const Color(0xFFFFD54F) : const Color(0xFF262C38),
+                foregroundColor: unit.isUltimateReady ? Colors.black : Colors.white54,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  side: BorderSide(
+                    color: unit.isUltimateReady ? const Color(0xFFFFE082) : Colors.white24,
+                    width: 1.2,
+                  ),
+                ),
+              ),
+              onPressed: unit.isUltimateReady
+                  ? () {
+                      setState(() {
+                        _engine.executeUnitAction(
+                          unit,
+                          isReposition: false,
+                          explicitTarget: explicitTarget,
+                          actionType: 'ultimate',
+                        );
+                      });
+                    }
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          // Action 4: REPOSITION / SHIFT (25% TM Cost -> 7,500 TM retained)
+          SizedBox(
+            width: isLandscapeMobile ? 86 : 96,
             child: PopupMenuButton<String>(
               tooltip: 'Shift 1 tile along rank or column',
               color: const Color(0xFF1E1E2C),
@@ -7471,7 +7639,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
               ],
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFF006064),
                   borderRadius: BorderRadius.circular(6),
@@ -7483,18 +7651,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 16),
-                        SizedBox(width: 4),
+                        Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 14),
+                        SizedBox(width: 2),
                         Text(
-                          'TACTICAL SHIFT',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFE0F7FA)),
+                          'SHIFT',
+                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Color(0xFFE0F7FA)),
                         ),
                       ],
                     ),
-                    SizedBox(height: 2),
+                    SizedBox(height: 1),
                     Text(
-                      '(7,500 TM / 25% Cost)',
-                      style: TextStyle(fontSize: 8.5, color: Color(0xFF80DEEA), fontWeight: FontWeight.bold),
+                      '25% Cost',
+                      style: TextStyle(fontSize: 7.5, color: Color(0xFF80DEEA), fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),

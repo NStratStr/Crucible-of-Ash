@@ -28,6 +28,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   final Function(String ultUnitId, {CombatUnitState? targetUnit, int? targetCol, int? targetRow}) onCastUltimate;
   final Function(int col, int row, bool isPlayer) onTileHover;
   final VoidCallback onClearHover;
+  final Function(CombatUnitState unit)? onLongPressUnit;
   final Widget Function(CombatUnitState unit, {required double tileWidth, required double tileHeight, required double colGap, bool isSelected}) buildUnitMiniature;
 
   const RankAndRite2DBattlefield({
@@ -51,6 +52,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     required this.onCastUltimate,
     required this.onTileHover,
     required this.onClearHover,
+    this.onLongPressUnit,
     required this.buildUnitMiniature,
   });
 
@@ -274,7 +276,11 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         Color plinthRimColor;
         Color plinthGlowColor;
 
-        if (isSelected || isDropCandidate || isHovered) {
+        final bool isTurnActiveUnit = occupant != null && engine.activeActingUnit?.id == occupant.id;
+        if (isTurnActiveUnit) {
+          plinthRimColor = const Color(0xFFFFD54F);
+          plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.85);
+        } else if (isSelected || isDropCandidate || isHovered) {
           plinthRimColor = const Color(0xFF00E5FF);
           plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.6);
         } else if (isMoveReachable) {
@@ -332,7 +338,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     ),
                     border: Border.all(
                       color: plinthRimColor,
-                      width: (isSelected || isDropCandidate || isHovered) ? 1.8 : 1.0,
+                      width: isTurnActiveUnit ? 2.4 : ((isSelected || isDropCandidate || isHovered) ? 1.8 : 1.0),
                     ),
                     boxShadow: [
                       // Ground contact shadow
@@ -344,8 +350,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       if (plinthGlowColor != Colors.transparent)
                         BoxShadow(
                           color: plinthGlowColor,
-                          blurRadius: isSelected ? 12 : 6,
-                          spreadRadius: isSelected ? 2 : 0,
+                          blurRadius: isTurnActiveUnit ? 18 : (isSelected ? 12 : 6),
+                          spreadRadius: isTurnActiveUnit ? 3 : (isSelected ? 2 : 0),
                         ),
                     ],
                   ),
@@ -443,6 +449,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       } else {
                         onSelectEnemyUnit(occupant.id);
                       }
+                    },
+                    onLongPress: () {
+                      onLongPressUnit?.call(occupant);
                     },
                     child: buildUnitMiniature(
                       occupant,

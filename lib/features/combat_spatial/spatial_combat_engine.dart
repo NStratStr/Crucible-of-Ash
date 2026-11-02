@@ -1363,13 +1363,23 @@ class SpatialCombatEngine extends ChangeNotifier {
   /// Rank & Rite Spec Sec 2: Turn Meter Action Cost Resolution
   /// - Skill / Attack: TM resets to 0.
   /// - Reposition (1 tile shift): TM resets to 7,500 (25% cost). Unit acts again soon.
-  void executeUnitAction(CombatUnitState unit, {bool isReposition = false, int? shiftCol, int? shiftRow}) {
+  void executeUnitAction(
+    CombatUnitState unit, {
+    bool isReposition = false,
+    int? shiftCol,
+    int? shiftRow,
+    CombatUnitState? explicitTarget,
+    String actionType = 'auto',
+  }) {
     if (isReposition && shiftCol != null && shiftRow != null) {
       movePlayerUnit(unit.id, shiftCol, shiftRow);
       unit.currentAp = CombatUnitState.moveRetainedTm; // 7,500 TM (25% cost per Spec Sec 2)
       addLog('TACTICAL SHIFT: ${unit.name} repositioned (TM retained: 7,500 / 25% cost).');
+    } else if (actionType == 'ultimate') {
+      castUltimate(unit.id, targetUnit: explicitTarget);
+      unit.currentAp = 0;
     } else {
-      _executeUnitTurn(unit);
+      _executeUnitTurn(unit, explicitTarget: explicitTarget, actionType: actionType);
       unit.currentAp = 0; // Skill / Attack consumes full TM (100% cost per Spec Sec 2)
     }
     hasCastTuningSlipThisTurn = false;
@@ -1379,7 +1389,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _executeUnitTurn(CombatUnitState unit) {
+  void _executeUnitTurn(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
     if (unit.id == 'pyre_zealot') {
       // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down its column
       // Highlights target nodes with a red tinge, giving 2s to reposition (50% AP) or shield
@@ -1457,11 +1467,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       lastBannerMessage = '⚠️ ${unit.name.toUpperCase()} WINDS UP: ${skillLabel.toUpperCase()} (2.0s)!';
       addLog('TELEGRAPH: ${unit.name} winds up $skillLabel targeting Col ${targetNode.column + 1} in 2.0s!');
     } else if (unit.archetype == UnitArchetype.reachMidline) {
-      _executeReachMidlineAction(unit);
+      _executeReachMidlineAction(unit, explicitTarget: explicitTarget, actionType: actionType);
     } else if (unit.archetype == UnitArchetype.vanguardMelee) {
-      _executeVanguardAction(unit);
+      _executeVanguardAction(unit, explicitTarget: explicitTarget, actionType: actionType);
     } else if (unit.archetype == UnitArchetype.backlineCaster) {
-      _executeCasterAction(unit);
+      _executeCasterAction(unit, explicitTarget: explicitTarget, actionType: actionType);
     } else if (unit.id == 'gorgoroth_boss' || unit.archetype == UnitArchetype.colossusBehemoth) {
       // Regular attack if not channeling
       if (unit.pendingIntent == null) {
@@ -1695,16 +1705,18 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   /// Adaptive Posture System: Resolves action for Reach / Midline Strikers (Skirmishers, Assassins, Marksmen)
-  void _executeReachMidlineAction(CombatUnitState unit) {
+  void _executeReachMidlineAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
     if (unit.occupiedNodes.isEmpty) return;
     final sbCol = unit.occupiedNodes.first.column;
     final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
-    final target = _resolveColumnTarget(unitCol: sbCol, targetingPlayers: !unit.isPlayer) ??
+    final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
+    final target = validExplicit ??
+        _resolveColumnTarget(unitCol: sbCol, targetingPlayers: !unit.isPlayer) ??
         opposingSquad.where((u) => u.isAlive).firstOrNull;
 
     if (target != null) {
-      // Every 3rd action cycle (after 2 basic attacks), unleash distinct Unit Signature Skill!
-      if (unit.isSignatureReady) {
+      final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
+      if (shouldSignature) {
         _executeSignatureSkill(unit, target);
         return;
       }
@@ -1770,8 +1782,10 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   /// Adaptive Posture System: Resolves action based on Vanguard's current physical row depth
-  void _executeVanguardAction(CombatUnitState unit) {
+  void _executeVanguardAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
     final col = unit.occupiedNodes.first.column;
+    final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+    final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
     switch (unit.currentDepth) {
       case RowDepth.front:
         // [ FRONT ROW ] ───► BRAWL STANCE (Default)
@@ -1791,10 +1805,12 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
 
         final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
-        final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
+        final target = validExplicit ??
+            _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer) ??
+            opposingSquad.where((u) => u.isAlive).firstOrNull;
         if (target != null) {
-          // If Signature Skill is ready (and not overriding a Hold the Line stationary cleave), unleash Signature Skill!
-          if (unit.isSignatureReady && !hasHoldTheLineBonus) {
+          final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
+          if (shouldSignature && !hasHoldTheLineBonus) {
             _executeSignatureSkill(unit, target);
             break;
           }
@@ -1862,7 +1878,9 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         // Shockwave / Tremor Slam: 60% Dmg + minor stagger / 15 armor chip down column.
         // If front tile in column is empty, unit automatically steps forward to reclaim the Frontline!
-        final target = _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer);
+        final target = validExplicit ??
+            _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer) ??
+            opposingSquad.where((u) => u.isAlive).firstOrNull;
         final shockwaveDmg = (unit.attack * 0.60).round();
         if (target != null) {
           final dmg = target.takeDamage(shockwaveDmg);
@@ -1931,13 +1949,14 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   /// Adaptive Posture System: Resolves action for Backline Casters
-  void _executeCasterAction(CombatUnitState unit) {
+  void _executeCasterAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
+    final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
     if (unit.currentDepth == RowDepth.front) {
       // Point-Blank Vulnerability:
       // Basic spell becomes Panic Discharge: radial blast with high knockback pushing enemy Vanguard back
       final enemySquad = unit.isPlayer ? enemyUnits : playerUnits;
       final frontEnemies = enemySquad.where((u) => u.isAlive && u.occupies(unit.occupiedNodes.first.column, 0)).toList();
-      final target = frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
+      final target = validExplicit ?? frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
       if (target != null) {
         final dmg = (unit.effectiveAttack * 1.1).round();
         target.takeDamage(dmg, isPhysical: false);
@@ -1968,10 +1987,12 @@ class SpatialCombatEngine extends ChangeNotifier {
       final bool isAethericBonus = unit.currentDepth == RowDepth.back;
       final targetCol = unit.occupiedNodes.first.column;
       final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
-      final primaryColumnTarget = _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
+      final primaryColumnTarget = validExplicit ??
+          _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
           opposingSquad.where((u) => u.isAlive).firstOrNull;
 
-      if (unit.isSignatureReady && primaryColumnTarget != null) {
+      final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
+      if (shouldSignature && primaryColumnTarget != null) {
         _executeSignatureSkill(unit, primaryColumnTarget);
         return;
       }
