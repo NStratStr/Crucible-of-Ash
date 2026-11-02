@@ -103,12 +103,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _engine.isRunning = false;
     }
 
-    PedigreeInspectorDialog.show(
-      context,
-      entity,
-      isEnemy: !unit.isPlayer,
-      relicService: widget.relicService,
-      initialShowCharacterSheet: true,
+    _playSfx('sfx_card.wav');
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.78),
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: GothicCharacterSheetCard(
+          unit: entity!,
+          relicService: widget.relicService,
+          totalIchor: 0,
+          onClose: () => Navigator.of(dialogCtx).pop(),
+          onToggleClassicCodex: () {
+            Navigator.of(dialogCtx).pop();
+            PedigreeInspectorDialog.show(
+              context,
+              entity!,
+              isEnemy: !unit.isPlayer,
+              relicService: widget.relicService,
+              initialShowCharacterSheet: false,
+            );
+          },
+        ),
+      ),
     ).then((_) {
       if (mounted && wasRunning && !_engine.isTurnExecutionPaused) {
         setState(() {
@@ -4045,6 +4066,43 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
             ),
+            const SizedBox(width: 6),
+
+            // Character Sheet Inspect Quick Action Button
+            GestureDetector(
+              onTap: () {
+                _openUnitInspectorDialog(unit);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4E342E), Color(0xFF2E1C14)],
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x55FFD54F), blurRadius: 4),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('📜', style: TextStyle(fontSize: 9.5)),
+                    SizedBox(width: 3),
+                    Text(
+                      'SHEET',
+                      style: TextStyle(
+                        fontSize: 8.0,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFFFD54F),
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(width: 8),
 
             // 1. Basic Attack Action Badge / RPG Button
@@ -5239,8 +5297,43 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
 
-                  // Unit name label: Only shown when selected
-                  if (isSelected)
+                  // Unit name label & Character Sheet Inspect Button: Only shown when selected
+                  if (isSelected) ...[
+                    GestureDetector(
+                      onTap: () {
+                        _openUnitInspectorDialog(unit);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 2.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF3E2723), Color(0xFF6D4C41)],
+                          ),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x66FFD54F), blurRadius: 4, spreadRadius: 0.5),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('📜', style: TextStyle(fontSize: 8)),
+                            SizedBox(width: 3),
+                            Text(
+                              'CHARACTER SHEET',
+                              style: TextStyle(
+                                fontSize: 6.8,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFFFD54F),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
@@ -5259,6 +5352,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         maxLines: 1,
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -6408,12 +6502,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final isSelected = _selectedUltimateUnitId == unit.id;
 
     final Widget slateWidget = Container(
-      width: 105,
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      width: 130,
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
       decoration: BoxDecoration(
         color: isReady
-            ? const Color(0xFF261C0E).withValues(alpha: 0.95)
+            ? const Color(0xFF2E200C).withValues(alpha: 0.98)
             : const Color(0xFF14141E).withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
@@ -6423,9 +6517,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           width: isReady ? 1.6 : 0.8,
         ),
         boxShadow: isReady
-            ? [
+            ? const [
                 BoxShadow(
-                  color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                  color: Color(0x66FFD54F),
                   blurRadius: 8,
                   spreadRadius: 1,
                 ),
@@ -6436,8 +6530,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         children: [
           // Unit Portrait in Gothic Frame
           Container(
-            width: 28,
-            height: 36,
+            width: 30,
+            height: 38,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
@@ -6472,7 +6566,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           fontSize: 8.0,
                           fontWeight: FontWeight.bold,
                           color: isReady ? const Color(0xFFFFE082) : Colors.white70,
-                          letterSpacing: 0.4,
+                          letterSpacing: 0.3,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -6481,26 +6575,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     const SizedBox(width: 2),
                     Text(
                       'Lv.${unit.level}',
-                      style: TextStyle(
-                        fontSize: 7.5,
+                      style: const TextStyle(
+                        fontSize: 7.0,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFFFFD54F),
+                        color: Color(0xFFFFD54F),
                         fontFamily: 'monospace',
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 1),
                 Text(
-                  isReady ? 'READY! ⚡' : '${unit.ultimateGauge}%',
+                  '⚡ ${unit.ultimateTitle.toUpperCase()}',
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 7.2,
                     fontWeight: FontWeight.w900,
-                    color: isReady ? const Color(0xFFFFD54F) : Colors.white38,
-                    fontFamily: 'monospace',
+                    color: isReady ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
+                    letterSpacing: 0.2,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isReady ? 'TAP TO CAST!' : '${unit.ultimateGauge}%',
+                      style: TextStyle(
+                        fontSize: 6.8,
+                        fontWeight: FontWeight.w900,
+                        color: isReady ? const Color(0xFFFFD54F) : Colors.white38,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    if (isReady)
+                      const Icon(Icons.touch_app, size: 8, color: Color(0xFFFFD54F)),
+                  ],
+                ),
+                const SizedBox(height: 1.5),
                 // Progress Bar
                 Container(
                   height: 2.5,
@@ -6526,15 +6638,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       ),
     );
 
-    if (!isReady) {
-      return slateWidget;
-    }
-
     return GestureDetector(
-      onDoubleTap: () {
-        if (!_engine.isPreBattlePhase) {
-          _engine.castUltimate(unit.id);
+      onTap: () {
+        if (isReady && !_engine.isPreBattlePhase) {
           _playSfx('sfx_spell.wav');
+          _engine.castUltimate(unit.id);
+        } else {
+          setState(() {
+            _selectedUnitId = unit.id;
+            _selectedEnemyUnitId = null;
+          });
         }
       },
       child: slateWidget,
