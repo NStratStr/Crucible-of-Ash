@@ -347,6 +347,28 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
               ),
 
+              // 1b. Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate)
+              if ((selectedCardId != null && !isPlayer) || isHovered)
+                Positioned(
+                  bottom: 2,
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: (isHovered || isDropCandidate) ? 0.85 : (selectedCardId != null ? 0.40 : 0.0),
+                      child: Image.asset(
+                        (selectedCardId == 'phalanx_intercept' || selectedCardId == 'stoke_the_embers')
+                            ? 'assets/images/Spells/Support_spell_magic_circle.png'
+                            : (selectedCardId == 'revive_vitae'
+                                ? 'assets/images/Spells/Heal_spell_magic_circle.png'
+                                : 'assets/images/Spells/Attack_spell_magic_circle.png'),
+                        width: plinthW * 1.15,
+                        height: plinthH * 2.2,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                ),
+
               // 2. Subtle Coordinate Marker (Faintly etched into stone surface)
               Positioned(
                 bottom: 11,

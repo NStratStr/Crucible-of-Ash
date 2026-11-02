@@ -376,6 +376,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
     if (isHeavyImpact) {
+      _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
       _groundRipples.add(_GroundShockwaveRipple(
         id: 'ripple_${event.id}_$nowMs',
         origin: targetOffset,
@@ -790,9 +791,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
+              child: Transform.translate(
+                offset: _screenShakeOffset,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
                   // Atmospheric Multi-Layer Parallax Battlefield Arena Backdrop
                   Positioned.fill(
                     child: Stack(
@@ -1383,6 +1386,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                 ],
+              ),
               ),
             ),
 
