@@ -104,6 +104,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   AudioPlayer? _bgmPlayer;
   AudioPlayer? _sfxPlayer;
   bool _isMuted = false;
+  bool _isDockCollapsed = false;
+  bool _hasBossEnraged = false;
 
   @override
   void initState() {
@@ -182,6 +184,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   void _onEngineUpdate() {
     if (!mounted) return;
+
+    // Boss Enrage Check: When boss drops under 50% HP, trigger Enrage Roar & Arena Shake!
+    final boss = _engine.enemyUnits.where((u) => (u.id == 'gorgoroth_boss' || u.footprint != UnitFootprint.single1x1) && u.isAlive).firstOrNull;
+    if (boss != null && !_hasBossEnraged && boss.hp <= (boss.maxHp * 0.50)) {
+      _hasBossEnraged = true;
+      _playSfx('sfx_spell.wav');
+      _triggerScreenShake(intensity: 12.0);
+      _activeSynergyBannerText = '🔥 ' + boss.name.toUpperCase() + ' ENTERS ASHEN ENRAGE!';
+      _activeSynergyBannerColor = const Color(0xFFFF3D00);
+      Timer(const Duration(milliseconds: 2200), () {
+        if (mounted && _activeSynergyBannerText != null && _activeSynergyBannerText!.contains('ASHEN ENRAGE')) {
+          setState(() {
+            _activeSynergyBannerText = null;
+          });
+        }
+      });
+    }
 
     // Check if a new combat action event was dispatched
     final event = _engine.activeActionEvent;
@@ -1465,13 +1484,52 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
+            // Collapsible Minimal HUD Toggle Handle
+            if (!_engine.isPreBattlePhase)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isDockCollapsed = !_isDockCollapsed;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF14141E).withValues(alpha: 0.85),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        border: Border.all(color: Colors.white24, width: 0.8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isDockCollapsed ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            size: 13,
+                            color: const Color(0xFFFFD54F),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            _isDockCollapsed ? 'EXPAND CARDS' : 'COLLAPSE',
+                            style: const TextStyle(fontSize: 7.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Combat Docks (Ultimates & Grimoire Hand)
             if (_engine.isPreBattlePhase)
               Transform.translate(
                 offset: const Offset(0, -10.0),
                 child: _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile),
               )
-            else ...[
+            else if (!_isDockCollapsed) ...[
               // Rank & Rite Spec Sec 2: Turn Action Decision Tray (When Turn Meter reaches 10,000 TM)
               if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
                 _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile),
@@ -6397,6 +6455,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (!isReady) {
       return slateWidget;
     }
+
+    return GestureDetector(
+      onDoubleTap: () {
+        if (!_engine.isPreBattlePhase) {
+          _engine.castUltimate(unit.id);
+          _playSfx('sfx_spell.wav');
+        }
+      },
+      child: slateWidget,
+    );
 
     // When charged, unit portrait can be dragged onto the battlefield with 30% tactical bullet-time
     return Draggable<String>(
