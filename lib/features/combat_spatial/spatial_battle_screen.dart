@@ -81,6 +81,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   // Visual Combat Feedback & VFX State
   String? _lastHandledEventId;
   String? _attackingUnitId;
+  String? _activeSynergyBannerText;
+  Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
   String? _damagedUnitId;
   final Set<String> _damagedUnitIds = {};
   String? _activeSkillName;
@@ -367,6 +369,35 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     } else if (event.isSignatureSkill && caster != null) {
       _activeSignatureUnit = caster;
       _playSfx('sfx_spell.wav');
+    }
+
+    // Trigger short Tactical Synergy Callout Banners
+    String? synergyText;
+    Color synergyColor = const Color(0xFFFFD54F);
+    if (isBloodnova) {
+      synergyText = '🩸 BLEED DETONATION!';
+      synergyColor = const Color(0xFFFF1744);
+    } else if (event.skillName.contains('Phalanx') || event.skillName.contains('Intercept')) {
+      synergyText = '🛡️ VANGUARD INTERCEPT!';
+      synergyColor = const Color(0xFF00E5FF);
+    } else if (event.isCrit && event.bleedStacks > 0) {
+      synergyText = '🩸 FLANKING CRIT EXPLOIT!';
+      synergyColor = const Color(0xFFFF9100);
+    } else if (event.skillName.contains('Shatter') || event.skillName.contains('SHATTERS')) {
+      synergyText = '⚡ AEGIS SHATTER!';
+      synergyColor = const Color(0xFFFFD54F);
+    }
+
+    if (synergyText != null) {
+      _activeSynergyBannerText = synergyText;
+      _activeSynergyBannerColor = synergyColor;
+      Timer(const Duration(milliseconds: 1400), () {
+        if (mounted && _activeSynergyBannerText == synergyText) {
+          setState(() {
+            _activeSynergyBannerText = null;
+          });
+        }
+      });
     }
 
     // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
@@ -1017,6 +1048,50 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
 
+                  // Tactical Synergy Combo Banner Overlay
+                  if (_activeSynergyBannerText != null)
+                    Positioned(
+                      top: 18,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutBack,
+                          builder: (context, scale, child) {
+                            return Transform.scale(
+                              scale: scale,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0E0E18).withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _activeSynergyBannerColor, width: 1.4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _activeSynergyBannerColor.withValues(alpha: 0.5),
+                                      blurRadius: 12,
+                                      spreadRadius: 1.5,
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  _activeSynergyBannerText!,
+                                  style: TextStyle(
+                                    color: _activeSynergyBannerColor,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   // In-Combat Ultimate Burst or Signature Skill Dramatic Cut-In Overlay
                   if (_activeUltimateUnit != null)
                     _buildUltimateCinematicOverlay(_activeUltimateUnit!),

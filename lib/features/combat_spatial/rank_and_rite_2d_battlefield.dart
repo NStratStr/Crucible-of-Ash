@@ -281,10 +281,15 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           plinthRimColor = const Color(0xFF00E676);
           plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.4);
         } else if (occupant != null) {
-          plinthRimColor = isPlayer
-              ? const Color(0xFF64B5F6).withValues(alpha: 0.70)
-              : const Color(0xFFE57373).withValues(alpha: 0.65);
-          plinthGlowColor = (isPlayer ? const Color(0xFF2196F3) : const Color(0xFFF44336)).withValues(alpha: 0.25);
+          if (hasVanguardCover) {
+            plinthRimColor = const Color(0xFF00E5FF);
+            plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.45);
+          } else {
+            plinthRimColor = isPlayer
+                ? const Color(0xFF64B5F6).withValues(alpha: 0.70)
+                : const Color(0xFFE57373).withValues(alpha: 0.65);
+            plinthGlowColor = (isPlayer ? const Color(0xFF2196F3) : const Color(0xFFF44336)).withValues(alpha: 0.25);
+          }
         } else {
           // Empty ground coordinate
           plinthRimColor = isPlayer
