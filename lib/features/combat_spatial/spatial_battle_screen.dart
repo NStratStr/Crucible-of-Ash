@@ -13,6 +13,7 @@ import 'spatial_combat_engine.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
+import '../../shared/widgets/gothic_character_sheet_card.dart';
 
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
@@ -402,13 +403,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       secondaryColor = const Color(0xFF00E5FF);
       durationMs = 800;
       _playSfx('sfx_block.wav'); // Heavy armor crack / shield shatter
-    } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.archetype == UnitArchetype.marksmanRanged)) {
+    } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
       vfxType = 'arrow';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFFFF8A80);
       durationMs = 550;
       _playSfx('sfx_hit.wav');
-    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.casterAoe)) {
+    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
       vfxType = 'firebolt';
       primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
       secondaryColor = const Color(0xFFFFD54F);
@@ -475,6 +476,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Trigger short Tactical Synergy Callout Banners
     String? synergyText;
     Color synergyColor = const Color(0xFFFFD54F);
+    final bool isBloodnova = event.skillName.contains('Bloodnova') || (event.skillName.contains('Vitae Eruption'));
     if (isBloodnova) {
       synergyText = '🩸 BLEED DETONATION!';
       synergyColor = const Color(0xFFFF1744);
@@ -503,7 +505,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
     final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
-    final bool isBloodnova = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
     final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
 
     // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
@@ -7463,6 +7464,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double trayHeight = isLandscapeMobile ? 64.0 : 86.0;
     final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
     final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
+    final explicitTarget = _selectedEnemyUnitId != null
+        ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
+        : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -7552,11 +7556,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
           ),
           const SizedBox(width: 12),
-
-          // Targeted enemy lookup
-          final explicitTarget = _selectedEnemyUnitId != null
-              ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
-              : null;
 
           // Action 1: BASIC ATTACK (Always Ready / Standard TM Cost)
           Expanded(

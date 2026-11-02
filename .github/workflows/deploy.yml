@@ -36,7 +36,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release --base-href "/Crucible-of-Ash/"
+        run: flutter build web --release --base-href "/Crucible-of-Ash/" -v
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -49,3 +49,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
