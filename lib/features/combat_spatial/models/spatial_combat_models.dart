@@ -299,7 +299,7 @@ class CombatUnitState {
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
     this.actionCycleCount = 0,
-    this.signatureCooldown = 2,
+    this.signatureCooldown = 0,
   })  : baseMaxHp = baseMaxHp ?? maxHp,
         isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
         activeStance = activeStance ?? _defaultStanceForArchetype(archetype);

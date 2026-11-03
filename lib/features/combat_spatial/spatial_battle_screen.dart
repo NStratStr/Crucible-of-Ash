@@ -5566,20 +5566,45 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 6. Active Ability Hit Sprite Sheet VFX (e.g. Fire / Sun Magic Circle Hit)
+            // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Crimson Slash, Fire/Light Shield, Sun Magic Circle)
+            if (unit.aegisShield > 0)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Center(
+                    child: SizedBox(
+                      width: isBoss ? bossSpanWidth * 1.4 : tileWidth * 1.6,
+                      height: isBoss ? (tileHeight * 2.8) : (tileHeight * 2.4),
+                      child: SpriteSheetAnimation(
+                        assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                        columns: 3,
+                        rows: 3,
+                        totalFrames: 9,
+                        duration: const Duration(milliseconds: 1200),
+                        loop: true,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             if (isDamaged && (floatingPop == null || !floatingPop.contains('+')))
               Positioned.fill(
                 child: IgnorePointer(
                   child: Center(
                     child: SizedBox(
-                      width: isBoss ? bossSpanWidth * 1.3 : tileWidth * 1.5,
+                      width: isBoss ? bossSpanWidth * 1.4 : tileWidth * 1.6,
                       height: isBoss ? (tileHeight * 2.6) : (tileHeight * 2.2),
                       child: SpriteSheetAnimation(
-                        assetPath: 'assets/animations/vfx/sun_burst_circle_sheet.png',
-                        columns: 8,
-                        rows: 5,
-                        totalFrames: 40,
-                        duration: const Duration(milliseconds: 800),
+                        assetPath: (_activeSkillName != null && (_activeSkillName!.contains('Slash') || _activeSkillName!.contains('Lacerat') || _activeSkillName!.contains('Flayer') || _activeSkillName!.contains('Cleave') || _activeSkillName!.contains('Blade') || _activeSkillName!.contains('Crit') || _activeSkillName!.contains('Bleed')))
+                            ? 'assets/animations/vfx/crimson_slash_sheet.png'
+                            : ((_activeSkillName != null && (_activeSkillName!.contains('Aegis') || _activeSkillName!.contains('Shield') || _activeSkillName!.contains('Phalanx') || _activeSkillName!.contains('Bulwark') || _activeSkillName!.contains('Block')))
+                                ? 'assets/animations/vfx/fire_shield_sheet.png'
+                                : 'assets/animations/vfx/crimson_slash_sheet.png'),
+                        columns: 3,
+                        rows: 3,
+                        totalFrames: 9,
+                        duration: const Duration(milliseconds: 650),
                         loop: false,
                         fit: BoxFit.contain,
                       ),
