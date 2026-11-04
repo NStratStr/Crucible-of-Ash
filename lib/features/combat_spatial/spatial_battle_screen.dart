@@ -5134,6 +5134,46 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
+            // 2b. Overhead Enemy Intent Telegraph Badge (Suggestion 2)
+            if (!unit.isPlayer && unit.pendingIntent != null && unit.isAlive)
+              Positioned(
+                top: isBoss ? -34 : -28,
+                child: Builder(
+                  builder: (context) {
+                    final intent = unit.pendingIntent!;
+                    final remTicks = (intent.triggerTick - _engine.currentTick).clamp(0, 9999);
+                    final remSec = (remTicks / 30.0).toStringAsFixed(1);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xEE380B13),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x66FF1744), blurRadius: 6, spreadRadius: 1),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('⚔️', style: TextStyle(fontSize: 8)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${intent.skillName.toUpperCase()} (${remSec}s)',
+                            style: const TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFF8A80),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
             // 3. Status Badges & Selected Unit Indicator
             Positioned(
               top: isBoss ? -22 : -16,

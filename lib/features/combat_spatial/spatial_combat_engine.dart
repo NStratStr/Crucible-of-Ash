@@ -1568,7 +1568,62 @@ class SpatialCombatEngine extends ChangeNotifier {
     return '$label (+$bonusDmg DMG & +15 AEGIS)';
   }
 
-  /// Executes a unit's distinct Signature Skill every 3rd action cycle (+25% Ultimate Charge)
+  /// Suggestion 1: Status Synergies & Elemental/Kinetic Combos
+  /// - Bleed Detonation: Physical hits on targets with >= 2 Bleed consume stacks for massive kinetic burst + adjacent splash!
+  /// - Solar Ignition: Holy/Fire/Magic hits on burning targets cause burn spread to rank/column + 30% bonus magic damage!
+  /// - Armor Shatter / Stagger: When an attack drops enemy armor to 0, target is Staggered (-2,500 AP penalty)!
+  void _applyStatusSynergies(
+    CombatUnitState attacker,
+    CombatUnitState target,
+    int damageDealt, {
+    required bool isPhysical,
+    bool isHolyOrMagic = false,
+  }) {
+    if (!target.isAlive) return;
+    final opposingSquad = target.isPlayer ? playerUnits : enemyUnits;
+
+    // 1. Bleed Detonation
+    if (isPhysical && target.bleedStacks >= 2) {
+      final detonatedStacks = target.bleedStacks;
+      target.bleedStacks = 0;
+      bleedDetonationsCount++;
+      final burstDmg = (detonatedStacks * 28 * reckoningDamageMultiplier).round();
+      final directDmg = target.takeDamage(burstDmg, ignoreArmor: true, isPhysical: true);
+      addLog('🩸 BLEED DETONATION! ${attacker.name} consumed $detonatedStacks bleed on ${target.name} for $directDmg kinetic burst!');
+      
+      final tCol = target.occupiedNodes.firstOrNull?.column ?? 0;
+      final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
+      for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => (n.column - tCol).abs() <= 1 && (n.row - tRow).abs() <= 1))) {
+        final splashDmg = neighbor.takeDamage((burstDmg * 0.50).round(), ignoreArmor: true, isPhysical: true);
+        addLog('  🩸 Splash Detonation: ${neighbor.name} took $splashDmg burst damage!');
+      }
+      lastBannerMessage = '🩸 BLEED DETONATION: ${target.name} shattered for $directDmg burst!';
+    }
+
+    // 2. Solar Ignition (Holy or Magic strike on Burning enemy)
+    if (isHolyOrMagic && target.burnDuration > 0) {
+      final bonusBurnDmg = (damageDealt * 0.30).round();
+      target.takeDamage(bonusBurnDmg, ignoreArmor: true, isPhysical: false);
+      final tCol = target.occupiedNodes.firstOrNull?.column ?? 0;
+      final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
+      for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.column == tCol || n.row == tRow))) {
+        neighbor.burnDuration = max(neighbor.burnDuration, 60);
+        addLog('  🔥 Solar Ignition spread to ${neighbor.name} (2s Burn)!');
+      }
+      addLog('🔥 SOLAR IGNITION! ${attacker.name} ignited ${target.name} for +$bonusBurnDmg Holy Burn DMG!');
+      lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf ${target.name} squad!';
+    }
+
+    // 3. Armor Shattered -> Stagger
+    if (target.maxArmor > 0 && target.armor <= 0 && target.isAlive) {
+      target.currentAp = max(0, target.currentAp - 2500);
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      addLog('⚡ ARMOR SHATTERED! ${target.name} is STAGGERED (-2,500 AP, Vulnerable 3s)!');
+      lastBannerMessage = '⚡ ARMOR SHATTERED: ${target.name} staggered!';
+    }
+  }
+
+  /// Executes a unit\'s distinct Signature Skill every 3rd action cycle (+25% Ultimate Charge)
   void _executeSignatureSkill(CombatUnitState unit, CombatUnitState target) {
     final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}';
     final skillName = unit.signatureSkillName;
@@ -1684,6 +1739,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     unit.actionCycleCount++;
 
     final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+    _applyStatusSynergies(
+      unit,
+      target,
+      dmg,
+      isPhysical: unit.archetype != UnitArchetype.backlineCaster,
+      isHolyOrMagic: unit.archetype == UnitArchetype.backlineCaster || unit.name.toLowerCase().contains('malakor') || unit.name.toLowerCase().contains('valeria'),
+    );
     lastBannerMessage = '★ SIGNATURE SKILL: ${unit.name.toUpperCase()} — ${skillName.toUpperCase()} ($dmg DMG)!';
 
     dispatchAction(SpatialActionEvent(
@@ -1763,6 +1825,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
 
       final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+      _applyStatusSynergies(unit, target, dmg, isPhysical: true);
 
       dispatchAction(SpatialActionEvent(
         id: 'act_${currentTick}_${unit.id}',
@@ -1807,7 +1870,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
         final target = validExplicit ??
-            _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer) ??
+            _resolveColumnTarget(unitCol: validExplicit?.occupiedNodes.firstOrNull?.column ?? col, targetingPlayers: !unit.isPlayer) ??
             opposingSquad.where((u) => u.isAlive).firstOrNull;
         if (target != null) {
           final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
@@ -1852,6 +1915,13 @@ class SpatialCombatEngine extends ChangeNotifier {
           // Basic attack grants +15% Ultimate gauge
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
           final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+          _applyStatusSynergies(
+            unit,
+            target,
+            dmg,
+            isPhysical: true,
+            isHolyOrMagic: unit.id == 'lady_valeria' || hasHoldTheLineBonus,
+          );
 
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
@@ -1880,7 +1950,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         // Shockwave / Tremor Slam: 60% Dmg + minor stagger / 15 armor chip down column.
         // If front tile in column is empty, unit automatically steps forward to reclaim the Frontline!
         final target = validExplicit ??
-            _resolveColumnTarget(unitCol: col, targetingPlayers: !unit.isPlayer) ??
+            _resolveColumnTarget(unitCol: validExplicit?.occupiedNodes.firstOrNull?.column ?? col, targetingPlayers: !unit.isPlayer) ??
             opposingSquad.where((u) => u.isAlive).firstOrNull;
         final shockwaveDmg = (unit.attack * 0.60).round();
         if (target != null) {
@@ -1986,7 +2056,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       // -> Strike pierces straight down column (Row 0, 1, 2)
       // -> Generates +1 Global Focus for Gauntlet reservoir
       final bool isAethericBonus = unit.currentDepth == RowDepth.back;
-      final targetCol = unit.occupiedNodes.first.column;
+      final explicitCol = validExplicit?.occupiedNodes.firstOrNull?.column;
+      final targetCol = explicitCol ?? unit.occupiedNodes.first.column;
       final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
       final primaryColumnTarget = validExplicit ??
           _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
@@ -2034,6 +2105,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         if (primaryTarget != null) {
           final graftProc = _applyGraftedTraitProc(unit, primaryTarget, primaryDmg);
+          _applyStatusSynergies(unit, primaryTarget, primaryDmg, isPhysical: false, isHolyOrMagic: true);
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
             attackerId: unit.id,
@@ -2050,7 +2122,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           ));
         }
       } else {
-        final target = opposingSquad.where((u) => u.isAlive).firstOrNull;
+        final target = validExplicit ?? opposingSquad.where((u) => u.isAlive).firstOrNull;
         if (target != null) {
           final dmg = target.takeDamage(unit.attack);
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);

@@ -235,6 +235,18 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     final selectedAlly = selectedUnitId != null ? engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull : null;
     final bool isMoveReachable = isPlayer && selectedAlly != null && occupant == null && selectedAlly.canMoveTo(col, row, ignoreApCost: engine.isPreBattlePhase);
 
+    // Telegraphed Enemy Threat Danger Zone (Suggestion 2)
+    final bool isTelegraphed = isPlayer && engine.activeTelegraphedNodes.any((n) => n.column == col && n.row == row);
+    SpatialTelegraphIntent? activeIntentOnCell;
+    if (isTelegraphed) {
+      for (final enemy in engine.enemyUnits) {
+        if (enemy.isAlive && enemy.pendingIntent != null && enemy.pendingIntent!.targetNodes.any((n) => n.column == col && n.row == row)) {
+          activeIntentOnCell = enemy.pendingIntent;
+          break;
+        }
+      }
+    }
+
     // Natural Field-of-Vision Depth Scaling:
     // Row 0 (Frontline, closest to clash): Plinths are larger and wider (1.0 scale)
     // Row 1 (Midline): Scale 0.94
@@ -277,7 +289,10 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         Color plinthGlowColor;
 
         final bool isTurnActiveUnit = occupant != null && engine.activeActingUnit?.id == occupant.id;
-        if (isTurnActiveUnit) {
+        if (isTelegraphed) {
+          plinthRimColor = const Color(0xFFFF1744);
+          plinthGlowColor = const Color(0xFFFF1744).withValues(alpha: 0.75);
+        } else if (isTurnActiveUnit) {
           plinthRimColor = const Color(0xFFFFD54F);
           plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.85);
         } else if (isSelected || isDropCandidate || isHovered) {
@@ -397,6 +412,55 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
               ),
 
+              // 2b. Telegraphed Enemy Threat Danger Zone Countdown & Hazard Overlay
+              if (isTelegraphed)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0x33FF1744),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0x88FF1744), width: 1.2),
+                      ),
+                    ),
+                  ),
+                ),
+              if (isTelegraphed && activeIntentOnCell != null)
+                Positioned(
+                  top: 2,
+                  left: 2,
+                  right: 2,
+                  child: Builder(
+                    builder: (context) {
+                      final intent = activeIntentOnCell!;
+                      final remTicks = (intent.triggerTick - engine.currentTick).clamp(0, 9999);
+                      final remSec = (remTicks / 30.0).toStringAsFixed(1);
+                      return Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xEE4A0E17),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: const Color(0xFFFF1744), width: 0.9),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x66FF1744), blurRadius: 4),
+                            ],
+                          ),
+                          child: Text(
+                            '⚠️ ${remSec}s',
+                            style: const TextStyle(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFF8A80),
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
               // 3. Vanguard Cover Badge (Rank & Rite Spec Sec 3)
               if (hasVanguardCover)
                 Positioned(
@@ -438,6 +502,27 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
+              // 4b. Ghost Placement Preview when dragging a unit
+              if (occupant == null && isPlayer && draggedUnitId != null && (isHovered || isDropCandidate))
+                Builder(
+                  builder: (context) {
+                    final draggedUnit = engine.playerUnits.where((u) => u.id == draggedUnitId).firstOrNull;
+                    if (draggedUnit == null) return const SizedBox.shrink();
+                    return Center(
+                      child: Opacity(
+                        opacity: 0.55,
+                        child: buildUnitMiniature(
+                          draggedUnit,
+                          tileWidth: tileWidth,
+                          tileHeight: tileHeight,
+                          colGap: 0,
+                          isSelected: false,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
               // 5. Standing Unit Miniature (Grounded on the perspective plinth)
               if (occupant != null)
                 Center(
@@ -449,6 +534,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       } else {
                         onSelectEnemyUnit(occupant.id);
                       }
+                    },
+                    onDoubleTap: () {
+                      onLongPressUnit?.call(occupant);
                     },
                     onLongPress: () {
                       onLongPressUnit?.call(occupant);
