@@ -5750,8 +5750,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   child: Center(
                     child: Builder(
                       builder: (context) {
-                        final shieldWidth = isBoss ? bossSpanWidth * 1.7 : (tileWidth * 2.3).clamp(80.0, 240.0);
-                        final shieldHeight = isBoss ? (tileHeight * 3.4) : (tileHeight * 2.9).clamp(90.0, 280.0);
+                        // User requested: Enlarge shield animation and remove second yellow circle
+                        final shieldWidth = isBoss ? bossSpanWidth * 2.0 : (tileWidth * 2.85).clamp(110.0, 320.0);
+                        final shieldHeight = isBoss ? (tileHeight * 4.2) : (tileHeight * 3.6).clamp(120.0, 360.0);
                         final nowMs = DateTime.now().millisecondsSinceEpoch;
                         final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
 
@@ -5773,35 +5774,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           return SizedBox(
                             width: shieldWidth,
                             height: shieldHeight,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Image.asset(
-                                  'assets/animations/vfx/fire_shield_static.png',
-                                  fit: BoxFit.contain,
-                                  width: shieldWidth * 0.92,
-                                  height: shieldHeight * 0.92,
-                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                ),
-                                Container(
-                                  width: shieldWidth * 0.65,
-                                  height: shieldHeight * 0.65,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: const Color(0xFFFFD54F).withValues(alpha: 0.55),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFFF9100).withValues(alpha: 0.35),
-                                        blurRadius: 12,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            child: Image.asset(
+                              'assets/animations/vfx/fire_shield_static.png',
+                              fit: BoxFit.contain,
+                              width: shieldWidth,
+                              height: shieldHeight,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                             ),
                           );
                         }
@@ -7807,7 +7785,29 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
           // Action 1: BASIC ATTACK (Always Ready / Standard TM Cost)
           Expanded(
-            child: ElevatedButton.icon(
+            child: Tooltip(
+              preferBelow: false,
+              verticalOffset: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1014),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
+              ),
+              richMessage: TextSpan(
+                children: [
+                  const TextSpan(
+                    text: '⚔️ BASIC ATTACK\n',
+                    style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF8A80), fontSize: 11),
+                  ),
+                  TextSpan(
+                    text: 'Deals 100% Attack (${unit.effectiveAttack} DMG) to frontline/column target.\nCharges +15% Ultimate Gauge.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
               icon: const Icon(Icons.sports_mma, size: 14),
               label: Text(
                 'BASIC ATTACK\n${explicitTarget != null ? "Target: " + explicitTarget.name.split(" ").first : "Default Target"}',
@@ -7835,55 +7835,101 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               },
             ),
           ),
+        ),
           const SizedBox(width: 6),
 
           // Action 2: SIGNATURE SKILL (With cooldown tracking)
           Expanded(
-            child: ElevatedButton.icon(
-              icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
-              label: Text(
-                unit.isSignatureReady
-                    ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
-                    : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w900,
-                  height: 1.15,
-                  color: unit.isSignatureReady ? Colors.white : Colors.white54,
-                ),
+            child: Tooltip(
+              preferBelow: false,
+              verticalOffset: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1026),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFEA80FC), width: 1.2),
+                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  side: BorderSide(
-                    color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
-                    width: 1.2,
+              richMessage: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '★ ${unit.signatureSkillName.toUpperCase()}\n',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEA80FC), fontSize: 11),
+                  ),
+                  TextSpan(
+                    text: '${unit.signatureSkillDescription}\nCooldown: 2 Turns (Charges +25% Ultimate Gauge)',
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
+                icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
+                label: Text(
+                  unit.isSignatureReady
+                      ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
+                      : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                    color: unit.isSignatureReady ? Colors.white : Colors.white54,
                   ),
                 ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: BorderSide(
+                      color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+                onPressed: unit.isSignatureReady
+                    ? () {
+                        setState(() {
+                          _engine.executeUnitAction(
+                            unit,
+                            isReposition: false,
+                            explicitTarget: explicitTarget,
+                            actionType: 'signature',
+                          );
+                        });
+                      }
+                    : null,
               ),
-              onPressed: unit.isSignatureReady
-                  ? () {
-                      setState(() {
-                        _engine.executeUnitAction(
-                          unit,
-                          isReposition: false,
-                          explicitTarget: explicitTarget,
-                          actionType: 'signature',
-                        );
-                      });
-                    }
-                  : null,
             ),
           ),
           const SizedBox(width: 6),
 
-          // Action 3: ULTIMATE ABILITY (With Gauge / Ready state)
+          // Action 3: ULTIMATE ABILITY (With Cooldown / Ready state)
           Expanded(
-            child: ElevatedButton.icon(
+            child: Tooltip(
+              preferBelow: false,
+              verticalOffset: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF262010),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
+              ),
+              richMessage: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '⚡ ${unit.ultimateTitle.toUpperCase()}\n',
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), fontSize: 11),
+                  ),
+                  TextSpan(
+                    text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Immediate battle opening access)',
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
               icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
               label: Text(
                 unit.isUltimateReady
@@ -7923,6 +7969,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   : null,
             ),
           ),
+        ),
           const SizedBox(width: 6),
 
           // Action 4: REPOSITION / SHIFT (25% TM Cost -> 7,500 TM retained)
