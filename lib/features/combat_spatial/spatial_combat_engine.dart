@@ -151,6 +151,8 @@ class SpatialCombatEngine extends ChangeNotifier {
   int totalDamageTaken = 0;
   int totalHealingDone = 0;
   int bleedDetonationsCount = 0;
+  int totalActionsCount = 0; // Total attacks/skills/ultimates resolved in battle
+  int playerTurnDecisionsCount = 0; // Total tactical player decision rounds completed
 
   SpatialCombatEngine({
     List<UnitEntity>? initialPlayerEntities,
@@ -414,6 +416,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     totalDamageTaken = 0;
     totalHealingDone = 0;
     bleedDetonationsCount = 0;
+    totalActionsCount = 0;
+    playerTurnDecisionsCount = 0;
     currentTick = 0;
     isRunning = false;
     isPreBattlePhase = true;
@@ -591,6 +595,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   void dispatchAction(SpatialActionEvent event) {
+    totalActionsCount++;
     activeActionEvent = event;
     if (event.damage > 0) {
       if (event.isPlayerAttacker) {
@@ -1382,6 +1387,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       _executeUnitTurn(unit, explicitTarget: explicitTarget, actionType: actionType);
       unit.currentAp = 0; // Skill / Attack consumes full TM (100% cost per Spec Sec 2)
     }
+    playerTurnDecisionsCount++;
     hasCastTuningSlipThisTurn = false;
     activeActingUnit = null;
     isTurnExecutionPaused = false;

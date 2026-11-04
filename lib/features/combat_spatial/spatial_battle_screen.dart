@@ -825,7 +825,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 border: Border.all(color: const Color(0xFFB3261E)),
               ),
               child: const Text(
-                'EXPERIMENTAL v3.2',
+                'EXPERIMENTAL v3.3 (TACTICAL RITE)',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -1848,6 +1848,36 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       ],
                     ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 1d. Live Action & Battle Pacing Counter (User Requested)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B2430),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFF64B5F6).withValues(alpha: 0.6),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flash_on, color: Color(0xFF64B5F6), size: 13),
+                      const SizedBox(width: 4),
+                      Text(
+                        'ACTIONS:  • ROUND: ',
+                        style: const TextStyle(
+                          color: Color(0xFFBBDEFB),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 9.5,
+                          fontFamily: 'monospace',
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
