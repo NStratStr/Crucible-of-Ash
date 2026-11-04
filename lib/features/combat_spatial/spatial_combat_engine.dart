@@ -1386,6 +1386,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     activeActingUnit = null;
     isTurnExecutionPaused = false;
     isRunning = true; // Resume simulation
+    advanceToNextWaveIfPending();
     notifyListeners();
   }
 

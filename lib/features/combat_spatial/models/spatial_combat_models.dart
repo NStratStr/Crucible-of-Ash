@@ -615,6 +615,20 @@ class CombatUnitState {
   }
 
   /// Ultimate Skill Display Title
+  /// Character Dark Fantasy War Cry / Battle Chant
+  String get battleChant {
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('valeria')) return 'By the Holy Ash of the Dawnbound, shatter and yield!';
+    if (key.contains('vladislav')) return 'The blood of our ancestors hungers... tithe is due!';
+    if (key.contains('malakor')) return 'Purge the blight! No ash shall outlive our righteous pyre!';
+    if (key.contains('sanguine_blade')) return 'Let flesh rend, let their veins weep crimson.';
+    if (key.contains('iron_footman')) return 'Stand firm behind the iron wall! None shall pass!';
+    if (key.contains('sun_smith')) return 'From the kiln of dawn, solar fury is unleashed!';
+    if (key.contains('arbalest')) return 'Target marked. Release the iron bolt!';
+    if (key.contains('cinder_witch')) return 'Cinders dance, cinders consume!';
+    return 'For the Order! No mercy to the fallen!';
+  }
+
   String get ultimateTitle {
     final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
     if (key.contains('valeria')) return 'Wrath of the Dawnbound';

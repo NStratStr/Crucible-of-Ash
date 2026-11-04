@@ -182,6 +182,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<_ActiveCombatSpriteVfx> _activeSpriteVfx = [];
   Offset _screenShakeOffset = Offset.zero;
   double _shakeIntensity = 0.0;
+  double _battlefieldCameraZoom = 1.0;
+  bool _isSlowMoFinisher = false;
 
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
@@ -326,6 +328,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return Offset(screenX, screenY);
   }
 
+  void _triggerCameraImpactZoom({double zoomScale = 1.05, int durationMs = 280}) {
+    if (!mounted) return;
+    setState(() {
+      _battlefieldCameraZoom = zoomScale;
+    });
+    final t = Timer(Duration(milliseconds: durationMs), () {
+      if (mounted) {
+        setState(() {
+          _battlefieldCameraZoom = 1.0;
+        });
+      }
+    });
+    _animTimers.add(t);
+  }
+
   void _triggerScreenShake({double intensity = 6.0}) {
     _shakeIntensity = intensity;
     const int stepCount = 6;
@@ -463,6 +480,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
     }
 
+    // Check if this attack was a lethal finisher against the last enemy in wave/battle
+    final bool isLethalFinisher = target != null && !target.isPlayer && !target.isAlive && _engine.enemyUnits.where((u) => u.isAlive).isEmpty;
+    if (isLethalFinisher) {
+      _isSlowMoFinisher = true;
+      _triggerCameraImpactZoom(zoomScale: 1.09, durationMs: 900);
+      _playSfx('sfx_victory.wav');
+      final slowMoTimer = Timer(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          setState(() {
+            _isSlowMoFinisher = false;
+          });
+        }
+      });
+      _animTimers.add(slowMoTimer);
+    }
+
     // Check if event is a player Ultimate Burst or Signature Skill
     final bool isUltimate = event.id.startsWith('ult_');
     if (isUltimate && caster != null && caster.isPlayer) {
@@ -508,7 +541,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
 
     // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
+    // Dynamic Kinetic Camera Zoom & Hit-Stop on Crits / Ultimates / Boss Heavy Strikes
     if (isHeavyImpact) {
+      _triggerCameraImpactZoom(
+        zoomScale: isUltimate ? 1.08 : (isBossStrike ? 1.06 : 1.04),
+        durationMs: isUltimate ? 400 : 280,
+      );
       _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
       _groundRipples.add(_GroundShockwaveRipple(
         id: 'ripple_${event.id}_$nowMs',
@@ -924,9 +962,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
-              child: Transform.translate(
-                offset: _screenShakeOffset,
-                child: Stack(
+              child: Transform.scale(
+                scale: _battlefieldCameraZoom,
+                child: Transform.translate(
+                  offset: _screenShakeOffset,
+                  child: Stack(
                   fit: StackFit.expand,
                   children: [
                   // Atmospheric Multi-Layer Parallax Battlefield Arena Backdrop
@@ -1206,6 +1246,42 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   // Pulled-Up Spell Card Inspector & Cast HUD (Floating just above the dock)
                   if (_selectedCardId != null || _hoveredCardId != null)
                     _buildPulledUpCardOverlay(isLandscapeMobile: isLandscapeMobile),
+
+                  // Slow-Motion Lethal Finisher Crimson Vignette Filter
+                  if (_isSlowMoFinisher)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: Alignment.center,
+                              radius: 0.95,
+                              colors: [
+                                Colors.transparent,
+                                const Color(0xFFFF1744).withValues(alpha: 0.35),
+                                Colors.black.withValues(alpha: 0.75),
+                              ],
+                              stops: const [0.35, 0.75, 1.0],
+                            ),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '⚔️ DECISIVE BLOW ⚔️',
+                              style: TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 4.0,
+                                shadows: [
+                                  Shadow(color: Color(0xFFFF1744), blurRadius: 18),
+                                  Shadow(color: Colors.black, blurRadius: 10),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   // Victory / Defeat Tactical Overlay Banner
                   if (_engine.isVictory || _engine.isDefeat)
@@ -1566,6 +1642,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                 ],
+              ),
               ),
               ),
             ),
@@ -4678,6 +4755,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                             const SizedBox(height: 6),
 
+                            // Battle Cry Chant
+                            Text(
+                              unit.battleChant,
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.4,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+
                             // Ultimate Flavor & Tactical Effect
                             Text(
                               unit.ultimateDescription,
@@ -4785,6 +4877,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.8,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          unit.battleChant,
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: 9.5,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
