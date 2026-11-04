@@ -241,7 +241,9 @@ class CombatUnitState {
   int invulnerabilityTicks; // grace window after revive (e.g., 6 ticks = 0.2s)
   bool get isInvulnerable => invulnerabilityTicks > 0;
   int ultimateGauge; // 0 to 100%
-  bool get isUltimateReady => ultimateGauge >= 100;
+  int ultimateCooldown; // 0 = Ultimate Burst Ready! Turn-based cooldown (active at battle start)
+  bool get isUltimateReady => ultimateCooldown <= 0;
+  int shieldAppliedMs; // timestamp when aegisShield was applied (for one-shot spell animation -> static overlay transition)
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
@@ -285,7 +287,9 @@ class CombatUnitState {
     this.reviveCount = 0,
     int? baseMaxHp,
     this.invulnerabilityTicks = 0,
-    this.ultimateGauge = 0,
+    this.ultimateGauge = 100,
+    this.ultimateCooldown = 0,
+    this.shieldAppliedMs = 0,
     this.isSlagCarapaceActive = false,
     this.isPetrifiedPlinth = false,
     this.plinthDurability = 3,

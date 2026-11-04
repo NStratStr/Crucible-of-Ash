@@ -350,7 +350,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     for (final ally in playerUnits.where((u) => u.isAlive)) {
       final healAmt = max(25, (ally.maxHp * 0.20).round());
       ally.hp = min(ally.maxHp, ally.hp + healAmt);
-      ally.aegisShield += 15;
+      ally.aegisShield += 15; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
       totalHealingDone += healAmt;
     }
     focus = min(maxFocus, focus + 1);
@@ -730,7 +730,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 55,
       attack: 74,
       speed: 85,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     // Iron Footman: 1x1 Vanguard in Col 4 Frontline (Col index 3, Row 0)
@@ -750,7 +750,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 45,
       attack: 60,
       speed: 80,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     // Sanguine Blade: 1x1 Midline in Col 4 Midline (Col index 3, Row 1)
@@ -771,7 +771,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 20,
       attack: 78,
       speed: 120,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     // Sun-Smith Artificer: 1x1 Arcanum in Col 5 Backline (Col index 4, Row 2)
@@ -791,7 +791,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       armor: 15,
       attack: 70,
       speed: 95,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     playerUnits.addAll([valeria, ironFootman, sanguineBlade, sunSmith]);
@@ -1537,7 +1537,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       return 'SERRATED LINEAGE (+1 BLEED & HASTE)';
     }
     if (t.contains('bastion') || t.contains('carapace') || t.contains('bulwark') || t.contains('iron') || t.contains('shield')) {
-      attacker.aegisShield += 20;
+      attacker.aegisShield += 20; attacker.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
       addLog('  🧬 [GRAFT: IRON BASTION] ${attacker.name} fortifies with +20 Aegis Shield!');
       return 'IRON BASTION (+20 AEGIS)';
     }
@@ -1562,7 +1562,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     // Default generic Crucible Graft proc
     final bonusDmg = max(5, (damageDealt * 0.15).round());
     target.takeDamage(bonusDmg, ignoreArmor: true, isPhysical: true);
-    attacker.aegisShield += 15;
+    attacker.aegisShield += 15; attacker.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
     final label = attacker.graftedTraitDisplayName?.split(' (').first.toUpperCase() ?? 'CRUCIBLE GRAFT';
     addLog('  🧬 [GRAFT: $label] ${attacker.name} deals +$bonusDmg True DMG & gains +15 Aegis!');
     return '$label (+$bonusDmg DMG & +15 AEGIS)';
@@ -1650,7 +1650,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       target.sunderArmor(0.25);
       target.currentAp = max(0, target.currentAp - 1500);
       for (final ally in friendlySquad.where((u) => u.isAlive && u.currentDepth == RowDepth.front)) {
-        ally.aegisShield += 25;
+        ally.aegisShield += 25; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
       }
       pattern = TargetPattern.piercingColumnSkewer;
       addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName for $dmg DMG, sunders 25% Armor, and shields Frontline (+25 Aegis)!');
@@ -1673,7 +1673,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       dmg = target.takeDamage(rawDmg, isPhysical: true);
       target.armor = max(0, target.armor - 15);
       target.currentAp = max(0, target.currentAp - 1500);
-      unit.aegisShield += 25;
+      unit.aegisShield += 25; unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
       addLog('★ SIGNATURE SKILL: ${unit.name} slams ${target.name} with $skillName for $dmg DMG (-15 Armor, -1,500 AP, +25 Aegis)!');
     } else if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
       final rawDmg = (unit.effectiveAttack * 1.50).round();
@@ -1704,7 +1704,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       final lowestAlly = allies.firstOrNull;
       if (lowestAlly != null) {
         lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + 40);
-        lowestAlly.aegisShield += 20;
+        lowestAlly.aegisShield += 20; lowestAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
         if (unit.isPlayer) totalHealingDone += 40;
       }
       if (unit.isPlayer && focus < maxFocus) {
@@ -1786,6 +1786,8 @@ class SpatialCombatEngine extends ChangeNotifier {
 
       unit.actionCycleCount++;
       unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+      unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
+      unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
 
       // Flanking Momentum / Marksman Precision check:
       // Triggered if unit moved this turn cycle, target has active Bleed, or Marksman shooting from Backline
@@ -1880,6 +1882,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           }
           unit.actionCycleCount++;
           unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+          unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
 
           final int baseDmg = hasHoldTheLineBonus ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
           final dmg = target.takeDamage(baseDmg, isPhysical: true);
@@ -1997,7 +2000,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         final alliesAhead = squad.where((u) => u.isAlive && u.id != unit.id && u.occupiedNodes.any((n) => n.column == col && n.row < 2)).toList();
         for (final ally in alliesAhead) {
           ally.armor = min(ally.maxArmor + 35, ally.armor + 25);
-          ally.aegisShield += 30;
+          ally.aegisShield += 30; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
           addLog('${unit.name} [BRACED BULWARK] shields ${ally.name} ahead (+25 Armor, +30 Aegis)!');
         }
         unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
@@ -2385,7 +2388,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       customAssetPath: incomingEntity.customAvatarAsset,
       nativeTraitId: incomingEntity.nativeTraitId,
       graftedTraitId: effectiveGraftId,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     playerUnits[index] = newCombatUnit;
@@ -2440,7 +2443,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       customAssetPath: incomingEntity.customAvatarAsset,
       nativeTraitId: incomingEntity.nativeTraitId,
       graftedTraitId: effectiveGraftId,
-      ultimateGauge: 40,
+      ultimateGauge: 100, ultimateCooldown: 0,
     );
 
     playerUnits.add(newCombatUnit);
@@ -2662,11 +2665,11 @@ class SpatialCombatEngine extends ChangeNotifier {
         final armorGain = (35 * (commandService?.potencyMultiplier ?? 1.0)).round();
         final shieldGain = (50 * (commandService?.potencyMultiplier ?? 1.0)).round();
         recipient.armor += armorGain;
-        recipient.aegisShield += shieldGain;
+        recipient.aegisShield += shieldGain; recipient.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
         if (card.id == 'stand_resolute' || card.id == 'iron_bulwark') {
           for (final ally in playerUnits.where((u) => u.isAlive && u.id != recipient.id && u.currentDepth == RowDepth.front)) {
             ally.armor += 20;
-            ally.aegisShield += 30;
+            ally.aegisShield += 30; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
           }
         }
         lastBannerMessage = '🛡️ ${card.name.toUpperCase()}: +$armorGain Armor & +$shieldGain Aegis Shield to ${recipient.name}!';
@@ -2946,7 +2949,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (lowestAlly.isNotEmpty) {
           final target = lowestAlly.first;
           target.hp = min(target.maxHp, target.hp + 120);
-          target.aegisShield += 40;
+          target.aegisShield += 40; target.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
           lastBannerMessage = '✨ ${card.name.toUpperCase()}: +120 HP & +40 Shield to ${target.name}!';
           addLog('CAST: ${card.name} invigorated ${target.name} (+120 HP, +40 Shield).');
           dispatchAction(SpatialActionEvent(
@@ -3054,7 +3057,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (card.id == 'feast_of_ruin' || card.id == 'retributive_stride') {
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.hp = min(ally.maxHp, ally.hp + 35);
-          ally.aegisShield += 25;
+          ally.aegisShield += 25; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
         }
       }
 
@@ -3100,7 +3103,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       return false;
     }
 
-    unit.ultimateGauge = 0; // Consume meter
+    unit.ultimateGauge = 0;
+    unit.ultimateCooldown = 3; // 3-turn cooldown after unleash
 
     switch (unit.id) {
       case 'lady_valeria':
@@ -3142,7 +3146,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         // to all allies in Row 0 for 4s
         final alliesInRow = playerUnits.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
         for (final ally in alliesInRow) {
-          ally.aegisShield += 60;
+          ally.aegisShield += 60; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
           ally.armor = min(ally.maxArmor + 30, ally.armor + 25);
           addLog('UNBREAKABLE PHALANX: ${ally.name} warded with +60 Aegis Barrier & +25 Armor!');
         }

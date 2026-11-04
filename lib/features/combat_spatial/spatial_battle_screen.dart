@@ -5712,22 +5712,70 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
 
             // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Crimson Slash, Fire/Light Shield, Sun Magic Circle)
+            // User requested: Shield is sized appropriately to encompass unit (2.3x tileWidth / 2.9x tileHeight),
+            // plays the one-shot eruption animation, and then transitions into a static luminous shield barrier overlay!
             if (unit.aegisShield > 0)
               Positioned.fill(
                 child: IgnorePointer(
                   child: Center(
-                    child: SizedBox(
-                      width: isBoss ? bossSpanWidth * 1.4 : tileWidth * 1.6,
-                      height: isBoss ? (tileHeight * 2.8) : (tileHeight * 2.4),
-                      child: SpriteSheetAnimation(
-                        assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
-                        columns: 3,
-                        rows: 3,
-                        totalFrames: 9,
-                        duration: const Duration(milliseconds: 1200),
-                        loop: true,
-                        fit: BoxFit.contain,
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final shieldWidth = isBoss ? bossSpanWidth * 1.7 : (tileWidth * 2.3).clamp(80.0, 240.0);
+                        final shieldHeight = isBoss ? (tileHeight * 3.4) : (tileHeight * 2.9).clamp(90.0, 280.0);
+                        final nowMs = DateTime.now().millisecondsSinceEpoch;
+                        final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
+
+                        if (isInitialCasting) {
+                          return SizedBox(
+                            width: shieldWidth,
+                            height: shieldHeight,
+                            child: const SpriteSheetAnimation(
+                              assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                              columns: 3,
+                              rows: 3,
+                              totalFrames: 9,
+                              duration: Duration(milliseconds: 1000),
+                              loop: false,
+                              fit: BoxFit.contain,
+                            ),
+                          );
+                        } else {
+                          return SizedBox(
+                            width: shieldWidth,
+                            height: shieldHeight,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Image.asset(
+                                  'assets/animations/vfx/fire_shield_static.png',
+                                  fit: BoxFit.contain,
+                                  width: shieldWidth * 0.92,
+                                  height: shieldHeight * 0.92,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                ),
+                                Container(
+                                  width: shieldWidth * 0.65,
+                                  height: shieldHeight * 0.65,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFFFFD54F).withValues(alpha: 0.55),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF9100).withValues(alpha: 0.35),
+                                        blurRadius: 12,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ),
                 ),
@@ -7806,7 +7854,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // Action 3: ULTIMATE ABILITY (With Gauge / Ready state)
           Expanded(
             child: ElevatedButton.icon(
-              icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.battery_charging_full, size: 14),
+              icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
               label: Text(
                 unit.isUltimateReady
                     ? '⚡ ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
