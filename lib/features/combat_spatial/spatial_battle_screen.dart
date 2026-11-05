@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../core/combat_math.dart';
 import '../../shared/utils/platform_fullscreen.dart';
@@ -192,9 +193,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   bool _isDockCollapsed = false;
   bool _hasBossEnraged = false;
 
+  late final FocusNode _battlefieldFocusNode;
+
   @override
   void initState() {
     super.initState();
+    _battlefieldFocusNode = FocusNode();
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -326,6 +330,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double screenX = originX + (col - gRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
     final double screenY = originY + (col + gRow) * (tileHeight * 0.5) + (tileHeight * 0.35);
     return Offset(screenX, screenY);
+  }
+
+  int _hitStopRemainingMs = 0;
+
+  void _triggerHitStop({int durationMs = 70}) {
+    _hitStopRemainingMs = max(_hitStopRemainingMs, durationMs);
   }
 
   void _triggerCameraImpactZoom({double zoomScale = 1.05, int durationMs = 280}) {
@@ -543,6 +553,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
     // Dynamic Kinetic Camera Zoom & Hit-Stop on Crits / Ultimates / Boss Heavy Strikes
     if (isHeavyImpact) {
+      // Kinetic Hit-Stop micro-freeze: 120ms on ultimates, 80ms on crits & boss strikes
+      _triggerHitStop(durationMs: isUltimate ? 120 : (isBossStrike ? 90 : 75));
       // Action Cam Zoom on Ultimates (Suggestion 3)
       _triggerCameraImpactZoom(
         zoomScale: isUltimate ? 1.14 : (isBossStrike ? 1.07 : 1.04),
@@ -756,7 +768,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         _dashPhase = (_dashPhase + 0.06) % 1.0;
       }
       if (_engine.isRunning) {
-        if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+        if (_hitStopRemainingMs > 0) {
+          _hitStopRemainingMs = max(0, _hitStopRemainingMs - baseIntervalMs);
+          _tickAccumulator = 0.0;
+        } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
           // Pause all AP generation and tick accumulation while watching a skill/attack in action!
           _tickAccumulator = 0.0;
         } else {
@@ -778,6 +793,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   @override
   void dispose() {
+    _battlefieldFocusNode.dispose();
     _loopTimer?.cancel();
     for (final t in _animTimers) {
       t.cancel();
@@ -806,7 +822,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
     final bool isLandscapeMobile = screenHeight < 550;
 
-    return Scaffold(
+    return Focus(
+      focusNode: _battlefieldFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleBattleKeyEvent,
+      child: Scaffold(
       backgroundColor: const Color(0xFF0D0D12),
       appBar: isLandscapeMobile ? null : AppBar(
         backgroundColor: const Color(0xFF14141E),
@@ -828,7 +848,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 border: Border.all(color: const Color(0xFFB3261E)),
               ),
               child: const Text(
-                'EXPERIMENTAL v3.3 (TACTICAL RITE)',
+                'EXPERIMENTAL v3.4 (SNAPPY COMBAT)',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -1716,6 +1736,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -1927,32 +1948,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
                 const SizedBox(width: 8),
 
-                // 2. Simulation Speed & Bullet-Time Toggle
+                // 2. Simulation Speed (Cycle 1.0X -> 1.5X -> 2.0X Turbo)
                 GestureDetector(
                   onTap: () {
-                    _engine.setBulletTime(!_engine.isBulletTime);
+                    setState(() {
+                      _engine.cycleCombatSpeed();
+                    });
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _engine.isBulletTime ? const Color(0xFFFF9100).withValues(alpha: 0.3) : const Color(0xFF282836),
+                      color: _engine.combatPacingSpeed > 1.0
+                          ? const Color(0xFFFF9100).withValues(alpha: 0.25)
+                          : const Color(0xFF282836),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white24,
+                        color: _engine.combatPacingSpeed > 1.0
+                            ? const Color(0xFFFF9100)
+                            : Colors.white24,
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          _engine.isBulletTime ? Icons.slow_motion_video : Icons.speed,
-                          color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                          _engine.combatPacingSpeed > 1.0 ? Icons.fast_forward : Icons.speed,
+                          color: _engine.combatPacingSpeed > 1.0
+                              ? const Color(0xFFFF9100)
+                              : Colors.white70,
                           size: 14,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          _engine.isBulletTime ? '30% BULLET-TIME' : '1.0X REALTIME',
+                          _engine.isBulletTime
+                              ? '30% SLOW'
+                              : 'X PACING',
                           style: TextStyle(
-                            color: _engine.isBulletTime ? const Color(0xFFFF9100) : Colors.white70,
+                            color: _engine.combatPacingSpeed > 1.0
+                                ? const Color(0xFFFF9100)
+                                : Colors.white70,
                             fontWeight: FontWeight.bold,
                             fontSize: 9.5,
                           ),
@@ -7684,6 +7717,105 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+  CombatUnitState? _getSmartDefaultTarget() {
+    final livingEnemies = _engine.enemyUnits.where((e) => e.isAlive).toList();
+    if (livingEnemies.isEmpty) return null;
+
+    // Priority 1: An enemy currently winding up a dangerous telegraphed strike (interrupt target!)
+    final telegraphed = livingEnemies.where((e) => e.pendingIntent != null).firstOrNull;
+    if (telegraphed != null) return telegraphed;
+
+    // Priority 2: An enemy with 0 armor (staggered and ripe for lethal damage)
+    final staggered = livingEnemies.where((e) => e.maxArmor > 0 && e.armor <= 0).firstOrNull;
+    if (staggered != null) return staggered;
+
+    // Priority 3: Lowest absolute current HP target
+    livingEnemies.sort((a, b) => a.hp.compareTo(b.hp));
+    return livingEnemies.first;
+  }
+
+  void _cycleNextEnemyTarget() {
+    final livingEnemies = _engine.enemyUnits.where((e) => e.isAlive).toList();
+    if (livingEnemies.isEmpty) return;
+
+    if (_selectedEnemyUnitId == null) {
+      setState(() {
+        _selectedEnemyUnitId = livingEnemies.first.id;
+      });
+      return;
+    }
+
+    final currentIndex = livingEnemies.indexWhere((e) => e.id == _selectedEnemyUnitId);
+    final nextIndex = (currentIndex + 1) % livingEnemies.length;
+    setState(() {
+      _selectedEnemyUnitId = livingEnemies[nextIndex].id;
+    });
+  }
+
+  void _executeHotkeyedAction(String actionType) {
+    if (!_engine.isTurnExecutionPaused || _engine.activeActingUnit == null) return;
+    final unit = _engine.activeActingUnit!;
+    final explicitTarget = _selectedEnemyUnitId != null
+        ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
+        : _getSmartDefaultTarget();
+
+    if (actionType == 'signature' && !unit.isSignatureReady) return;
+    if (actionType == 'ultimate' && !unit.isUltimateReady) return;
+
+    setState(() {
+      _engine.executeUnitAction(
+        unit,
+        isReposition: false,
+        explicitTarget: explicitTarget,
+        actionType: actionType,
+      );
+    });
+  }
+
+  KeyEventResult _handleBattleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // Key '1': Basic Attack
+    if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
+      _executeHotkeyedAction('basic');
+      return KeyEventResult.handled;
+    }
+
+    // Key '2': Signature Skill
+    if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
+      _executeHotkeyedAction('signature');
+      return KeyEventResult.handled;
+    }
+
+    // Key '3': Ultimate Ability
+    if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
+      _executeHotkeyedAction('ultimate');
+      return KeyEventResult.handled;
+    }
+
+    // Key 'Tab': Cycle Enemy Target
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      _cycleNextEnemyTarget();
+      return KeyEventResult.handled;
+    }
+
+    // Spacebar: Confirm / Fire Basic Attack
+    if (event.logicalKey == LogicalKeyboardKey.space) {
+      _executeHotkeyedAction('basic');
+      return KeyEventResult.handled;
+    }
+
+    // Key 'T': Cycle Combat Pacing Speed (1.0x -> 1.5x -> 2.0x)
+    if (event.logicalKey == LogicalKeyboardKey.keyT) {
+      setState(() {
+        _engine.cycleCombatSpeed();
+      });
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
   /// Rank & Rite Spec Sec 2: Turn Action Decision Tray
   /// Triggered whenever an ally reaches 10,000 TM. Execution pauses so player can:
   /// 1. Cast 1 Tuning Slip from Sculptor Tray (Vitae pool <= 7).
@@ -7695,7 +7827,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
     final explicitTarget = _selectedEnemyUnitId != null
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
-        : null;
+        : _getSmartDefaultTarget();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -7813,7 +7945,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               child: ElevatedButton.icon(
               icon: const Icon(Icons.sports_mma, size: 14),
               label: Text(
-                'BASIC ATTACK\n${explicitTarget != null ? "Target: " + explicitTarget.name.split(" ").first : "Default Target"}',
+                '⚔️ [1] BASIC ATTACK\n',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.15),
               ),
@@ -7856,7 +7988,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               richMessage: TextSpan(
                 children: [
                   TextSpan(
-                    text: '★ ${unit.signatureSkillName.toUpperCase()}\n',
+                    text: '★ [2] ${unit.signatureSkillName.toUpperCase()}\n',
                     style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEA80FC), fontSize: 11),
                   ),
                   TextSpan(
@@ -7936,8 +8068,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
               label: Text(
                 unit.isUltimateReady
-                    ? '⚡ ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
-                    : '⚡ ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateGauge}% Gauge)',
+                    ? '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
+                    : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateGauge}% Gauge)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 8.5,

@@ -895,9 +895,25 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  double combatPacingSpeed = 1.0; // 1.0 = 1.0x, 1.5 = 1.5x, 2.0 = 2.0x
+
+  void cycleCombatSpeed() {
+    if (combatPacingSpeed == 1.0) {
+      combatPacingSpeed = 1.5;
+    } else if (combatPacingSpeed == 1.5) {
+      combatPacingSpeed = 2.0;
+    } else {
+      combatPacingSpeed = 1.0;
+    }
+    if (!isBulletTime) {
+      simulationSpeed = combatPacingSpeed;
+    }
+    notifyListeners();
+  }
+
   void setBulletTime(bool active) {
     isBulletTime = active;
-    simulationSpeed = active ? 0.30 : 1.0;
+    simulationSpeed = active ? 0.30 : combatPacingSpeed;
     notifyListeners();
   }
 
