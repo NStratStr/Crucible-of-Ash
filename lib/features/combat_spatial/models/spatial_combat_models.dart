@@ -44,6 +44,7 @@ class SpatialActionEvent {
   final Map<String, int> secondaryTargetHits; // targetId -> damage dealt
   final int timestampMs;
   final bool isSignatureSkill;
+  final bool isHolyOrMagic;
   final String? graftedTraitProc;
 
   const SpatialActionEvent({
@@ -63,6 +64,7 @@ class SpatialActionEvent {
     this.secondaryTargetHits = const {},
     required this.timestampMs,
     this.isSignatureSkill = false,
+    this.isHolyOrMagic = false,
     this.graftedTraitProc,
   });
 }

@@ -151,6 +151,8 @@ class SpatialCombatEngine extends ChangeNotifier {
   int totalDamageTaken = 0;
   int totalHealingDone = 0;
   int bleedDetonationsCount = 0;
+  int solarIgnitionsCount = 0;
+  int interruptsCount = 0;
   int totalActionsCount = 0; // Total attacks/skills/ultimates resolved in battle
   int playerTurnDecisionsCount = 0; // Total tactical player decision rounds completed
 
@@ -416,6 +418,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     totalDamageTaken = 0;
     totalHealingDone = 0;
     bleedDetonationsCount = 0;
+    solarIgnitionsCount = 0;
+    interruptsCount = 0;
     totalActionsCount = 0;
     playerTurnDecisionsCount = 0;
     currentTick = 0;
@@ -1608,6 +1612,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     // 2. Solar Ignition (Holy or Magic strike on Burning enemy)
     if (isHolyOrMagic && target.burnDuration > 0) {
+      solarIgnitionsCount++;
       final bonusBurnDmg = (damageDealt * 0.30).round();
       target.takeDamage(bonusBurnDmg, ignoreArmor: true, isPhysical: false);
       final tCol = target.occupiedNodes.firstOrNull?.column ?? 0;
@@ -1620,12 +1625,20 @@ class SpatialCombatEngine extends ChangeNotifier {
       lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf ${target.name} squad!';
     }
 
-    // 3. Armor Shattered -> Stagger
+    // 3. Armor Shattered -> Stagger & Interruption
     if (target.maxArmor > 0 && target.armor <= 0 && target.isAlive) {
       target.currentAp = max(0, target.currentAp - 2500);
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
-      addLog('⚡ ARMOR SHATTERED! ${target.name} is STAGGERED (-2,500 AP, Vulnerable 3s)!');
-      lastBannerMessage = '⚡ ARMOR SHATTERED: ${target.name} staggered!';
+      if (target.pendingIntent != null) {
+        final canceledSkill = target.pendingIntent!.skillName;
+        target.pendingIntent = null;
+        interruptsCount++;
+        addLog('🛑 STRIKE INTERRUPTED! ${attacker.name} shattered ${target.name}\'s stance, canceling $canceledSkill!');
+        lastBannerMessage = '🛑 STRIKE INTERRUPTED: ${target.name}\'s $canceledSkill canceled!';
+      } else {
+        addLog('⚡ ARMOR SHATTERED! ${target.name} is STAGGERED (-2,500 AP, Vulnerable 3s)!');
+        lastBannerMessage = '⚡ ARMOR SHATTERED: ${target.name} staggered!';
+      }
     }
   }
 
@@ -1769,6 +1782,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       secondaryTargetHits: secondaryHits,
       timestampMs: DateTime.now().millisecondsSinceEpoch,
       isSignatureSkill: true,
+      isHolyOrMagic: unit.archetype == UnitArchetype.backlineCaster || unit.name.toLowerCase().contains('malakor') || unit.name.toLowerCase().contains('valeria'),
       graftedTraitProc: graftProc,
     ));
   }

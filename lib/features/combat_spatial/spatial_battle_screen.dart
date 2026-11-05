@@ -543,17 +543,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
     // Dynamic Kinetic Camera Zoom & Hit-Stop on Crits / Ultimates / Boss Heavy Strikes
     if (isHeavyImpact) {
+      // Action Cam Zoom on Ultimates (Suggestion 3)
       _triggerCameraImpactZoom(
-        zoomScale: isUltimate ? 1.08 : (isBossStrike ? 1.06 : 1.04),
-        durationMs: isUltimate ? 400 : 280,
+        zoomScale: isUltimate ? 1.14 : (isBossStrike ? 1.07 : 1.04),
+        durationMs: isUltimate ? 600 : 280,
       );
       _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
       _groundRipples.add(_GroundShockwaveRipple(
         id: 'ripple_${event.id}_$nowMs',
         origin: targetOffset,
-        color: (isBossStrike || isBloodnova)
-            ? const Color(0xFFFF1744)
-            : (event.isCrit ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)),
+        color: (isBossStrike || isBloodnova || event.bleedStacks > 0)
+            ? const Color(0xFFFF1744) // Deep crimson necrotic/bleed shockwave
+            : (event.isHolyOrMagic || event.skillName.contains('Solar') || event.skillName.contains('Dawnbound') || event.skillName.contains('Brand'))
+                ? const Color(0xFFFFD54F) // Brilliant golden solar flash
+                : (event.isCrit ? const Color(0xFFFF9100) : const Color(0xFF00E5FF)),
         maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
         createdMs: nowMs,
         durationMs: 650,
@@ -1518,11 +1521,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    const Text('BLEED BURSTS', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
+                                                    const Text('SYNERGIES & BREAKS', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
                                                     const SizedBox(height: 1),
                                                     Text(
-                                                      '${_engine.bleedDetonationsCount}',
-                                                      style: const TextStyle(color: Color(0xFFFF1744), fontSize: 11, fontWeight: FontWeight.w900),
+                                                      '🩸\ 🔥\ 🛑',
+                                                      style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 9.5, fontWeight: FontWeight.w900),
                                                     ),
                                                   ],
                                                 ),
