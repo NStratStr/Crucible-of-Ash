@@ -15,6 +15,7 @@ import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
 import '../../shared/widgets/gothic_character_sheet_card.dart';
+import '../../shared/widgets/gothic_header_bar.dart';
 
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
@@ -906,45 +907,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       onKeyEvent: _handleBattleKeyEvent,
       child: Scaffold(
       backgroundColor: const Color(0xFF0D0D12),
-      appBar: isLandscapeMobile ? null : AppBar(
-        backgroundColor: const Color(0xFF14141E),
-        elevation: 0,
-        leading: widget.onBackToStandardCombat != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F)),
-                onPressed: widget.onBackToStandardCombat,
-                tooltip: 'Return to Standard Arena',
-              )
-            : null,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFB3261E).withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFB3261E)),
-              ),
-              child: const Text(
-                'EXPERIMENTAL v3.6 (PACED KINETICS)',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFFF8A80),
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                widget.encounterTitle?.toUpperCase() ?? _engine.encounterTitle.toUpperCase(),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+      appBar: isLandscapeMobile
+          ? null
+          : GothicHeaderBar(
+              title: widget.encounterTitle ?? _engine.encounterTitle,
+              categoryTag: 'Battle',
+              leading: widget.onBackToStandardCombat != null
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFFFFD54F), size: 20),
+                      onPressed: widget.onBackToStandardCombat,
+                      tooltip: 'Return to Standard Arena',
+                    )
+                  : null,
         actions: [
           // Ambient Audio Mute Toggle
           IconButton(
@@ -1801,11 +1775,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
               _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
 
-              // Tactical Card Hand & Burn Pit (Sculptor Tray) - overlaps battlefield slightly for tabletop feel
-              Transform.translate(
-                offset: const Offset(0, -10.0),
-                child: _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
-              ),
+              // Tactical Card Hand & Burn Pit (Sculptor Tray)
+              _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
             ],
 
             // Live 30 Hz Combat Event Log (Hidden in Zen Mode and Mobile Landscape)
@@ -5168,41 +5139,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 1b. Turn Active Aura OR Stance Mastery Runic Plinth Aura (Tabletop visual condition cue)
-            if (!unit.isDowned && (_engine.activeActingUnit?.id == unit.id || unit.hasStanceBonusReady || (unit.activeStance == StanceType.holdTheLine && unit.consecutiveTurnsStationary >= 1)))
-              Positioned(
-                bottom: 3,
-                child: Container(
-                  width: baseWidth + 8,
-                  height: baseHeight + 6,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(Radius.elliptical((baseWidth + 8) / 2, (baseHeight + 6) / 2)),
-                    border: Border.all(
-                      color: (_engine.activeActingUnit?.id == unit.id)
-                          ? const Color(0xFFFFD54F) // Luminous Golden/Amber ring for active unit acting now
-                          : (unit.activeStance == StanceType.holdTheLine
-                              ? const Color(0xFFFFD54F) // Amber/Gold rune ring for Hold the Line
-                              : (unit.activeStance == StanceType.flankingMomentum
-                                  ? const Color(0xFFFF1744) // Crimson trail for Flanking Momentum
-                                  : const Color(0xFF00E5FF))), // Cyan star for Aetheric Alignment
-                      width: (_engine.activeActingUnit?.id == unit.id) ? 2.4 : 1.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_engine.activeActingUnit?.id == unit.id)
-                            ? const Color(0xFFFFD54F).withValues(alpha: 0.85)
-                            : (unit.activeStance == StanceType.holdTheLine
-                                ? const Color(0xFFFFD54F).withValues(alpha: 0.65)
-                                : (unit.activeStance == StanceType.flankingMomentum
-                                    ? const Color(0xFFFF1744).withValues(alpha: 0.65)
-                                    : const Color(0xFF00E5FF).withValues(alpha: 0.65))),
-                        blurRadius: (_engine.activeActingUnit?.id == unit.id) ? 14 : 8,
-                        spreadRadius: (_engine.activeActingUnit?.id == unit.id) ? 3 : 1,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            // 1b. Ground plinth in rank_and_rite_2d_battlefield cleanly handles active unit rim/glow.
+            // Redundant second yellow circle removed per user request for visual clarity.
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
@@ -5867,8 +5805,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     child: Builder(
                       builder: (context) {
                         // User requested: Enlarge shield animation and remove second yellow circle
-                        final shieldWidth = isBoss ? bossSpanWidth * 2.0 : (tileWidth * 2.85).clamp(110.0, 320.0);
-                        final shieldHeight = isBoss ? (tileHeight * 4.2) : (tileHeight * 3.6).clamp(120.0, 360.0);
+                        final shieldWidth = isBoss ? bossSpanWidth * 2.2 : (tileWidth * 3.1).clamp(120.0, 350.0);
+                        final shieldHeight = isBoss ? (tileHeight * 4.4) : (tileHeight * 3.9).clamp(130.0, 390.0);
                         final nowMs = DateTime.now().millisecondsSinceEpoch;
                         final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
 
@@ -5910,8 +5848,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 child: IgnorePointer(
                   child: Center(
                     child: SizedBox(
-                      width: isBoss ? bossSpanWidth * 1.4 : tileWidth * 1.6,
-                      height: isBoss ? (tileHeight * 2.6) : (tileHeight * 2.2),
+                      width: isBoss ? bossSpanWidth * 1.8 : tileWidth * 2.3,
+                      height: isBoss ? (tileHeight * 3.4) : (tileHeight * 2.9),
                       child: SpriteSheetAnimation(
                         assetPath: (_activeSkillName != null && (_activeSkillName!.contains('Slash') || _activeSkillName!.contains('Lacerat') || _activeSkillName!.contains('Flayer') || _activeSkillName!.contains('Cleave') || _activeSkillName!.contains('Blade') || _activeSkillName!.contains('Crit') || _activeSkillName!.contains('Bleed')))
                             ? 'assets/animations/vfx/crimson_slash_sheet.png'
@@ -8003,6 +7941,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Tooltip(
               preferBelow: false,
               verticalOffset: 28,
+              waitDuration: Duration.zero,
+              showDuration: const Duration(seconds: 4),
+              triggerMode: TooltipTriggerMode.tap,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1014),
@@ -8058,6 +7999,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Tooltip(
               preferBelow: false,
               verticalOffset: 28,
+              waitDuration: Duration.zero,
+              showDuration: const Duration(seconds: 4),
+              triggerMode: TooltipTriggerMode.tap,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1026),
@@ -8125,6 +8069,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Tooltip(
               preferBelow: false,
               verticalOffset: 28,
+              waitDuration: Duration.zero,
+              showDuration: const Duration(seconds: 4),
+              triggerMode: TooltipTriggerMode.tap,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF262010),

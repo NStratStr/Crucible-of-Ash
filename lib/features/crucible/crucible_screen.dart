@@ -5,6 +5,7 @@ import '../../shared/models/trait_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/gothic_card_frame_widget.dart';
 import '../../shared/widgets/living_atmosphere_background.dart';
+import '../../shared/widgets/gothic_header_bar.dart';
 import 'crucible_service.dart';
 
 class CrucibleScreen extends StatefulWidget {
@@ -383,18 +384,11 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF111114),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF181820),
-          title: const Text(
-            'THE CRUCIBLE OF BLOOD',
-            style: TextStyle(
-              letterSpacing: 2.0,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          centerTitle: true,
-          elevation: 0,
+        appBar: GothicHeaderBar(
+          title: 'Crucible of Blood',
+          categoryTag: 'Ritual',
+          totalIchor: widget.totalIchor,
+          bloodlineSigils: widget.bloodlineSigils,
         ),
         body: LivingAtmosphereBackground(
           imageAsset: 'assets/images/crucible_ritual_chamber.jpg',

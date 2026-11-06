@@ -37,6 +37,7 @@ import '../models/relic_entity.dart';
 import '../models/unit_entity.dart';
 import 'hexagonal_affinity_wheel_widget.dart';
 import 'pedigree_inspector_dialog.dart';
+import 'gothic_header_bar.dart';
 
 class AppShell extends StatefulWidget {
   final bool enableAutoBattle;
@@ -2019,13 +2020,10 @@ class _AppShellState extends State<AppShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF181820),
-        title: const Text(
-          'YOUR LINEAGE ROSTER',
-          style: TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        centerTitle: true,
+      appBar: GothicHeaderBar(
+        title: 'Brigade Lineage Roster',
+        categoryTag: 'Lineage',
+        bloodlineSigils: _bloodlineSigils,
         actions: [
           IconButton(
             tooltip: 'Grimoire Deck Archives',
@@ -2547,13 +2545,9 @@ class _AppShellState extends State<AppShell> {
   Widget _buildCodexView() {
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF181820),
-        title: const Text(
-          'HEXAGONAL AFFINITY & COMMAND CODEX',
-          style: TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        centerTitle: true,
+      appBar: const GothicHeaderBar(
+        title: 'Affinity & Command Codex',
+        categoryTag: 'Codex',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(14),

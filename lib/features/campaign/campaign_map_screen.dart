@@ -331,7 +331,11 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.surfaceColor,
+        backgroundColor: const Color(0xFF12121A),
+        elevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: Color(0xFF282836), width: 1.2),
+        ),
         leading: widget.onOpenHome != null
             ? IconButton(
                 icon: const Icon(Icons.home, color: Color(0xFFFFD54F), size: 22),

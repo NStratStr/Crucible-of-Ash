@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../shared/models/relic_entity.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/widgets/gothic_header_bar.dart';
 import 'relic_service.dart';
 import 'relic_set_codex_dialog.dart';
 
@@ -108,54 +109,16 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF181820),
-        title: const Text(
-          'THE RELIC FORGE & ARMORY',
-          style: TextStyle(letterSpacing: 1.5, fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        centerTitle: true,
+      appBar: GothicHeaderBar(
+        title: 'Relic Forge & Armory',
+        categoryTag: 'Armory',
+        totalIchor: widget.totalIchor,
+        cursedOre: widget.cursedOre,
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline, color: Color(0xFFFFD54F), size: 20),
             tooltip: 'Relic & Set Guide',
             onPressed: () => RelicSetCodexDialog.show(context, currentChapter: widget.currentChapter),
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF181820),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2B2B36)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.water_drop, color: Color(0xFFEF5350), size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  '${widget.totalIchor} ICHOR',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10.5,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
-                const SizedBox(width: 4),
-                Text(
-                  '${widget.cursedOre} ORE',
-                  style: const TextStyle(
-                    color: Color(0xFF80CBC4),
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10.5,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
