@@ -271,6 +271,22 @@ class CombatUnitState {
   bool get hasBreakBar => maxStagger > 0;
   double get staggerFraction => maxStagger > 0 ? (stagger / maxStagger).clamp(0.0, 1.0) : 0.0;
 
+  // Malakor Kinetic Bastion Mechanics
+  bool isKineticBastionActive;
+  int kineticBastionCharges;
+  int maxKineticBastionCharges;
+  bool get hasKineticBastion => isKineticBastionActive;
+  void addKineticCharge([int amount = 1]) {
+    kineticBastionCharges = (kineticBastionCharges + amount).clamp(0, maxKineticBastionCharges);
+  }
+  void dischargeKineticCharges() {
+    kineticBastionCharges = 0;
+  }
+
+  // Morvath Necrotic Mire & Plague Feast Mechanics
+  bool isNecroticMireActive;
+  bool isChannelingPlagueFeast;
+
   final String? customAssetPath;
   final String? nativeTraitId;
   final String? graftedTraitId;
@@ -319,6 +335,11 @@ class CombatUnitState {
     int? stagger,
     this.isStaggered = false,
     this.staggerDurationTicks = 0,
+    this.isKineticBastionActive = false,
+    this.kineticBastionCharges = 0,
+    this.maxKineticBastionCharges = 5,
+    this.isNecroticMireActive = false,
+    this.isChannelingPlagueFeast = false,
     this.isPetrifiedPlinth = false,
     this.plinthDurability = 3,
     this.isShattered = false,

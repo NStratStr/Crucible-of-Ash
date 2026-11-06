@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'models/spatial_combat_models.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/data/starter_brigades.dart';
 import '../../core/combat_math.dart';
 import '../relics/relic_service.dart';
 import '../generals/general_command_service.dart';
@@ -19,6 +20,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   int currentWaveIndex = 1;
   int totalWaves = 1;
   bool isBossEncounterFlag = false;
+  final Set<GridNode> necroticMireNodes = {};
 
   // Active Commander & Grimoire Service
   GeneralCommandService? commandService;
@@ -276,11 +278,23 @@ class SpatialCombatEngine extends ChangeNotifier {
         armor: bossEntity.defense,
         attack: bossEntity.attack,
         speed: bossEntity.speed,
-        isSlagCarapaceActive: true,
+        isSlagCarapaceActive: (bossEntity.speciesId.toLowerCase().contains('gorgoroth') || bossEntity.name.toLowerCase().contains('gorgoroth') || bossEntity.id.toLowerCase().contains('gorgoroth')),
         customAssetPath: bossEntity.customAvatarAsset,
         maxStagger: (bossEntity.speciesId.toLowerCase().contains('gorgoroth') || bossEntity.name.toLowerCase().contains('gorgoroth') || bossEntity.id.toLowerCase().contains('gorgoroth')) ? 180 : 0,
         stagger: (bossEntity.speciesId.toLowerCase().contains('gorgoroth') || bossEntity.name.toLowerCase().contains('gorgoroth') || bossEntity.id.toLowerCase().contains('gorgoroth')) ? 180 : 0,
+        isKineticBastionActive: (bossEntity.speciesId.toLowerCase().contains('malakor') || bossEntity.name.toLowerCase().contains('malakor') || bossEntity.id.toLowerCase().contains('malakor')),
+        kineticBastionCharges: 0,
+        maxKineticBastionCharges: 5,
+        isNecroticMireActive: (bossEntity.speciesId.toLowerCase().contains('morvath') || bossEntity.name.toLowerCase().contains('morvath') || bossEntity.id.toLowerCase().contains('morvath')),
       );
+
+      if (bossUnit.isNecroticMireActive) {
+        necroticMireNodes.clear();
+        necroticMireNodes.addAll([
+          const GridNode(column: 0, row: 0),
+          const GridNode(column: 2, row: 1),
+        ]);
+      }
       enemyUnits.add(bossUnit);
 
       int minionIdx = 0;
@@ -1093,64 +1107,131 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     // Check impending Boss Intents (Gorgoroth or any Campaign/Gauntlet Colossus Boss winds up on tick 135, and cycles every 160 ticks)
     // GDD §6.2: Under 50% HP, Boss enters Phase 2 Enkindled: winds up room-wide "Hearth Cataclysm"
+    // Necrotic Mire Ticking Miasma Check (Every 15 ticks / 0.5s)
+    if (necroticMireNodes.isNotEmpty && currentTick % 15 == 0) {
+      for (final ally in playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty)) {
+        if (necroticMireNodes.any((n) => ally.occupies(n.column, n.row))) {
+          final dmg = ally.takeDamage(15, ignoreArmor: true, isPhysical: false);
+          addLog('☣️ MIASMA: ${ally.name} suffers $dmg true damage from Necrotic Mire!');
+          lastBannerMessage = '☣️ MIASMA CORROSION: Move off corrupted ground!';
+        }
+      }
+    }
+
     final bossUnit = enemyUnits
         .where((u) =>
-            (u.id == 'gorgoroth_boss' ||
-                u.archetype == UnitArchetype.colossusBehemoth ||
+            (u.id.contains('boss') ||
+                u.templateId.contains('gorgoroth') ||
+                u.templateId.contains('malakor') ||
+                u.templateId.contains('morvath') ||
                 u.footprint != UnitFootprint.single1x1) &&
             u.isAlive)
         .firstOrNull;
-    if (bossUnit != null && !bossUnit.isStaggered) {
-      final bool isPhase2Enkindled = bossUnit.hp <= (bossUnit.maxHp * 0.50);
 
-      if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && bossUnit.pendingIntent == null) {
-        if (isPhase2Enkindled) {
-          // Hearth Cataclysm: 20-tick windup terminal channel hitting all Frontline (row 0) and Midline (row 1) nodes!
-          final cataclysmNodes = [
-            for (int col = 0; col < 3; col++) ...[
-              GridNode(column: col, row: 0),
-              GridNode(column: col, row: 1),
-            ],
+    if (bossUnit != null && !bossUnit.isStaggered) {
+      final bool isGorg = bossUnit.id.contains('gorgoroth') || bossUnit.templateId.contains('gorgoroth');
+      final bool isMalakor = bossUnit.id.contains('malakor') || bossUnit.templateId.contains('malakor') || bossUnit.hasKineticBastion;
+      final bool isMorvath = bossUnit.id.contains('morvath') || bossUnit.templateId.contains('morvath') || bossUnit.isNecroticMireActive;
+
+      if (isGorg) {
+        final bool isPhase2Enkindled = bossUnit.hp <= (bossUnit.maxHp * 0.50);
+
+        if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && bossUnit.pendingIntent == null) {
+          if (isPhase2Enkindled) {
+            final cataclysmNodes = [
+              for (int col = 0; col < 3; col++) ...[
+                GridNode(column: col, row: 0),
+                GridNode(column: col, row: 1),
+              ],
+            ];
+            bossUnit.pendingIntent = SpatialTelegraphIntent(
+              id: 'hearth_cataclysm_$currentTick',
+              skillName: 'Hearth Cataclysm',
+              pattern: TargetPattern.horizontalRowScythe,
+              originCol: 1,
+              originRow: 0,
+              targetNodes: cataclysmNodes,
+              triggerTick: currentTick + 20,
+              totalWindupTicks: 20,
+              rawDamage: max(220, (bossUnit.attack * 2.8).round()),
+            );
+            lastBannerMessage = '🔥 ENKINDLED APEX: HEARTH CATACLYSM WINDING UP!';
+            addLog('BOSS APEX: ${bossUnit.name} initiates HEARTH CATACLYSM incinerating Frontline and Midline in 20 ticks! Break with Smite or Retreat to Backline!');
+          } else {
+            final telegraphNodes = [
+              const GridNode(column: 1, row: 0),
+              const GridNode(column: 2, row: 0),
+              const GridNode(column: 1, row: 1),
+            ];
+            bossUnit.pendingIntent = SpatialTelegraphIntent(
+              id: 'cleave_intent_$currentTick',
+              skillName: 'Molten Great-Cleaver',
+              pattern: TargetPattern.tShapedCleave,
+              originCol: 1,
+              originRow: 0,
+              targetNodes: telegraphNodes,
+              triggerTick: currentTick + 15,
+              totalWindupTicks: 15,
+              rawDamage: bossUnit.id == 'gorgoroth_boss' ? 280 : max(180, (bossUnit.attack * 2.4).round()),
+            );
+            lastBannerMessage = '⚠️ ${bossUnit.name.toUpperCase()} WINDS UP: MOLTEN GREAT-CLEAVER!';
+            addLog('TELEGRAPH: ${bossUnit.name} prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
+          }
+        }
+      } else if (isMalakor) {
+        // Malakor Sunder telegraph at tick 120 / 240
+        if ((currentTick == 120 || currentTick == 240) && bossUnit.pendingIntent == null) {
+          final sunderNodes = [
+            const GridNode(column: 1, row: 0),
+            const GridNode(column: 1, row: 1),
+            const GridNode(column: 1, row: 2),
           ];
           bossUnit.pendingIntent = SpatialTelegraphIntent(
-            id: 'hearth_cataclysm_$currentTick',
-            skillName: 'Hearth Cataclysm',
+            id: 'iron_sunder_$currentTick',
+            skillName: 'Iron Sunder',
+            pattern: TargetPattern.piercingColumnSkewer,
+            originCol: 1,
+            originRow: 0,
+            targetNodes: sunderNodes,
+            triggerTick: currentTick + 15,
+            totalWindupTicks: 15,
+            rawDamage: max(200, (bossUnit.attack * 2.2).round()),
+          );
+          lastBannerMessage = '⚠️ MALAKOR WINDS UP: IRON SUNDER (CENTER COLUMN)!';
+          addLog('TELEGRAPH: Malakor the Unbroken prepares Iron Sunder striking Center Column in 15 ticks!');
+        }
+      } else if (isMorvath) {
+        // Morvath periodic ground corruption
+        if ((currentTick == 60 || currentTick == 150 || currentTick == 240) && necroticMireNodes.length < 5) {
+          final nextCol = (currentTick * 3) % 3;
+          final nextRow = (currentTick ~/ 60) % 2;
+          necroticMireNodes.add(GridNode(column: nextCol, row: nextRow));
+          addLog('☣️ NECROTIC CORRUPTION: Morvath taints Col ${nextCol + 1}, Row ${nextRow + 1} with poisonous mire!');
+          lastBannerMessage = '☣️ NECROTIC CORRUPTION: New Ground fouled with Toxic Mire!';
+        }
+
+        final bool isLowHp = bossUnit.hp <= (bossUnit.maxHp * 0.50);
+        if ((isLowHp || currentTick == 140 || currentTick == 280) && bossUnit.pendingIntent == null && !bossUnit.isChannelingPlagueFeast) {
+          bossUnit.isChannelingPlagueFeast = true;
+          bossUnit.pendingIntent = SpatialTelegraphIntent(
+            id: 'plague_feast_$currentTick',
+            skillName: 'Plague Feast',
             pattern: TargetPattern.horizontalRowScythe,
             originCol: 1,
             originRow: 0,
-            targetNodes: cataclysmNodes,
-            triggerTick: currentTick + 20,
-            totalWindupTicks: 20,
-            rawDamage: max(220, (bossUnit.attack * 2.8).round()),
+            targetNodes: necroticMireNodes.isNotEmpty ? necroticMireNodes.toList() : [const GridNode(column: 1, row: 0)],
+            triggerTick: currentTick + 25,
+            totalWindupTicks: 25,
+            rawDamage: 50,
           );
-          lastBannerMessage = '🔥 ENKINDLED APEX: HEARTH CATACLYSM WINDING UP!';
-          addLog('BOSS APEX: ${bossUnit.name} initiates HEARTH CATACLYSM incinerating Frontline and Midline in 20 ticks! Break with Smite or Retreat to Backline!');
-        } else {
-          // Wind up Apex Intent: Molten Great-Cleaver (Execution 15 ticks later)
-          final telegraphNodes = [
-            const GridNode(column: 1, row: 0), // Front Col 2 (primary target)
-            const GridNode(column: 2, row: 0), // Front Col 3 (lateral splash toward Col 3)
-            const GridNode(column: 1, row: 1), // Mid Col 2 (deep shockwave)
-          ];
-          bossUnit.pendingIntent = SpatialTelegraphIntent(
-            id: 'cleave_intent_$currentTick',
-            skillName: 'Molten Great-Cleaver',
-            pattern: TargetPattern.tShapedCleave,
-            originCol: 1,
-            originRow: 0,
-            targetNodes: telegraphNodes,
-            triggerTick: currentTick + 15,
-            totalWindupTicks: 15,
-            rawDamage: bossUnit.id == 'gorgoroth_boss' ? 280 : max(180, (bossUnit.attack * 2.4).round()),
-          );
-          lastBannerMessage = '⚠️ ${bossUnit.name.toUpperCase()} WINDS UP: MOLTEN GREAT-CLEAVER!';
-          addLog('TELEGRAPH: ${bossUnit.name} prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
+          lastBannerMessage = '☣️ PLAGUE FEAST: MORVATH SIPHONS FOUL SOULS (2.5s)! EVACUATE MIRE!';
+          addLog('BOSS APEX: Morvath channels Plague Feast! Step off corrupted tiles or take siphon damage!');
         }
       }
 
       // Check Intent Trigger for Boss Apex skills
       if (bossUnit.pendingIntent != null && currentTick >= bossUnit.pendingIntent!.triggerTick) {
-        _resolveGorgorothIntent(bossUnit, bossUnit.pendingIntent!);
+        _resolveBossIntent(bossUnit, bossUnit.pendingIntent!);
         bossUnit.pendingIntent = null;
       }
     }
@@ -1200,7 +1281,32 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _resolveGorgorothIntent(CombatUnitState boss, SpatialTelegraphIntent intent) {
+  void _resolveGorgorothIntent(CombatUnitState boss, SpatialTelegraphIntent intent) => _resolveBossIntent(boss, intent);
+
+  void _resolveBossIntent(CombatUnitState boss, SpatialTelegraphIntent intent) {
+    if (intent.skillName == 'Plague Feast') {
+      int siphonedTotal = 0;
+      for (final node in intent.targetNodes) {
+        final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
+        if (occupant != null) {
+          final dmg = occupant.takeDamage(intent.rawDamage, ignoreArmor: true);
+          siphonedTotal += dmg;
+          addLog('☣️ SIPHON HIT: ${occupant.name} lost $dmg HP to Plague Feast!');
+        }
+      }
+      if (siphonedTotal > 0) {
+        final healAmt = siphonedTotal * 2;
+        boss.hp = min(boss.maxHp, boss.hp + healAmt);
+        lastBannerMessage = '☣️ MORVATH HEALED +$healAmt HP FROM PLAGUE FEAST!';
+        addLog('BOSS HEAL: Morvath siphoned and regenerated +$healAmt HP!');
+      } else {
+        lastBannerMessage = '🛡️ EVADED! Zero allies caught in Plague Feast mire!';
+        addLog('FEAST EVADED: All allies moved off corrupted tiles in time!');
+      }
+      boss.isChannelingPlagueFeast = false;
+      return;
+    }
+
     addLog('${boss.name} releases ${intent.skillName} across ${intent.pattern.name} zone!');
     int hitCount = 0;
     CombatUnitState? primaryTarget;
@@ -1306,6 +1412,21 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (broke) {
         lastBannerMessage = '⚡ ${target.name.toUpperCase()} STAGGERED! CORE EXPOSED — +50% VULNERABILITY!';
         addLog('💥 BREAK BAR SHATTERED! ${target.name} staggered for 2.0s — takes guaranteed crits and +50% damage!');
+      }
+    }
+
+    if (target.hasKineticBastion) {
+      if (ignoreArmor || !isPhysical || trajectory == AttackTrajectory.lobbedMagic) {
+        target.dischargeKineticCharges();
+        addLog('⚡ KINETIC DISCHARGE: Piercing/magical strike grounded ${target.name}\'s kinetic charges!');
+        lastBannerMessage = '⚡ KINETIC DISCHARGE! ${target.name.toUpperCase()}\'S CHARGES GROUNDED!';
+      } else {
+        target.addKineticCharge(1);
+        addLog('⚡ KINETIC CHARGE: ${target.name} absorbs kinetic force! (${target.kineticBastionCharges}/${target.maxKineticBastionCharges})');
+        lastBannerMessage = '⚡ KINETIC CHARGE: ${target.name.toUpperCase()} AT ${target.kineticBastionCharges}/${target.maxKineticBastionCharges}!';
+        if (target.kineticBastionCharges >= target.maxKineticBastionCharges && target.pendingIntent == null) {
+          _triggerMalakorCounterTremor(target);
+        }
       }
     }
     return target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
@@ -1434,6 +1555,80 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
       }
     }
+  }
+
+  void _triggerMalakorCounterTremor(CombatUnitState boss) {
+    boss.dischargeKineticCharges();
+    final telegraphNodes = [
+      for (int c = 0; c < 3; c++) ...[
+        GridNode(column: c, row: 0),
+        GridNode(column: c, row: 1),
+      ],
+    ];
+    boss.pendingIntent = SpatialTelegraphIntent(
+      id: 'malakor_counter_tremor_$currentTick',
+      skillName: 'Cataclysmic Counter-Tremor',
+      pattern: TargetPattern.horizontalRowScythe,
+      originCol: 1,
+      originRow: 0,
+      targetNodes: telegraphNodes,
+      triggerTick: currentTick + 20,
+      totalWindupTicks: 20,
+      rawDamage: max(200, (boss.attack * 2.5).round()),
+    );
+    lastBannerMessage = '⚠️ KINETIC SURGE: ${boss.name.toUpperCase()} RELEASES COUNTER-TREMOR (2.0s)!';
+    addLog('BOSS APEX: ${boss.name} reaches maximum kinetic storage and unleashes Cataclysmic Counter-Tremor!');
+  }
+
+  void switchBossTrial(String bossId) {
+    necroticMireNodes.clear();
+    List<UnitEntity> bossEntities;
+    String bTitle;
+    String bDesc;
+    if (bossId == 'malakor') {
+      bossEntities = StarterBrigades.createMalakorBossEnemies();
+      bTitle = 'Boss Arena: Malakor the Unbroken';
+      bDesc = 'Malakor the Unbroken — Kinetic Bastion & Counter-Tremor';
+    } else if (bossId == 'morvath') {
+      bossEntities = StarterBrigades.createMorvathBossEnemies();
+      bTitle = 'Boss Arena: Morvath the Defiler';
+      bDesc = 'Morvath the Defiler — Necrotic Mire & Plague Feast';
+    } else {
+      bossEntities = StarterBrigades.createGorgorothBossEnemies();
+      bTitle = 'Boss Arena: Gorgoroth the Flayed';
+      bDesc = 'Gorgoroth the Flayed — Stagger & Break Bar Mechanics';
+    }
+
+    encounterTitle = bTitle;
+    encounterDescription = bDesc;
+    _allEnemyWaves.clear();
+    _allEnemyWaves.add(bossEntities);
+    currentWaveIndex = 1;
+    totalWaves = 1;
+    isBossEncounterFlag = true;
+
+    currentTick = 0;
+    isRunning = false;
+    isTurnExecutionPaused = false;
+    activeActingUnit = null;
+    isPreBattlePhase = true;
+    lastBannerMessage = '⚔️ TRIAL ENGAGED: $bTitle';
+    _spawnEnemyWaveEntities(bossEntities, isBossWave: true);
+
+    for (final ally in playerUnits) {
+      ally.hp = ally.maxHp;
+      ally.armor = ally.maxArmor;
+      ally.aegisShield = 0;
+      ally.bleedStacks = 0;
+      ally.poisonStacks = 0;
+      ally.stunDuration = 0;
+      ally.freezeDuration = 0;
+      ally.burnDuration = 0;
+      ally.isPetrifiedPlinth = false;
+      ally.isShattered = false;
+      ally.plinthDurability = 3;
+    }
+    notifyListeners();
   }
 
   /// Line of sight check (Rank & Rite Spec Sec 1 & 5)

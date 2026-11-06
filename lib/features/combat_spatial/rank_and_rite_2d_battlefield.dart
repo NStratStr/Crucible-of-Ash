@@ -298,10 +298,14 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         Color plinthRimColor;
         Color plinthGlowColor;
 
+        final bool isNecroticMire = isPlayer && engine.necroticMireNodes.any((n) => n.column == col && n.row == row);
         final bool isTurnActiveUnit = occupant != null && engine.activeActingUnit?.id == occupant.id;
         if (isTelegraphed) {
           plinthRimColor = const Color(0xFFFF1744);
           plinthGlowColor = const Color(0xFFFF1744).withValues(alpha: 0.75);
+        } else if (isNecroticMire) {
+          plinthRimColor = const Color(0xFF00E676);
+          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.75);
         } else if (isTurnActiveUnit) {
           plinthRimColor = const Color(0xFFFFD54F);
           plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.85);
@@ -476,6 +480,25 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                         ),
                       );
                     },
+                  ),
+                ),
+
+              // Necrotic Mire Badge in 2D
+              if (isNecroticMire)
+                Positioned(
+                  bottom: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xEE1B5E20),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF69F0AE), width: 0.8),
+                      boxShadow: const [BoxShadow(color: Color(0x6600E676), blurRadius: 4)],
+                    ),
+                    child: const Text(
+                      '☣️ MIASMA (-15)',
+                      style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Color(0xFFB9F6CA)),
+                    ),
                   ),
                 ),
 

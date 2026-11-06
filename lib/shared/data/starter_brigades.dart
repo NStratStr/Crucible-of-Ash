@@ -1686,6 +1686,126 @@ class StarterBrigades {
     ];
   }
 
+  /// Dedicated Malakor the Unbroken Boss Trial roster for Boss Arena testing
+  static List<UnitEntity> createMalakorBossEnemies() {
+    return [
+      const UnitEntity(
+        id: 'malakor_boss',
+        speciesId: 'malakor_unbroken',
+        name: 'Malakor the Unbroken',
+        generation: 3,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 25,
+        maxLevel: 40,
+        currentHp: 2800,
+        maxHp: 2800,
+        attack: 100,
+        defense: 120,
+        speed: 65,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: ['Iron Golem Titan', 'Malakor'],
+        customAvatarAsset: 'assets/images/ironclad_dreadnought.png',
+      ),
+      const UnitEntity(
+        id: 'iron_sentry',
+        speciesId: 'tombstone_sentinel',
+        name: 'Ironclad Sentry',
+        generation: 2,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front2,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 420,
+        maxHp: 420,
+        attack: 60,
+        defense: 45,
+        speed: 85,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png',
+      ),
+      const UnitEntity(
+        id: 'kinetic_arcanist',
+        speciesId: 'cinder_witch',
+        name: 'Kinetic Channeler',
+        generation: 2,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 310,
+        maxHp: 310,
+        attack: 70,
+        defense: 15,
+        speed: 105,
+        nativeTraitId: 'pyre_infusion',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-05-SUP-G1 Blood Alchemist.png',
+      ),
+    ];
+  }
+
+  /// Dedicated Morvath the Defiler Boss Trial roster for Boss Arena testing
+  static List<UnitEntity> createMorvathBossEnemies() {
+    return [
+      const UnitEntity(
+        id: 'morvath_boss',
+        speciesId: 'morvath_defiler',
+        name: 'Morvath the Defiler',
+        generation: 3,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.front1,
+        level: 25,
+        maxLevel: 40,
+        currentHp: 2200,
+        maxHp: 2200,
+        attack: 115,
+        defense: 50,
+        speed: 80,
+        nativeTraitId: 'plague_hex',
+        lineageAncestors: ['Plague Archon', 'Morvath'],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G6 Sanguine Archon.png',
+      ),
+      const UnitEntity(
+        id: 'plague_leper',
+        speciesId: 'grave_ghoul',
+        name: 'Plaguebearer Ghoul',
+        generation: 2,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 350,
+        maxHp: 350,
+        attack: 70,
+        defense: 20,
+        speed: 110,
+        nativeTraitId: 'vicious_strike',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/Grave Ghoul - CRY - 02 -G1.jpg',
+      ),
+      const UnitEntity(
+        id: 'fetid_shaman',
+        speciesId: 'cinder_witch',
+        name: 'Fetid Miasma Shaman',
+        generation: 2,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 300,
+        maxHp: 300,
+        attack: 65,
+        defense: 15,
+        speed: 115,
+        nativeTraitId: 'pyre_infusion',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-05-SUP-G1 Blood Alchemist.png',
+      ),
+    ];
+  }
+
   /// Chapter Gatekeeper Boss
   static List<UnitEntity> createBossEnemies() => createChapterBossEnemies(1);
 

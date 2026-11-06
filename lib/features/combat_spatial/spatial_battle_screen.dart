@@ -1179,6 +1179,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 }
               } else if (val == 'restart') {
                 _restartCombatEncounter();
+              } else if (val == 'boss_gorgoroth') {
+                _playSfx('sfx_slash.wav');
+                setState(() {
+                  _engine.switchBossTrial('gorgoroth');
+                });
+              } else if (val == 'boss_malakor') {
+                _playSfx('sfx_block.wav');
+                setState(() {
+                  _engine.switchBossTrial('malakor');
+                });
+              } else if (val == 'boss_morvath') {
+                _playSfx('sfx_spell.wav');
+                setState(() {
+                  _engine.switchBossTrial('morvath');
+                });
               }
             },
             itemBuilder: (context) => [
@@ -1212,6 +1227,40 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     Icon(Icons.replay, size: 16, color: Color(0xFFFF5252)),
                     SizedBox(width: 8),
                     Text('Restart Battle', style: TextStyle(fontSize: 12, color: Color(0xFFFF8A80))),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'boss_gorgoroth',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.shield, size: 16, color: Color(0xFF00E5FF)),
+                    SizedBox(width: 8),
+                    Text('Trial: Gorgoroth the Flayed', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'boss_malakor',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.electric_bolt, size: 16, color: Color(0xFFFFD54F)),
+                    SizedBox(width: 8),
+                    Text('Trial: Malakor the Unbroken', style: TextStyle(fontSize: 12, color: Color(0xFFFFE082))),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'boss_morvath',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.coronavirus, size: 16, color: Color(0xFF69F0AE)),
+                    SizedBox(width: 8),
+                    Text('Trial: Morvath the Defiler', style: TextStyle(fontSize: 12, color: Color(0xFFA7FFEB))),
                   ],
                 ),
               ),
@@ -2038,6 +2087,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     'CARAPACE ACTIVE',
                     style: TextStyle(fontSize: 7.5, color: Color(0xFFFFCC80), fontWeight: FontWeight.bold),
                   ),
+                )
+              else if (boss.hasKineticBastion)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF372F15),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
+                  ),
+                  child: const Text(
+                    'KINETIC BASTION (+80 ARMOR)',
+                    style: TextStyle(fontSize: 7.5, color: Color(0xFFFFE082), fontWeight: FontWeight.bold),
+                  ),
+                )
+              else if (boss.isNecroticMireActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B3820),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: const Color(0xFF69F0AE), width: 0.6),
+                  ),
+                  child: const Text(
+                    'NECROTIC MIRE ACTIVE',
+                    style: TextStyle(fontSize: 7.5, color: Color(0xFFA7FFEB), fontWeight: FontWeight.bold),
+                  ),
                 ),
               const Spacer(),
               if (isStaggered)
@@ -2105,63 +2180,155 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ],
           ),
           const SizedBox(height: 3),
-          // Boss Break / Stagger Bar
-          Row(
-            children: [
-              Text(
-                isStaggered ? '⚡ STAGGERED' : 'BREAK BAR',
-                style: TextStyle(
-                  color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 7.5,
-                  letterSpacing: 0.6,
+          // Boss Break / Stagger Bar (Gorgoroth)
+          if (boss.hasBreakBar) ...[
+            Row(
+              children: [
+                Text(
+                  isStaggered ? '⚡ STAGGERED' : 'BREAK BAR',
+                  style: TextStyle(
+                    color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 7.5,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(
-                          color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF).withValues(alpha: 0.4),
-                          width: 0.5,
-                        ),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: isStaggered ? 1.0 : staggerRatio,
-                      child: Container(
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
                         height: 4,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isStaggered
-                                ? [const Color(0xFFFFD600), const Color(0xFFFF9100)]
-                                : [const Color(0xFF00E5FF), const Color(0xFF40C4FF)],
-                          ),
+                          color: Colors.black54,
                           borderRadius: BorderRadius.circular(2),
+                          border: Border.all(
+                            color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                            width: 0.5,
+                          ),
                         ),
                       ),
+                      FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: isStaggered ? 1.0 : staggerRatio,
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: isStaggered
+                                  ? [const Color(0xFFFFD600), const Color(0xFFFF9100)]
+                                  : [const Color(0xFF00E5FF), const Color(0xFF40C4FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isStaggered ? 'SHATTERED' : '${boss.stagger}/${boss.maxStagger}',
+                  style: TextStyle(
+                    color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
+                    fontSize: 7.5,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ] else if (boss.hasKineticBastion) ...[
+            // Malakor Kinetic Bastion Charge Bar
+            Row(
+              children: [
+                const Icon(Icons.electric_bolt, size: 10, color: Color(0xFFFFD54F)),
+                const SizedBox(width: 3),
+                const Text(
+                  'KINETIC BASTION',
+                  style: TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 7.5,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Row(
+                    children: List.generate(boss.maxKineticBastionCharges, (index) {
+                      final bool isFilled = index < boss.kineticBastionCharges;
+                      return Expanded(
+                        child: Container(
+                          height: 5,
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          decoration: BoxDecoration(
+                            color: isFilled ? const Color(0xFFFF9100) : Colors.black45,
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(
+                              color: isFilled ? const Color(0xFFFFD54F) : Colors.white24,
+                              width: 0.6,
+                            ),
+                            boxShadow: isFilled
+                                ? [const BoxShadow(color: Color(0x66FF9100), blurRadius: 4)]
+                                : null,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${boss.kineticBastionCharges}/${boss.maxKineticBastionCharges}',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 7.5,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ] else if (boss.isNecroticMireActive) ...[
+            // Morvath Necrotic Mire Corruption Bar
+            Row(
+              children: [
+                const Icon(Icons.coronavirus, size: 10, color: Color(0xFF69F0AE)),
+                const SizedBox(width: 3),
+                const Text(
+                  'NECROTIC MIRE',
+                  style: TextStyle(
+                    color: Color(0xFF69F0AE),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 7.5,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B5E20),
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(color: const Color(0xFF69F0AE), width: 0.6),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                isStaggered ? 'SHATTERED' : '${boss.stagger}/${boss.maxStagger}',
-                style: TextStyle(
-                  color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
-                  fontSize: 7.5,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
+                const SizedBox(width: 6),
+                Text(
+                  '${_engine.necroticMireNodes.length} FOULED TILES',
+                  style: const TextStyle(
+                    color: Color(0xFF69F0AE),
+                    fontSize: 7.5,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -3884,14 +4051,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                         ? const Color(0xFF82B1FF).withValues(alpha: 0.38)
                                         : const Color(0xFFFF8A80).withValues(alpha: 0.32))))))));
 
-        final bool hasGlow = isSpellAoeAffected || isTelegraphed || isSelected || isDropCandidate || isReachable || isSwappable;
-        final Color glowColor = isSpellAoeAffected
-            ? const Color(0xFFFFD54F)
-            : (isTelegraphed
-                ? const Color(0xFFFF1744)
-                : (isReachable
-                    ? const Color(0xFF00E676)
-                    : (isDropCandidate || isSwappable ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F))));
+        final bool isNecroticMire = isPlayerSquad && _engine.necroticMireNodes.any((n) => n.column == col && n.row == row);
+        final bool hasGlow = isSpellAoeAffected || isTelegraphed || isSelected || isDropCandidate || isReachable || isSwappable || isNecroticMire;
+        final Color glowColor = isNecroticMire
+            ? const Color(0xFF00E676)
+            : (isSpellAoeAffected
+                ? const Color(0xFFFFD54F)
+                : (isTelegraphed
+                    ? const Color(0xFFFF1744)
+                    : (isReachable
+                        ? const Color(0xFF00E676)
+                        : (isDropCandidate || isSwappable ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F)))));
 
         return SizedBox(
           width: tileWidth,
@@ -3907,6 +4077,46 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // Necrotic Mire Corrupted Ground Glow & Floating Badge
+                if (isNecroticMire) ...[
+                  Center(
+                    child: Container(
+                      width: tileWidth * 0.70,
+                      height: tileHeight * 0.70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF1B5E20).withValues(alpha: 0.45),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x6600E676), blurRadius: 10, spreadRadius: 2),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: -2,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xEE1B5E20),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFF69F0AE), width: 0.8),
+                        ),
+                        child: const Text(
+                          '☣️ MIASMA (-15)',
+                          style: TextStyle(
+                            fontSize: 7.0,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF69F0AE),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 // Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate AOE)
                 if (isSpellAoeAffected)
                   Center(
@@ -6995,6 +7205,49 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         });
                       },
                     ),
+                    if (_engine.isBossEncounterFlag) ...[
+                      const SizedBox(width: 8),
+                      const Text(
+                        'BOSS:',
+                        style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Colors.white54, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      _buildPresetChip(
+                        label: '🗿 GORGOROTH',
+                        accentColor: const Color(0xFF00E5FF),
+                        tooltip: 'Switch to Gorgoroth the Flayed (Stagger & Break Bar)',
+                        onTap: () {
+                          _playSfx('sfx_slash.wav');
+                          setState(() {
+                            _engine.switchBossTrial('gorgoroth');
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      _buildPresetChip(
+                        label: '🛡️ MALAKOR',
+                        accentColor: const Color(0xFFFFD54F),
+                        tooltip: 'Switch to Malakor the Unbroken (Kinetic Bastion & Counter-Tremor)',
+                        onTap: () {
+                          _playSfx('sfx_block.wav');
+                          setState(() {
+                            _engine.switchBossTrial('malakor');
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      _buildPresetChip(
+                        label: '☣️ MORVATH',
+                        accentColor: const Color(0xFF69F0AE),
+                        tooltip: 'Switch to Morvath the Defiler (Necrotic Mire & Plague Feast)',
+                        onTap: () {
+                          _playSfx('sfx_spell.wav');
+                          setState(() {
+                            _engine.switchBossTrial('morvath');
+                          });
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
