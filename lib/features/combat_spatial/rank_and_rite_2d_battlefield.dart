@@ -16,6 +16,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   final String? selectedCardId;
   final String? draggedUltimateUnitId;
   final String? selectedUltimateUnitId;
+  final Set<String>? secondaryTargetEnemyIds;
   final int? hoveredTileCol;
   final int? hoveredTileRow;
   final bool? isHoveredPlayerSide;
@@ -40,6 +41,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     required this.selectedCardId,
     required this.draggedUltimateUnitId,
     required this.selectedUltimateUnitId,
+    this.secondaryTargetEnemyIds,
     required this.hoveredTileCol,
     required this.hoveredTileRow,
     required this.isHoveredPlayerSide,
@@ -227,6 +229,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     final occupant = units.where((u) => (u.isAlive || u.isSolidObstacle) && u.occupies(col, row)).firstOrNull;
     final bool isSelected = occupant != null && (isPlayer ? (selectedUnitId == occupant.id) : (selectedEnemyUnitId == occupant.id));
     final bool isHovered = hoveredTileCol == col && hoveredTileRow == row && isHoveredPlayerSide == isPlayer;
+    final bool isSecondaryCleave = occupant != null && !isPlayer && (secondaryTargetEnemyIds?.contains(occupant.id) ?? false);
 
     // Vanguard Cover check (Rank & Rite Spec Sec 3)
     final bool hasVanguardCover = isPlayer && occupant != null && engine.isCoveredByVanguard(occupant, trajectory: AttackTrajectory.directPhysical);
@@ -295,6 +298,14 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         } else if (isTurnActiveUnit) {
           plinthRimColor = const Color(0xFFFFD54F);
           plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.85);
+        } else if (!isPlayer && isSelected) {
+          // Explicit targeted enemy lock: fierce crimson/gold reticle rim!
+          plinthRimColor = const Color(0xFFFF1744);
+          plinthGlowColor = const Color(0xFFFF5252).withValues(alpha: 0.85);
+        } else if (isSecondaryCleave) {
+          // Secondary cleave/splash target: warm amber rim & pulse!
+          plinthRimColor = const Color(0xFFFF9100);
+          plinthGlowColor = const Color(0xFFFF9100).withValues(alpha: 0.75);
         } else if (isSelected || isDropCandidate || isHovered) {
           plinthRimColor = const Color(0xFF00E5FF);
           plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.6);
@@ -476,6 +487,55 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     child: const Text(
                       '🛡️-25%',
                       style: TextStyle(fontSize: 7, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+
+              // 3b. Primary Target Lock Reticle Badge
+              if (!isPlayer && isSelected && occupant != null)
+                Positioned(
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFB71C1C),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFFFF5252), width: 1.0),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x99FF1744), blurRadius: 6),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.gps_fixed, size: 8, color: Colors.white),
+                        SizedBox(width: 2),
+                        Text(
+                          'TARGET LOCK',
+                          style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // 3c. Secondary Cleave / Splash Target Badge
+              if (!isPlayer && isSecondaryCleave && !isSelected && occupant != null)
+                Positioned(
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE65100),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFFFFB74D), width: 0.9),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x66FF9100), blurRadius: 5),
+                      ],
+                    ),
+                    child: const Text(
+                      '⚔️ CLEAVE SPLASH',
+                      style: TextStyle(fontSize: 6.0, fontWeight: FontWeight.w900, color: Color(0xFFFFE082), letterSpacing: 0.4),
                     ),
                   ),
                 ),

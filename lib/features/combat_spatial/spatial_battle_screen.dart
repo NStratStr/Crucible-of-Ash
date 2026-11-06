@@ -60,6 +60,43 @@ class SpatialBattleScreen extends StatefulWidget {
 }
 
 class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
+  Set<String> _computeProjectedSecondaryTargetEnemyIds() {
+    final Set<String> secondaryIds = {};
+    final actingAlly = _engine.activeActingUnit ??
+        (_selectedUnitId != null ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull : null);
+    if (actingAlly == null) return secondaryIds;
+
+    final targetEnemy = _selectedEnemyUnitId != null
+        ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
+        : _getSmartDefaultTarget();
+    if (targetEnemy == null || targetEnemy.occupiedNodes.isEmpty) return secondaryIds;
+
+    final primaryCol = targetEnemy.occupiedNodes.first.column;
+    final primaryRow = targetEnemy.occupiedNodes.first.row;
+
+    final bool hasRowCleave = actingAlly.activeStance == StanceType.holdTheLine ||
+        actingAlly.id.contains('vladislav') ||
+        actingAlly.signatureSkillName.toLowerCase().contains('cleave') ||
+        actingAlly.signatureSkillName.toLowerCase().contains('slash') ||
+        actingAlly.archetype == UnitArchetype.vanguardMelee;
+
+    final bool hasColumnPierce = actingAlly.archetype == UnitArchetype.backlineCaster ||
+        actingAlly.signatureSkillName.toLowerCase().contains('pierc') ||
+        actingAlly.signatureSkillName.toLowerCase().contains('skewer') ||
+        actingAlly.signatureSkillName.toLowerCase().contains('bolt');
+
+    for (final enemy in _engine.enemyUnits.where((e) => e.isAlive && e.id != targetEnemy.id)) {
+      for (final node in enemy.occupiedNodes) {
+        if (hasRowCleave && node.row == primaryRow && (node.column - primaryCol).abs() == 1) {
+          secondaryIds.add(enemy.id);
+        } else if (hasColumnPierce && node.column == primaryCol && node.row > primaryRow) {
+          secondaryIds.add(enemy.id);
+        }
+      }
+    }
+    return secondaryIds;
+  }
+
   void _openUnitInspectorDialog(CombatUnitState unit) {
     UnitEntity? entity = _currentSquadUnits.where((u) => u.id == unit.id).firstOrNull ??
         _reserveUnits.where((u) => u.id == unit.id).firstOrNull;
@@ -920,6 +957,55 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     )
                   : null,
         actions: [
+          // Simulation Speed Multiplier Toggle (1.0x -> 1.5x -> 2.0x)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _engine.cycleCombatSpeed();
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: _engine.combatPacingSpeed > 1.0
+                    ? const Color(0xFFFF9100).withValues(alpha: 0.25)
+                    : const Color(0xFF1E1E28),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: _engine.combatPacingSpeed > 1.0
+                      ? const Color(0xFFFF9100)
+                      : const Color(0xFF38384E),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _engine.combatPacingSpeed > 1.0 ? Icons.fast_forward : Icons.speed,
+                    color: _engine.combatPacingSpeed > 1.0
+                        ? const Color(0xFFFFB74D)
+                        : Colors.white70,
+                    size: 13,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    '${_engine.combatPacingSpeed.toStringAsFixed(1)}×',
+                    style: TextStyle(
+                      color: _engine.combatPacingSpeed > 1.0
+                          ? const Color(0xFFFFD54F)
+                          : Colors.white70,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
           // Ambient Audio Mute Toggle
           IconButton(
             icon: Icon(
@@ -1128,6 +1214,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                     engine: _engine,
                                     selectedUnitId: _selectedUnitId,
                                     selectedEnemyUnitId: _selectedEnemyUnitId,
+                                    secondaryTargetEnemyIds: _computeProjectedSecondaryTargetEnemyIds(),
                                     draggedUnitId: _draggedUnitId,
                                     selectedCardId: _selectedCardId,
                                     draggedUltimateUnitId: _draggedUltimateUnitId,
@@ -2030,7 +2117,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         Text(
                           _engine.isBulletTime
                               ? '30% SLOW'
-                              : 'X PACING',
+                              : '${_engine.combatPacingSpeed.toStringAsFixed(1)}×',
                           style: TextStyle(
                             color: _engine.combatPacingSpeed > 1.0
                                 ? const Color(0xFFFF9100)
@@ -5262,221 +5349,246 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (unit.isInvulnerable)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF),
-                        borderRadius: BorderRadius.circular(2),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0xFF00E5FF), blurRadius: 4),
-                        ],
-                      ),
-                      child: const Text(
-                        '✨AWAKENING',
-                        style: TextStyle(
-                          fontSize: 6.5,
-                          color: Colors.black,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ),
-                  if (unit.isSlagCarapaceActive)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 1.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF221115),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
-                      ),
-                      child: const Text(
-                        'CARAPACE',
-                        style: TextStyle(
-                          fontSize: 6.5,
-                          color: Color(0xFFFFD54F),
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ),
-                  // Compact Horizontal Status Badges Cluster
+                  // Compact Horizontal Status Badges Cluster with Instant Tooltips
                   Builder(
                     builder: (context) {
+                      Widget buildStatusBadge({required Widget child, required String message}) {
+                        return Tooltip(
+                          message: message,
+                          waitDuration: Duration.zero,
+                          showDuration: const Duration(seconds: 4),
+                          triggerMode: TooltipTriggerMode.tap,
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF161622),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFFFD54F), width: 0.9),
+                            boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 6)],
+                          ),
+                          textStyle: const TextStyle(fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.bold),
+                          child: child,
+                        );
+                      }
+
                       final List<Widget> statusBadges = [];
 
                       if (unit.isInvulnerable) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00E5FF),
-                            borderRadius: BorderRadius.circular(2),
-                            boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 4)],
+                        statusBadges.add(buildStatusBadge(
+                          message: '✨ AWAKENING GRACE: Complete invulnerability window after reviving.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00E5FF),
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 4)],
+                            ),
+                            child: const Text('✨AWAKEN', style: TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.w900)),
                           ),
-                          child: const Text('✨AWAKEN', style: TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.w900)),
                         ));
                       }
                       if (unit.isSlagCarapaceActive) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF221115),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
+                        statusBadges.add(buildStatusBadge(
+                          message: 'SLAG CARAPACE: +30% Armor & immune to critical strikes until shattered.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF221115),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
+                            ),
+                            child: const Text('CARAPACE', style: TextStyle(fontSize: 6.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('CARAPACE', style: TextStyle(fontSize: 6.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.isPetrifiedPlinth) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF263238),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🪨 GROUNDING PLINTH: Durability ${unit.plinthDurability}/3. Anchors construct mass.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF263238),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                            ),
+                            child: Text('🪨PLINTH (${unit.plinthDurability}/3)', style: const TextStyle(fontSize: 5.5, color: Color(0xFFFFCC80), fontWeight: FontWeight.w900)),
                           ),
-                          child: Text('🪨PLINTH (${unit.plinthDurability}/3)', style: const TextStyle(fontSize: 5.5, color: Color(0xFFFFCC80), fontWeight: FontWeight.w900)),
                         ));
                       } else if (unit.isDowned) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF263238),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🪨 DOWNED VESSEL: Inert stone plinth. AP accumulation frozen.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF263238),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFF90A4AE), width: 0.8),
+                            ),
+                            child: const Text('🪨DOWN', style: TextStyle(fontSize: 6.0, color: Color(0xFFCFD8DC), fontWeight: FontWeight.w900)),
                           ),
-                          child: const Text('🪨DOWN', style: TextStyle(fontSize: 6.0, color: Color(0xFFCFD8DC), fontWeight: FontWeight.w900)),
                         ));
                       }
                       if (unit.isAlive && _engine.isCoveredByVanguard(unit, trajectory: AttackTrajectory.directPhysical)) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1B5E20),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFF81C784), width: 0.6),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🛡️ VANGUARD COVER: Direct physical damage reduced by 25% by frontline ally.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1B5E20),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFF81C784), width: 0.6),
+                            ),
+                            child: const Text('🛡️COVER -25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFA5D6A7), fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('🛡️COVER -25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFA5D6A7), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.reviveCount > 0) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A148C),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '💀 SOUL FRACTURE: -${unit.reviveCount * 20}% Max HP revival penalty.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4A148C),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Text('💀-${unit.reviveCount * 20}%', style: const TextStyle(fontSize: 5.5, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('💀-${unit.reviveCount * 20}%', style: const TextStyle(fontSize: 5.5, color: Color(0xFFE1BEE7), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.bleedStacks > 0) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFB71C1C),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🩸 ARTERIAL BLEED (${unit.bleedStacks} Stacks): Takes ${unit.bleedStacks * 8} true Vitae damage on turn.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF880E4F),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Text('🩸${unit.bleedStacks}', style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('🩸${unit.bleedStacks}', style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.poisonStacks > 0) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFF66BB6A), width: 0.5),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🧪 MIASMA POISON (${unit.poisonStacks} Stacks): Blighting corrosion damage.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1B5E20),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Text('🧪${unit.poisonStacks}', style: const TextStyle(fontSize: 6.0, color: Colors.white, fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('🧪${unit.poisonStacks}', style: const TextStyle(fontSize: 6.0, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.burnDuration > 0) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE65100),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🔥 SLAG BURN (${unit.burnDuration} Turns): Fire damage over time.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFBF360C),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text('🔥', style: TextStyle(fontSize: 6.0)),
                           ),
-                          child: const Text('🔥', style: TextStyle(fontSize: 6.0)),
                         ));
                       }
                       if (unit.isFrozen) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0288D1),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFF81D4FA), width: 0.5),
+                        statusBadges.add(buildStatusBadge(
+                          message: '❄️ FROZEN: Action Point accumulation reduced by 50%.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0277BD),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFF81D4FA), width: 0.5),
+                            ),
+                            child: const Text('❄️', style: TextStyle(fontSize: 6.0)),
                           ),
-                          child: const Text('❄️', style: TextStyle(fontSize: 6.0)),
                         ));
                       }
                       if (unit.isStunned) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFBC02D),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '⚡ STUNNED: Action meter halted; unable to cast skills or act.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFBC02D),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text('⚡', style: TextStyle(fontSize: 6.0)),
                           ),
-                          child: const Text('⚡', style: TextStyle(fontSize: 6.0)),
                         ));
                       }
                       if (unit.isVulnerable) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6A1B9A),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFFCE93D8), width: 0.5),
+                        statusBadges.add(buildStatusBadge(
+                          message: '💔 VULNERABLE: Takes +25% increased damage from all incoming strikes.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6A1B9A),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFCE93D8), width: 0.5),
+                            ),
+                            child: const Text('💔+25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('💔+25%', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.isHasted) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00B0FF),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '⚡ HASTED: Action Point accumulation boosted by +35%.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00B0FF),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text('⚡+35%', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('⚡+35%', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.aegisShield > 0) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00B0FF),
-                            borderRadius: BorderRadius.circular(2),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🛡️ AEGIS BARRIER: Absorbs ${unit.aegisShield} damage before losing HP.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00B0FF),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Text('🛡️${unit.aegisShield}', style: const TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('🛡️${unit.aegisShield}', style: const TextStyle(fontSize: 6.0, color: Colors.black, fontWeight: FontWeight.bold)),
                         ));
                       }
                       if (unit.isAlive && unit.isSignatureReady) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD54F),
-                            borderRadius: BorderRadius.circular(2),
-                            boxShadow: const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4)],
+                        statusBadges.add(buildStatusBadge(
+                          message: '★ SIGNATURE READY: Will trigger [${unit.signatureSkillName}] on next turn!',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD54F),
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4)],
+                            ),
+                            child: const Text('★SKILL', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.w900)),
                           ),
-                          child: const Text('★SKILL', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.w900)),
                         ));
                       }
                       if (unit.isAlive && unit.graftedTraitId != null && unit.graftedTraitId!.isNotEmpty) {
-                        statusBadges.add(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A148C),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFFEA80FC), width: 0.5),
+                        statusBadges.add(buildStatusBadge(
+                          message: '🧬 GRAFTED TRAIT: ${unit.graftedTraitDisplayName ?? unit.graftedTraitId}.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4A148C),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFEA80FC), width: 0.5),
+                            ),
+                            child: const Text('🧬GRAFT', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
                           ),
-                          child: const Text('🧬GRAFT', style: TextStyle(fontSize: 5.5, color: Color(0xFFF3E5F5), fontWeight: FontWeight.bold)),
                         ));
                       }
-
+                      
                       if (statusBadges.isEmpty) return const SizedBox.shrink();
 
                       return Padding(
