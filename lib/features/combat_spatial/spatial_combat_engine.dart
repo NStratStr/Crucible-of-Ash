@@ -513,6 +513,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           customAssetPath: p.customAvatarAsset,
           nativeTraitId: p.nativeTraitId,
           graftedTraitId: effectiveGraftId,
+          chiseledTraitIds: p.chiseledTraitIds,
         ));
       }
     } else {
@@ -553,6 +554,21 @@ class SpatialCombatEngine extends ChangeNotifier {
 
       if (core != null) {
         addLog('⚡ CORE RESONANCE: ${core.name} (${core.passiveTitle}) active on pedestal!');
+      }
+    }
+
+    // --- APPLY PLINTH CHISELED SOUL-TRAITS (GDD Sec 6.1) ---
+    for (final ally in playerUnits) {
+      if (ally.chiseledTraitIds.contains('solar_resonance')) {
+        ally.aegisShield += 35;
+        ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        addLog('✨ PLINTH CHISEL: ${ally.name} resonates with Solar Filigree (+35 Aegis Shield)!');
+      }
+      if (ally.chiseledTraitIds.contains('colossus_sinew')) {
+        ally.maxHp += 150;
+        ally.hp += 150;
+        ally.maxStagger = (ally.maxStagger * 1.30).round();
+        addLog('🗿 PLINTH CHISEL: ${ally.name} fortified with Colossus Sinew (+150 HP)!');
       }
     }
 
@@ -1482,7 +1498,19 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
       }
     }
-    return target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
+    final applied = target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
+    if (target.chiseledTraitIds.contains('iron_thorns') && isPhysical && applied > 0) {
+      // Find attacker if viable
+      final enemiesOrAllies = target.isPlayer ? enemyUnits : playerUnits;
+      final livingAttackers = enemiesOrAllies.where((u) => u.isAlive).toList();
+      if (livingAttackers.isNotEmpty) {
+        final reflectAttacker = livingAttackers.first;
+        final reflectDmg = max(5, (applied * 0.25).round());
+        reflectAttacker.takeDamage(reflectDmg, ignoreArmor: true, isPhysical: true);
+        addLog('  ⚡ [CHISEL: IRON THORNS] ${target.name} reflects $reflectDmg true damage to ${reflectAttacker.name}!');
+      }
+    }
+    return applied;
   }
 
   bool isCoveredByVanguard(CombatUnitState target, {required AttackTrajectory trajectory, int? attackerRow}) {
@@ -1919,6 +1947,21 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Applies Crucible Grafted Trait proc & Active Commander Aura on any attack or signature skill
   String? _applyGraftedTraitProc(CombatUnitState attacker, CombatUnitState target, int damageDealt) {
+    // --- GDD Sec 6.1: Plinth Chiseled Soul-Traits On-Hit Triggers ---
+    for (final chiselId in attacker.chiseledTraitIds) {
+      if (chiselId == 'vampiric_sinew' && damageDealt > 0) {
+        final healAmt = max(6, (damageDealt * 0.15).round());
+        attacker.hp = min(attacker.maxHp, attacker.hp + healAmt);
+        if (attacker.isPlayer) totalHealingDone += healAmt;
+        addLog('  🩸 [CHISEL: VAMPIRIC SINEW] ${attacker.name} siphons +$healAmt HP!');
+      } else if (chiselId == 'brimstone_core') {
+        target.burnDuration = max(target.burnDuration, 3 * 30);
+        addLog('  🔥 [CHISEL: BRIMSTONE CORE] ${target.name} ignited for 3s burn!');
+      } else if (chiselId == 'porous_edge') {
+        target.armor = max(0, (target.armor * 0.80).round());
+        addLog('  ⚔️ [CHISEL: POROUS EDGE] ${attacker.name} shreds 20% of ${target.name}\'s Armor!');
+      }
+    }
     // Active Commander Aura: Lord Vladislav's Crimson Tithe (+10% Vampiric Siphon vs Wounded/Bleeding foes)
     if (attacker.isPlayer &&
         commandService?.activeGeneralType == GeneralType.vladislav &&

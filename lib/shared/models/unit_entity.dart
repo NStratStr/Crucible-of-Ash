@@ -112,6 +112,7 @@ class UnitEntity {
   // Pedigree & Traits
   final String nativeTraitId;
   final String? graftedTraitId;
+  final List<String> chiseledTraitIds;
   final List<String> lineageAncestors;
   final String? customAvatarAsset;
   final int currentXp;
@@ -145,10 +146,31 @@ class UnitEntity {
     this.skills = const [],
     required this.nativeTraitId,
     this.graftedTraitId,
+    this.chiseledTraitIds = const [],
     required this.lineageAncestors,
     this.customAvatarAsset,
     this.currentXp = 0,
   });
+
+  /// GDD v2.6 / v3.2 Sec 6.1: Plinth Trait Sockets unlocked by Generation rank:
+  /// G1-G2: 0 sockets (native/grafted only)
+  /// G3: 1 socket
+  /// G4-G5: 2 sockets
+  /// G6 Pureblood Sovereign: 3 sockets
+  int get maxPlinthSockets {
+    if (generation >= 6) return 3;
+    if (generation >= 4) return 2;
+    if (generation >= 3) return 1;
+    return 0;
+  }
+
+  int get availablePlinthSockets => max(0, maxPlinthSockets - chiseledTraitIds.length);
+
+  List<String> get allActiveTraitIds => [
+    nativeTraitId,
+    if (graftedTraitId != null) graftedTraitId!,
+    ...chiseledTraitIds,
+  ];
 
   /// GDD v2.6: Armor is an alias for physical defense rating.
   int get armor => defense;
@@ -866,6 +888,7 @@ class UnitEntity {
     List<SkillEntity>? skills,
     String? nativeTraitId,
     String? graftedTraitId,
+    List<String>? chiseledTraitIds,
     FormationSlot? slot,
     UnitRarity? rarity,
     PlinthMaterial? plinthMaterial,
@@ -903,6 +926,7 @@ class UnitEntity {
       skills: skills ?? this.skills,
       nativeTraitId: nativeTraitId ?? this.nativeTraitId,
       graftedTraitId: graftedTraitId ?? this.graftedTraitId,
+      chiseledTraitIds: chiseledTraitIds ?? this.chiseledTraitIds,
       lineageAncestors: lineageAncestors,
       customAvatarAsset: customAvatarAsset ?? this.customAvatarAsset,
       currentXp: currentXp ?? this.currentXp,
@@ -1001,6 +1025,7 @@ class UnitEntity {
       'critDamage': critDamage,
       'nativeTraitId': nativeTraitId,
       'graftedTraitId': graftedTraitId,
+      'chiseledTraitIds': chiseledTraitIds,
       'lineageAncestors': lineageAncestors,
       'customAvatarAsset': customAvatarAsset,
       'currentXp': currentXp,
@@ -1048,6 +1073,10 @@ class UnitEntity {
       critDamage: (json['critDamage'] as num?)?.toDouble() ?? 1.50,
       nativeTraitId: json['nativeTraitId'] as String? ?? 'none',
       graftedTraitId: json['graftedTraitId'] as String?,
+      chiseledTraitIds: (json['chiseledTraitIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       lineageAncestors: (json['lineageAncestors'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

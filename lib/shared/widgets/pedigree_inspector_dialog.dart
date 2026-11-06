@@ -6,6 +6,8 @@ import '../models/relic_entity.dart';
 import '../models/skill_entity.dart';
 import '../models/trait_entity.dart';
 import '../models/unit_entity.dart';
+import '../../features/traits/trait_chiseling_service.dart';
+import '../../features/traits/trait_chiseling_dialog.dart';
 import 'gothic_card_frame_widget.dart';
 import 'gothic_character_sheet_card.dart';
 import 'hexagonal_affinity_wheel_widget.dart';
@@ -18,6 +20,8 @@ class PedigreeInspectorDialog extends StatefulWidget {
   final int totalIchor;
   final void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp;
   final bool initialShowCharacterSheet;
+  final TraitChiselingService? chiselingService;
+  final ValueChanged<UnitEntity>? onUnitUpdated;
 
   const PedigreeInspectorDialog({
     super.key,
@@ -27,6 +31,8 @@ class PedigreeInspectorDialog extends StatefulWidget {
     this.totalIchor = 0,
     this.onLevelUp,
     this.initialShowCharacterSheet = false,
+    this.chiselingService,
+    this.onUnitUpdated,
   });
 
   static Future<void> show(
@@ -37,6 +43,8 @@ class PedigreeInspectorDialog extends StatefulWidget {
     int totalIchor = 0,
     void Function(UnitEntity updatedUnit, int ichorCost)? onLevelUp,
     bool initialShowCharacterSheet = false,
+    TraitChiselingService? chiselingService,
+    ValueChanged<UnitEntity>? onUnitUpdated,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -49,6 +57,8 @@ class PedigreeInspectorDialog extends StatefulWidget {
         totalIchor: totalIchor,
         onLevelUp: onLevelUp,
         initialShowCharacterSheet: initialShowCharacterSheet,
+        chiselingService: chiselingService,
+        onUnitUpdated: onUnitUpdated,
       ),
     );
   }
@@ -2123,6 +2133,8 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                           ),
                         ),
                       ],
+                      // --- PLINTH TRAIT CHISELING SECTION (GDD Sec 6.1) ---
+                      _buildPlinthChiselingSection(context, _currentUnit),
                       const Divider(color: Color(0xFF2B2B36), height: 1),
                       const SizedBox(height: 8),
                       if (unit.verifiedLineageTags.isNotEmpty) ...[
@@ -2276,6 +2288,108 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
           ),
         ),
       ],
+    );
+  }
+  Widget _buildPlinthChiselingSection(BuildContext context, UnitEntity unit) {
+    final maxSockets = unit.maxPlinthSockets;
+    final chiseled = unit.chiseledTraitIds;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6, bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101722),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.foundation, size: 16, color: Color(0xFF00E5FF)),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'PLINTH RING TRAIT SOCKETS (GDD §6.1)',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF00E5FF),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              Text(
+                '${chiseled.length}/$maxSockets',
+                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF80D8FF)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (maxSockets == 0)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                '🔒 Plinth Sockets locked. Unlocks at Generation III (1), Gen IV (2), Gen VI (3).',
+                style: TextStyle(fontSize: 9.5, color: Colors.white38, fontStyle: FontStyle.italic),
+              ),
+            )
+          else ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: chiseled.map((id) {
+                final trait = TraitEntity.getTrait(id);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: trait.themeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: trait.themeColor.withValues(alpha: 0.6)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(trait.icon, size: 12, color: trait.themeColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        trait.name,
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: trait.themeColor),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            if (!widget.isEnemy)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00E5FF),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                icon: const Icon(Icons.carpenter, size: 14),
+                label: const Text('CHISEL SOUL-RUNES', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  TraitChiselingDialog.show(
+                    context,
+                    unit: _currentUnit,
+                    chiselingService: widget.chiselingService ?? TraitChiselingService(),
+                    totalAsh: _currentIchor,
+                    totalIchor: _currentIchor,
+                    onUnitUpdated: (updated) {
+                      setState(() => _currentUnit = updated);
+                      widget.onUnitUpdated?.call(updated);
+                    },
+                  );
+                },
+              ),
+          ],
+        ],
+      ),
     );
   }
 }

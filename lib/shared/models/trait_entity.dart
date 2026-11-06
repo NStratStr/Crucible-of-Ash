@@ -187,7 +187,64 @@ class TraitEntity {
       icon: Icons.groups,
       themeColor: Color(0xFFFB8C00),
     ),
-  };
+      // --- GDD Sec 6.1 INSCRIBED SOUL-CHISEL TRAITS ---
+    'vampiric_sinew': TraitEntity(
+      id: 'vampiric_sinew',
+      name: 'Vampiric Sinew',
+      description: 'Porous mineral fibers siphon vitae on strike, granting +15% Lifesteal and +15 Speed.',
+      trigger: TraitTrigger.onAttackHit,
+      icon: Icons.bloodtype,
+      themeColor: Color(0xFFE91E63),
+    ),
+    'iron_thorns': TraitEntity(
+      id: 'iron_thorns',
+      name: 'Iron Thorns',
+      description: 'Hardened volcanic spikes reflect 25% of incoming physical damage as true damage.',
+      trigger: TraitTrigger.onTakeDamage,
+      icon: Icons.security,
+      themeColor: Color(0xFF90A4AE),
+    ),
+    'porous_edge': TraitEntity(
+      id: 'porous_edge',
+      name: 'Porous Edge',
+      description: 'Osmotic blade shears mineral glazes, shredding 20% of the target\'s Armor defense.',
+      trigger: TraitTrigger.onAttackHit,
+      icon: Icons.carpenter,
+      themeColor: Color(0xFFFF9800),
+    ),
+    'phase_fractured_shell': TraitEntity(
+      id: 'phase_fractured_shell',
+      name: 'Phase-Fractured Shell',
+      description: 'Interleaved void glass plates reduce incoming critical strike damage by 35%.',
+      trigger: TraitTrigger.onTakeDamage,
+      icon: Icons.shield_moon,
+      themeColor: Color(0xFF00E5FF),
+    ),
+    'brimstone_core': TraitEntity(
+      id: 'brimstone_core',
+      name: 'Brimstone Core',
+      description: 'Combustion heat burns struck foes for 20 Fire damage per second over 3 seconds.',
+      trigger: TraitTrigger.onAttackHit,
+      icon: Icons.local_fire_department,
+      themeColor: Color(0xFFFF5722),
+    ),
+    'solar_resonance': TraitEntity(
+      id: 'solar_resonance',
+      name: 'Solar Resonance',
+      description: 'White rain filigree grants +35 Aegis Shield at combat start and +20% healing received.',
+      trigger: TraitTrigger.passiveStat,
+      icon: Icons.light_mode,
+      themeColor: Color(0xFFFFD54F),
+    ),
+    'colossus_sinew': TraitEntity(
+      id: 'colossus_sinew',
+      name: 'Colossus Sinew',
+      description: 'Massive density grants +150 Max HP and increases Stagger Break threshold by +30%.',
+      trigger: TraitTrigger.passiveStat,
+      icon: Icons.foundation,
+      themeColor: Color(0xFF7E57C2),
+    ),
+};
 
   static TraitEntity getTrait(String id) {
     if (registry.containsKey(id)) {

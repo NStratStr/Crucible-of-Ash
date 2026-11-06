@@ -30,6 +30,7 @@ import '../../features/plinths/plinth_sculptory_screen.dart';
 import '../../features/delves/delve_models.dart';
 import '../../features/delves/delve_service.dart';
 import '../../features/delves/catacomb_delve_screen.dart';
+import '../../features/traits/trait_chiseling_service.dart';
 import '../../features/relics/relic_service.dart';
 import '../../features/ftue/awakening_dialog.dart';
 import '../../features/ftue/ftue_guidance_banner.dart';
@@ -89,6 +90,7 @@ class _AppShellState extends State<AppShell> {
   late RelicService _relicService;
   late PlinthService _plinthService;
   late DelveService _delveService;
+  late TraitChiselingService _traitChiselingService;
   DelveRoom? _activeDelveRoom;
   late FtueService _ftueService;
   late List<UnitEntity> _inventory;
@@ -112,6 +114,7 @@ class _AppShellState extends State<AppShell> {
     _relicService = RelicService();
     _plinthService = PlinthService();
     _delveService = DelveService();
+    _traitChiselingService = TraitChiselingService();
     _ftueService = FtueService();
     _resetEncounter(null, BattleModifier.none, false);
     _inventory = StarterBrigades.createReserveInventory();
@@ -1635,6 +1638,22 @@ class _AppShellState extends State<AppShell> {
     _saveCurrentState();
   }
 
+  void _updateUnitInRoster(UnitEntity updatedUnit) {
+    setState(() {
+      final allyIdx = _tickManager.allies.indexWhere((u) => u.id == updatedUnit.id);
+      if (allyIdx != -1) {
+        final updatedAllies = List<UnitEntity>.from(_tickManager.allies);
+        updatedAllies[allyIdx] = updatedUnit;
+        _tickManager.updateSquads(allies: updatedAllies);
+      }
+      final invIdx = _inventory.indexWhere((u) => u.id == updatedUnit.id);
+      if (invIdx != -1) {
+        _inventory[invIdx] = updatedUnit;
+      }
+    });
+    _saveCurrentState();
+  }
+
   void _openCatacombDelveSheet() {
     showModalBottomSheet(
       context: context,
@@ -2523,6 +2542,8 @@ class _AppShellState extends State<AppShell> {
                     unit,
                     relicService: _relicService,
                     totalIchor: _totalIchor,
+                    chiselingService: _traitChiselingService,
+                    onUnitUpdated: _updateUnitInRoster,
                     onLevelUp: (updatedUnit, cost) => _levelUpUnit(
                       unitId: updatedUnit.id,
                       xpAmount: cost,

@@ -290,6 +290,7 @@ class CombatUnitState {
   final String? customAssetPath;
   final String? nativeTraitId;
   final String? graftedTraitId;
+  final List<String> chiseledTraitIds;
   StanceType activeStance;
   int consecutiveTurnsStationary;
   bool hasStanceBonusReady;
@@ -348,6 +349,7 @@ class CombatUnitState {
     this.customAssetPath,
     this.nativeTraitId,
     this.graftedTraitId,
+    this.chiseledTraitIds = const [],
     this.consecutiveTurnsStationary = 0,
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
