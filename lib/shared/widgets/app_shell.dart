@@ -52,6 +52,13 @@ class _AppShellState extends State<AppShell> {
   int _totalIchor = 450;
   int _cursedOre = 75;
   int _bloodlineSigils = 2;
+  int _brimSlagCores = 2;
+  int _solarIron = 2;
+  int _quicksilver = 2;
+  int _crucibleTier = 1;
+  int _forgeTier = 1;
+  int _hospiceTier = 1;
+  int _spindleTier = 1;
   final Set<ExpeditionBoon> _activeExpeditionBoons = {};
   GeneralType _activeGeneralType = GeneralType.vladislav;
   Map<GeneralType, int> _phylacteryRanks = {
@@ -128,6 +135,13 @@ class _AppShellState extends State<AppShell> {
       _totalIchor = saved.totalIchor;
       _cursedOre = saved.cursedOre;
       _bloodlineSigils = saved.bloodlineSigils;
+      _brimSlagCores = saved.brimSlagCores;
+      _solarIron = saved.solarIron;
+      _quicksilver = saved.quicksilver;
+      _crucibleTier = saved.crucibleTier;
+      _forgeTier = saved.forgeTier;
+      _hospiceTier = saved.hospiceTier;
+      _spindleTier = saved.spindleTier;
       _activeGeneralType = saved.activeGeneralType;
       _phylacteryRanks = Map.from(saved.phylacteryRanks);
       _currentChapter = saved.currentChapter;
@@ -160,6 +174,13 @@ class _AppShellState extends State<AppShell> {
           _totalIchor = saved.totalIchor;
           _cursedOre = saved.cursedOre;
           _bloodlineSigils = saved.bloodlineSigils;
+          _brimSlagCores = saved.brimSlagCores;
+          _solarIron = saved.solarIron;
+          _quicksilver = saved.quicksilver;
+          _crucibleTier = saved.crucibleTier;
+          _forgeTier = saved.forgeTier;
+          _hospiceTier = saved.hospiceTier;
+          _spindleTier = saved.spindleTier;
           _activeGeneralType = saved.activeGeneralType;
           _phylacteryRanks = Map.from(saved.phylacteryRanks);
           _currentChapter = saved.currentChapter;
@@ -228,6 +249,13 @@ class _AppShellState extends State<AppShell> {
         totalIchor: _totalIchor,
         cursedOre: _cursedOre,
         bloodlineSigils: _bloodlineSigils,
+        brimSlagCores: _brimSlagCores,
+        solarIron: _solarIron,
+        quicksilver: _quicksilver,
+        crucibleTier: _crucibleTier,
+        forgeTier: _forgeTier,
+        hospiceTier: _hospiceTier,
+        spindleTier: _spindleTier,
         activeGeneralType: _activeGeneralType,
         phylacteryRanks: _phylacteryRanks,
         currentChapter: _currentChapter,
@@ -917,6 +945,17 @@ class _AppShellState extends State<AppShell> {
           fixedName: isStage1_1 ? 'Rescued Vanguard Husk' : null,
           fixedSpeciesId: isStage1_1 ? 'rotting_husk' : null,
         );
+      }
+
+      if (isBossNode) {
+        final nodeName = _activeNode?.name ?? '';
+        if (nodeName.contains('Forge') || nodeName.contains('Iron') || nodeName.contains('Colossus') || nodeName.contains('Dreadnought')) {
+          _solarIron += 1;
+        } else if (nodeName.contains('Archive') || nodeName.contains('Spindle') || nodeName.contains('Delve')) {
+          _quicksilver += 1;
+        } else {
+          _brimSlagCores += 1;
+        }
       }
 
       bool isFirstConquest = false;
@@ -1621,6 +1660,37 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _upgradeSanctuaryFacility({
+    required String facilityId,
+    required int newTier,
+    required int ichorCost,
+    required int oreCost,
+    required int reagentCost,
+    required String reagentType,
+  }) {
+    if (_totalIchor < ichorCost || _cursedOre < oreCost) return;
+    if (reagentType == 'brimSlag' && _brimSlagCores < reagentCost) return;
+    if (reagentType == 'solarIron' && _solarIron < reagentCost) return;
+    if (reagentType == 'quicksilver' && _quicksilver < reagentCost) return;
+    if (reagentType == 'sigils' && _bloodlineSigils < reagentCost) return;
+
+    setState(() {
+      _totalIchor -= ichorCost;
+      _cursedOre -= oreCost;
+      if (reagentType == 'brimSlag') _brimSlagCores -= reagentCost;
+      if (reagentType == 'solarIron') _solarIron -= reagentCost;
+      if (reagentType == 'quicksilver') _quicksilver -= reagentCost;
+      if (reagentType == 'sigils') _bloodlineSigils -= reagentCost;
+
+      if (facilityId == 'crucible') _crucibleTier = newTier;
+      if (facilityId == 'forge') _forgeTier = newTier;
+      if (facilityId == 'hospice') _hospiceTier = newTier;
+      if (facilityId == 'spindle' || facilityId == 'beacon') _spindleTier = newTier;
+    });
+
+    _saveCurrentState();
+  }
+
   void _showHomeModal() {
     showDialog(
       context: context,
@@ -1629,6 +1699,14 @@ class _AppShellState extends State<AppShell> {
         totalIchor: _totalIchor,
         cursedOre: _cursedOre,
         bloodlineSigils: _bloodlineSigils,
+        brimSlagCores: _brimSlagCores,
+        solarIron: _solarIron,
+        quicksilver: _quicksilver,
+        crucibleTier: _crucibleTier,
+        forgeTier: _forgeTier,
+        hospiceTier: _hospiceTier,
+        spindleTier: _spindleTier,
+        onUpgradeFacility: _upgradeSanctuaryFacility,
         activeGeneral: _activeGeneralType,
         currentChapter: _currentChapter,
         currentAscension: _currentAscension,

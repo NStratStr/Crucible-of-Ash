@@ -10,6 +10,13 @@ class GameSaveData {
   final int totalIchor;
   final int cursedOre;
   final int bloodlineSigils;
+  final int brimSlagCores;
+  final int solarIron;
+  final int quicksilver;
+  final int crucibleTier;
+  final int forgeTier;
+  final int hospiceTier;
+  final int spindleTier;
   final GeneralType activeGeneralType;
   final Map<GeneralType, int> phylacteryRanks;
   final int currentChapter;
@@ -31,6 +38,13 @@ class GameSaveData {
     required this.totalIchor,
     required this.cursedOre,
     required this.bloodlineSigils,
+    this.brimSlagCores = 2,
+    this.solarIron = 2,
+    this.quicksilver = 2,
+    this.crucibleTier = 1,
+    this.forgeTier = 1,
+    this.hospiceTier = 1,
+    this.spindleTier = 1,
     required this.activeGeneralType,
     required this.phylacteryRanks,
     required this.currentChapter,
@@ -55,6 +69,13 @@ class GameSaveData {
       'totalIchor': totalIchor,
       'cursedOre': cursedOre,
       'bloodlineSigils': bloodlineSigils,
+      'brimSlagCores': brimSlagCores,
+      'solarIron': solarIron,
+      'quicksilver': quicksilver,
+      'crucibleTier': crucibleTier,
+      'forgeTier': forgeTier,
+      'hospiceTier': hospiceTier,
+      'spindleTier': spindleTier,
       'activeGeneralType': activeGeneralType.name,
       'phylacteryRanks': phylacteryRanks.map((k, v) => MapEntry(k.name, v)),
       'currentChapter': currentChapter,
@@ -126,6 +147,13 @@ class GameSaveData {
       totalIchor: (json['totalIchor'] as num?)?.toInt() ?? 450,
       cursedOre: (json['cursedOre'] as num?)?.toInt() ?? 75,
       bloodlineSigils: (json['bloodlineSigils'] as num?)?.toInt() ?? 2,
+      brimSlagCores: (json['brimSlagCores'] as num?)?.toInt() ?? 2,
+      solarIron: (json['solarIron'] as num?)?.toInt() ?? 2,
+      quicksilver: (json['quicksilver'] as num?)?.toInt() ?? 2,
+      crucibleTier: (json['crucibleTier'] as num?)?.toInt() ?? 1,
+      forgeTier: (json['forgeTier'] as num?)?.toInt() ?? 1,
+      hospiceTier: (json['hospiceTier'] as num?)?.toInt() ?? 1,
+      spindleTier: (json['spindleTier'] as num?)?.toInt() ?? 1,
       activeGeneralType: generalType,
       phylacteryRanks: ranks,
       currentChapter: (json['currentChapter'] as num?)?.toInt() ?? 1,

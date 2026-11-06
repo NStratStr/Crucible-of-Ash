@@ -9,6 +9,7 @@ import '../models/unit_entity.dart';
 import 'gothic_card_frame_widget.dart';
 import 'gothic_character_sheet_card.dart';
 import 'hexagonal_affinity_wheel_widget.dart';
+import '../../core/audio/global_audio_service.dart';
 
 class PedigreeInspectorDialog extends StatefulWidget {
   final UnitEntity unit;
@@ -247,6 +248,501 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
       default:
         return 'GEN $gen • DESCENDANT';
     }
+  }
+
+  void _showProgenitorDetailDialog({
+    required BuildContext context,
+    required String ancestorName,
+    required int generation,
+    required String? traitId,
+    required String statLegacyText,
+    required Color themeColor,
+  }) {
+    GlobalAudioService().playSfx('SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav');
+    final trait = traitId != null ? TraitEntity.registry[traitId] : null;
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Container(
+            width: 480,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D0E18),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: themeColor.withValues(alpha: 0.8), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: themeColor.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  spreadRadius: 4,
+                ),
+                const BoxShadow(color: Colors.black87, blurRadius: 16),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: themeColor.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: themeColor, width: 1),
+                      ),
+                      child: Icon(Icons.account_tree, color: themeColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: themeColor, width: 0.8),
+                                ),
+                                child: Text(
+                                  'GENERATION $generation PROGENITOR',
+                                  style: TextStyle(
+                                    color: themeColor,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            ancestorName.toUpperCase(),
+                            style: const TextStyle(
+                              fontFamily: 'serif',
+                              color: Color(0xFFFFD54F),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Divider(color: Colors.white12),
+                const SizedBox(height: 10),
+
+                // Stat Inheritance Block
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF131422),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF42A5F5).withValues(alpha: 0.4), width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.trending_up, color: Color(0xFF42A5F5), size: 15),
+                          SizedBox(width: 6),
+                          Text(
+                            'LINEAGE STAT TRANSFERENCE',
+                            style: TextStyle(
+                              color: Color(0xFF42A5F5),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        statLegacyText,
+                        style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Trait Contribution Block
+                if (trait != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF131422),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: trait.themeColor.withValues(alpha: 0.4), width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(trait.icon, color: trait.themeColor, size: 15),
+                            const SizedBox(width: 6),
+                            Text(
+                              'CONTRIBUTED TRAIT: ${trait.name.toUpperCase()}',
+                              style: TextStyle(
+                                color: trait.themeColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          trait.description,
+                          style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Bloodline Lore
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF090A10),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: const Text(
+                    'Sacrificed upon the Altar of the Great Crucible. Their flesh and calcified bone were dissolved into raw Vitae, transferring their signature traits and vital statistics across bloodline generations.',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Close Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 38,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE5A93C),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text(
+                      'RETURN TO PEDIGREE INSPECTOR',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInteractiveLineagePedigreeTree(BuildContext context, UnitEntity unit) {
+    // If unit is G1 with no ancestors recorded
+    if (unit.generation <= 1 && unit.lineageAncestors.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF090A12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.4), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFE5A93C), width: 0.8),
+                  ),
+                  child: const Text(
+                    'GEN 1 PRIMORDIAL FOUNDER',
+                    style: TextStyle(
+                      color: Color(0xFFE5A93C),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'GENESIS ROOT SEED',
+                  style: TextStyle(color: Colors.white54, fontSize: 9.5),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Harvested directly from the Ash Wastes as primordial stock. Holds +0% prior generational stat compounding. Elevate this unit in The Great Crucible to infuse stats forward into Generation 2.',
+              style: TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.35),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Build progenitor chain
+    final List<Map<String, dynamic>> ancestors = [];
+    final rawAncestors = unit.lineageAncestors;
+
+    if (rawAncestors.isNotEmpty) {
+      for (int i = 0; i < rawAncestors.length; i++) {
+        final raw = rawAncestors[i];
+        final cleanName = raw.replaceAll('_', ' ');
+        final gen = (i + 1).clamp(1, unit.generation - 1);
+        final statBonus = (gen * 10);
+        final traitId = (i == rawAncestors.length - 1 && unit.graftedTraitId != null)
+            ? unit.graftedTraitId
+            : unit.nativeTraitId;
+
+        ancestors.add({
+          'name': cleanName,
+          'gen': gen,
+          'traitId': traitId,
+          'statLegacy': 'Bestowed +$statBonus% compounded stat transference (+10% HP, ATK, DEF per generation).',
+          'themeColor': gen == 1 ? const Color(0xFF90A4AE) : (gen == 2 ? const Color(0xFF42A5F5) : const Color(0xFFFFD54F)),
+        });
+      }
+    } else {
+      // Synthesize generation ancestors for G2+ units
+      for (int g = 1; g < unit.generation; g++) {
+        final statBonus = (g * 10);
+        ancestors.add({
+          'name': '${unit.name} Progenitor G$g',
+          'gen': g,
+          'traitId': g == 1 ? unit.nativeTraitId : unit.graftedTraitId,
+          'statLegacy': 'Bestowed +$statBonus% compounded stat transference (+10% HP, ATK, DEF per generation).',
+          'themeColor': g == 1 ? const Color(0xFF90A4AE) : const Color(0xFFFFD54F),
+        });
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < ancestors.length; i++) ...[
+          _buildAncestorNodeCard(context, ancestors[i]),
+          // Vertical Genealogical Connector Line
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Column(
+                children: [
+                  Container(width: 2, height: 10, color: const Color(0xFFFFD54F).withValues(alpha: 0.6)),
+                  const Icon(Icons.arrow_downward, size: 12, color: Color(0xFFFFD54F)),
+                ],
+              ),
+            ),
+          ),
+        ],
+
+        // Current Descendant Terminal Node
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141726),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFFD54F), width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFD54F).withValues(alpha: 0.2),
+                blurRadius: 10,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFFFD54F), width: 1),
+                ),
+                child: Text(
+                  'G${unit.generation} ACTIVE',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD54F),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      unit.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Holds +${((unit.generation - 1) * 10).clamp(0, 100)}% cumulative bloodline stat compounding.',
+                      style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 9.5),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.star, color: Color(0xFFFFD54F), size: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAncestorNodeCard(BuildContext context, Map<String, dynamic> data) {
+    final String name = data['name'];
+    final int gen = data['gen'];
+    final String? traitId = data['traitId'];
+    final Color themeColor = data['themeColor'];
+    final String statLegacy = data['statLegacy'];
+    final trait = traitId != null ? TraitEntity.registry[traitId] : null;
+
+    return InkWell(
+      onTap: () => _showProgenitorDetailDialog(
+        context: context,
+        ancestorName: name,
+        generation: gen,
+        traitId: traitId,
+        statLegacyText: statLegacy,
+        themeColor: themeColor,
+      ),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F101A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: themeColor.withValues(alpha: 0.5), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: themeColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: themeColor, width: 0.8),
+              ),
+              child: Text(
+                'G$gen',
+                style: TextStyle(
+                  color: themeColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      if (trait != null) ...[
+                        Icon(trait.icon, size: 10, color: trait.themeColor),
+                        const SizedBox(width: 3),
+                        Text(
+                          trait.name,
+                          style: TextStyle(color: trait.themeColor, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        '+${gen * 10}% Stats',
+                        style: const TextStyle(color: Color(0xFF81C784), fontSize: 9, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.touch_app, size: 10, color: Color(0xFFFFD54F)),
+                  SizedBox(width: 3),
+                  Text(
+                    'INSPECT',
+                    style: TextStyle(color: Color(0xFFFFD54F), fontSize: 8.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1678,35 +2174,21 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                         ),
                         const SizedBox(height: 8),
                       ],
-                      const Text(
-                        'BLOODLINE PROGENITORS',
-                        style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 9, fontWeight: FontWeight.bold),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'BLOODLINE PROGENITORS & PEDIGREE TREE',
+                            style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                          ),
+                          const Text(
+                            'TAP ANCESTOR TO INSPECT',
+                            style: TextStyle(color: Color(0xFFFFD54F), fontSize: 8, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      if (unit.lineageAncestors.isEmpty)
-                        const Text(
-                          'Primordial Stock (First Generation Feral Thrall)',
-                          style: TextStyle(color: Colors.white54, fontSize: 10, fontStyle: FontStyle.italic),
-                        )
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: unit.lineageAncestors.map((ancestor) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.subdirectory_arrow_right, size: 12, color: Color(0xFFE5A93C)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    ancestor,
-                                    style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                      const SizedBox(height: 8),
+                      _buildInteractiveLineagePedigreeTree(context, unit),
                     ],
                   ),
                 ),

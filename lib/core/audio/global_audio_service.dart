@@ -15,10 +15,43 @@ class GlobalAudioService {
   GlobalAudioService._internal();
 
   AudioPlayer? _bgmPlayer;
-  AudioPlayer? _sfxPlayer;
+  final List<AudioPlayer> _sfxPlayers = [];
+  int _sfxIndex = 0;
+  static const int _maxSfxPlayers = 4;
   Timer? _fadeTimer;
   String? _currentBgmAsset;
   bool _isInitialized = false;
+
+  /// Resolves generic/arcade SFX identifiers to visceral acoustic dark fantasy assets
+  static String resolveSfxAsset(String sfxName) {
+    switch (sfxName) {
+      case 'sfx_block.wav':
+        return 'WEAPArmr_Metal Shield Block Hits_JSE_MW.wav';
+      case 'sfx_slash.wav':
+        return 'SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav';
+      case 'sfx_hit.wav':
+        return 'WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav';
+      case 'sfx_spell.wav':
+        return 'Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav';
+      case 'sfx_card.wav':
+        return 'SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav';
+      case 'sfx_summon.wav':
+        return 'CHAINMvmt_InsJ_Chains_Metal_Movement_Distant_Moderate_02-01.wav';
+      case 'sfx_crit.wav':
+        return 'GOREBone_Bone Breaks Celery 01_JSE_GMP.wav';
+      case 'sfx_blood.wav':
+        return 'GORESplt_Gore Splatter 01_JSE_GMP.wav';
+      case 'sfx_smite.wav':
+      case 'sfx_hammer.wav':
+        return 'Bluezone_BC0297_stone_impact_hammer_015.wav';
+      case 'sfx_shatter.wav':
+        return 'WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav';
+      case 'sfx_enrage.wav':
+        return 'Dinosaur Growl 3_Mono.wav';
+      default:
+        return sfxName;
+    }
+  }
 
   Future<void> init() async {
     if (_isInitialized) return;
@@ -26,8 +59,11 @@ class GlobalAudioService {
 
     try {
       _bgmPlayer = AudioPlayer();
-      _sfxPlayer = AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
+
+      for (int i = 0; i < _maxSfxPlayers; i++) {
+        _sfxPlayers.add(AudioPlayer());
+      }
 
       final settings = SettingsService();
       settings.addListener(_onSettingsChanged);
@@ -136,17 +172,21 @@ class GlobalAudioService {
     await _bgmPlayer?.resume();
   }
 
-  /// Plays a short one-shot sound effect safely
+  /// Plays a short one-shot sound effect safely using the pooled SFX players
   void playSfx(String sfxName, {double volumeMultiplier = 0.70}) {
     final settings = SettingsService();
-    if (!settings.sfxEnabled || _sfxPlayer == null) return;
+    if (!settings.sfxEnabled || _sfxPlayers.isEmpty) return;
 
     try {
+      final resolved = resolveSfxAsset(sfxName);
+      final player = _sfxPlayers[_sfxIndex];
+      _sfxIndex = (_sfxIndex + 1) % _sfxPlayers.length;
+
       final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
-      _sfxPlayer!.setVolume(vol).then((_) {
-        _sfxPlayer!.play(AssetSource('audio/$sfxName'));
+      player.setVolume(vol).then((_) {
+        player.play(AssetSource('audio/$resolved'));
       }).catchError((e) {
-        debugPrint('Error playing SFX $sfxName: $e');
+        debugPrint('Error playing SFX $resolved: $e');
       });
     } catch (e) {
       debugPrint('Error playing SFX $sfxName: $e');

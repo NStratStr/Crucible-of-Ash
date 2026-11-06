@@ -228,12 +228,45 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
-  AudioPlayer? _sfxPlayer;
+  final List<AudioPlayer> _sfxPlayers = [];
+  int _sfxIndex = 0;
+  static const int _maxSfxPlayers = 4;
   bool _isMuted = false;
   bool _isDockCollapsed = false;
   bool _hasBossEnraged = false;
 
   late final FocusNode _battlefieldFocusNode;
+
+  /// Resolves generic SFX names to visceral acoustic assets
+  static String _resolveSfx(String sfxName) {
+    switch (sfxName) {
+      case 'sfx_block.wav':
+        return 'WEAPArmr_Metal Shield Block Hits_JSE_MW.wav';
+      case 'sfx_slash.wav':
+        return 'SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav';
+      case 'sfx_hit.wav':
+        return 'WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav';
+      case 'sfx_spell.wav':
+        return 'Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav';
+      case 'sfx_card.wav':
+        return 'SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav';
+      case 'sfx_summon.wav':
+        return 'CHAINMvmt_InsJ_Chains_Metal_Movement_Distant_Moderate_02-01.wav';
+      case 'sfx_crit.wav':
+        return 'GOREBone_Bone Breaks Celery 01_JSE_GMP.wav';
+      case 'sfx_blood.wav':
+        return 'GORESplt_Gore Splatter 01_JSE_GMP.wav';
+      case 'sfx_smite.wav':
+      case 'sfx_hammer.wav':
+        return 'Bluezone_BC0297_stone_impact_hammer_015.wav';
+      case 'sfx_shatter.wav':
+        return 'WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav';
+      case 'sfx_enrage.wav':
+        return 'Dinosaur Growl 3_Mono.wav';
+      default:
+        return sfxName;
+    }
+  }
 
   @override
   void initState() {
@@ -267,13 +300,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       final settings = SettingsService();
       _isMuted = !settings.bgmEnabled;
       _bgmPlayer = AudioPlayer();
-      _sfxPlayer = AudioPlayer();
+      _sfxPlayers.clear();
+      for (int i = 0; i < _maxSfxPlayers; i++) {
+        _sfxPlayers.add(AudioPlayer());
+      }
       
       // Stop loop event spam on Windows native backend
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       final bgmVol = _isMuted ? 0.0 : (settings.bgmVolume * 0.45);
       await _bgmPlayer!.setVolume(bgmVol);
-      await _sfxPlayer!.setVolume(settings.sfxVolume * 0.70);
+      for (final player in _sfxPlayers) {
+        await player.setVolume(settings.sfxVolume * 0.70);
+      }
       if (settings.bgmEnabled) {
         await _bgmPlayer!.play(AssetSource('audio/combat_bgm_ambient.mp3'));
       }
@@ -282,12 +320,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
   }
 
-  void _playSfx(String sfxName) {
+  void _playSfx(String sfxName, {double volumeMultiplier = 0.70}) {
     final settings = SettingsService();
-    if (_isMuted || !settings.sfxEnabled || _sfxPlayer == null) return;
+    if (_isMuted || !settings.sfxEnabled || _sfxPlayers.isEmpty) return;
     try {
-      _sfxPlayer!.play(AssetSource('audio/$sfxName')).catchError((e) {
-        debugPrint('Error playing SFX $sfxName: $e');
+      final resolved = _resolveSfx(sfxName);
+      final player = _sfxPlayers[_sfxIndex];
+      _sfxIndex = (_sfxIndex + 1) % _sfxPlayers.length;
+
+      final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
+      player.setVolume(vol).then((_) {
+        player.play(AssetSource('audio/$resolved'));
+      }).catchError((e) {
+        debugPrint('Error playing SFX $resolved: $e');
       });
     } catch (e) {
       debugPrint('Error playing SFX $sfxName: $e');
@@ -318,7 +363,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final boss = _engine.enemyUnits.where((u) => (u.id == 'gorgoroth_boss' || u.footprint != UnitFootprint.single1x1) && u.isAlive).firstOrNull;
     if (boss != null && !_hasBossEnraged && boss.hp <= (boss.maxHp * 0.50)) {
       _hasBossEnraged = true;
-      _playSfx('sfx_spell.wav');
+      _playSfx('Dinosaur Growl 3_Mono.wav');
       _triggerScreenShake(intensity: 12.0);
       _activeSynergyBannerText = '🔥 ' + boss.name.toUpperCase() + ' ENTERS ASHEN ENRAGE!';
       _activeSynergyBannerColor = const Color(0xFFFF3D00);
@@ -451,81 +496,81 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
       durationMs = 1450;
-      _playSfx('sfx_slash.wav');
+      _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
     } else if (event.isWallSplat) {
       vfxType = 'shatter';
       primaryColor = const Color(0xFFFF9100);
       secondaryColor = const Color(0xFFFF1744);
       durationMs = 1200;
-      _playSfx('sfx_block.wav');
+      _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
     } else if (event.isUnitCollision) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFFFF5252);
       secondaryColor = const Color(0xFFFFD54F);
       durationMs = 1100;
-      _playSfx('sfx_hit.wav');
-    } else     if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
+      _playSfx('Heavy Body Crunch 02.wav');
+    } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
       vfxType = 'bloodnova';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFD50000);
       durationMs = 1450;
-      _playSfx('sfx_slash.wav'); // High-impact blood cleave
+      _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
     } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFFFF1744);
       durationMs = 1300;
-      _playSfx('sfx_slash.wav');
+      _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
     } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
       vfxType = 'slash';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFFFF1744);
       durationMs = 1200;
-      _playSfx('sfx_slash.wav');
+      _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
     } else if (event.skillName.contains('Celestial Surge')) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFFFFD54F);
       durationMs = 1350;
-      _playSfx('sfx_spell.wav');
+      _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
     } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
       vfxType = 'bloodsiphon';
       primaryColor = const Color(0xFFFF5252);
       secondaryColor = const Color(0xFF880E4F);
       durationMs = 1200;
-      _playSfx('sfx_spell.wav'); // Dark blood drain surge
+      _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
     } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
       vfxType = 'shatter';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
       durationMs = 1350;
-      _playSfx('sfx_block.wav'); // Heavy armor crack / shield shatter
+      _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
     } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
       vfxType = 'arrow';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFFFF8A80);
       durationMs = 950;
-      _playSfx('sfx_hit.wav');
+      _playSfx('Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav');
     } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
       vfxType = 'firebolt';
       primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
       secondaryColor = const Color(0xFFFFD54F);
       durationMs = 1100;
-      _playSfx('sfx_spell.wav'); // Magic surge
+      _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
     } else if (event.isHeal || event.skillName.contains('Phalanx')) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFF80D8FF);
       durationMs = 1200;
-      _playSfx('sfx_block.wav'); // Defensive barrier
+      _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
     } else if (event.isCrit) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFFFD54F);
       durationMs = 1300;
-      _playSfx('sfx_slash.wav'); // Lethal blade critical
+      _playSfx('GOREBone_Bone Breaks Celery 01_JSE_GMP.wav');
     } else {
-      _playSfx('sfx_hit.wav'); // Standard melee impact
+      _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
     }
 
     final newVfx = _CombatVfx(
@@ -917,12 +962,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _animTimers.clear();
     _engine.removeListener(_onEngineUpdate);
     final bgm = _bgmPlayer;
-    final sfx = _sfxPlayer;
+    final sfxList = List<AudioPlayer>.from(_sfxPlayers);
     _bgmPlayer = null;
-    _sfxPlayer = null;
+    _sfxPlayers.clear();
     try {
       bgm?.stop().then((_) => bgm.dispose()).catchError((_) {});
-      sfx?.stop().then((_) => sfx.dispose()).catchError((_) {});
+      for (final sfx in sfxList) {
+        sfx.stop().then((_) => sfx.dispose()).catchError((_) {});
+      }
     } catch (_) {}
     super.dispose();
   }

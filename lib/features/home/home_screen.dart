@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../generals/general_command_service.dart';
 import '../persistence/cloud_account_dialog.dart';
+import 'sanctuary_facility_dialog.dart';
 
 import 'package:flutter/material.dart';
 import '../generals/general_command_service.dart';
@@ -15,6 +16,13 @@ class HomeScreen extends StatefulWidget {
   final int totalIchor;
   final int cursedOre;
   final int bloodlineSigils;
+  final int brimSlagCores;
+  final int solarIron;
+  final int quicksilver;
+  final int crucibleTier;
+  final int forgeTier;
+  final int hospiceTier;
+  final int spindleTier;
   final GeneralType activeGeneral;
   final int currentChapter;
   final int currentAscension;
@@ -27,6 +35,14 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenEndgameGauntlet;
   final VoidCallback onOpenSummoning;
   final VoidCallback onOpenSettings;
+  final void Function({
+    required String facilityId,
+    required int newTier,
+    required int ichorCost,
+    required int oreCost,
+    required int reagentCost,
+    required String reagentType,
+  })? onUpgradeFacility;
   final VoidCallback? onCloudDataRestored;
   final bool showCloseButton;
 
@@ -35,6 +51,13 @@ class HomeScreen extends StatefulWidget {
     required this.totalIchor,
     required this.cursedOre,
     required this.bloodlineSigils,
+    this.brimSlagCores = 2,
+    this.solarIron = 2,
+    this.quicksilver = 2,
+    this.crucibleTier = 1,
+    this.forgeTier = 1,
+    this.hospiceTier = 1,
+    this.spindleTier = 1,
     required this.activeGeneral,
     required this.currentChapter,
     required this.currentAscension,
@@ -47,6 +70,7 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenEndgameGauntlet,
     required this.onOpenSummoning,
     required this.onOpenSettings,
+    this.onUpgradeFacility,
     this.onCloudDataRestored,
     this.showCloseButton = true,
   });
@@ -58,6 +82,57 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   HomeViewMode _viewMode = HomeViewMode.sanctuaryTown;
   String? _hoveredBuilding;
+
+  String _toRoman(int num) {
+    switch (num) {
+      case 1:
+        return 'I';
+      case 2:
+        return 'II';
+      case 3:
+        return 'III';
+      case 4:
+        return 'IV';
+      case 5:
+        return 'V';
+      default:
+        return num.toString();
+    }
+  }
+
+  void _openSanctuaryArchitecture([String? districtId]) {
+    SanctuaryFacilityUpgradeDialog.show(
+      context,
+      totalIchor: widget.totalIchor,
+      cursedOre: widget.cursedOre,
+      bloodlineSigils: widget.bloodlineSigils,
+      brimSlagCores: widget.brimSlagCores,
+      solarIron: widget.solarIron,
+      quicksilver: widget.quicksilver,
+      crucibleTier: widget.crucibleTier,
+      forgeTier: widget.forgeTier,
+      hospiceTier: widget.hospiceTier,
+      spindleTier: widget.spindleTier,
+      initialDistrictId: districtId,
+      onUpgradeFacility: ({
+        required facilityId,
+        required newTier,
+        required ichorCost,
+        required oreCost,
+        required reagentCost,
+        required reagentType,
+      }) {
+        widget.onUpgradeFacility?.call(
+          facilityId: facilityId,
+          newTier: newTier,
+          ichorCost: ichorCost,
+          oreCost: oreCost,
+          reagentCost: reagentCost,
+          reagentType: reagentType,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -537,6 +612,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 230 * buildingScale,
                 shadowWidth: 100 * buildingScale,
                 badgeOffsetY: -4,
+                tierLabel: 'TIER ${_toRoman(widget.spindleTier)}',
+                onUpgradeTap: () => _openSanctuaryArchitecture('spindle'),
                 onTap: widget.onOpenBrigadeRoster,
               ),
             ),
@@ -556,6 +633,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 200 * buildingScale,
                 shadowWidth: 190 * buildingScale,
                 badgeOffsetY: 8,
+                tierLabel: 'TIER ${_toRoman(widget.crucibleTier)}',
+                onUpgradeTap: () => _openSanctuaryArchitecture('crucible'),
                 onTap: widget.onOpenCrucible,
               ),
             ),
@@ -575,6 +654,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 240 * buildingScale,
                 shadowWidth: 210 * buildingScale,
                 badgeOffsetY: 4,
+                tierLabel: 'TIER ${_toRoman(widget.forgeTier)}',
+                onUpgradeTap: () => _openSanctuaryArchitecture('forge'),
                 onTap: widget.onOpenRelicForge,
               ),
             ),
@@ -638,6 +719,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
                       _buildQuickActionBtn('SUMMON', Icons.person_add_alt_1, const Color(0xFFFFD54F), widget.onOpenSummoning),
                       _buildQuickActionBtn('ROSTER', Icons.people_alt_outlined, const Color(0xFFAB47BC), widget.onOpenBrigadeRoster),
+                      _buildQuickActionBtn('UPGRADE', Icons.account_balance, const Color(0xFFFFD54F), () => _openSanctuaryArchitecture(null)),
                     ],
                   ),
                 ),
@@ -686,6 +768,8 @@ class _HomeScreenState extends State<HomeScreen> {
     required double shadowWidth,
     required double badgeOffsetY,
     required VoidCallback onTap,
+    String? tierLabel,
+    VoidCallback? onUpgradeTap,
   }) {
     final isHovered = _hoveredBuilding == title;
 
@@ -730,16 +814,55 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'serif',
-                          color: isHovered ? const Color(0xFFFFD54F) : Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10.0,
-                          letterSpacing: 0.8,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'serif',
+                              color: isHovered ? const Color(0xFFFFD54F) : Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10.0,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          if (tierLabel != null) ...[
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: glowColor.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: glowColor, width: 0.8),
+                              ),
+                              child: Text(
+                                tierLabel,
+                                style: TextStyle(
+                                  color: glowColor,
+                                  fontSize: 7.5,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (onUpgradeTap != null) ...[
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: onUpgradeTap,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5A93C).withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                                ),
+                                child: const Icon(Icons.upgrade, size: 10, color: Color(0xFFFFD54F)),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         subtitle,
