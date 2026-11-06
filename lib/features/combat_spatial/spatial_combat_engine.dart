@@ -278,6 +278,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         speed: bossEntity.speed,
         isSlagCarapaceActive: true,
         customAssetPath: bossEntity.customAvatarAsset,
+        maxStagger: (bossEntity.speciesId.toLowerCase().contains('gorgoroth') || bossEntity.name.toLowerCase().contains('gorgoroth') || bossEntity.id.toLowerCase().contains('gorgoroth')) ? 180 : 0,
+        stagger: (bossEntity.speciesId.toLowerCase().contains('gorgoroth') || bossEntity.name.toLowerCase().contains('gorgoroth') || bossEntity.id.toLowerCase().contains('gorgoroth')) ? 180 : 0,
       );
       enemyUnits.add(bossUnit);
 
@@ -683,6 +685,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       attack: 110,
       speed: 70,
       isSlagCarapaceActive: true,
+      maxStagger: 180,
+      stagger: 180,
     );
 
     // Cinder Witch: 1x1 Arcanum in Col 1 Backline (Col index 0, Row 2)
@@ -1051,6 +1055,17 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (unit.isAlive && unit.hasteDuration > 0) {
           unit.hasteDuration = max(0, unit.hasteDuration - 30);
         }
+
+        // Boss Stagger / Break Bar recovery countdown
+        if (unit.isAlive && unit.isStaggered) {
+          unit.staggerDurationTicks = max(0, unit.staggerDurationTicks - 30);
+          if (unit.staggerDurationTicks <= 0) {
+            unit.isStaggered = false;
+            unit.stagger = unit.maxStagger;
+            lastBannerMessage = '🛡️ ${unit.name.toUpperCase()} RECOVERS — SLAG CARAPACE HARDENED!';
+            addLog('${unit.name} recovers from Stagger! Break Bar restored to ${unit.maxStagger}.');
+          }
+        }
       }
     }
 
@@ -1071,7 +1086,7 @@ class SpatialCombatEngine extends ChangeNotifier {
                 u.footprint != UnitFootprint.single1x1) &&
             u.isAlive)
         .firstOrNull;
-    if (bossUnit != null) {
+    if (bossUnit != null && !bossUnit.isStaggered) {
       final bool isPhase2Enkindled = bossUnit.hp <= (bossUnit.maxHp * 0.50);
 
       if ((currentTick == 135 || (currentTick > 150 && currentTick % 160 == 0)) && bossUnit.pendingIntent == null) {
@@ -1268,6 +1283,16 @@ class SpatialCombatEngine extends ChangeNotifier {
     if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: attackerRow)) {
       finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
       addLog('🛡️ VANGUARD COVER: ${target.name} takes -25% damage behind Vanguard line!');
+    }
+    if (target.hasBreakBar && !target.isStaggered) {
+      int staggerChip = max(10, (finalDmg * 0.18).round());
+      if (isPhysical) staggerChip = (staggerChip * 1.35).round();
+      if (ignoreArmor) staggerChip += 15;
+      final bool broke = target.damageStagger(staggerChip);
+      if (broke) {
+        lastBannerMessage = '⚡ ${target.name.toUpperCase()} STAGGERED! CORE EXPOSED — +50% VULNERABILITY!';
+        addLog('💥 BREAK BAR SHATTERED! ${target.name} staggered for 2.0s — takes guaranteed crits and +50% damage!');
+      }
     }
     return target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
   }
@@ -2798,7 +2823,14 @@ class SpatialCombatEngine extends ChangeNotifier {
         final dmg = boss.takeDamage(rawDmg);
         addLog('SMITE CAST: Dealt $dmg kinetic damage to ${boss.name}!');
 
-        // Slag Carapace Shatter condition
+        // Slag Carapace Shatter & Stagger condition
+        if (boss.hasBreakBar) {
+          final broke = boss.damageStagger(50);
+          if (broke) {
+            lastBannerMessage = '⚡ ${boss.name.toUpperCase()} STAGGERED! CORE EXPOSED — +50% VULNERABILITY!';
+            addLog('💥 BREAK BAR SHATTERED! Smite broke ${boss.name}\'s posture!');
+          }
+        }
         if (boss.isSlagCarapaceActive) {
           boss.isSlagCarapaceActive = false;
           boss.sunderArmor(0.50); // Sunder armor by 50%

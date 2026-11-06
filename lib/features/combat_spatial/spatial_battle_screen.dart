@@ -234,6 +234,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   bool _isMuted = false;
   bool _isDockCollapsed = false;
   bool _hasBossEnraged = false;
+  bool _wasBossStaggered = false;
 
   late final FocusNode _battlefieldFocusNode;
 
@@ -374,6 +375,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           });
         }
       });
+    }
+
+    // Boss Stagger / Break Bar audio and shake transition
+    if (boss != null) {
+      if (boss.isStaggered && !_wasBossStaggered) {
+        _wasBossStaggered = true;
+        _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
+        _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
+        _triggerScreenShake(intensity: 10.0);
+      } else if (!boss.isStaggered && _wasBossStaggered) {
+        _wasBossStaggered = false;
+        _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
+      }
     }
 
     // Check if a new combat action event was dispatched
@@ -755,7 +769,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       Color popColor;
       Color popBorder;
       double popSize = 11.0;
-      bool isCrit = event.isCrit;
+      bool isCrit = event.isCrit || (target?.isStaggered == true);
 
       if (event.isHeal) {
         if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
@@ -782,11 +796,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           popColor = const Color(0xFFFF5252);
           popBorder = const Color(0xFFB71C1C);
           popSize = 12.0;
-        } else if (event.isCrit) {
-          popText = '★ -${event.damage} CRIT!';
+        } else if (isCrit) {
+          popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '★ -${event.damage} CRIT!';
           popColor = const Color(0xFFFFD54F);
           popBorder = const Color(0xFFFF9100);
-          popSize = 14.0;
+          popSize = 14.5;
         } else if (event.bleedStacks > 0) {
           popText = '🩸 -${event.damage} (+${event.bleedStacks} Bleed)';
           popColor = const Color(0xFFFF3D00);
@@ -1923,6 +1937,189 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+  Widget _buildBossBreakBarHud(CombatUnitState boss, {bool isLandscapeMobile = false}) {
+    final double hpRatio = boss.maxHp > 0 ? (boss.hp / boss.maxHp).clamp(0.0, 1.0) : 0.0;
+    final double staggerRatio = boss.staggerFraction;
+    final bool isStaggered = boss.isStaggered;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 2),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 2 : 5),
+      decoration: BoxDecoration(
+        color: isStaggered ? const Color(0xFF261D00) : const Color(0xFF140C10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFFFF5252).withValues(alpha: 0.6),
+          width: isStaggered ? 1.5 : 1.0,
+        ),
+        boxShadow: isStaggered
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFFD600).withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.shield_outlined, size: 14, color: Color(0xFFFF8A80)),
+              const SizedBox(width: 5),
+              Text(
+                boss.name.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFFFFE082),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 10.5,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (boss.isSlagCarapaceActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3E2723),
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: const Color(0xFFFFB74D), width: 0.6),
+                  ),
+                  child: const Text(
+                    'CARAPACE ACTIVE',
+                    style: TextStyle(fontSize: 7.5, color: Color(0xFFFFCC80), fontWeight: FontWeight.bold),
+                  ),
+                ),
+              const Spacer(),
+              if (isStaggered)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD600),
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: const [BoxShadow(color: Color(0xFFFFAB00), blurRadius: 6)],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.flash_on, size: 11, color: Colors.black),
+                      const SizedBox(width: 2),
+                      Text(
+                        'CORE EXPOSED (${(boss.staggerDurationTicks / 30.0).toStringAsFixed(1)}s) • +50% VULNERABILITY',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 8.5,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Text(
+                  'HP: ${boss.hp}/${boss.maxHp} (${(hpRatio * 100).toInt()}%)',
+                  style: const TextStyle(
+                    color: Color(0xFFFFCDD2),
+                    fontSize: 9.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          // Boss HP Bar
+          Stack(
+            children: [
+              Container(
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(2.5),
+                  border: Border.all(color: Colors.white24, width: 0.5),
+                ),
+              ),
+              FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: hpRatio,
+                child: Container(
+                  height: 5,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFD32F2F), Color(0xFFFF5252)],
+                    ),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          // Boss Break / Stagger Bar
+          Row(
+            children: [
+              Text(
+                isStaggered ? '⚡ STAGGERED' : 'BREAK BAR',
+                style: TextStyle(
+                  color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 7.5,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(
+                          color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: isStaggered ? 1.0 : staggerRatio,
+                      child: Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isStaggered
+                                ? [const Color(0xFFFFD600), const Color(0xFFFF9100)]
+                                : [const Color(0xFF00E5FF), const Color(0xFF40C4FF)],
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isStaggered ? 'SHATTERED' : '${boss.stagger}/${boss.maxStagger}',
+                style: TextStyle(
+                  color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
+                  fontSize: 7.5,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopStatusRibbon(CombatUnitState? boss, {bool isLandscapeMobile = false}) {
     final double focusProgress = ((_engine.currentTick % 40) / 40.0).clamp(0.0, 1.0);
 
@@ -2342,6 +2539,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ),
 
           const SizedBox(height: 4),
+
+          if (boss != null && boss.isAlive && boss.hasBreakBar) ...[
+            const SizedBox(height: 4),
+            _buildBossBreakBarHud(boss, isLandscapeMobile: isLandscapeMobile),
+          ],
 
           // 4. Live Initiative Action Timeline (ATB Sequence Preview)
           if (!isLandscapeMobile)
@@ -5444,6 +5646,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               border: Border.all(color: const Color(0xFFFFD54F), width: 0.6),
                             ),
                             child: const Text('CARAPACE', style: TextStyle(fontSize: 6.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold)),
+                          ),
+                        ));
+                      }
+                      if (unit.isStaggered) {
+                        statusBadges.add(buildStatusBadge(
+                          message: '⚡ STAGGERED CORE: Break bar shattered! +50% incoming damage & guaranteed critical hits.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD600),
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: const [BoxShadow(color: Color(0xFFFFAB00), blurRadius: 6, spreadRadius: 1)],
+                            ),
+                            child: const Text('⚡CORE EXPOSED +50%', style: TextStyle(fontSize: 5.5, color: Colors.black, fontWeight: FontWeight.w900)),
+                          ),
+                        ));
+                      } else if (unit.hasBreakBar && unit.isAlive) {
+                        statusBadges.add(buildStatusBadge(
+                          message: '🛡️ BREAK BAR (${unit.stagger}/${unit.maxStagger}): Physical & kinetic strikes chip posture.',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1A237E),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFF00E5FF), width: 0.6),
+                            ),
+                            child: Text('BREAK ${(unit.staggerFraction * 100).toInt()}%', style: const TextStyle(fontSize: 5.5, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900)),
                           ),
                         ));
                       }

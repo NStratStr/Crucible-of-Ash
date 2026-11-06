@@ -263,6 +263,14 @@ class CombatUnitState {
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
 
+  // Boss Stagger & Break Bar Mechanics
+  int maxStagger;
+  int stagger;
+  bool isStaggered;
+  int staggerDurationTicks;
+  bool get hasBreakBar => maxStagger > 0;
+  double get staggerFraction => maxStagger > 0 ? (stagger / maxStagger).clamp(0.0, 1.0) : 0.0;
+
   final String? customAssetPath;
   final String? nativeTraitId;
   final String? graftedTraitId;
@@ -307,6 +315,10 @@ class CombatUnitState {
     this.ultimateCooldown = 0,
     this.shieldAppliedMs = 0,
     this.isSlagCarapaceActive = false,
+    this.maxStagger = 0,
+    int? stagger,
+    this.isStaggered = false,
+    this.staggerDurationTicks = 0,
     this.isPetrifiedPlinth = false,
     this.plinthDurability = 3,
     this.isShattered = false,
@@ -320,7 +332,8 @@ class CombatUnitState {
     this.movedSinceLastTurn = false,
     this.actionCycleCount = 0,
     this.signatureCooldown = 0,
-  })  : baseMaxHp = baseMaxHp ?? maxHp,
+  })  : stagger = stagger ?? maxStagger,
+        baseMaxHp = baseMaxHp ?? maxHp,
         isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
         activeStance = activeStance ?? _defaultStanceForArchetype(archetype);
 
@@ -762,6 +775,11 @@ class CombatUnitState {
       finalDmg *= 1.25;
     }
 
+    // Staggered Core Exposed: +50% incoming damage bonus vulnerability
+    if (isStaggered) {
+      finalDmg *= 1.50;
+    }
+
     // Freeze Shatter: Physical hits shatter freeze for +15% Max HP bonus damage and end freeze (GDD §4)
     if (isFrozen && isPhysical) {
       final shatterBonus = (maxHp * 0.15).round();
@@ -809,6 +827,21 @@ class CombatUnitState {
       hasteDuration = 0;
     }
     return applied;
+  }
+
+  /// Reduces break bar / stagger health by given amount.
+  /// When stagger reaches 0, triggers Staggered Core Exposed phase!
+  bool damageStagger(int amount) {
+    if (maxStagger <= 0 || isStaggered || isDowned) return false;
+    stagger = (stagger - amount).clamp(0, maxStagger);
+    if (stagger == 0) {
+      isStaggered = true;
+      staggerDurationTicks = 60; // 2.0s in 30Hz loop (staggered vulnerability window)
+      stunDuration = 60;
+      pendingIntent = null; // Interrupt channeled apocalyptic intent!
+      return true; // Break bar shattered!
+    }
+    return false;
   }
 
   /// Sunders armor by percentage
