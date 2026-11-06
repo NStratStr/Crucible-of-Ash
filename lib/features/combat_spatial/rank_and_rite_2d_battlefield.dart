@@ -234,6 +234,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     // Vanguard Cover check (Rank & Rite Spec Sec 3)
     final bool hasVanguardCover = isPlayer && occupant != null && engine.isCoveredByVanguard(occupant, trajectory: AttackTrajectory.directPhysical);
 
+    // Pre-battle projected attacker and flank status
+    final projectedAttacker = engine.playerUnits.where(
+      (u) => u.isAlive && u.occupiedNodes.isNotEmpty && engine.resolveProjectedTarget(u)?.id == occupant?.id,
+    ).firstOrNull;
+    final bool isTargetedInPreBattle = engine.isPreBattlePhase && !isPlayer && projectedAttacker != null && occupant != null;
+    final bool isFlankedInPreBattle = isTargetedInPreBattle && !engine.isCoveredByVanguard(occupant!, trajectory: AttackTrajectory.flanking);
+
     // Movement validity for selected ally
     final selectedAlly = selectedUnitId != null ? engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull : null;
     final bool isMoveReachable = isPlayer && selectedAlly != null && occupant == null && selectedAlly.canMoveTo(col, row, ignoreApCost: engine.isPreBattlePhase);
@@ -478,15 +485,61 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   top: 4,
                   right: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.28),
                       borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: const Color(0xFF00E5FF), width: 0.8),
+                      border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFF00E5FF).withValues(alpha: 0.4), blurRadius: 4),
+                      ],
                     ),
                     child: const Text(
-                      '🛡️-25%',
-                      style: TextStyle(fontSize: 7, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                      '🛡️ COVER -25%',
+                      style: TextStyle(fontSize: 6.8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+
+              // 3b-pre. Pre-Battle Projected Target & Flank Reticle Badge
+              if (isTargetedInPreBattle && !isSelected)
+                Positioned(
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: isFlankedInPreBattle ? const Color(0xEE4A148C) : const Color(0xEE0D47A1),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(
+                        color: isFlankedInPreBattle ? const Color(0xFFB388FF) : const Color(0xFF00E5FF),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isFlankedInPreBattle ? const Color(0xFFB388FF) : const Color(0xFF00E5FF)).withValues(alpha: 0.5),
+                          blurRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isFlankedInPreBattle ? Icons.flash_on : Icons.gps_fixed,
+                          size: 8,
+                          color: isFlankedInPreBattle ? const Color(0xFFE1BEE7) : const Color(0xFF80D8FF),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          isFlankedInPreBattle ? '⚡ FLANK (+20% CRIT)' : '🎯 TARGET',
+                          style: TextStyle(
+                            fontSize: 6.5,
+                            fontWeight: FontWeight.w900,
+                            color: isFlankedInPreBattle ? const Color(0xFFE1BEE7) : const Color(0xFF80D8FF),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

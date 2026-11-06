@@ -1334,6 +1334,108 @@ class SpatialCombatEngine extends ChangeNotifier {
     return vanguard != null;
   }
 
+  int get coveredAlliesCount {
+    return playerUnits
+        .where((u) => u.isAlive && u.occupiedNodes.isNotEmpty && isCoveredByVanguard(u, trajectory: AttackTrajectory.directPhysical))
+        .length;
+  }
+
+  int get flankingAlliesCount {
+    int count = 0;
+    for (final u in playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty)) {
+      if (u.archetype == UnitArchetype.reachMidline) {
+        final target = resolveProjectedTarget(u);
+        if (target != null && !isCoveredByVanguard(target, trajectory: AttackTrajectory.flanking)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  void applyFormationPreset(String presetType) {
+    if (!isPreBattlePhase) return;
+    final aliveAllies = playerUnits.where((u) => u.isAlive).toList();
+    if (aliveAllies.isEmpty) return;
+
+    for (final u in aliveAllies) {
+      u.occupiedNodes.clear();
+    }
+
+    final vanguards = aliveAllies.where((u) => u.archetype == UnitArchetype.vanguardMelee).toList();
+    final midliners = aliveAllies.where((u) => u.archetype == UnitArchetype.reachMidline).toList();
+    final casters = aliveAllies.where((u) => u.archetype == UnitArchetype.backlineCaster).toList();
+    final others = aliveAllies.where((u) => !vanguards.contains(u) && !midliners.contains(u) && !casters.contains(u)).toList();
+
+    if (presetType == 'bastion') {
+      final vCols = [1, 0, 2];
+      for (int i = 0; i < vanguards.length; i++) {
+        vanguards[i].occupiedNodes.add(GridNode(column: vCols[i % vCols.length], row: 0, occupantUnitId: vanguards[i].id));
+      }
+      final mCols = [1, 0, 2];
+      for (int i = 0; i < midliners.length; i++) {
+        midliners[i].occupiedNodes.add(GridNode(column: mCols[i % mCols.length], row: 1, occupantUnitId: midliners[i].id));
+      }
+      final cCols = [1, 0, 2];
+      for (int i = 0; i < casters.length; i++) {
+        casters[i].occupiedNodes.add(GridNode(column: cCols[i % cCols.length], row: 2, occupantUnitId: casters[i].id));
+      }
+      _fillRemainingAllies(others);
+      lastBannerMessage = '🛡️ FORMATION: BASTION WALL DEPLOYED (Vanguards Frontline, Casters Backline)';
+      addLog('FORMATION: Bastion Wall applied. Frontline Vanguards provide -25% Cover.');
+    } else if (presetType == 'flank') {
+      if (vanguards.isNotEmpty) {
+        vanguards[0].occupiedNodes.add(GridNode(column: 1, row: 0, occupantUnitId: vanguards[0].id));
+      }
+      final flankCols = [0, 2, 1];
+      for (int i = 0; i < midliners.length; i++) {
+        midliners[i].occupiedNodes.add(GridNode(column: flankCols[i % flankCols.length], row: 1, occupantUnitId: midliners[i].id));
+      }
+      for (int i = 0; i < casters.length; i++) {
+        casters[i].occupiedNodes.add(GridNode(column: (i % 2 == 0) ? 0 : 2, row: 2, occupantUnitId: casters[i].id));
+      }
+      final remaining = [...vanguards.skip(1), ...others];
+      _fillRemainingAllies(remaining);
+      lastBannerMessage = '⚔️ FORMATION: FLANK SPREAD DEPLOYED (Skirmishers angled for Flank Crits)';
+      addLog('FORMATION: Flank Spread applied. Skirmishers positioned to bypass enemy cover.');
+    } else if (presetType == 'punch') {
+      final priorityList = [...vanguards, ...midliners, ...casters, ...others];
+      int placed = 0;
+      for (final u in priorityList) {
+        if (placed == 0) {
+          u.occupiedNodes.add(GridNode(column: 1, row: 0, occupantUnitId: u.id));
+        } else if (placed == 1) {
+          u.occupiedNodes.add(GridNode(column: 1, row: 1, occupantUnitId: u.id));
+        } else if (placed == 2) {
+          u.occupiedNodes.add(GridNode(column: 1, row: 2, occupantUnitId: u.id));
+        } else {
+          final col = (placed % 2 == 0) ? 0 : 2;
+          final row = (placed ~/ 2 == 1) ? 0 : 1;
+          u.occupiedNodes.add(GridNode(column: col, row: row, occupantUnitId: u.id));
+        }
+        placed++;
+      }
+      lastBannerMessage = '💥 FORMATION: CENTER PUNCH DEPLOYED (Focused Col 2 penetration)';
+      addLog('FORMATION: Center Punch applied. Concentrated heavy attack down center column.');
+    }
+    notifyListeners();
+  }
+
+  void _fillRemainingAllies(List<CombatUnitState> units) {
+    for (final u in units) {
+      if (u.occupiedNodes.isNotEmpty) continue;
+      bool placed = false;
+      for (int r = 0; r <= 2 && !placed; r++) {
+        for (int c = 0; c <= 2 && !placed; c++) {
+          if (!playerUnits.any((other) => other.isAlive && other.occupies(c, r))) {
+            u.occupiedNodes.add(GridNode(column: c, row: r, occupantUnitId: u.id));
+            placed = true;
+          }
+        }
+      }
+    }
+  }
+
   /// Line of sight check (Rank & Rite Spec Sec 1 & 5)
   /// Checks whether a direct physical attack can reach target or is blocked by Frontline / Petrified Plinth.
   bool hasLineOfSight(CombatUnitState attacker, CombatUnitState target, {required AttackTrajectory trajectory}) {

@@ -2887,10 +2887,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       if (target != null && target.occupiedNodes.isNotEmpty) {
         final Offset targetOffset = _getUnitCenterIsometricOffset(target, tileWidth: tileWidth, tileHeight: tileHeight);
 
+        // Flank detection: Midliner or off-column angle against uncovered target
+        final bool isFlanking = (unit.archetype == UnitArchetype.reachMidline || srcCol != target.occupiedNodes.first.column) &&
+            !_engine.isCoveredByVanguard(target, trajectory: AttackTrajectory.flanking);
+
         // Adaptive Posture Color & Damage Estimate
         Color trajColor = const Color(0xFF00E5FF);
         double mult = 1.0;
-        if (unit.archetype == UnitArchetype.vanguardMelee && srcLocalRow == 1) {
+        if (isFlanking) {
+          trajColor = const Color(0xFFB388FF); // Violet Flank Attack
+          mult = 1.20; // +20% Flank Crit Bonus
+        } else if (unit.archetype == UnitArchetype.vanguardMelee && srcLocalRow == 1) {
           trajColor = const Color(0xFFFFB74D); // Midline Advancing Tremor (60%)
           mult = 0.60;
         } else if (unit.archetype == UnitArchetype.vanguardMelee && srcLocalRow == 0 && unit.hasStanceBonusReady) {
@@ -2903,7 +2910,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         }
 
         final int estDmg = (unit.attack * mult * (1.0 - (target.armor / 100.0).clamp(0.0, 0.75))).round();
-        final skillDesc = '${_getUnitBasicAttackDescription(unit, srcCol, srcLocalRow)} [~$estDmg DMG]';
+        final baseSkillDesc = _getUnitBasicAttackDescription(unit, srcCol, srcLocalRow);
+        final String prefix = isFlanking ? '⚡ FLANK (+20% CRIT)' : '🎯 TARGET';
+        final skillDesc = '$baseSkillDesc [~$estDmg DMG]';
 
         trajectories.add(_TrajectoryData(
           sourceOffset: sourceOffset,
@@ -2911,7 +2920,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           skillName: skillDesc,
           targetName: target.name,
           color: trajColor,
-          showLabel: isPrimaryInspected,
+          showLabel: isPrimaryInspected || _engine.isPreBattlePhase,
+          labelPrefix: prefix,
         ));
 
         // Add secondary cleave or column-pierce trajectory branches when inspecting unit
@@ -2945,14 +2955,49 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       }
     }
 
-    if (_showAllTrajectories) {
-      for (final u in _engine.playerUnits.where((u) => u.isAlive)) {
-        addPlayerUnitTrajectory(u, isPrimaryInspected: u.id == inspectedUnitId);
+    if (_showAllTrajectories || _engine.isPreBattlePhase) {
+      for (final u in _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty)) {
+        addPlayerUnitTrajectory(u, isPrimaryInspected: u.id == inspectedUnitId || _engine.isPreBattlePhase);
       }
     } else if (inspectedUnitId != null) {
       final unit = _engine.playerUnits.where((u) => u.id == inspectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
         addPlayerUnitTrajectory(unit, isPrimaryInspected: true);
+      }
+    }
+
+    // Vanguard Protective Cover Cords (Row 0 Vanguard protects Column Allies in Row 1 & Row 2)
+    final vanguardRow0 = _engine.playerUnits.where(
+      (u) => u.isAlive && u.archetype == UnitArchetype.vanguardMelee && u.occupiedNodes.any((n) => n.row == 0),
+    );
+    for (final vg in vanguardRow0) {
+      final vgNode = vg.occupiedNodes.firstWhere((n) => n.row == 0);
+      final int vgCol = vgNode.column;
+      final int vgGRow = 4 + 0;
+      final double vgX = originX + (vgCol - vgGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+      final double vgY = originY + (vgCol + vgGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+      final Offset vgOffset = Offset(vgX, vgY);
+
+      final coveredAllies = _engine.playerUnits.where(
+        (u) => u.isAlive && u.id != vg.id && u.occupiedNodes.any((n) => n.column == vgCol && n.row > 0),
+      );
+      for (final ally in coveredAllies) {
+        final aNode = ally.occupiedNodes.firstWhere((n) => n.column == vgCol && n.row > 0);
+        final int aGRow = 4 + aNode.row;
+        final double aX = originX + (aNode.column - aGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
+        final double aY = originY + (aNode.column + aGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
+        final Offset allyOffset = Offset(aX, aY);
+
+        trajectories.add(_TrajectoryData(
+          sourceOffset: vgOffset,
+          targetOffset: allyOffset,
+          skillName: 'Vanguard Aegis',
+          targetName: ally.name,
+          color: const Color(0xFF00E5FF),
+          isCoverCord: true,
+          showLabel: true,
+          labelPrefix: '🛡️ COVER -25%',
+        ));
       }
     }
 
@@ -6629,6 +6674,38 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
   }
 
+  Widget _buildPresetChip({
+    required String label,
+    required Color accentColor,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(3),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 0.8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 8.0,
+              fontWeight: FontWeight.w900,
+              color: accentColor,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPreBattleStagingDock({bool isLandscapeMobile = false}) {
     final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
     final int deployedCount = livingAllies.where((u) => u.occupiedNodes.isNotEmpty).length;
@@ -6827,7 +6904,100 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 5),
+              // Tactical Formation Presets & Synergy Metrics Strip
+              Container(
+                margin: const EdgeInsets.only(top: 4, bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131722),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFF262A3B), width: 0.8),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4), width: 0.7),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.shield_outlined, size: 10, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'COVER: ${_engine.coveredAlliesCount}',
+                            style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Color(0xFF00E5FF), fontFamily: 'monospace'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB388FF).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.4), width: 0.7),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flash_on, size: 10, color: Color(0xFFB388FF)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'FLANK: ${_engine.flankingAlliesCount}',
+                            style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Color(0xFFB388FF), fontFamily: 'monospace'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'PRESETS:',
+                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Colors.white54, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(width: 5),
+                    _buildPresetChip(
+                      label: '🛡️ BASTION',
+                      accentColor: const Color(0xFF00E5FF),
+                      tooltip: 'Frontline Vanguards provide -25% cover to backline',
+                      onTap: () {
+                        _playSfx('sfx_block.wav');
+                        setState(() {
+                          _engine.applyFormationPreset('bastion');
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    _buildPresetChip(
+                      label: '⚔️ FLANK',
+                      accentColor: const Color(0xFFB388FF),
+                      tooltip: 'Wings deployed for +20% Flank Crits',
+                      onTap: () {
+                        _playSfx('sfx_card.wav');
+                        setState(() {
+                          _engine.applyFormationPreset('flank');
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    _buildPresetChip(
+                      label: '💥 PUNCH',
+                      accentColor: const Color(0xFFFFB74D),
+                      tooltip: 'Concentrated Center Column 2 Penetration',
+                      onTap: () {
+                        _playSfx('sfx_slash.wav');
+                        setState(() {
+                          _engine.applyFormationPreset('punch');
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
 
               // Unit Cards Horizontal Carousel + Add Reinforcement Slot
               SizedBox(
@@ -9329,6 +9499,7 @@ class _TrajectoryData {
   final bool showLabel;
   final bool isArcPath;
   final String? labelPrefix;
+  final bool isCoverCord;
 
   const _TrajectoryData({
     required this.sourceOffset,
@@ -9340,6 +9511,7 @@ class _TrajectoryData {
     this.showLabel = true,
     this.isArcPath = false,
     this.labelPrefix,
+    this.isCoverCord = false,
   });
 }
 
@@ -9375,6 +9547,89 @@ class _AttackTrajectoryOverlayPainter extends CustomPainter {
       (sourceOffset.dx + targetOffset.dx) * 0.5,
       (sourceOffset.dy + targetOffset.dy) * 0.5 - min(30.0, distance * 0.12),
     );
+
+    if (traj.isCoverCord) {
+      // Defensive Vanguard Cover Cord: Glowing cyan tether connecting Frontline Vanguard to Covered Ally
+      final glowPaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5.0
+        ..strokeCap = StrokeCap.round;
+
+      final corePaint = Paint()
+        ..color = const Color(0xFF80D8FF).withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
+
+      final brightCorePaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.9
+        ..strokeCap = StrokeCap.round;
+
+      const int numSegments = 20;
+      for (int i = 0; i < numSegments; i += 2) {
+        final rawT1 = (i / numSegments + dashPhase) % 1.0;
+        final rawT2 = rawT1 + (1.0 / numSegments);
+        final t1 = rawT1.clamp(0.0, 1.0);
+        final t2 = rawT2.clamp(0.0, 1.0);
+        if (t2 <= t1) continue;
+
+        final p1 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t1);
+        final p2 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t2);
+
+        canvas.drawLine(p1, p2, glowPaint);
+        canvas.drawLine(p1, p2, corePaint);
+        canvas.drawLine(p1, p2, brightCorePaint);
+      }
+
+      final anchorPaint = Paint()
+        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(sourceOffset, 6.0, anchorPaint);
+      canvas.drawCircle(targetOffset, 6.0, anchorPaint);
+
+      final midPoint = _evaluateBezier(sourceOffset, controlPoint, targetOffset, 0.5);
+      final textSpan = const TextSpan(
+        text: '🛡️ COVER (-25%)',
+        style: TextStyle(
+          color: Color(0xFF80D8FF),
+          fontSize: 7.5,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        ),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final pillRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: midPoint,
+          width: textPainter.width + 10.0,
+          height: 15.0,
+        ),
+        const Radius.circular(3.0),
+      );
+
+      canvas.drawRRect(pillRect, Paint()..color = const Color(0xEE0B1A24));
+      canvas.drawRRect(
+        pillRect,
+        Paint()
+          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.9,
+      );
+
+      textPainter.paint(
+        canvas,
+        Offset(midPoint.dx - textPainter.width * 0.5, midPoint.dy - textPainter.height * 0.5),
+      );
+      return;
+    }
 
     final double alphaScale = isSecondary ? 0.65 : 1.0;
 
