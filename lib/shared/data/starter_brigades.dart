@@ -1626,6 +1626,66 @@ class StarterBrigades {
     ];
   }
 
+  /// Dedicated Gorgoroth the Flayed Boss Trial roster for Boss Arena testing
+  static List<UnitEntity> createGorgorothBossEnemies() {
+    return [
+      const UnitEntity(
+        id: 'gorgoroth_boss',
+        speciesId: 'gorgoroth_flayed',
+        name: 'Gorgoroth the Flayed',
+        generation: 3,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 25,
+        maxLevel: 40,
+        currentHp: 2400,
+        maxHp: 2400,
+        attack: 110,
+        defense: 75,
+        speed: 70,
+        nativeTraitId: 'blood_sovereign',
+        lineageAncestors: ['Primordial Titan', 'Gorgoroth'],
+        customAvatarAsset: 'assets/images/flayed_butcher.png',
+      ),
+      const UnitEntity(
+        id: 'cinder_witch',
+        speciesId: 'cinder_witch',
+        name: 'Cinder Witch',
+        generation: 2,
+        archetype: Archetype.occultist,
+        slot: FormationSlot.back1,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 320,
+        maxHp: 320,
+        attack: 65,
+        defense: 15,
+        speed: 110,
+        nativeTraitId: 'pyre_infusion',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-03-SUP-G3 Alchemist.png',
+      ),
+      const UnitEntity(
+        id: 'pyre_zealot',
+        speciesId: 'grave_ghoul',
+        name: 'Pyre Zealot',
+        generation: 2,
+        archetype: Archetype.assassin,
+        slot: FormationSlot.front2,
+        level: 20,
+        maxLevel: 35,
+        currentHp: 360,
+        maxHp: 360,
+        attack: 75,
+        defense: 25,
+        speed: 105,
+        nativeTraitId: 'vicious_strike',
+        lineageAncestors: [],
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-01-VGD-G1 Ghoul.png',
+      ),
+    ];
+  }
+
   /// Chapter Gatekeeper Boss
   static List<UnitEntity> createBossEnemies() => createChapterBossEnemies(1);
 

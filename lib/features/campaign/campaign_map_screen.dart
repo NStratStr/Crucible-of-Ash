@@ -192,6 +192,7 @@ class CampaignMapScreen extends StatefulWidget {
   final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
   final VoidCallback? onLaunchMvpSkirmish;
+  final VoidCallback? onLaunchGorgorothBoss;
   final VoidCallback? onOpenHome;
   final VoidCallback? onOpenSummoning;
   final VoidCallback? onOpenSettings;
@@ -215,6 +216,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
     this.onLaunchMvpSkirmish,
+    this.onLaunchGorgorothBoss,
     this.onOpenHome,
     this.onOpenSummoning,
     this.onOpenSettings,
@@ -539,11 +541,11 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               ),
             ),
           ),
-          if (!isMobile && widget.onLaunchMvpSkirmish != null)
+          if (!isMobile && (widget.onLaunchGorgorothBoss != null || widget.onLaunchMvpSkirmish != null))
             IconButton(
-              icon: const Icon(Icons.shield_outlined, color: Color(0xFFFF7043), size: 18),
-              tooltip: 'MVP 3-Wave Skirmish (GDD Sec 14.1)',
-              onPressed: widget.onLaunchMvpSkirmish,
+              icon: const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 18),
+              tooltip: 'Boss Arena: Gorgoroth Trial',
+              onPressed: widget.onLaunchGorgorothBoss ?? widget.onLaunchMvpSkirmish,
             ),
           if (!isMobile && widget.onOpenEndgameGauntlet != null)
             IconButton(
@@ -628,7 +630,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
       body: Column(
         children: [
           if (widget.activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
-          if (widget.onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
+          if (widget.onLaunchGorgorothBoss != null || widget.onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
           Expanded(
             child: _viewMode == CampaignViewMode.linearLadder
                 ? _buildLinearCampaignView(context, theme)
@@ -1174,6 +1176,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
   }
 
   Widget _buildMvpSkirmishBanner() {
+    final bool hasBossTrial = widget.onLaunchGorgorothBoss != null;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1201,24 +1204,26 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
             child: const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 16),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'MVP TRIAL: 3-WAVE ASHEN SKIRMISH',
-                  style: TextStyle(
+                  hasBossTrial ? 'BOSS TRIAL: GORGOROTH THE FLAYED' : 'MVP TRIAL: 3-WAVE ASHEN SKIRMISH',
+                  style: const TextStyle(
                     color: Color(0xFFFFD54F),
                     fontSize: 10.0,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
                   ),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 1),
                 Text(
-                  'Ash Legion vs Crypt Stalkers • Boss Gorgoroth the Flayed • Vladislav Grimoire',
-                  style: TextStyle(
+                  hasBossTrial
+                      ? 'Instant 2x2 Colossus Boss Fight • Stagger, Break Bar & Core Exposure (+50% Crit)'
+                      : 'Ash Legion vs Crypt Stalkers • Boss Gorgoroth the Flayed • Vladislav Grimoire',
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 8.5,
                   ),
@@ -1228,11 +1233,11 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
           ),
           ElevatedButton.icon(
             key: const ValueKey('launch_mvp_skirmish_button'),
-            onPressed: widget.onLaunchMvpSkirmish,
+            onPressed: widget.onLaunchGorgorothBoss ?? widget.onLaunchMvpSkirmish,
             icon: const Icon(Icons.sports_kabaddi, size: 14, color: Colors.black),
-            label: const Text(
-              'ENGAGE',
-              style: TextStyle(
+            label: Text(
+              hasBossTrial ? 'CHALLENGE BOSS' : 'ENGAGE',
+              style: const TextStyle(
                 fontSize: 9.5,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.0,

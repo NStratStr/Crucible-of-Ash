@@ -988,6 +988,40 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     super.dispose();
   }
 
+  void _restartCombatEncounter() {
+    for (final t in _animTimers) {
+      t.cancel();
+    }
+    _animTimers.clear();
+    _actionEventQueue.clear();
+    _activeVfx.clear();
+    _floatingPops.clear();
+    _unitFloatingPops.clear();
+    _damagedUnitIds.clear();
+    _attackingUnitId = null;
+    _damagedUnitId = null;
+    _activeSkillName = null;
+    _hasBossEnraged = false;
+    _wasBossStaggered = false;
+
+    final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
+    final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
+
+    _engine.removeListener(_onEngineUpdate);
+    _engine = SpatialCombatEngine(
+      initialPlayerEntities: players,
+      initialEnemyEntities: enemies,
+      enemyWaves: widget.enemyWaves,
+      title: widget.encounterTitle,
+      isBossEncounter: widget.isBossEncounter,
+      relicService: widget.relicService,
+      commandService: widget.commandService,
+    );
+    _engine.isActionPauseEnabled = true;
+    _engine.addListener(_onEngineUpdate);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final gorgoroth = _engine.enemyUnits
@@ -1143,6 +1177,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 while (_engine.currentTick < 135) {
                   _engine.stepTick();
                 }
+              } else if (val == 'restart') {
+                _restartCombatEncounter();
               }
             },
             itemBuilder: (context) => [
@@ -1165,6 +1201,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     Icon(Icons.fast_forward, size: 16, color: Color(0xFFFFD54F)),
                     SizedBox(width: 8),
                     Text('Fast-Forward T135', style: TextStyle(fontSize: 12, color: Color(0xFFFFD54F))),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'restart',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.replay, size: 16, color: Color(0xFFFF5252)),
+                    SizedBox(width: 8),
+                    Text('Restart Battle', style: TextStyle(fontSize: 12, color: Color(0xFFFF8A80))),
                   ],
                 ),
               ),

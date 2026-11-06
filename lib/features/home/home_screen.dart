@@ -1286,6 +1286,16 @@ class _HomeScreenState extends State<HomeScreen> {
         'borderColor': const Color(0xFFE5A93C),
       },
       {
+        'title': 'BOSS ARENA: GORGOROTH',
+        'subtitle': 'Colossus Behemoth trial • Stagger & Core Break Bar test',
+        'badge': 'BOSS TRIAL',
+        'badgeColor': const Color(0xFFFF5252),
+        'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
+        'action': widget.onOpenBattleArena,
+        'borderColor': const Color(0xFFFF1744),
+      },
+
+      {
         'title': 'THE CRUCIBLE ALTAR',
         'subtitle': 'Bloodline infusion, progenitor fusion & 6-gen pedigree',
         'badge': 'GENETIC EVOLUTION',

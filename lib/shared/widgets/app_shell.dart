@@ -342,6 +342,36 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _launchGorgorothBossTrial() {
+    final bossEnemies = StarterBrigades.createGorgorothBossEnemies();
+    final bossNode = CampaignNode(
+      id: 'gorgoroth_boss_arena',
+      depth: 10,
+      verticalRatio: 0.5,
+      type: CampaignNodeType.boss,
+      name: 'Boss Arena: Gorgoroth the Flayed',
+      description: 'Gorgoroth the Flayed — 2x2 Colossus Boss Trial with Stagger & Break Bar Mechanics',
+      nextNodeIds: const [],
+      rewardIchor: 1000,
+      customBackgroundAsset: 'assets/images/backgrounds/battlefield_ashen_plains.png',
+      isCurrent: true,
+      isReachable: true,
+    );
+
+    // If all allies were fallen, revive squad before entering
+    if (_tickManager.allies.every((u) => !u.isAlive)) {
+      final revived = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+      _tickManager.updateSquads(allies: revived);
+    }
+
+    _activeNode = bossNode;
+    _activeEnemyWaves = [bossEnemies];
+    _resetEncounter(bossEnemies, BattleModifier.none, true, [bossEnemies]);
+    setState(() {
+      _currentIndex = 1; // Switch to Boss Arena
+    });
+  }
+
   void _launchMvpThreeWaveSkirmish() {
     final waves = StarterBrigades.createMvpThreeWaveSkirmish();
     final allies = StarterBrigades.createAshLegionPlayerSquad();
@@ -1716,7 +1746,7 @@ class _AppShellState extends State<AppShell> {
         },
         onOpenBattleArena: () {
           Navigator.of(dialogCtx).pop();
-          setState(() => _currentIndex = 1);
+          _launchGorgorothBossTrial();
         },
         onOpenCrucible: () {
           Navigator.of(dialogCtx).pop();
@@ -1853,7 +1883,8 @@ class _AppShellState extends State<AppShell> {
                     bloodlineSigils: _bloodlineSigils,
                     activeBoons: _activeExpeditionBoons,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
-                    onLaunchMvpSkirmish: _launchMvpThreeWaveSkirmish,
+                    onLaunchGorgorothBoss: _launchGorgorothBossTrial,
+                    onLaunchMvpSkirmish: _launchGorgorothBossTrial,
                     currentChapter: _currentChapter,
                     maxUnlockedChapter: _maxUnlockedChapter,
                     currentAscension: _currentAscension,
@@ -1892,9 +1923,9 @@ class _AppShellState extends State<AppShell> {
                             });
                             _saveCurrentState();
                           },
-                          encounterTitle: _activeNode?.name ?? 'The Sunder at Ashen Gate',
-                          backdropAsset: _activeNode?.customBackgroundAsset ?? ChapterTheme.forChapter(_currentChapter).backgroundAsset,
-                          isBossEncounter: _activeNode?.type == CampaignNodeType.boss,
+                          encounterTitle: _activeNode?.name ?? 'Boss Arena: Gorgoroth the Flayed',
+                          backdropAsset: _activeNode?.customBackgroundAsset ?? 'assets/images/backgrounds/battlefield_ashen_plains.png',
+                          isBossEncounter: _activeNode?.type == CampaignNodeType.boss || _activeNode?.id == 'gorgoroth_boss_arena' || _activeNode == null,
                           onVictory: () {
                             _onCombatVictory();
                           },
@@ -1998,6 +2029,10 @@ class _AppShellState extends State<AppShell> {
                       _showHomeModal();
                       return;
                     }
+                    if (index == 2) {
+                      _launchGorgorothBossTrial();
+                      return;
+                    }
                     setState(() => _currentIndex = index - 1);
                   },
                   items: [
@@ -2016,7 +2051,7 @@ class _AppShellState extends State<AppShell> {
                         height: 21,
                         errorBuilder: (_, __, ___) => const Icon(Icons.shield),
                       ),
-                      label: 'Battle Arena',
+                      label: 'Boss Arena',
                     ),
                     BottomNavigationBarItem(
                       icon: Image.asset(

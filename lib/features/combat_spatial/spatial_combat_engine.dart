@@ -431,8 +431,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     currentTick = 0;
     isRunning = false;
     isPreBattlePhase = true;
-    focus = 3;
-    maxFocus = 7;
+    focus = isBoss ? 5 : 3;
+    maxFocus = isBoss ? 8 : 7;
     isBulletTime = false;
 
     // --- POPULATE ENEMY UNITS ONTO SPATIAL GRID ---
@@ -560,6 +560,20 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
         ),
       ]);
+    }
+
+    if (isBoss || enemyUnits.any((u) => u.hasBreakBar)) {
+      if (!hand.any((c) => c.id == 'smite_the_calcified')) {
+        hand.add(const SpatialCombatCard(
+          id: 'smite_the_calcified',
+          name: 'Smite the Calcified',
+          focusCost: 3,
+          description: 'Kinetic strike (2.5x ATK). Deals +50 Break Bar Stagger damage & shatters Carapace!',
+          pattern: TargetPattern.singleTarget,
+          damageMultiplier: 2.5,
+          armorShredPercent: 50,
+        ));
+      }
     }
 
     drawPile.addAll([
