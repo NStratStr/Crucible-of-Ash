@@ -164,6 +164,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   // Visual Combat Feedback & VFX State
   String? _lastHandledEventId;
+  final List<SpatialActionEvent> _actionEventQueue = [];
+  bool _isActionSequenceRunning = false;
   String? _attackingUnitId;
   String? _activeSynergyBannerText;
   Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
@@ -295,7 +297,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final event = _engine.activeActionEvent;
     if (event != null && event.id != _lastHandledEventId) {
       _lastHandledEventId = event.id;
-      _triggerVisualCombatSequence(event);
+      _enqueueCombatEvent(event);
     }
 
     setState(() {});
@@ -378,6 +380,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     }
   }
 
+  void _enqueueCombatEvent(SpatialActionEvent event) {
+    _actionEventQueue.add(event);
+    _drainNextCombatEvent();
+  }
+
+  void _drainNextCombatEvent() {
+    if (_isActionSequenceRunning || _actionEventQueue.isEmpty) return;
+    _isActionSequenceRunning = true;
+    final nextEvent = _actionEventQueue.removeAt(0);
+    _triggerVisualCombatSequence(nextEvent);
+  }
+
   void _triggerVisualCombatSequence(SpatialActionEvent event) {
     // Locate caster and target units to calculate real isometric trajectory points
     final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
@@ -392,85 +406,85 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     String vfxType = 'slash';
     Color primaryColor = const Color(0xFFFF5252);
     Color secondaryColor = const Color(0xFFFF8A80);
-    int durationMs = 650;
+    int durationMs = 1100;
 
     if (event.isAssistStrike) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
-      durationMs = 450;
+      durationMs = 1450;
       _playSfx('sfx_slash.wav');
     } else if (event.isWallSplat) {
       vfxType = 'shatter';
       primaryColor = const Color(0xFFFF9100);
       secondaryColor = const Color(0xFFFF1744);
-      durationMs = 700;
+      durationMs = 1200;
       _playSfx('sfx_block.wav');
     } else if (event.isUnitCollision) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFFFF5252);
       secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 650;
+      durationMs = 1100;
       _playSfx('sfx_hit.wav');
     } else     if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
       vfxType = 'bloodnova';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFD50000);
-      durationMs = 850;
+      durationMs = 1450;
       _playSfx('sfx_slash.wav'); // High-impact blood cleave
     } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFFFF1744);
-      durationMs = 750;
+      durationMs = 1300;
       _playSfx('sfx_slash.wav');
     } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
       vfxType = 'slash';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFFFF1744);
-      durationMs = 700;
+      durationMs = 1200;
       _playSfx('sfx_slash.wav');
     } else if (event.skillName.contains('Celestial Surge')) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 800;
+      durationMs = 1350;
       _playSfx('sfx_spell.wav');
     } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
       vfxType = 'bloodsiphon';
       primaryColor = const Color(0xFFFF5252);
       secondaryColor = const Color(0xFF880E4F);
-      durationMs = 700;
+      durationMs = 1200;
       _playSfx('sfx_spell.wav'); // Dark blood drain surge
     } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
       vfxType = 'shatter';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFF00E5FF);
-      durationMs = 800;
+      durationMs = 1350;
       _playSfx('sfx_block.wav'); // Heavy armor crack / shield shatter
     } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
       vfxType = 'arrow';
       primaryColor = const Color(0xFFFFD54F);
       secondaryColor = const Color(0xFFFF8A80);
-      durationMs = 550;
+      durationMs = 950;
       _playSfx('sfx_hit.wav');
     } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
       vfxType = 'firebolt';
       primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
       secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 650;
+      durationMs = 1100;
       _playSfx('sfx_spell.wav'); // Magic surge
     } else if (event.isHeal || event.skillName.contains('Phalanx')) {
       vfxType = 'shockwave';
       primaryColor = const Color(0xFF00E5FF);
       secondaryColor = const Color(0xFF80D8FF);
-      durationMs = 700;
+      durationMs = 1200;
       _playSfx('sfx_block.wav'); // Defensive barrier
     } else if (event.isCrit) {
       vfxType = 'slash';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 750;
+      durationMs = 1300;
       _playSfx('sfx_slash.wav'); // Lethal blade critical
     } else {
       _playSfx('sfx_hit.wav'); // Standard melee impact
@@ -703,10 +717,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       _unitFloatingPops[event.targetId] = popText;
 
-      // Clean up previous floating pop for this unit and push new animated item
-      _floatingPops.removeWhere((p) => p.unitId == event.targetId || p.isExpired);
+      // Allow natural stacking by not wiping existing active pops immediately
+      final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
+      final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (existingCount * 8.0);
+
       _floatingPops.add(_FloatingCombatText(
-        id: 'pop_${event.id}_$nowMs',
+        id: 'pop_' + event.id + '_' + nowMs.toString(),
         unitId: event.targetId,
         text: popText,
         color: popColor,
@@ -714,16 +730,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         fontSize: popSize,
         isCrit: isCrit,
         createdMs: nowMs,
-        durationMs: isCrit ? 1200 : 900,
+        durationMs: isCrit ? 2200 : 1750,
+        horizontalDrift: drift,
       ));
 
       // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
       if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
-        final graftText = '🧬 ${event.graftedTraitProc}';
+        final graftText = '🧬 ' + (event.graftedTraitProc ?? '');
         _unitFloatingPops[event.attackerId] = graftText;
-        _floatingPops.removeWhere((p) => p.unitId == event.attackerId);
         _floatingPops.add(_FloatingCombatText(
-          id: 'pop_graft_${event.id}_$nowMs',
+          id: 'pop_graft_' + event.id + '_' + nowMs.toString(),
           unitId: event.attackerId,
           text: graftText,
           color: const Color(0xFFEA80FC),
@@ -731,19 +747,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           fontSize: 10.5,
           isCrit: false,
           createdMs: nowMs,
-          durationMs: 1100,
+          durationMs: 1900,
+          horizontalDrift: 12.0,
         ));
       }
 
       // Push floating popups for all secondary targets hit by multi-target / AOE spells
       if (event.secondaryTargetHits.isNotEmpty) {
+        int secIndex = 0;
         event.secondaryTargetHits.forEach((secId, secDmg) {
           final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
-          final secText = isSecBlood ? '🩸 -$secDmg SPLASH' : '-$secDmg CLEAVE';
+          final secText = isSecBlood ? '🩸 - SPLASH' : '- CLEAVE';
           _unitFloatingPops[secId] = secText;
-          _floatingPops.removeWhere((p) => p.unitId == secId);
+          secIndex++;
           _floatingPops.add(_FloatingCombatText(
-            id: 'pop_${event.id}_${secId}_$nowMs',
+            id: 'pop_' + event.id + '_' + secId + '_' + nowMs.toString(),
             unitId: secId,
             text: secText,
             color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
@@ -751,7 +769,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             fontSize: 11.5,
             isCrit: false,
             createdMs: nowMs,
-            durationMs: 950,
+            durationMs: 1800,
+            horizontalDrift: (secIndex % 2 == 0 ? 10.0 : -10.0),
           ));
         });
       }
@@ -787,8 +806,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     });
     _animTimers.add(t1);
 
-    // Dismiss banner & resume combat ticks after 1800ms for Signature/Ultimate, or 1400ms for basic attacks
-    final int pauseWindowMs = (isUltimate || event.isSignatureSkill) ? 1900 : 1400;
+    // Dismiss banner & resume combat ticks: extended pacing window to clearly absorb animations & floating text
+    final int pauseWindowMs = (isUltimate || event.isSignatureSkill) ? 2200 : (event.isAssistStrike || event.isKnockback ? 1200 : 1600);
     final t2 = Timer(Duration(milliseconds: pauseWindowMs), () {
       if (mounted) {
         setState(() {
@@ -797,7 +816,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           _activeUltimateUnit = null;
           _activeSignatureUnit = null;
         });
-        _engine.clearActiveAction();
+        _isActionSequenceRunning = false;
+        if (_actionEventQueue.isNotEmpty) {
+          // 120ms staging gap between consecutive actions so attacks don't abruptly cut each other off
+          final tNext = Timer(const Duration(milliseconds: 120), () {
+            if (mounted) _drainNextCombatEvent();
+          });
+          _animTimers.add(tNext);
+        } else {
+          _engine.clearActiveAction();
+        }
       }
     });
     _animTimers.add(t2);
@@ -898,7 +926,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 border: Border.all(color: const Color(0xFFB3261E)),
               ),
               child: const Text(
-                'EXPERIMENTAL v3.5 (DYNAMIC IMPACTS)',
+                'EXPERIMENTAL v3.6 (PACED KINETICS)',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -5619,65 +5647,67 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 4. Floating Damage / Effect Pop Text (Live execution with animated rise & fade)
-            if (_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired)) ...[
-              () {
-                final pop = _floatingPops.firstWhere((p) => p.unitId == unit.id && !p.isExpired);
-                final t = pop.progress;
-                // Vertical rise: floats upward by up to 26 pixels
-                final double riseY = (t * 26.0);
-                // Opacity curve: solid for first 65%, then fades out to 0
-                final double opacity = (1.0 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
-                // Scale bounce on entry
-                final double scale = pop.isCrit
-                    ? (t < 0.2 ? 1.0 + (t / 0.2) * 0.35 : 1.35 - ((t - 0.2) * 0.35))
-                    : 1.0;
+            // 4. Floating Damage / Effect Pop Text (Live execution with graceful smooth ascent & gentle drift)
+            ..._floatingPops.where((p) => p.unitId == unit.id && !p.isExpired).map((pop) {
+              final t = pop.progress;
+              // Smooth decelerating cubic ascent: rises up to 48 pixels slowly
+              final double smoothT = sin(t * 3.14159 / 2);
+              final double riseY = smoothT * 48.0;
+              // Gentle horizontal drift
+              final double driftX = pop.horizontalDrift * smoothT;
+              // Opacity curve: visible for first 60%, gentle fade out to 0
+              final double opacity = t < 0.60 ? 1.0 : (1.0 - ((t - 0.60) / 0.40)).clamp(0.0, 1.0);
+              // Scale bounce on entry
+              final double scale = pop.isCrit
+                  ? (t < 0.15 ? 1.0 + (t / 0.15) * 0.28 : 1.28 - ((t - 0.15) * 0.20)).clamp(1.0, 1.28)
+                  : (t < 0.15 ? 0.85 + (t / 0.15) * 0.15 : 1.0);
 
-                return Positioned(
-                  top: (isBoss ? -34 : -26) - riseY,
-                  child: Opacity(
-                    opacity: opacity,
-                    child: Transform.scale(
-                      scale: scale,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: pop.isCrit ? 8 : 6,
-                          vertical: pop.isCrit ? 3 : 2,
+              return Positioned(
+                top: (isBoss ? -34 : -26) - riseY,
+                left: driftX != 0 ? driftX : null,
+                child: Opacity(
+                  opacity: opacity,
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: pop.isCrit ? 8 : 6,
+                        vertical: pop.isCrit ? 3 : 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C0C14).withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: pop.borderColor,
+                          width: pop.isCrit ? 1.8 : 1.2,
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0C0C14).withValues(alpha: 0.94),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: pop.borderColor,
-                            width: pop.isCrit ? 1.8 : 1.2,
+                        boxShadow: [
+                          BoxShadow(
+                            color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.65 : 0.40),
+                            blurRadius: pop.isCrit ? 10 : 5,
+                            spreadRadius: pop.isCrit ? 1.5 : 0.5,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.65 : 0.40),
-                              blurRadius: pop.isCrit ? 10 : 5,
-                              spreadRadius: pop.isCrit ? 1.5 : 0.5,
-                            ),
+                        ],
+                      ),
+                      child: Text(
+                        pop.text,
+                        style: TextStyle(
+                          color: pop.color,
+                          fontWeight: FontWeight.w900,
+                          fontSize: pop.fontSize,
+                          letterSpacing: pop.isCrit ? 0.8 : 0.4,
+                          fontFamily: 'monospace',
+                          shadows: const [
+                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
                           ],
-                        ),
-                        child: Text(
-                          pop.text,
-                          style: TextStyle(
-                            color: pop.color,
-                            fontWeight: FontWeight.w900,
-                            fontSize: pop.fontSize,
-                            letterSpacing: pop.isCrit ? 0.8 : 0.4,
-                            fontFamily: 'monospace',
-                            shadows: const [
-                              Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
-                            ],
-                          ),
                         ),
                       ),
                     ),
                   ),
-                );
-              }(),
-            ] else if (floatingPop != null)
+                ),
+              );
+            }),
+            if (!_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired) && floatingPop != null)
               Positioned(
                 top: isBoss ? -34 : -26,
                 child: Container(
@@ -9149,6 +9179,7 @@ class _FloatingCombatText {
   final bool isCrit;
   final int createdMs;
   final int durationMs;
+  final double horizontalDrift;
 
   const _FloatingCombatText({
     required this.id,
@@ -9159,7 +9190,8 @@ class _FloatingCombatText {
     this.fontSize = 11.0,
     this.isCrit = false,
     required this.createdMs,
-    this.durationMs = 950,
+    this.durationMs = 1750,
+    this.horizontalDrift = 0.0,
   });
 
   double get progress {
