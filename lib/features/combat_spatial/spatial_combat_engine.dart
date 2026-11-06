@@ -6,6 +6,7 @@ import '../../shared/data/starter_brigades.dart';
 import '../../core/combat_math.dart';
 import '../relics/relic_service.dart';
 import '../generals/general_command_service.dart';
+import '../plinths/plinth_service.dart';
 
 /// Deterministic 30 Hz Spatial Combat Engine simulating the 3-Row x 5-Col Grid Plane
 class SpatialCombatEngine extends ChangeNotifier {
@@ -24,6 +25,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   // Active Commander & Grimoire Service
   GeneralCommandService? commandService;
+  PlinthService? plinthService;
 
   // Commander Focus Economy (Rank & Rite Spec Sec 6: Sculptor Tray / Shared Team Vitae pool max 7)
   int focus = 3;
@@ -183,6 +185,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     bool isBossEncounter = false,
     RelicService? relicService,
     this.commandService,
+    this.plinthService,
   })  : encounterTitle = title ?? 'The Sunder at Ashen Gate',
         encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
     final waves = (enemyWaves != null && enemyWaves.isNotEmpty)
@@ -198,6 +201,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         description: description,
         relicService: relicService,
         activeCommandService: commandService,
+        activePlinthService: plinthService,
       );
     } else {
       setupSunderAtAshenGate();
@@ -423,10 +427,12 @@ class SpatialCombatEngine extends ChangeNotifier {
     String? description,
     RelicService? relicService,
     GeneralCommandService? activeCommandService,
+    PlinthService? activePlinthService,
   }) {
     if (title != null) encounterTitle = title;
     if (description != null) encounterDescription = description;
     if (activeCommandService != null) commandService = activeCommandService;
+    if (activePlinthService != null) plinthService = activePlinthService;
     isBossEncounterFlag = isBoss;
 
     playerUnits.clear();
@@ -513,6 +519,41 @@ class SpatialCombatEngine extends ChangeNotifier {
       // Default fallback player squad (Ash & Stone Order)
       setupSunderAtAshenGate();
       return;
+    }
+
+    // --- APPLY MASTER PLINTH BLESSINGS & SOCKETED TITAN CORE RESONANCE ---
+    if (plinthService != null) {
+      final master = plinthService!.activeMasterPlinth;
+      final tier = plinthService!.getTier(master.id);
+      final core = plinthService!.activeSocketedCore;
+
+      if (master.id == 'obsidian_bulwark') {
+        final bonusAegis = 25 * tier;
+        for (final ally in playerUnits.where((u) => u.archetype == UnitArchetype.vanguardMelee)) {
+          ally.maxArmor = (ally.maxArmor * (1.0 + 0.15 * tier)).round();
+          ally.armor = ally.maxArmor;
+          ally.aegisShield += bonusAegis;
+          ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        }
+        addLog('🛡️ PLINTH BLESSING: Obsidian Bulwark (Tier $tier) grants +$bonusAegis Aegis Shield to Vanguards!');
+      } else if (master.id == 'cinder_spire') {
+        focus = min(maxFocus, focus + tier);
+        for (final caster in playerUnits.where((u) => u.archetype == UnitArchetype.backlineCaster)) {
+          caster.attack = (caster.attack * (1.0 + 0.15 * tier)).round();
+        }
+        addLog('🔥 PLINTH BLESSING: Cinder Spire (Tier $tier) grants +$tier Initial Focus & +${15 * tier}% Spell Power!');
+      } else if (master.id == 'strigoi_runestone') {
+        for (final mid in playerUnits.where((u) => u.archetype == UnitArchetype.reachMidline)) {
+          mid.speed += 15 * tier;
+        }
+        addLog('🩸 PLINTH BLESSING: Strigoi Runestone (Tier $tier) infuses Midliners with +${15 * tier} Speed!');
+      } else if (master.id == 'titans_foundation') {
+        addLog('🗿 PLINTH BLESSING: Titan\'s Foundation (Tier $tier) empowers squad with Colossus Posture!');
+      }
+
+      if (core != null) {
+        addLog('⚡ CORE RESONANCE: ${core.name} (${core.passiveTitle}) active on pedestal!');
+      }
     }
 
     // Cards Setup: Deal Commander's Custom Grimoire Orders alongside Sovereign Tactics!

@@ -9,6 +9,7 @@ import '../../shared/utils/platform_fullscreen.dart';
 import '../settings/settings_service.dart';
 import '../relics/relic_service.dart';
 import '../generals/general_command_service.dart';
+import '../plinths/plinth_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import 'rank_and_rite_2d_battlefield.dart';
@@ -37,6 +38,8 @@ class SpatialBattleScreen extends StatefulWidget {
   final bool isBossEncounter;
   final RelicService? relicService;
   final GeneralCommandService? commandService;
+  final PlinthService? plinthService;
+  final VoidCallback? onOpenPlinthSculptory;
 
   const SpatialBattleScreen({
     super.key,
@@ -53,6 +56,8 @@ class SpatialBattleScreen extends StatefulWidget {
     this.isBossEncounter = false,
     this.relicService,
     this.commandService,
+    this.plinthService,
+    this.onOpenPlinthSculptory,
   });
 
   @override
@@ -289,6 +294,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       isBossEncounter: widget.isBossEncounter,
       relicService: widget.relicService,
       commandService: widget.commandService,
+      plinthService: widget.plinthService,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -1016,6 +1022,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       isBossEncounter: widget.isBossEncounter,
       relicService: widget.relicService,
       commandService: widget.commandService,
+      plinthService: widget.plinthService,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -1194,6 +1201,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 setState(() {
                   _engine.switchBossTrial('morvath');
                 });
+              } else if (val == 'plinth_sculptory') {
+                if (widget.onOpenPlinthSculptory != null) {
+                  widget.onOpenPlinthSculptory!();
+                }
               }
             },
             itemBuilder: (context) => [
@@ -1261,6 +1272,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     Icon(Icons.coronavirus, size: 16, color: Color(0xFF69F0AE)),
                     SizedBox(width: 8),
                     Text('Trial: Morvath the Defiler', style: TextStyle(fontSize: 12, color: Color(0xFFA7FFEB))),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'plinth_sculptory',
+                height: 32,
+                child: Row(
+                  children: [
+                    Icon(Icons.foundation, size: 16, color: Color(0xFF00E5FF)),
+                    SizedBox(width: 8),
+                    Text('Plinth Sculptory', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
                   ],
                 ),
               ),

@@ -25,6 +25,8 @@ import '../../features/summoning/summoning_screen.dart';
 import '../../features/settings/settings_dialog.dart';
 import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
+import '../../features/plinths/plinth_service.dart';
+import '../../features/plinths/plinth_sculptory_screen.dart';
 import '../../features/relics/relic_service.dart';
 import '../../features/ftue/awakening_dialog.dart';
 import '../../features/ftue/ftue_guidance_banner.dart';
@@ -82,6 +84,7 @@ class _AppShellState extends State<AppShell> {
   late CombatResolutionService _combatService;
   late GeneralCommandService _commandService;
   late RelicService _relicService;
+  late PlinthService _plinthService;
   late FtueService _ftueService;
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
@@ -102,6 +105,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _relicService = RelicService();
+    _plinthService = PlinthService();
     _ftueService = FtueService();
     _resetEncounter(null, BattleModifier.none, false);
     _inventory = StarterBrigades.createReserveInventory();
@@ -1114,9 +1118,7 @@ class _AppShellState extends State<AppShell> {
           }
         },
         onOpenSculptory: () {
-          setState(() {
-            _currentIndex = 3; // Switch to Crucible Altar / Sculptory
-          });
+          _openPlinthSculptorySheet();
         },
       );
   }
@@ -1600,6 +1602,26 @@ class _AppShellState extends State<AppShell> {
     _saveCurrentState();
   }
 
+  void _openPlinthSculptorySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return FractionallySizedBox(
+          heightFactor: 0.94,
+          child: PlinthSculptoryScreen(
+            plinthService: _plinthService,
+            brigadeUnits: _tickManager.allies,
+            totalIchor: _totalIchor,
+            onIchorChanged: (val) => setState(() => _totalIchor = val),
+            onClose: () => Navigator.of(ctx).pop(),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleOpenEndgameGauntlet() async {
     final trial = await EndgameGauntletDialog.show(
       context,
@@ -1777,6 +1799,10 @@ class _AppShellState extends State<AppShell> {
           Navigator.of(dialogCtx).pop();
           _handleOpenSummoning();
         },
+        onOpenPlinthSculptory: () {
+          Navigator.of(dialogCtx).pop();
+          _openPlinthSculptorySheet();
+        },
         onOpenSettings: () {
           SettingsDialog.show(dialogCtx);
         },
@@ -1941,6 +1967,8 @@ class _AppShellState extends State<AppShell> {
                             });
                           },
                           relicService: _relicService,
+                          plinthService: _plinthService,
+                          onOpenPlinthSculptory: _openPlinthSculptorySheet,
                           onBackToStandardCombat: () {
                             setState(() {
                               _currentIndex = 0; // Return to Campaign Map

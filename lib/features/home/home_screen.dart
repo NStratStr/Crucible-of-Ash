@@ -35,6 +35,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenEndgameGauntlet;
   final VoidCallback onOpenSummoning;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenPlinthSculptory;
   final void Function({
     required String facilityId,
     required int newTier,
@@ -70,6 +71,7 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenEndgameGauntlet,
     required this.onOpenSummoning,
     required this.onOpenSettings,
+    this.onOpenPlinthSculptory,
     this.onUpgradeFacility,
     this.onCloudDataRestored,
     this.showCloseButton = true,
@@ -1303,6 +1305,15 @@ class _HomeScreenState extends State<HomeScreen> {
         'iconAsset': 'assets/images/UI/Flame Shield icon Transparent.png',
         'action': widget.onOpenCrucible,
         'borderColor': const Color(0xFFFF7043),
+      },
+      {
+        'title': 'PLINTH SCULPTORY',
+        'subtitle': 'Carve battle plinths & socket harvested Titan Cores',
+        'badge': 'PEDESTAL RUNES',
+        'badgeColor': const Color(0xFF00E5FF),
+        'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
+        'action': widget.onOpenPlinthSculptory ?? () {},
+        'borderColor': const Color(0xFF00E5FF),
       },
       {
         'title': 'THE RELIC FORGE',
