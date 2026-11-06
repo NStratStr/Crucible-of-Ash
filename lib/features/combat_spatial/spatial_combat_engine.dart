@@ -153,6 +153,10 @@ class SpatialCombatEngine extends ChangeNotifier {
   int bleedDetonationsCount = 0;
   int solarIgnitionsCount = 0;
   int interruptsCount = 0;
+  int knockbacksCount = 0;
+  int wallSplatsCount = 0;
+  int collisionsCount = 0;
+  int chainAssistsCount = 0;
   int totalActionsCount = 0; // Total attacks/skills/ultimates resolved in battle
   int playerTurnDecisionsCount = 0; // Total tactical player decision rounds completed
 
@@ -1615,15 +1619,15 @@ class SpatialCombatEngine extends ChangeNotifier {
       bleedDetonationsCount++;
       final burstDmg = (detonatedStacks * 28 * reckoningDamageMultiplier).round();
       final directDmg = target.takeDamage(burstDmg, ignoreArmor: true, isPhysical: true);
-      addLog('🩸 BLEED DETONATION! ${attacker.name} consumed $detonatedStacks bleed on ${target.name} for $directDmg kinetic burst!');
-      
+      addLog('🩸 BLEED DETONATION! \ consumed \ bleed on \ for \ kinetic burst!');
+
       final tCol = target.occupiedNodes.firstOrNull?.column ?? 0;
       final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
       for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => (n.column - tCol).abs() <= 1 && (n.row - tRow).abs() <= 1))) {
         final splashDmg = neighbor.takeDamage((burstDmg * 0.50).round(), ignoreArmor: true, isPhysical: true);
-        addLog('  🩸 Splash Detonation: ${neighbor.name} took $splashDmg burst damage!');
+        addLog('  🩸 Splash Detonation: \ took \ burst damage!');
       }
-      lastBannerMessage = '🩸 BLEED DETONATION: ${target.name} shattered for $directDmg burst!';
+      lastBannerMessage = '🩸 BLEED DETONATION: \ shattered for \ burst!';
     }
 
     // 2. Solar Ignition (Holy or Magic strike on Burning enemy)
@@ -1635,10 +1639,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
       for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.column == tCol || n.row == tRow))) {
         neighbor.burnDuration = max(neighbor.burnDuration, 60);
-        addLog('  🔥 Solar Ignition spread to ${neighbor.name} (2s Burn)!');
+        addLog('  🔥 Solar Ignition spread to \ (2s Burn)!');
       }
-      addLog('🔥 SOLAR IGNITION! ${attacker.name} ignited ${target.name} for +$bonusBurnDmg Holy Burn DMG!');
-      lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf ${target.name} squad!';
+      addLog('🔥 SOLAR IGNITION! \ ignited \ for +\ Holy Burn DMG!');
+      lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf \ squad!';
     }
 
     // 3. Armor Shattered -> Stagger & Interruption
@@ -1649,16 +1653,143 @@ class SpatialCombatEngine extends ChangeNotifier {
         final canceledSkill = target.pendingIntent!.skillName;
         target.pendingIntent = null;
         interruptsCount++;
-        addLog('🛑 STRIKE INTERRUPTED! ${attacker.name} shattered ${target.name}\'s stance, canceling $canceledSkill!');
-        lastBannerMessage = '🛑 STRIKE INTERRUPTED: ${target.name}\'s $canceledSkill canceled!';
+        addLog('🛑 STRIKE INTERRUPTED! \ shattered \'s stance, canceling \!');
+        lastBannerMessage = '🛑 STRIKE INTERRUPTED: \'s \ canceled!';
+        _triggerChainAssist(attacker, target);
       } else {
-        addLog('⚡ ARMOR SHATTERED! ${target.name} is STAGGERED (-2,500 AP, Vulnerable 3s)!');
-        lastBannerMessage = '⚡ ARMOR SHATTERED: ${target.name} staggered!';
+        addLog('⚡ ARMOR SHATTERED! \ is STAGGERED (-2,500 AP, Vulnerable 3s)!');
+        lastBannerMessage = '⚡ ARMOR SHATTERED: \ staggered!';
+        _triggerChainAssist(attacker, target);
       }
+    }
+
+    // 4. Heavy Vanguard Strikes or Crits trigger Knockback and Bowling Collisions
+    if (isPhysical && (damageDealt >= (attacker.effectiveAttack * 1.15).round() || attacker.archetype == UnitArchetype.vanguardMelee)) {
+      _applyKnockbackAndCollision(attacker, target, baseDamage: damageDealt);
     }
   }
 
-  /// Executes a unit\'s distinct Signature Skill every 3rd action cycle (+25% Ultimate Charge)
+  /// Applies Dynamic Knockback and Collision Splats
+  void _applyKnockbackAndCollision(CombatUnitState attacker, CombatUnitState target, {required int baseDamage}) {
+    if (!target.isAlive || target.isDisplacementImmune || target.occupiedNodes.isEmpty) return;
+    if (target.footprint != UnitFootprint.single1x1) return;
+
+    final int currentCol = target.occupiedNodes.first.column;
+    final int currentRow = target.occupiedNodes.first.row;
+    final opposingSquad = target.isPlayer ? playerUnits : enemyUnits;
+
+    knockbacksCount++;
+
+    if (currentRow >= 2) {
+      wallSplatsCount++;
+      final wallCrushDmg = (baseDamage * 0.45).round();
+      final actualDmg = wallCrushDmg > 18 ? wallCrushDmg : 18;
+      final taken = target.takeDamage(actualDmg, ignoreArmor: true, isPhysical: true);
+      target.currentAp = target.currentAp > 2000 ? target.currentAp - 2000 : 0;
+      addLog('WALL SPLAT! \ slammed into the arena boundary for \ crush DMG (-2,000 TM Daze)!');
+      lastBannerMessage = 'WALL SPLAT: \ crushed against arena barrier!';
+      dispatchAction(SpatialActionEvent(
+        id: 'splat_\_',
+        attackerId: attacker.id,
+        attackerName: attacker.name,
+        skillName: 'Wall Splat Crush',
+        targetId: target.id,
+        targetName: target.name,
+        damage: taken,
+        isPlayerAttacker: attacker.isPlayer,
+        isKnockback: true,
+        isWallSplat: true,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+      return;
+    }
+
+    final int targetRow = currentRow + 1;
+    final collider = opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.column == currentCol && n.row == targetRow)).firstOrNull;
+
+    if (collider != null) {
+      collisionsCount++;
+      final collisionDmg = (baseDamage * 0.40).round();
+      final actualDmg = collisionDmg > 15 ? collisionDmg : 15;
+      final taken1 = target.takeDamage(actualDmg, ignoreArmor: true, isPhysical: true);
+      final taken2 = collider.takeDamage(actualDmg, ignoreArmor: true, isPhysical: true);
+      target.currentAp = target.currentAp > 1500 ? target.currentAp - 1500 : 0;
+      collider.currentAp = collider.currentAp > 1500 ? collider.currentAp - 1500 : 0;
+
+      addLog('BOWLING COLLISION! \ bowled backward into \! Both take \ collision damage (-1,500 TM)!');
+      lastBannerMessage = 'COLLISION: \ bowled into \!';
+      dispatchAction(SpatialActionEvent(
+        id: 'collide_\_',
+        attackerId: attacker.id,
+        attackerName: attacker.name,
+        skillName: 'Bowling Collision',
+        targetId: target.id,
+        targetName: target.name,
+        damage: taken1,
+        secondaryTargetHits: {collider.id: taken2},
+        isPlayerAttacker: attacker.isPlayer,
+        isKnockback: true,
+        isUnitCollision: true,
+        collidedWithUnitName: collider.name,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    } else {
+      target.occupiedNodes = [
+        GridNode(column: currentCol, row: targetRow, occupantUnitId: target.id),
+      ];
+      target.currentAp = target.currentAp > 1000 ? target.currentAp - 1000 : 0;
+      final rowLabel = targetRow == 1 ? 'Mid' : 'Back';
+      addLog('KNOCKBACK! \ pushed back to Row \ (-1,000 TM)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'knock_\_',
+        attackerId: attacker.id,
+        attackerName: attacker.name,
+        skillName: 'Knockback Push',
+        targetId: target.id,
+        targetName: target.name,
+        damage: 0,
+        isPlayerAttacker: attacker.isPlayer,
+        isKnockback: true,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    }
+  }
+
+  /// Triggers Ally Chain Assist (Tag-Team Combos)
+  void _triggerChainAssist(CombatUnitState primaryAttacker, CombatUnitState target) {
+    if (!target.isAlive) return;
+    final friendlySquad = primaryAttacker.isPlayer ? playerUnits : enemyUnits;
+
+    final assistCandidate = friendlySquad.where((u) => u.isAlive && u.id != primaryAttacker.id).toList();
+    if (assistCandidate.isEmpty) return;
+
+    assistCandidate.sort((a, b) => b.effectiveAttack.compareTo(a.effectiveAttack));
+    final ally = assistCandidate.first;
+
+    chainAssistsCount++;
+    final assistDmg = (ally.effectiveAttack * 0.45).round();
+    final actualAssistDmg = assistDmg > 12 ? assistDmg : 12;
+    final dmgDealt = target.takeDamage(actualAssistDmg, isPhysical: true);
+
+    addLog('TAG-TEAM ASSIST! \ coordinated with \, striking \ for \ bonus DMG!');
+    lastBannerMessage = 'ASSIST! \ follow-up strike for \ DMG!';
+
+    dispatchAction(SpatialActionEvent(
+      id: 'assist_\_',
+      attackerId: ally.id,
+      attackerName: ally.name,
+      skillName: 'Tag-Team Assist',
+      targetId: target.id,
+      targetName: target.name,
+      damage: dmgDealt,
+      isPlayerAttacker: ally.isPlayer,
+      isAssistStrike: true,
+      assistAttackerId: ally.id,
+      assistAttackerName: ally.name,
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+    ));
+  }
+
   void _executeSignatureSkill(CombatUnitState unit, CombatUnitState target) {
     final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}';
     final skillName = unit.signatureSkillName;

@@ -394,7 +394,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     Color secondaryColor = const Color(0xFFFF8A80);
     int durationMs = 650;
 
-    if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
+    if (event.isAssistStrike) {
+      vfxType = 'slash';
+      primaryColor = const Color(0xFFFFD54F);
+      secondaryColor = const Color(0xFF00E5FF);
+      durationMs = 450;
+      _playSfx('sfx_slash.wav');
+    } else if (event.isWallSplat) {
+      vfxType = 'shatter';
+      primaryColor = const Color(0xFFFF9100);
+      secondaryColor = const Color(0xFFFF1744);
+      durationMs = 700;
+      _playSfx('sfx_block.wav');
+    } else if (event.isUnitCollision) {
+      vfxType = 'shockwave';
+      primaryColor = const Color(0xFFFF5252);
+      secondaryColor = const Color(0xFFFFD54F);
+      durationMs = 650;
+      _playSfx('sfx_hit.wav');
+    } else     if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
       vfxType = 'bloodnova';
       primaryColor = const Color(0xFFFF1744);
       secondaryColor = const Color(0xFFD50000);
@@ -488,6 +506,38 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ));
         }
       });
+    }
+
+    // Visceral Thematic Death Bursts & Ragdoll Dissolves on Unit Defeat
+    if (target != null && !target.isAlive) {
+      final isBoss = target.id == 'gorgoroth_boss' || target.footprint != UnitFootprint.single1x1;
+      final String deathType = isBoss
+          ? 'death_boss'
+          : (target.bleedStacks > 0
+              ? 'death_bleed'
+              : (event.isHolyOrMagic ? 'death_solar' : 'death_kinetic'));
+      final Color deathColor = isBoss
+          ? const Color(0xFFFF3D00)
+          : (deathType == 'death_bleed'
+              ? const Color(0xFFFF1744)
+              : (deathType == 'death_solar' ? const Color(0xFFFFD54F) : const Color(0xFF90A4AE)));
+
+      _activeVfx.add(_CombatVfx(
+        id: 'death__',
+        startOffset: targetOffset,
+        targetOffset: targetOffset,
+        primaryColor: deathColor,
+        secondaryColor: isBoss ? const Color(0xFFFFD54F) : Colors.white70,
+        type: deathType,
+        durationMs: isBoss ? 1200 : 750,
+        createdMs: nowMs,
+      ));
+
+      if (isBoss) {
+        _triggerScreenShake(intensity: 14.0);
+        _triggerHitStop(durationMs: 250);
+        _triggerCameraImpactZoom(zoomScale: 1.15, durationMs: 1000);
+      }
     }
 
     // Check if this attack was a lethal finisher against the last enemy in wave/battle
@@ -848,7 +898,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 border: Border.all(color: const Color(0xFFB3261E)),
               ),
               child: const Text(
-                'EXPERIMENTAL v3.4 (SNAPPY COMBAT)',
+                'EXPERIMENTAL v3.5 (DYNAMIC IMPACTS)',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -1544,7 +1594,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                                     const Text('SYNERGIES & BREAKS', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
                                                     const SizedBox(height: 1),
                                                     Text(
-                                                      '🩸\ 🔥\ 🛑',
+                                                      '🩸  • 🔥  • 🛑  • 🎳  • ⚔️ ',
                                                       style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 9.5, fontWeight: FontWeight.w900),
                                                     ),
                                                   ],
@@ -8507,6 +8557,12 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         case 'rune_invocation':
           _drawRuneInvocation(canvas, vfx, progress);
           break;
+        case 'death_bleed':
+        case 'death_solar':
+        case 'death_kinetic':
+        case 'death_boss':
+          _drawDeathBurst(canvas, vfx, progress);
+          break;
       }
     }
   }
@@ -8814,6 +8870,34 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         ..color = Colors.white.withAlpha(((1.0 - burstT) * 220).round())
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, 12.0 * burstT, flarePaint);
+    }
+  }
+
+  void _drawDeathBurst(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.targetOffset;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+    final count = vfx.type == 'death_boss' ? 24 : 14;
+    final maxDist = vfx.type == 'death_boss' ? 85.0 : 55.0;
+
+    // Expanding shock perimeter
+    final shockPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha((alpha * 0.7).round())
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (1.0 - progress) * 3.5;
+    canvas.drawCircle(center, maxDist * progress, shockPaint);
+
+    // Radiating ember/splatter particles
+    for (int i = 0; i < count; i++) {
+      final angle = (i * (2 * 3.14159 / count)) + (progress * 0.8);
+      final dist = (maxDist * 0.3) + (maxDist * 0.7 * progress);
+      final px = center.dx + (cos(angle) * dist);
+      final py = center.dy + (sin(angle) * dist * 0.55); // Isometric squash
+      final pRadius = (vfx.type == 'death_boss' ? 5.5 : 3.5) * (1.0 - progress);
+
+      final pPaint = Paint()
+        ..color = (i % 2 == 0 ? vfx.primaryColor : vfx.secondaryColor).withAlpha(alpha)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(px, py), max(0.8, pRadius), pPaint);
     }
   }
 

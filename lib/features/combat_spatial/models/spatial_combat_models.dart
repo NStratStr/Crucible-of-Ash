@@ -46,6 +46,13 @@ class SpatialActionEvent {
   final bool isSignatureSkill;
   final bool isHolyOrMagic;
   final String? graftedTraitProc;
+  final bool isAssistStrike;
+  final String? assistAttackerName;
+  final String? assistAttackerId;
+  final bool isKnockback;
+  final bool isWallSplat;
+  final bool isUnitCollision;
+  final String? collidedWithUnitName;
 
   const SpatialActionEvent({
     required this.id,
@@ -66,6 +73,13 @@ class SpatialActionEvent {
     this.isSignatureSkill = false,
     this.isHolyOrMagic = false,
     this.graftedTraitProc,
+    this.isAssistStrike = false,
+    this.assistAttackerName,
+    this.assistAttackerId,
+    this.isKnockback = false,
+    this.isWallSplat = false,
+    this.isUnitCollision = false,
+    this.collidedWithUnitName,
   });
 }
 
@@ -211,7 +225,7 @@ class CombatUnitState {
   final bool isPlayer;
   final UnitFootprint footprint;
   final UnitArchetype archetype;
-  final List<GridNode> occupiedNodes;
+  List<GridNode> occupiedNodes;
   final bool isDisplacementImmune;
   final int moveRange;
   final int level;
