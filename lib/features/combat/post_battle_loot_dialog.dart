@@ -18,6 +18,7 @@ class CombatRewardsData {
   final int starRating;
   final bool isFirstClear;
   final bool isThreeStarRewardUnlocked;
+  final int petrifiedPlinths;
 
   const CombatRewardsData({
     required this.isVictory,
@@ -36,6 +37,7 @@ class CombatRewardsData {
     this.starRating = 3,
     this.isFirstClear = true,
     this.isThreeStarRewardUnlocked = false,
+    this.petrifiedPlinths = 0,
   });
 }
 
@@ -45,17 +47,20 @@ class CombatRewardsData {
 class PostBattleLootDialog extends StatelessWidget {
   final CombatRewardsData rewards;
   final VoidCallback onContinue;
+  final VoidCallback? onOpenSculptory;
 
   const PostBattleLootDialog({
     super.key,
     required this.rewards,
     required this.onContinue,
+    this.onOpenSculptory,
   });
 
   static Future<void> show({
     required BuildContext context,
     required CombatRewardsData rewards,
     required VoidCallback onContinue,
+    VoidCallback? onOpenSculptory,
   }) {
     return showDialog(
       context: context,
@@ -66,6 +71,7 @@ class PostBattleLootDialog extends StatelessWidget {
           Navigator.of(ctx).pop();
           onContinue();
         },
+        onOpenSculptory: onOpenSculptory,
       ),
     );
   }
@@ -338,6 +344,16 @@ class PostBattleLootDialog extends StatelessWidget {
                               valueColor: const Color(0xFFCE93D8),
                             ),
                           ],
+                          if (rewards.petrifiedPlinths > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildRewardTile(
+                              icon: Icons.foundation,
+                              iconColor: const Color(0xFF00E5FF),
+                              label: 'PETRIFIED PLINTH SHARDS (SCULPTORY)',
+                              value: '+${rewards.petrifiedPlinths} SHARDS',
+                              valueColor: const Color(0xFF80D8FF),
+                            ),
+                          ],
                         ] else ...[
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -479,32 +495,66 @@ class PostBattleLootDialog extends StatelessWidget {
                 // 3. Extraction Action Button
                 Padding(
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 4),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      key: const ValueKey('post_battle_continue_button'),
-                      onPressed: onContinue,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isVictory ? primaryGold : const Color(0xFFB71C1C),
-                        foregroundColor: isVictory ? Colors.black : Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      ),
-                      icon: Icon(
-                        isVictory ? Icons.check_circle_outline : Icons.exit_to_app,
-                        size: 18,
-                        color: isVictory ? Colors.black : Colors.white,
-                      ),
-                      label: Text(
-                        isVictory ? 'COLLECT REWARDS' : 'RETURN TO CAMP',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                          letterSpacing: 1.2,
-                          color: isVictory ? Colors.black : Colors.white,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          key: const ValueKey('post_battle_continue_button'),
+                          onPressed: onContinue,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isVictory ? primaryGold : const Color(0xFFB71C1C),
+                            foregroundColor: isVictory ? Colors.black : Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            elevation: 4,
+                          ),
+                          icon: Icon(
+                            isVictory ? Icons.check_circle_outline : Icons.exit_to_app,
+                            size: 18,
+                            color: isVictory ? Colors.black : Colors.white,
+                          ),
+                          label: Text(
+                            isVictory ? 'COLLECT REWARDS & ADVANCE' : 'RETURN TO CAMP',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                              color: isVictory ? Colors.black : Colors.white,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      if (isVictory && onOpenSculptory != null) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              onOpenSculptory!();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF00E5FF),
+                              side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            icon: const Icon(Icons.foundation, size: 16, color: Color(0xFF00E5FF)),
+                            label: const Text(
+                              'OPEN PLINTH SCULPTORY',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                letterSpacing: 1.0,
+                                color: Color(0xFF80D8FF),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],

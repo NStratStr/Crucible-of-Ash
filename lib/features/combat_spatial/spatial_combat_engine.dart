@@ -124,7 +124,19 @@ class SpatialCombatEngine extends ChangeNotifier {
   // GDD §7.1: Crypt Currencies & Reagents
   int get rewardUnboundAsh => isVictory ? (240 + (starRating * 80)) : 45;
   int get rewardDistilledVitae => isVictory ? (18 + (starRating * 6)) : 2;
-  String? get rewardBossReagent => isVictory ? 'Molten Brim-Slag (Tier 2 Keystone)' : null;
+  int get rewardPetrifiedPlinths => isVictory ? (isBossEncounterFlag ? 4 : 2) : 0;
+  String? get rewardBossReagent {
+    if (!isVictory) return null;
+    final boss = enemyUnits.where((u) => u.footprint != UnitFootprint.single1x1 || u.id.contains('boss')).firstOrNull;
+    if (boss == null) return null;
+    if (boss.id.contains('malakor') || boss.templateId.contains('malakor')) {
+      return 'Kinetic Bastion Plate (Titan Alloy Core)';
+    } else if (boss.id.contains('morvath') || boss.templateId.contains('morvath')) {
+      return 'Putrid Phylactery of Morvath (Plague Core)';
+    } else {
+      return 'Calcified Heart of Gorgoroth (G1 Titan Core)';
+    }
+  }
 
   /// GDD Section 6.3: Ashen Reckoning (Universal Soft Enrage)
   /// Skirmishes / encounters enter Reckoning at 3:00 (5,400 ticks), or demo threshold (tick 900)

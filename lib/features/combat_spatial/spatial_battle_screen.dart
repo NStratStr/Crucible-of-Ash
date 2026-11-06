@@ -1728,15 +1728,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                               ),
                                             ],
                                           ),
+                                          // Petrified Plinths
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.foundation, color: Color(0xFF00E5FF), size: 14),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '+${_engine.rewardPetrifiedPlinths} Plinths',
+                                                style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 10, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
                                           if (_engine.rewardBossReagent != null)
-                                            const Row(
+                                            Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.whatshot, color: Color(0xFFFF9100), size: 14),
-                                                SizedBox(width: 4),
+                                                const Icon(Icons.whatshot, color: Color(0xFFFF9100), size: 14),
+                                                const SizedBox(width: 4),
                                                 Text(
-                                                  'Brim-Slag Core',
-                                                  style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold),
+                                                  _engine.rewardBossReagent!,
+                                                  style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.bold),
                                                 ),
                                               ],
                                             ),

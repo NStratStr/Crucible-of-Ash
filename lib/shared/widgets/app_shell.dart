@@ -55,6 +55,7 @@ class _AppShellState extends State<AppShell> {
   int _brimSlagCores = 2;
   int _solarIron = 2;
   int _quicksilver = 2;
+  int _petrifiedPlinths = 8;
   int _crucibleTier = 1;
   int _forgeTier = 1;
   int _hospiceTier = 1;
@@ -1035,21 +1036,19 @@ class _AppShellState extends State<AppShell> {
     final int distilledVitae = ((earnedIchor * 0.45 + (_activeNode?.type == CampaignNodeType.boss ? (isFirstClear ? 350 : 100) : (_activeNode?.type == CampaignNodeType.elite ? (isFirstClear ? 120 : 35) : 15))) * dropMult).round();
 
     String? bossReagent;
-    if (_activeNode?.type == CampaignNodeType.boss && (isFirstClear || isThreeStarRewardUnlocked)) {
-      switch (_currentChapter) {
-        case 1:
-          bossReagent = 'Calcified Heart of Gorgoroth (G1 Progenitor Core)';
-          break;
-        case 2:
-          bossReagent = 'Abyssal Chitin Siphon (G2 Occult Core)';
-          break;
-        case 3:
-          bossReagent = 'Primordial Hearth-Core (G3 World Titan Ember)';
-          break;
-        default:
-          bossReagent = 'Prismatic Mineral Geode';
+    if ((_activeNode?.type == CampaignNodeType.boss || _activeNode?.id == 'gorgoroth_boss_arena') && (isFirstClear || isThreeStarRewardUnlocked)) {
+      final bossName = _activeNode?.name ?? '';
+      if (bossName.contains('Malakor')) {
+        bossReagent = 'Kinetic Bastion Plate (Titan Alloy Core)';
+      } else if (bossName.contains('Morvath')) {
+        bossReagent = 'Putrid Phylactery of Morvath (Plague Core)';
+      } else {
+        bossReagent = 'Calcified Heart of Gorgoroth (G1 Titan Core)';
       }
     }
+
+    final int petrifiedPlinths = (_activeNode?.type == CampaignNodeType.boss || _activeNode?.id == 'gorgoroth_boss_arena') ? 4 : 2;
+    _petrifiedPlinths += petrifiedPlinths;
 
     final rewardsData = CombatRewardsData(
       isVictory: true,
@@ -1068,6 +1067,7 @@ class _AppShellState extends State<AppShell> {
       starRating: currentStarRating,
       isFirstClear: isFirstClear,
       isThreeStarRewardUnlocked: isThreeStarRewardUnlocked,
+      petrifiedPlinths: petrifiedPlinths,
     );
 
       if (_ftueService.currentStage == FtueStage.encounter1) {
@@ -1112,6 +1112,11 @@ class _AppShellState extends State<AppShell> {
               _activeNode = null;
             });
           }
+        },
+        onOpenSculptory: () {
+          setState(() {
+            _currentIndex = 3; // Switch to Crucible Altar / Sculptory
+          });
         },
       );
   }
