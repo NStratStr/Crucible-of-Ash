@@ -27,6 +27,9 @@ import '../../features/persistence/game_state_persistence_service.dart';
 import '../../features/relics/relic_forge_screen.dart';
 import '../../features/plinths/plinth_service.dart';
 import '../../features/plinths/plinth_sculptory_screen.dart';
+import '../../features/delves/delve_models.dart';
+import '../../features/delves/delve_service.dart';
+import '../../features/delves/catacomb_delve_screen.dart';
 import '../../features/relics/relic_service.dart';
 import '../../features/ftue/awakening_dialog.dart';
 import '../../features/ftue/ftue_guidance_banner.dart';
@@ -85,6 +88,8 @@ class _AppShellState extends State<AppShell> {
   late GeneralCommandService _commandService;
   late RelicService _relicService;
   late PlinthService _plinthService;
+  late DelveService _delveService;
+  DelveRoom? _activeDelveRoom;
   late FtueService _ftueService;
   late List<UnitEntity> _inventory;
   late List<CampaignNode> _campaignNodes;
@@ -106,6 +111,7 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _relicService = RelicService();
     _plinthService = PlinthService();
+    _delveService = DelveService();
     _ftueService = FtueService();
     _resetEncounter(null, BattleModifier.none, false);
     _inventory = StarterBrigades.createReserveInventory();
@@ -1108,6 +1114,24 @@ class _AppShellState extends State<AppShell> {
         rewards: rewardsData,
         onContinue: () {
           if (!mounted) return;
+          if (_activeDelveRoom != null) {
+            _delveService.completeRoom(
+              _activeDelveRoom!.id,
+              extraIchor: scaledAsh,
+              extraOre: scaledOre,
+              extraSigils: earnedSigils,
+              extraPlinths: petrifiedPlinths,
+            );
+            _delveService.updateSquadHpAfterBattle(_tickManager.allies);
+            setState(() {
+              _activeDelveRoom = null;
+              _currentIndex = 0;
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _openCatacombDelveSheet();
+            });
+            return;
+          }
           if (isBossClear) {
             _showChapterAscensionDialog(nextCh);
           } else {
@@ -1240,6 +1264,15 @@ class _AppShellState extends State<AppShell> {
       _dungeonDelveOre = 0;
       _dungeonDelveSigils = 0;
     });
+
+    if (_activeDelveRoom != null) {
+      final consolation = _delveService.wipeRun();
+      _totalIchor += consolation['ichor'] ?? 0;
+      _cursedOre += consolation['ore'] ?? 0;
+      _bloodlineSigils += consolation['sigils'] ?? 0;
+      _plinthService.addShards(consolation['plinths'] ?? 0);
+      _activeDelveRoom = null;
+    }
 
     PostBattleLootDialog.show(
       context: context,
@@ -1602,6 +1635,82 @@ class _AppShellState extends State<AppShell> {
     _saveCurrentState();
   }
 
+  void _openCatacombDelveSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return FractionallySizedBox(
+          heightFactor: 0.95,
+          child: CatacombDelveScreen(
+            delveService: _delveService,
+            brigadeSquad: _tickManager.allies,
+            relicService: _relicService,
+            onLaunchCombat: (room, squadWithHp) {
+              Navigator.of(ctx).pop();
+              _launchDelveCombat(room, squadWithHp);
+            },
+            onExtractionConfirmed: ({required ichor, required ore, required sigils, required plinthShards}) {
+              setState(() {
+                _totalIchor += ichor;
+                _cursedOre += ore;
+                _bloodlineSigils += sigils;
+                _plinthService.addShards(plinthShards);
+              });
+              _saveCurrentState();
+            },
+            onClose: () => Navigator.of(ctx).pop(),
+          ),
+        );
+      },
+    );
+  }
+
+  void _launchDelveCombat(DelveRoom room, List<UnitEntity> squadWithHp) {
+    _activeDelveRoom = room;
+
+    List<UnitEntity> enemies;
+    if (room.type == DelveRoomType.catacombArchon) {
+      enemies = StarterBrigades.createGorgorothBossEnemies();
+    } else if (room.type == DelveRoomType.wanderingElite) {
+      enemies = StarterBrigades.createEliteEnemiesForChapter(room.floor);
+    } else {
+      enemies = StarterBrigades.createSkirmishEnemiesForChapter(room.floor);
+    }
+
+    final delveNode = CampaignNode(
+      id: 'delve_${room.id}',
+      depth: room.column + 1,
+      verticalRatio: 0.5,
+      type: room.type == DelveRoomType.catacombArchon
+          ? CampaignNodeType.boss
+          : (room.type == DelveRoomType.wanderingElite ? CampaignNodeType.elite : CampaignNodeType.skirmish),
+      name: 'Delve F${room.floor}: ${room.title}',
+      description: room.description,
+      nextNodeIds: const [],
+      rewardIchor: room.rewardIchor,
+      customBackgroundAsset: 'assets/images/backgrounds/battlefield_ashen_plains.png',
+      isCurrent: true,
+      isReachable: true,
+    );
+
+    // Apply persistent squad HP
+    final updatedAllies = squadWithHp.map((u) {
+      final hp = _delveService.getUnitHp(u);
+      return u.copyWith(currentHp: max(1, hp));
+    }).toList();
+    _tickManager.updateSquads(allies: updatedAllies);
+
+    _activeNode = delveNode;
+    _activeEnemyWaves = [enemies];
+    _resetEncounter(enemies, BattleModifier.none, room.type == DelveRoomType.catacombArchon, [enemies]);
+
+    setState(() {
+      _currentIndex = 1; // Launch battle view
+    });
+  }
+
   void _openPlinthSculptorySheet() {
     showModalBottomSheet(
       context: context,
@@ -1803,6 +1912,10 @@ class _AppShellState extends State<AppShell> {
           Navigator.of(dialogCtx).pop();
           _openPlinthSculptorySheet();
         },
+        onOpenCatacombDelves: () {
+          Navigator.of(dialogCtx).pop();
+          _openCatacombDelveSheet();
+        },
         onOpenSettings: () {
           SettingsDialog.show(dialogCtx);
         },
@@ -1914,6 +2027,7 @@ class _AppShellState extends State<AppShell> {
                     bloodlineSigils: _bloodlineSigils,
                     activeBoons: _activeExpeditionBoons,
                     onOpenEndgameGauntlet: _handleOpenEndgameGauntlet,
+                    onOpenCatacombDelves: _openCatacombDelveSheet,
                     onLaunchGorgorothBoss: _launchGorgorothBossTrial,
                     onLaunchMvpSkirmish: _launchGorgorothBossTrial,
                     currentChapter: _currentChapter,

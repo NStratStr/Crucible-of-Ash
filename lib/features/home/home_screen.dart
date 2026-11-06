@@ -3,9 +3,6 @@ import '../generals/general_command_service.dart';
 import '../persistence/cloud_account_dialog.dart';
 import 'sanctuary_facility_dialog.dart';
 
-import 'package:flutter/material.dart';
-import '../generals/general_command_service.dart';
-import '../persistence/cloud_account_dialog.dart';
 
 enum HomeViewMode {
   sanctuaryTown,
@@ -36,6 +33,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenSummoning;
   final VoidCallback onOpenSettings;
   final VoidCallback? onOpenPlinthSculptory;
+  final VoidCallback? onOpenCatacombDelves;
   final void Function({
     required String facilityId,
     required int newTier,
@@ -72,6 +70,7 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenSummoning,
     required this.onOpenSettings,
     this.onOpenPlinthSculptory,
+    this.onOpenCatacombDelves,
     this.onUpgradeFacility,
     this.onCloudDataRestored,
     this.showCloseButton = true,
@@ -1314,6 +1313,15 @@ class _HomeScreenState extends State<HomeScreen> {
         'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
         'action': widget.onOpenPlinthSculptory ?? () {},
         'borderColor': const Color(0xFF00E5FF),
+      },
+      {
+        'title': 'CATACOMB DELVES',
+        'subtitle': 'Stygian dungeon expeditions, risk/reward extraction & loot sack',
+        'badge': 'STYGIAN ABYSS',
+        'badgeColor': const Color(0xFFE040FB),
+        'iconAsset': 'assets/images/UI/Flame Shield icon Transparent.png',
+        'action': widget.onOpenCatacombDelves ?? () {},
+        'borderColor': const Color(0xFFE040FB),
       },
       {
         'title': 'THE RELIC FORGE',

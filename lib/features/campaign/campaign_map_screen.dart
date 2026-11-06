@@ -191,6 +191,7 @@ class CampaignMapScreen extends StatefulWidget {
   final int cursedOre;
   final int bloodlineSigils;
   final VoidCallback? onOpenEndgameGauntlet;
+  final VoidCallback? onOpenCatacombDelves;
   final VoidCallback? onLaunchMvpSkirmish;
   final VoidCallback? onLaunchGorgorothBoss;
   final VoidCallback? onOpenHome;
@@ -215,6 +216,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.cursedOre = 0,
     this.bloodlineSigils = 0,
     this.onOpenEndgameGauntlet,
+    this.onOpenCatacombDelves,
     this.onLaunchMvpSkirmish,
     this.onLaunchGorgorothBoss,
     this.onOpenHome,
@@ -553,6 +555,12 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               tooltip: 'Endgame Gauntlet',
               onPressed: widget.onOpenEndgameGauntlet,
             ),
+          if (widget.onOpenCatacombDelves != null)
+            IconButton(
+              icon: const Icon(Icons.explore, color: Color(0xFF00E5FF), size: 18),
+              tooltip: 'Catacomb Delves (Stygian Expeditions)',
+              onPressed: widget.onOpenCatacombDelves,
+            ),
           // Tri-Currency Display
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
@@ -702,6 +710,22 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                           onPressed: widget.onOpenEndgameGauntlet,
+                        ),
+                      ),
+                    if (widget.onOpenCatacombDelves != null)
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.explore, size: 16),
+                          label: const Text('CATACOMB DELVES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F1A24),
+                            foregroundColor: const Color(0xFF00E5FF),
+                            side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onPressed: widget.onOpenCatacombDelves,
                         ),
                       ),
                   ],

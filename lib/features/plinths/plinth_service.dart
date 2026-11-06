@@ -119,4 +119,6 @@ class PlinthService extends ChangeNotifier {
     _petrifiedPlinths += count;
     notifyListeners();
   }
+
+  void addShards(int count) => addPlinthShards(count);
 }
