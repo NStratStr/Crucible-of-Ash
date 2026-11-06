@@ -240,6 +240,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   bool _isDockCollapsed = false;
   bool _hasBossEnraged = false;
   bool _wasBossStaggered = false;
+  EncounterPhase _lastObservedPhase = EncounterPhase.standard;
 
   late final FocusNode _battlefieldFocusNode;
 
@@ -365,6 +366,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   void _onEngineUpdate() {
     if (!mounted) return;
+
+    // GDD Sec 7.1: Ashen Reckoning Phase Transition Tracking
+    final currentPhase = _engine.currentPhase;
+    if (currentPhase != _lastObservedPhase) {
+      _lastObservedPhase = currentPhase;
+      if (currentPhase == EncounterPhase.warningChime) {
+        _playSfx('sfx_block.wav');
+        _activeSynergyBannerText = '⚠️ WARNING CHIME: 15s TO ASHEN RECKONING!';
+        _activeSynergyBannerColor = const Color(0xFFFFD54F);
+      } else if (currentPhase == EncounterPhase.ashenReckoning) {
+        _playSfx('sfx_spell.wav');
+        _triggerScreenShake(intensity: 8.0);
+        _activeSynergyBannerText = '🔥 THE ASHEN RECKONING HAS BEGUN! (2.0x Dmg / -50% Heals)';
+        _activeSynergyBannerColor = const Color(0xFFFF5252);
+      } else if (currentPhase == EncounterPhase.terminalCollapse) {
+        _playSfx('sfx_slash.wav');
+        _triggerScreenShake(intensity: 14.0);
+        _activeSynergyBannerText = '💀 TERMINAL COLLAPSE! (True Dmg / Revives Disabled)';
+        _activeSynergyBannerColor = const Color(0xFFE040FB);
+      }
+    }
 
     // Boss Enrage Check: When boss drops under 50% HP, trigger Enrage Roar & Arena Shake!
     final boss = _engine.enemyUnits.where((u) => (u.id == 'gorgoroth_boss' || u.footprint != UnitFootprint.single1x1) && u.isAlive).firstOrNull;
@@ -2503,6 +2525,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+
+                // Ashen Reckoning Phase Clock Pill (GDD Sec 7.1)
+                _buildAshenReckoningPill(),
                 const SizedBox(width: 8),
 
                 // 1d. Live Action & Battle Pacing Counter (User Requested)
@@ -9162,6 +9188,78 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       ),
     );
   }
+  Widget _buildAshenReckoningPill() {
+    final phase = _engine.currentPhase;
+    Color badgeColor = const Color(0xFF80D8FF);
+    IconData icon = Icons.timer_outlined;
+    String label = 'STANDARD (${_engine.phaseFormattedTime})';
+
+    switch (phase) {
+      case EncounterPhase.standard:
+        badgeColor = const Color(0xFF80D8FF);
+        icon = Icons.timer_outlined;
+        label = 'STANDARD (${_engine.phaseFormattedTime})';
+        break;
+      case EncounterPhase.warningChime:
+        badgeColor = const Color(0xFFFFD54F);
+        icon = Icons.alarm;
+        label = 'WARNING (${_engine.phaseFormattedTime})';
+        break;
+      case EncounterPhase.ashenReckoning:
+        badgeColor = const Color(0xFFFF5252);
+        icon = Icons.local_fire_department;
+        label = 'RECKONING 2.0x (${_engine.phaseFormattedTime})';
+        break;
+      case EncounterPhase.terminalCollapse:
+        badgeColor = const Color(0xFFE040FB);
+        icon = Icons.dangerous;
+        label = 'COLLAPSE (${_engine.phaseFormattedTime})';
+        break;
+      case EncounterPhase.hardCapWipe:
+        badgeColor = const Color(0xFFFF1744);
+        icon = Icons.sentiment_very_dissatisfied;
+        label = 'SUDDEN DEATH';
+        break;
+    }
+
+    return Tooltip(
+      message: 'The Ashen Reckoning (GDD §7.1):\n• Standard Pacing\n• 1:15 Warning Chime\n• 1:30 Ashen Reckoning (2.0x Dmg / -50% Heals)\n• 1:45 Terminal Collapse (15/s True Dmg / No Revives)\n• 2:00 Sudden Death (Highest EHP Wins)',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: badgeColor.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: badgeColor.withValues(alpha: 0.7), width: 1.2),
+          boxShadow: phase == EncounterPhase.ashenReckoning || phase == EncounterPhase.terminalCollapse
+              ? [
+                  BoxShadow(
+                    color: badgeColor.withValues(alpha: 0.4),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: badgeColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: badgeColor,
+                fontFamily: 'monospace',
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// 2.5D Isometric Diamond Tile Plinth Painter
@@ -10240,6 +10338,7 @@ class _GroundShockwaveRipplePainter extends CustomPainter {
   bool shouldRepaint(covariant _GroundShockwaveRipplePainter oldDelegate) {
     return true;
   }
+
 }
 
 /// Custom painter rendering drifting, smoldering ash embers over downed units
@@ -10296,4 +10395,3 @@ class _AshEmbersDissolvePainter extends CustomPainter {
     return true;
   }
 }
-

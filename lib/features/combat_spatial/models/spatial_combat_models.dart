@@ -406,6 +406,9 @@ class CombatUnitState {
     return 'Standard Stance';
   }
 
+  /// GDD Sec 3.1 & 7.1: Effective Health (EHP) calculation for sudden death tiebreaking
+  double get ehp => hp * (1.0 + armor / 100.0);
+
   bool get isAlive => hp > 0 && !isPetrifiedPlinth;
   bool get isDowned => hp <= 0 || isPetrifiedPlinth;
   bool get isSolidObstacle => isPetrifiedPlinth && !isShattered;

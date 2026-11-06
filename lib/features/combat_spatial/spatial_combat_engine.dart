@@ -8,6 +8,15 @@ import '../relics/relic_service.dart';
 import '../generals/general_command_service.dart';
 import '../plinths/plinth_service.dart';
 
+/// GDD Sec 7.1: Operational Dynamics & The Ashen Reckoning Pacing Phases
+enum EncounterPhase {
+  standard,           // 0:00 - Normal combat pacing
+  warningChime,       // Ominous bell toll, timer turns amber
+  ashenReckoning,     // 2.0x Damage dealt, -50% Healing received
+  terminalCollapse,   // 15/s environmental true damage, Revives permanently disabled
+  hardCapWipe,        // Encounter concludes: Highest EHP wins (Skirmish/Elite) or Titan wipes squad
+}
+
 /// Deterministic 30 Hz Spatial Combat Engine simulating the 3-Row x 5-Col Grid Plane
 class SpatialCombatEngine extends ChangeNotifier {
   static const int tickThreshold = 10000;
@@ -71,11 +80,17 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool isSuddenDeathVictory = false;
+  bool isSuddenDeathDefeat = false;
+
   bool get isVictory =>
-      currentWaveIndex >= totalWaves &&
-      enemyUnits.isNotEmpty &&
-      enemyUnits.every((u) => !u.isAlive);
-  bool get isDefeat => playerUnits.isNotEmpty && playerUnits.every((u) => !u.isAlive);
+      isSuddenDeathVictory ||
+      (currentWaveIndex >= totalWaves &&
+          enemyUnits.isNotEmpty &&
+          enemyUnits.every((u) => !u.isAlive));
+  bool get isDefeat =>
+      isSuddenDeathDefeat ||
+      (playerUnits.isNotEmpty && playerUnits.every((u) => !u.isAlive));
 
   /// Active Commander Aura Summary for HUD display
   String get activeCommanderAuraLabel {
@@ -140,12 +155,56 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
-  /// GDD Section 6.3: Ashen Reckoning (Universal Soft Enrage)
-  /// Skirmishes / encounters enter Reckoning at 3:00 (5,400 ticks), or demo threshold (tick 900)
-  /// Modifiers during Reckoning: Damage dealt x2.0, healing received -50%
-  static const int reckoningTickThreshold = 900; // ~30 seconds demo threshold for fast testing
-  bool get isAshenReckoning => currentTick >= reckoningTickThreshold;
-  double get reckoningDamageMultiplier => isAshenReckoning ? 2.0 : 1.0;
+  /// GDD Section 7.1 & 7.2: The Ashen Reckoning & Pacing Enrage Engine
+  int phaseElapsedTicks = 0;
+  final Set<double> _triggeredBossHpThresholds = {};
+
+  bool get isEliteEncounter =>
+      encounterTitle.toLowerCase().contains('elite') ||
+      encounterTitle.toLowerCase().contains('champion') ||
+      enemyUnits.any((u) => u.footprint != UnitFootprint.single1x1 && !isBossEncounterFlag);
+
+  int get warningChimeTicks => isBossEncounterFlag ? 4500 : (isEliteEncounter ? 3150 : 2250);
+  int get ashenReckoningTicks => isBossEncounterFlag ? 5400 : (isEliteEncounter ? 3600 : 2700);
+  int get terminalCollapseTicks => isBossEncounterFlag ? 6300 : (isEliteEncounter ? 4050 : 3150);
+  int get hardCapWipeTicks => isBossEncounterFlag ? 7200 : (isEliteEncounter ? 4500 : 3600);
+
+  EncounterPhase get currentPhase {
+    if (phaseElapsedTicks >= hardCapWipeTicks) return EncounterPhase.hardCapWipe;
+    if (phaseElapsedTicks >= terminalCollapseTicks) return EncounterPhase.terminalCollapse;
+    if (phaseElapsedTicks >= ashenReckoningTicks) return EncounterPhase.ashenReckoning;
+    if (phaseElapsedTicks >= warningChimeTicks) return EncounterPhase.warningChime;
+    return EncounterPhase.standard;
+  }
+
+  bool get isAshenReckoning => isAshenReckoningActive;
+  bool get isAshenReckoningActive =>
+      currentPhase == EncounterPhase.ashenReckoning ||
+      currentPhase == EncounterPhase.terminalCollapse ||
+      currentPhase == EncounterPhase.hardCapWipe;
+
+  bool get isTerminalCollapseActive =>
+      currentPhase == EncounterPhase.terminalCollapse ||
+      currentPhase == EncounterPhase.hardCapWipe;
+
+  double get reckoningDamageMultiplier => isAshenReckoningActive ? 2.0 : 1.0;
+  double get reckoningHealingMultiplier => isAshenReckoningActive ? 0.50 : 1.0;
+
+  String get phaseFormattedTime {
+    final totalSeconds = phaseElapsedTicks ~/ 30;
+    final mins = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final secs = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$mins:$secs';
+  }
+
+  /// GDD Sec 7.2: Multi-Phase Boss Timer Resets
+  /// Stagger Break Bar shattering or crossing major health thresholds resets the phase clock to 0:00!
+  void resetPhaseTimer(String reason) {
+    phaseElapsedTicks = 0;
+    lastBannerMessage = '⏱️ PHASE RESET ($reason) • ASHEN RECKONING AVERTED!';
+    addLog('⏱️ [PHASE RESET] $reason resets the phase clock to 0:00! Reckoning penalties cleared.');
+    notifyListeners();
+  }
 
   /// Returns all grid nodes currently telegraphed by any enemy intent
   List<GridNode> get activeTelegraphedNodes {
@@ -461,6 +520,10 @@ class SpatialCombatEngine extends ChangeNotifier {
     totalActionsCount = 0;
     playerTurnDecisionsCount = 0;
     currentTick = 0;
+    phaseElapsedTicks = 0;
+    isSuddenDeathVictory = false;
+    isSuddenDeathDefeat = false;
+    _triggeredBossHpThresholds.clear();
     isRunning = false;
     isPreBattlePhase = true;
     focus = isBoss ? 5 : 3;
@@ -1044,6 +1107,73 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     currentTick++;
 
+    // Advance GDD Sec 7.1 Pacing Clock during active battle
+    if (isRunning && !isPreBattlePhase && !isVictory && !isDefeat) {
+      phaseElapsedTicks++;
+
+      // Phase milestone alerts
+      if (phaseElapsedTicks == warningChimeTicks) {
+        lastBannerMessage = '⚠️ WARNING CHIME: 15s TO ASHEN RECKONING!';
+        addLog('🔔 [WARNING CHIME] A deep tolling bell reverberates across the plains! Ashen Reckoning imminent.');
+      } else if (phaseElapsedTicks == ashenReckoningTicks) {
+        lastBannerMessage = '🔥 THE ASHEN RECKONING HAS BEGUN! (2.0x Dmg / -50% Heals)';
+        addLog('🔥 [ASHEN RECKONING] Caustic white rain tears open the sky! 2.0x Damage dealt, -50% Healing received.');
+      } else if (phaseElapsedTicks == terminalCollapseTicks) {
+        lastBannerMessage = '💀 TERMINAL COLLAPSE! (15/s True Damage • Revives Disabled)';
+        addLog('💀 [TERMINAL COLLAPSE] Ground fissures erupt! 15 true damage every second. Revives permanently disabled.');
+      }
+
+      // Terminal collapse miasma tick (every 30 ticks = 1 second)
+      if (isTerminalCollapseActive && phaseElapsedTicks % 30 == 0) {
+        final allLiving = [...playerUnits, ...enemyUnits].where((u) => u.isAlive).toList();
+        for (final unit in allLiving) {
+          unit.takeDamage(15, ignoreArmor: true, isPhysical: false);
+        }
+        addLog('⚡ [COLLAPSE MIASMA] Environmental necrotic pressure deals 15 true damage to all standing units!');
+      }
+
+      // Hard Cap Sudden Death / Titan Enrage Wipe
+      if (currentPhase == EncounterPhase.hardCapWipe) {
+        if (isBossEncounterFlag) {
+          lastBannerMessage = '☠️ TITAN ENRAGE WIPE: The Colossus unleashes terminal extinction!';
+          addLog('☠️ [ENRAGE WIPE] World Titan unleashes terminal extinction wave! Squad wiped.');
+          for (final ally in playerUnits) {
+            ally.hp = 0;
+          }
+          isSuddenDeathDefeat = true;
+          isRunning = false;
+        } else {
+          // Skirmish / Elite: Highest Total Remaining EHP Wins!
+          final double playerEhp = playerUnits.where((u) => u.isAlive).fold(0.0, (sum, u) => sum + u.ehp);
+          final double enemyEhp = enemyUnits.where((u) => u.isAlive).fold(0.0, (sum, u) => sum + u.ehp);
+          if (playerEhp >= enemyEhp) {
+            lastBannerMessage = '🏆 SUDDEN DEATH VICTORY! Squad held higher remaining EHP!';
+            addLog('🏆 [SUDDEN DEATH] Time limit reached! Player squad holds higher vitality ($playerEhp vs $enemyEhp EHP). Victory awarded!');
+            isSuddenDeathVictory = true;
+            isRunning = false;
+          } else {
+            lastBannerMessage = '☠️ SUDDEN DEATH DEFEAT! Opponents held higher vitality.';
+            addLog('☠️ [SUDDEN DEATH] Time limit reached! Opposing forces held higher vitality ($enemyEhp vs $playerEhp EHP). Defeat.');
+            isSuddenDeathDefeat = true;
+            isRunning = false;
+          }
+        }
+      }
+
+      // GDD Sec 7.2: Monitor Boss Health thresholds (66% and 33%) for Phase Clock Resets
+      final boss = enemyUnits.where((u) => u.footprint != UnitFootprint.single1x1 || u.id.contains('boss')).firstOrNull;
+      if (boss != null && boss.maxHp > 0) {
+        final hpRatio = boss.hp / boss.maxHp;
+        if (hpRatio <= 0.66 && !_triggeredBossHpThresholds.contains(0.66)) {
+          _triggeredBossHpThresholds.add(0.66);
+          resetPhaseTimer('Boss 66% HP Phase Shift');
+        } else if (hpRatio <= 0.33 && !_triggeredBossHpThresholds.contains(0.33)) {
+          _triggeredBossHpThresholds.add(0.33);
+          resetPhaseTimer('Boss 33% HP Phase Shift');
+        }
+      }
+    }
+
     // Grimoire Card Draw: Draw 1 card every 90 ticks (~3.0 seconds) if hand has room (< 4 cards)
     if (currentTick % 90 == 0 && hand.length < 4) {
       if (drawPile.isEmpty && burnPit.isNotEmpty) {
@@ -1473,6 +1603,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
       addLog('🛡️ VANGUARD COVER: ${target.name} takes -25% damage behind Vanguard line!');
     }
+    // GDD Sec 7.1: Ashen Reckoning 2.0x Damage Multiplier
+    if (isAshenReckoningActive) {
+      finalDmg *= reckoningDamageMultiplier;
+    }
     if (target.hasBreakBar && !target.isStaggered) {
       int staggerChip = max(10, (finalDmg * 0.18).round());
       if (isPhysical) staggerChip = (staggerChip * 1.35).round();
@@ -1481,6 +1615,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (broke) {
         lastBannerMessage = '⚡ ${target.name.toUpperCase()} STAGGERED! CORE EXPOSED — +50% VULNERABILITY!';
         addLog('💥 BREAK BAR SHATTERED! ${target.name} staggered for 2.0s — takes guaranteed crits and +50% damage!');
+        resetPhaseTimer('Boss Stagger Break');
       }
     }
 
@@ -3502,6 +3637,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       // 2. Incurs stacking -20% Max HP penalty (Soul Fracture) based on baseline Max HP
       // 3. Overflow vitality converts into an Aegis Shield Ring (50% of excess)
       // 4. Awakening State: 6-tick (0.2s) invulnerability window, cleansed debuffs, and AP reset to 0
+      if (isTerminalCollapseActive) {
+        addLog('⛔ REVIVE FAILED: Revives are permanently disabled during Terminal Collapse!');
+        lastBannerMessage = '⛔ REVIVE FAILED • DISABLED IN TERMINAL COLLAPSE!';
+        hand.add(card);
+        focus = min(maxFocus, focus + card.focusCost);
+        return false;
+      }
       final downedTarget = targetUnit ?? playerUnits.where((u) => u.isDowned).firstOrNull;
       if (downedTarget != null) {
         downedTarget.reviveCount++;
