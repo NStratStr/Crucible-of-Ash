@@ -466,12 +466,12 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   }
 
   void _refineRelic(RelicEntity relic) {
-    final maxTier = RelicEntity.maxRefinementTierForChapter(widget.currentChapter);
+    final maxCap = RelicEntity.maxRefinementTierForChapter(widget.currentChapter);
     if (!relic.canUpgradeForChapter(widget.currentChapter)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Refinement capped at +\! Conquer Chapter \ World Titan to promote the realm and unlock higher refinement.',
+            'Refinement capped at +$maxCap! Conquer Chapter ${widget.currentChapter} World Titan to promote the realm and unlock higher refinement.',
           ),
           backgroundColor: const Color(0xFFE5A93C),
         ),
@@ -480,7 +480,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     }
 
     final cost = relic.upgradeCostIchor;
-    const int oreCost = 15;
+    final int oreCost = relic.upgradeCostOre;
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -492,9 +492,9 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     }
     if (widget.cursedOre < oreCost) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient Cursed Ore! Refinement requires 15 Cursed Ore.'),
-          backgroundColor: Color(0xFF00695C),
+        SnackBar(
+          content: Text('Insufficient Cursed Ore! Refinement requires $oreCost Cursed Ore.'),
+          backgroundColor: const Color(0xFF00695C),
         ),
       );
       return;
@@ -504,14 +504,21 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     widget.onOreChanged?.call(widget.cursedOre - oreCost);
     final upgraded = widget.relicService.upgradeRelic(relic.id);
 
-    final bool rolledMilestone = upgraded.upgradeLevel == 2 || upgraded.upgradeLevel == 4 || upgraded.upgradeLevel == 5;
+    final bool rolledMilestone = upgraded.upgradeLevel == 2 ||
+        upgraded.upgradeLevel == 4 ||
+        upgraded.upgradeLevel == 6 ||
+        upgraded.upgradeLevel == 8 ||
+        upgraded.upgradeLevel == 10;
+
     final String milestoneMsg = rolledMilestone && upgraded.subStats.isNotEmpty
-        ? ' ★ SUB-STAR UNLOCKED: ${upgraded.subStats.last.displayLabel}!'
+        ? (upgraded.isMasterwork
+            ? ' ★ MASTERWORK AWAKENING (+10): +10% Resonance across all attributes!'
+            : ' ★ SUB-STAR UNLOCKED: ${upgraded.subStats.last.displayLabel}!')
         : '';
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Refined to ${upgraded.displayName}! Attributes increased by +25%.$milestoneMsg'),
+        content: Text('Refined to ${upgraded.displayName}! Attributes enhanced by +20%.$milestoneMsg'),
         backgroundColor: upgraded.rarityColor,
       ),
     );
@@ -822,7 +829,21 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 ),
                 child: const Text('EQUIP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
               ),
-              if (relic.canUpgradeForChapter(widget.currentChapter)) ...[
+              if (relic.isMasterwork) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD54F).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                  ),
+                  child: const Text(
+                    '★ MASTER (+10)',
+                    style: TextStyle(color: Color(0xFFFFD54F), fontSize: 7.5, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ] else if (relic.canUpgradeForChapter(widget.currentChapter)) ...[
                 const SizedBox(height: 4),
                 OutlinedButton(
                   onPressed: () => _refineRelic(relic),
@@ -833,8 +854,21 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                   child: Text(
-                    'REFINE (${relic.upgradeCostIchor}I)',
+                    'REFINE (${relic.upgradeCostIchor}I / ${relic.upgradeCostOre}O)',
                     style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'CH.${widget.currentChapter} CAP (+${RelicEntity.maxRefinementTierForChapter(widget.currentChapter)})',
+                    style: const TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],

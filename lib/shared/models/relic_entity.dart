@@ -1,12 +1,52 @@
 import 'package:flutter/material.dart';
 
 enum RelicSlot {
-  weapon,    // Slot 1: Fixed Flat ATK
-  armor,     // Slot 2: Fixed Flat HP
-  offhand,   // Slot 3: Fixed Flat DEF
-  boots,     // Slot 4: Speed (Flat), HP%, DEF%
-  talisman,  // Slot 5: Crit Rate%, Crit DMG%, ATK%
-  sigil,     // Slot 6: ATK%, HP%, DEF%
+  weapon,    // Slot 1: Weapon Edge / Catalyst Tip (Base ATK & Crit Multipliers)
+  armor,     // Slot 2: Core Plating / Harness (Armor, Resistance & Max HP)
+  boots,     // Slot 3: Kinetic Gyro / Piston Joint (Speed & AP Turn Accumulation Rate)
+  offhand,   // Slot 4: Ancillary Guard / Plinth Bulwark
+  talisman,  // Slot 5: Catalyst Talisman / Anima Focus
+  sigil,     // Slot 6: Sovereign Sigil / Crest
+}
+
+extension RelicSlotArmature on RelicSlot {
+  /// Master GDD §7.3 Armature Relic Gear Slot Names
+  String get armatureSlotName {
+    switch (this) {
+      case RelicSlot.weapon:
+        return 'Weapon Edge / Catalyst Tip';
+      case RelicSlot.armor:
+        return 'Core Plating / Harness';
+      case RelicSlot.boots:
+        return 'Kinetic Gyro / Piston Joint';
+      case RelicSlot.offhand:
+        return 'Ancillary Guard / Bulwark';
+      case RelicSlot.talisman:
+        return 'Catalyst Talisman / Focus';
+      case RelicSlot.sigil:
+        return 'Sovereign Sigil / Crest';
+    }
+  }
+
+  String get armatureRoleDescription {
+    switch (this) {
+      case RelicSlot.weapon:
+        return 'Base ATK & Critical Multipliers';
+      case RelicSlot.armor:
+        return 'Armor, Resistance & Max HP';
+      case RelicSlot.boots:
+        return 'Speed & AP Turn Rate';
+      case RelicSlot.offhand:
+        return 'Flat Defense & Guarding';
+      case RelicSlot.talisman:
+        return 'Critical Power & Focus';
+      case RelicSlot.sigil:
+        return 'All Attributes & Synergy';
+    }
+  }
+
+  bool get isCoreArmatureSlot =>
+      this == RelicSlot.weapon || this == RelicSlot.armor || this == RelicSlot.boots;
 }
 
 enum RelicSubStatType {
@@ -158,7 +198,18 @@ class RelicEntity {
     this.upgradeLevel = 0,
   });
 
-  String get displayName => upgradeLevel > 0 ? '$name +$upgradeLevel' : name;
+  String get displayName {
+    if (upgradeLevel >= 10) {
+      return '★ $name +10 [MASTERWORK]';
+    } else if (upgradeLevel > 0) {
+      return '$name +$upgradeLevel';
+    }
+    return name;
+  }
+
+  /// Whether relic has achieved the Masterwork Armature Awakening tier (+10)
+  bool get isMasterwork => upgradeLevel >= 10;
+  bool get canUpgrade => upgradeLevel < 10;
 
   /// Effective Crit Rate including both base weapon/item crit and all sub-stat rolls
   double get totalCritRate {
@@ -237,7 +288,7 @@ class RelicEntity {
     return acc;
   }
 
-  /// Total Attack including sub-stats
+  /// Total Attack including sub-stats and +10 Masterwork resonance
   int get totalAttack {
     int atk = bonusAttack;
     for (final s in subStats) {
@@ -245,10 +296,13 @@ class RelicEntity {
         atk += s.value.toInt();
       }
     }
+    if (isMasterwork) {
+      atk = (atk * 1.10).round();
+    }
     return atk;
   }
 
-  /// Total Defense including sub-stats
+  /// Total Defense including sub-stats and +10 Masterwork resonance
   int get totalDefense {
     int def = bonusDefense;
     for (final s in subStats) {
@@ -256,10 +310,13 @@ class RelicEntity {
         def += s.value.toInt();
       }
     }
+    if (isMasterwork) {
+      def = (def * 1.10).round();
+    }
     return def;
   }
 
-  /// Total HP including sub-stats
+  /// Total HP including sub-stats and +10 Masterwork resonance
   int get totalHp {
     int hp = bonusHp;
     for (final s in subStats) {
@@ -267,10 +324,13 @@ class RelicEntity {
         hp += s.value.toInt();
       }
     }
+    if (isMasterwork) {
+      hp = (hp * 1.10).round();
+    }
     return hp;
   }
 
-  /// Total Speed including sub-stats
+  /// Total Speed including sub-stats and +10 Masterwork resonance
   int get totalSpeed {
     int spd = bonusSpeed;
     for (final s in subStats) {
@@ -278,23 +338,25 @@ class RelicEntity {
         spd += s.value.toInt();
       }
     }
+    if (isMasterwork && spd > 0) {
+      spd = (spd * 1.10).round();
+    }
     return spd;
   }
 
   /// World promotion refinement cap (Tied to unlocked Chapter / World tier):
-  /// - Chapter 1: Refinement Cap +2
-  /// - Chapter 2: Refinement Cap +3
-  /// - Chapter 3+: Refinement Cap +5 (Master Refinement)
+  /// - Chapter 1: Refinement Cap +3
+  /// - Chapter 2: Refinement Cap +6
+  /// - Chapter 3+: Refinement Cap +10 (Master Armature Awakening)
   static int maxRefinementTierForChapter(int chapter) {
-    if (chapter <= 1) return 2;
-    if (chapter == 2) return 3;
-    return 5;
+    if (chapter <= 1) return 3;
+    if (chapter == 2) return 6;
+    return 10;
   }
 
   bool canUpgradeForChapter(int chapter) => upgradeLevel < maxRefinementTierForChapter(chapter);
-  bool get canUpgrade => upgradeLevel < 5;
-  int get upgradeCostIchor => (upgradeLevel + 1) * 75;
-  int get upgradeCostOre => (upgradeLevel + 1) * 10;
+  int get upgradeCostIchor => (upgradeLevel + 1) * 85;
+  int get upgradeCostOre => ((upgradeLevel + 1) * 6).clamp(5, 50);
 
   /// Mission-specific Relic Sets (different equipment sets themed to each mission / region):
   /// - Mission 1 (Ashen Perimeter): Ironclad (+DEF) & Tempest (+SPD)

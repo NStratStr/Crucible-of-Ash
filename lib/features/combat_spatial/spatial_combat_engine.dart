@@ -577,6 +577,12 @@ class SpatialCombatEngine extends ChangeNotifier {
           nativeTraitId: p.nativeTraitId,
           graftedTraitId: effectiveGraftId,
           chiseledTraitIds: p.chiseledTraitIds,
+          critRateBonus: relicBonuses.bonusCritRate,
+          critDamageBonus: relicBonuses.bonusCritDamage,
+          armorPenetrationBonus: relicBonuses.bonusArmorPenetration,
+          apRateMultiplier: 1.0 + (relicBonuses.bonusUltimateCharge * 0.4),
+          ultimateChargeBonus: relicBonuses.bonusUltimateCharge,
+          lifestealBonus: relicBonuses.bonusLifesteal,
         ));
       }
     } else {

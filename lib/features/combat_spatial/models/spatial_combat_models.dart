@@ -299,6 +299,14 @@ class CombatUnitState {
   int signatureCooldown; // 0 = Signature Skill Ready! Fires every 3rd action cycle (2 basic -> 1 skill)
   bool get isSignatureReady => signatureCooldown <= 0;
 
+  // Armature Relic Gear Bonuses (GDD §7.3)
+  double critRateBonus; // Weapon Edge / Catalyst Tip
+  double critDamageBonus; // Weapon Edge / Catalyst Tip
+  double armorPenetrationBonus; // Armor Piercing
+  double apRateMultiplier; // Kinetic Gyro / Piston Joint AP accumulation rate
+  double ultimateChargeBonus; // Ultimate / Focus generation
+  double lifestealBonus; // Sanguine Lifesteal on strike
+
   CombatUnitState({
     required this.id,
     required this.name,
@@ -355,6 +363,12 @@ class CombatUnitState {
     this.movedSinceLastTurn = false,
     this.actionCycleCount = 0,
     this.signatureCooldown = 0,
+    this.critRateBonus = 0.0,
+    this.critDamageBonus = 0.0,
+    this.armorPenetrationBonus = 0.0,
+    this.apRateMultiplier = 1.0,
+    this.ultimateChargeBonus = 0.0,
+    this.lifestealBonus = 0.0,
   })  : stagger = stagger ?? maxStagger,
         baseMaxHp = baseMaxHp ?? maxHp,
         isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
@@ -427,12 +441,13 @@ class CombatUnitState {
     return max(1, (attack * (1.0 - penalty)).round());
   }
 
-  /// Effective Speed factoring Poison decay (-2%/stack) and Haste (+35%)
+  /// Effective Speed factoring Poison decay (-2%/stack), Haste (+35%), and Kinetic Gyro AP rate
   int get effectiveSpeed {
     double mult = 1.0;
     if (isHasted) mult += 0.35;
     final penalty = (poisonStacks * 0.02).clamp(0.0, 0.40);
     mult -= penalty;
+    mult *= apRateMultiplier;
     return max(1, (speed * mult).round());
   }
 
@@ -824,7 +839,7 @@ class CombatUnitState {
   }
 
   /// Inflicts damage taking Slag Carapace, Aegis Shield, Armor, Vulnerable, and Freeze Shatter into account
-  int takeDamage(int rawDamage, {bool ignoreArmor = false, bool isPhysical = true}) {
+  int takeDamage(int rawDamage, {bool ignoreArmor = false, bool isPhysical = true, double armorPenetration = 0.0}) {
     if (isInvulnerable || isDowned) return 0;
 
     double finalDmg = rawDamage.toDouble();
@@ -850,7 +865,8 @@ class CombatUnitState {
       finalDmg *= 0.50; // -50% damage while Slag Carapace armor holds
     }
     if (!ignoreArmor) {
-      finalDmg *= (1.0 - physicalReductionRatio);
+      final effectiveReduction = (physicalReductionRatio * (1.0 - armorPenetration.clamp(0.0, 1.0))).clamp(0.0, 0.90);
+      finalDmg *= (1.0 - effectiveReduction);
     }
     int applied = max(1, finalDmg.round());
 

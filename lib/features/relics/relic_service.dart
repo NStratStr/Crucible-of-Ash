@@ -91,9 +91,10 @@ class RelicService extends ChangeNotifier {
     }
   }
 
-  /// Upgrades / Refines an existing relic (+1 to +5).
-  /// - Base stats scale by +25% per refinement tier.
-  /// - At refinement milestones (+2, +4, and +5), unlocks or boosts a Sub-Stat / Sub-Star (e.g. Crit Rate, Crit DMG, Speed, Lifesteal).
+  /// Upgrades / Refines an existing relic (+1 to +10 per GDD §7.3).
+  /// - Base stats scale by +20% per refinement tier.
+  /// - At +10, gains Masterwork Armature Awakening (+10% resonance across all attributes).
+  /// - At refinement milestones (+2, +4, +6, +8, and +10), unlocks or boosts a Sub-Stat / Sub-Star.
   RelicEntity upgradeRelic(String relicId) {
     final int idx = _relics.indexWhere((r) => r.id == relicId);
     if (idx == -1) {
@@ -101,14 +102,14 @@ class RelicService extends ChangeNotifier {
     }
     final current = _relics[idx];
     if (!current.canUpgrade) {
-      throw StateError('Relic has reached maximum refinement tier (+5).');
+      throw StateError('Relic has reached maximum refinement tier (+10).');
     }
 
     final int nextLevel = current.upgradeLevel + 1;
     final updatedSubStats = List<RelicSubStat>.from(current.subStats);
 
-    // Roll or boost sub-stats at milestones +2, +4, and +5
-    if (nextLevel == 2 || nextLevel == 4 || nextLevel == 5) {
+    // Roll or boost sub-stats at milestones +2, +4, +6, +8, and +10
+    if (nextLevel == 2 || nextLevel == 4 || nextLevel == 6 || nextLevel == 8 || nextLevel == 10) {
       final rollType = _randomSubStatType();
       final rollVal = _randomSubStatValue(rollType);
 
@@ -125,16 +126,35 @@ class RelicService extends ChangeNotifier {
 
     final upgraded = current.copyWith(
       upgradeLevel: nextLevel,
-      bonusAttack: (current.bonusAttack * 1.25).round(),
-      bonusDefense: (current.bonusDefense * 1.25).round(),
-      bonusHp: (current.bonusHp * 1.25).round(),
-      bonusSpeed: current.bonusSpeed > 0 ? current.bonusSpeed + 2 : 0,
+      bonusAttack: (current.bonusAttack * 1.20).round(),
+      bonusDefense: (current.bonusDefense * 1.20).round(),
+      bonusHp: (current.bonusHp * 1.20).round(),
+      bonusSpeed: current.bonusSpeed > 0 ? (current.bonusSpeed + 1 + (nextLevel % 2 == 0 ? 1 : 0)) : 0,
       subStats: updatedSubStats,
     );
 
     _relics[idx] = upgraded;
     notifyListeners();
     return upgraded;
+  }
+
+  /// Batch enhances a relic up to a target level (up to +10) if within chapter cap
+  RelicEntity batchEnhanceRelic({
+    required String relicId,
+    required int targetLevel,
+    int? maxChapter,
+  }) {
+    final int idx = _relics.indexWhere((r) => r.id == relicId);
+    if (idx == -1) throw ArgumentError('Relic $relicId not found.');
+
+    RelicEntity current = _relics[idx];
+    final int cap = maxChapter != null ? RelicEntity.maxRefinementTierForChapter(maxChapter) : 10;
+    final int finalTarget = targetLevel.clamp(1, cap);
+
+    while (current.upgradeLevel < finalTarget && current.canUpgrade) {
+      current = upgradeRelic(relicId);
+    }
+    return current;
   }
 
   RelicSubStatType _randomSubStatType() {
@@ -438,7 +458,7 @@ class RelicService extends ChangeNotifier {
     return [
       const RelicEntity(
         id: 'starter_relic_01',
-        name: 'Bloodhound Fang',
+        name: 'Bloodhound Weapon Edge',
         slot: RelicSlot.weapon,
         rarity: RelicRarity.rare,
         setType: RelicSetType.bloodleech,
@@ -464,7 +484,7 @@ class RelicService extends ChangeNotifier {
       ),
       const RelicEntity(
         id: 'starter_relic_03',
-        name: 'Ironclad Breastplate',
+        name: 'Ironclad Core Plating',
         slot: RelicSlot.armor,
         rarity: RelicRarity.rare,
         setType: RelicSetType.ironclad,
@@ -490,7 +510,7 @@ class RelicService extends ChangeNotifier {
       ),
       const RelicEntity(
         id: 'starter_relic_05',
-        name: 'Zephyr Stride Boots',
+        name: 'Zephyr Kinetic Gyro',
         slot: RelicSlot.boots,
         rarity: RelicRarity.rare,
         setType: RelicSetType.tempest,
