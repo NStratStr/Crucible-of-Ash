@@ -12,6 +12,7 @@ void main() {
 
     setUp(() {
       engine = SpatialCombatEngine();
+      engine.isAutoBattleMode = true;
     });
 
     test('Initializes "The Sunder at Ashen Gate" with multi-node behemoth and player squad', () {

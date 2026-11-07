@@ -5816,15 +5816,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       unitScaleMultiplier = 1.15;
     }
 
-    final double bossSpanWidth = isBoss ? (tileWidth * 2.2) : tileWidth;
+    final double bossSpanWidth = isBoss ? (tileWidth * 2.3) : tileWidth;
     final double baseWidth = isBoss ? bossSpanWidth * 0.70 : (tileWidth - 12) * unitScaleMultiplier;
-    final double baseHeight = isBoss ? 44 : (16 * unitScaleMultiplier);
+    final double baseHeight = isBoss ? 38 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
     // Elegant Wartune-style stage proportions:
     // Slightly enlarged characters stand handsomely grounded on their plinths with heroic presence!
-    final double modelWidth = (isBoss ? bossSpanWidth * 1.25 : tileWidth * 1.08 * unitScaleMultiplier).clamp(52.0, 300.0);
+    final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.08 * unitScaleMultiplier).clamp(52.0, 300.0);
     final double modelHeight = (isBoss
-        ? (tileHeight * 3.2).clamp(160.0, 320.0)
+        ? (tileHeight * 2.9).clamp(160.0, 320.0)
         : (tileHeight * 1.62 * unitScaleMultiplier).clamp(58.0, 175.0));
 
     return AnimatedContainer(
@@ -5833,9 +5833,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
       child: SizedBox(
         width: isBoss ? bossSpanWidth : tileWidth,
-        height: isBoss ? (tileHeight * 2.0) : tileHeight,
+        height: isBoss ? modelHeight : tileHeight,
         child: Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: [
             // 1. Tabletop 2.5D Contact Drop Shadow & Soft Ground Glow
@@ -5991,9 +5991,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
 
-            // 3. Status Badges & Selected Unit Indicator
+            // 3. Status Badges & Selected Unit Indicator (Positioned dynamically above the head of any model)
             Positioned(
-              top: isBoss ? -22 : -16,
+              bottom: modelHeight + 8,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -6388,7 +6388,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   : (t < 0.15 ? 0.85 + (t / 0.15) * 0.15 : 1.0);
 
               return Positioned(
-                top: (isBoss ? -34 : -26) - riseY,
+                bottom: modelHeight + 14 + riseY,
                 left: driftX != 0 ? driftX : null,
                 child: Opacity(
                   opacity: opacity,
@@ -6434,7 +6434,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             }),
             if (!_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired) && floatingPop != null)
               Positioned(
-                top: isBoss ? -34 : -26,
+                bottom: modelHeight + 14,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -6467,7 +6467,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // 4b. Tactical Spell Drag Hover: Phantom Damage & Effect Indicator Badge
             if (phantomEffect != null && floatingPop == null)
               Positioned(
-                top: isBoss ? -38 : -30,
+                bottom: modelHeight + 16,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                   decoration: BoxDecoration(
@@ -6582,20 +6582,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Crimson Slash, Fire/Light Shield, Sun Magic Circle)
-            // Encompasses the entire character model with a luminous radiant Aegis barrier dome
+            // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Radiant Celestial Aegis Dome Barrier)
+            // Fully encases the entire character model with a radiant arched forcefield dome from head to toe
             if (unit.aegisShield > 0)
               Positioned(
-                bottom: isBoss ? 4 : 2,
+                bottom: 0,
                 child: IgnorePointer(
                   child: Builder(
                     builder: (context) {
                       final double shieldWidth = isBoss
-                          ? (bossSpanWidth * 1.35)
-                          : (modelWidth * 1.55).clamp(130.0, 240.0);
+                          ? (bossSpanWidth * 1.25)
+                          : (modelWidth * 1.55).clamp(140.0, 240.0);
                       final double shieldHeight = isBoss
                           ? (modelHeight * 1.15)
-                          : (modelHeight * 1.40).clamp(130.0, 240.0);
+                          : (modelHeight * 1.25).clamp(140.0, 260.0);
                       final nowMs = DateTime.now().millisecondsSinceEpoch;
                       final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
 
@@ -6604,58 +6604,93 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         height: shieldHeight,
                         child: Stack(
                           alignment: Alignment.center,
+                          clipBehavior: Clip.none,
                           children: [
-                            // Radiant Aegis Barrier Dome Aura
+                            // Radiant Celestial Aegis Forcefield Dome
                             Container(
-                              width: shieldWidth * 0.86,
-                              height: shieldHeight * 0.86,
+                              width: shieldWidth,
+                              height: shieldHeight,
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(shieldWidth * 0.55),
+                                  bottom: Radius.circular(shieldWidth * 0.35),
+                                ),
                                 gradient: RadialGradient(
+                                  center: const Alignment(0, 0.05),
+                                  radius: 0.85,
                                   colors: [
-                                    const Color(0xFFFFD54F).withValues(alpha: 0.20),
-                                    const Color(0xFF00E5FF).withValues(alpha: 0.14),
+                                    const Color(0xFF00E5FF).withValues(alpha: 0.22),
+                                    const Color(0xFFFFD54F).withValues(alpha: 0.15),
+                                    const Color(0xFF00B0FF).withValues(alpha: 0.08),
                                     Colors.transparent,
                                   ],
-                                  stops: const [0.2, 0.7, 1.0],
+                                  stops: const [0.2, 0.55, 0.85, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: const Color(0xFFFFD54F).withValues(alpha: 0.50),
-                                  width: 1.5,
+                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.80),
+                                  width: 2.0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
-                                    blurRadius: 14,
+                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                                    blurRadius: 18,
                                     spreadRadius: 2,
                                   ),
                                   BoxShadow(
-                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                                    blurRadius: 10,
+                                    color: const Color(0xFFFFD54F).withValues(alpha: 0.30),
+                                    blurRadius: 12,
                                   ),
                                 ],
                               ),
                             ),
 
-                            // Dynamic Sprite VFX / Static Barrier
+                            // Dynamic Sprite VFX during spell trigger
                             if (isInitialCasting)
-                              SpriteSheetAnimation(
-                                assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
-                                columns: 3,
-                                rows: 3,
-                                totalFrames: 9,
-                                duration: const Duration(milliseconds: 1000),
-                                loop: false,
-                                fit: BoxFit.contain,
-                              )
-                            else
-                              Image.asset(
-                                'assets/animations/vfx/fire_shield_static.png',
-                                fit: BoxFit.contain,
-                                width: shieldWidth,
-                                height: shieldHeight,
-                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              SizedBox(
+                                width: shieldWidth * 1.1,
+                                height: shieldHeight * 1.1,
+                                child: SpriteSheetAnimation(
+                                  assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                                  columns: 3,
+                                  rows: 3,
+                                  totalFrames: 9,
+                                  duration: const Duration(milliseconds: 1000),
+                                  loop: false,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
+
+                            // Top Runic Aegis Crest Badge
+                            Positioned(
+                              top: -10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF004D40),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x9900E5FF), blurRadius: 6),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.shield, size: 9, color: Color(0xFF80D8FF)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      'AEGIS ${unit.aegisShield}',
+                                      style: const TextStyle(
+                                        fontSize: 7.0,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       );

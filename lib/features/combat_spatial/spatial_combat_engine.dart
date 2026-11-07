@@ -372,12 +372,21 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
       enemyUnits.add(bossUnit);
 
-      int minionIdx = 0;
+      // Allocate minions to vacant nodes outside the boss's multi-node footprint
+      final bossOccupied = bossUnit.occupiedNodes;
+      final vacantCandidates = [
+        const GridNode(column: 0, row: 2), // Backline top (Cinder Witch / Arcanum)
+        const GridNode(column: 0, row: 0), // Frontline top (Pyre Zealot / Flanker)
+        const GridNode(column: 0, row: 1), // Midline top
+        const GridNode(column: 1, row: 2), // Backline mid
+        const GridNode(column: 2, row: 2), // Backline bottom
+      ].where((n) => !bossOccupied.any((b) => b.column == n.column && b.row == n.row)).toList();
+
       for (int i = 1; i < waveEntities.length; i++) {
         final minion = waveEntities[i];
-        final col = (minionIdx % 2 == 0) ? 0 : 2;
-        final row = (minionIdx ~/ 2 == 0) ? 0 : 2;
-        minionIdx++;
+        final node = (i - 1 < vacantCandidates.length)
+            ? vacantCandidates[i - 1]
+            : GridNode(column: 0, row: (i - 1) % 3);
 
         enemyUnits.add(CombatUnitState(
           id: minion.id,
@@ -386,7 +395,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           isPlayer: false,
           footprint: UnitFootprint.single1x1,
           archetype: mapArchetypeToSpatial(minion.archetype),
-          occupiedNodes: [GridNode(column: col, row: row, occupantUnitId: minion.id)],
+          occupiedNodes: [GridNode(column: node.column, row: node.row, occupantUnitId: minion.id)],
           level: minion.level,
           maxHp: minion.maxHp,
           hp: minion.currentHp,
@@ -874,7 +883,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       speed: 110,
     );
 
-    // Pyre Zealot: 1x1 Striker in Col 5 Frontline (Col index 4, Row 0)
+    // Pyre Zealot: 1x1 Flanker in Col 0 Frontline (Top Lane)
     final pyreZealot = CombatUnitState(
       id: 'pyre_zealot',
       name: 'Pyre Zealot',
@@ -883,7 +892,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 2, row: 0, occupantUnitId: 'pyre_zealot'),
+        const GridNode(column: 2, row: 2, occupantUnitId: 'pyre_zealot'),
       ],
       maxHp: 410,
       hp: 410,

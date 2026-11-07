@@ -244,14 +244,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           final double centerX = (minX + maxX) / 2;
           final double centerY = (minY + maxY) / 2;
           final bool isQuadColossus = multiUnit.footprint == UnitFootprint.quadColossus2x2;
-          final double bossSpanWidth = tileWidth * (isQuadColossus ? 2.3 : 1.8);
-          final double bossSpanHeight = tileHeight * 2.8;
+          final double bossSpanWidth = tileWidth * (isQuadColossus ? 2.35 : 1.8);
+          final double bossSpanHeight = tileHeight * 3.1;
 
           // Natural Ground Baseline for the multi-node footprint:
-          // In 2.5D perspective, the central ground contact baseline of the 2x2 territory is at (minY + maxY)/2 + (tileHeight * 0.38)
-          final double groundBaselineY = centerY + (tileHeight * 0.38);
-          // Position boss so its bottom lava pedestal lands on groundBaselineY:
-          final double bossTop = groundBaselineY - bossSpanHeight + 8;
+          // In 2.5D perspective, the base of the 2x2 boss rests solidly across Col 1 and Col 2.
+          final double groundBaselineY = centerY + (tileHeight * 0.42);
+          final double bossTop = groundBaselineY - bossSpanHeight + 10;
           final double bossLeft = centerX - (bossSpanWidth / 2);
 
           final bool isSelected = isPlayer ? (selectedUnitId == multiUnit.id) : (selectedEnemyUnitId == multiUnit.id);
@@ -267,41 +266,35 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               clipBehavior: Clip.none,
               alignment: Alignment.bottomCenter,
               children: [
-                // 1. Unified Grand Colossus Territorial Base Plinth (Single commanding base under the boss)
+                // 1. Unified Molten Magma Underglow (Natural ambient terrain heat, seamless blend with dark battlefield)
                 Positioned(
-                  bottom: 2,
+                  bottom: 4,
                   child: IgnorePointer(
                     child: Container(
-                      width: bossSpanWidth * 0.92,
-                      height: tileHeight * 0.48,
+                      width: bossSpanWidth * 0.88,
+                      height: tileHeight * 0.44,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.all(Radius.elliptical(bossSpanWidth * 0.46, tileHeight * 0.24)),
+                        borderRadius: BorderRadius.all(Radius.elliptical(bossSpanWidth * 0.44, tileHeight * 0.22)),
                         gradient: RadialGradient(
-                          center: const Alignment(0, -0.15),
+                          center: const Alignment(0, -0.1),
                           radius: 0.85,
                           colors: isSelected
                               ? [
-                                  const Color(0x66FF1744),
-                                  const Color(0x221B0709),
+                                  const Color(0x77FF1744),
+                                  const Color(0x33FF5252),
                                   Colors.transparent,
                                 ]
                               : (isSecondaryCleave
                                   ? [
-                                      const Color(0x55FF9100),
-                                      const Color(0x221B0709),
+                                      const Color(0x66FF9100),
+                                      const Color(0x28FFB74D),
                                       Colors.transparent,
                                   ]
                                   : [
-                                      const Color(0x3538151A),
-                                      const Color(0x151B0709),
+                                      const Color(0x55E65100),
+                                      const Color(0x22BF360C),
                                       Colors.transparent,
                                   ]),
-                        ),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFFFF1744)
-                              : (isSecondaryCleave ? const Color(0xFFFF9100) : const Color(0x55FF5252)),
-                          width: isSelected ? 2.2 : (isSecondaryCleave ? 1.8 : 1.0),
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -311,13 +304,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                           ),
                           if (isSelected)
                             const BoxShadow(
-                              color: Color(0x99FF1744),
+                              color: Color(0x88FF1744),
                               blurRadius: 16,
                               spreadRadius: 2,
                             )
                           else if (isSecondaryCleave)
                             const BoxShadow(
-                              color: Color(0x88FF9100),
+                              color: Color(0x77FF9100),
                               blurRadius: 14,
                               spreadRadius: 2,
                             ),
@@ -327,37 +320,38 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
-                // 2. DragTarget & Single Boss Miniature
-                DragTarget<String>(
-                  onWillAcceptWithDetails: (details) {
-                    onTileHover(anchorNode.column, anchorNode.row, isPlayer);
-                    return true;
-                  },
-                  onLeave: (_) => onClearHover(),
-                  onAcceptWithDetails: (details) {
-                    final data = details.data;
-                    if (data.startsWith('card:')) {
-                      final cardId = data.replaceFirst('card:', '');
-                      onCastCard(cardId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
-                    } else if (data.startsWith('ultimate:')) {
-                      final ultId = data.replaceFirst('ultimate:', '');
-                      onCastUltimate(ultId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
-                    }
-                    onClearHover();
-                  },
-                  builder: (context, candidateData, rejectedData) {
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        if (isPlayer) {
-                          onSelectPlayerUnit(multiUnit.id);
-                        } else {
-                          onSelectEnemyUnit(multiUnit.id);
-                        }
-                      },
-                      onDoubleTap: () => onLongPressUnit?.call(multiUnit),
-                      onLongPress: () => onLongPressUnit?.call(multiUnit),
-                      child: Center(
+                // 2. DragTarget & Single Boss Miniature (Grounded firmly at bottomCenter)
+                Positioned(
+                  bottom: 0,
+                  child: DragTarget<String>(
+                    onWillAcceptWithDetails: (details) {
+                      onTileHover(anchorNode.column, anchorNode.row, isPlayer);
+                      return true;
+                    },
+                    onLeave: (_) => onClearHover(),
+                    onAcceptWithDetails: (details) {
+                      final data = details.data;
+                      if (data.startsWith('card:')) {
+                        final cardId = data.replaceFirst('card:', '');
+                        onCastCard(cardId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                      } else if (data.startsWith('ultimate:')) {
+                        final ultId = data.replaceFirst('ultimate:', '');
+                        onCastUltimate(ultId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                      }
+                      onClearHover();
+                    },
+                    builder: (context, candidateData, rejectedData) {
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (isPlayer) {
+                            onSelectPlayerUnit(multiUnit.id);
+                          } else {
+                            onSelectEnemyUnit(multiUnit.id);
+                          }
+                        },
+                        onDoubleTap: () => onLongPressUnit?.call(multiUnit),
+                        onLongPress: () => onLongPressUnit?.call(multiUnit),
                         child: buildUnitMiniature(
                           multiUnit,
                           tileWidth: tileWidth,
@@ -365,9 +359,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                           colGap: 0,
                           isSelected: isSelected || candidateData.isNotEmpty,
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
 
                 // 3. Single Overhead Target / Cleave Badge (Positioned once at the top of the giant boss)
@@ -427,7 +421,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   }) {
     final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
     final occupant = units.where((u) => (u.isAlive || u.isSolidObstacle) && u.occupies(col, row)).firstOrNull;
-    final bool isMultiNodeBoss = occupant != null && (occupant.occupiedNodes.length > 1 || occupant.footprint != UnitFootprint.single1x1);
+    final bool isPartOfMultiNodeBoss = units.any((u) => (u.isAlive || u.isSolidObstacle) && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1) && u.occupies(col, row));
+    final bool isMultiNodeBoss = isPartOfMultiNodeBoss;
     final bool isSelected = occupant != null && (isPlayer ? (selectedUnitId == occupant.id) : (selectedEnemyUnitId == occupant.id));
     final bool isHovered = hoveredTileCol == col && hoveredTileRow == row && isHoveredPlayerSide == isPlayer;
     final bool isSecondaryCleave = occupant != null && !isPlayer && (secondaryTargetEnemyIds?.contains(occupant.id) ?? false);
@@ -732,7 +727,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3b-pre. Pre-Battle Projected Target & Flank Reticle Badge
-              if (isTargetedInPreBattle && !isSelected)
+              if (!isMultiNodeBoss && isTargetedInPreBattle && !isSelected)
                 Positioned(
                   top: 2,
                   child: Container(
@@ -775,7 +770,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3b. Primary Target Lock Reticle Badge
-              if (!isPlayer && isSelected && (!isMultiNodeBoss || (occupant.occupiedNodes.isNotEmpty && occupant.occupiedNodes.first.column == col && occupant.occupiedNodes.first.row == row)))
+              if (!isMultiNodeBoss && !isPlayer && isSelected)
                 Positioned(
                   top: 2,
                   child: Container(
@@ -803,7 +798,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3c. Secondary Cleave / Splash Target Badge
-              if (!isPlayer && isSecondaryCleave && !isSelected && !isMultiNodeBoss)
+              if (!isMultiNodeBoss && !isPlayer && isSecondaryCleave && !isSelected)
                 Positioned(
                   top: 2,
                   child: Container(
@@ -900,14 +895,21 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
+                      final boss = units.firstWhere((u) => u.occupies(col, row));
                       if (isPlayer) {
-                        onSelectPlayerUnit(occupant.id);
+                        onSelectPlayerUnit(boss.id);
                       } else {
-                        onSelectEnemyUnit(occupant.id);
+                        onSelectEnemyUnit(boss.id);
                       }
                     },
-                    onDoubleTap: () => onLongPressUnit?.call(occupant),
-                    onLongPress: () => onLongPressUnit?.call(occupant),
+                    onDoubleTap: () {
+                      final boss = units.firstWhere((u) => u.occupies(col, row));
+                      onLongPressUnit?.call(boss);
+                    },
+                    onLongPress: () {
+                      final boss = units.firstWhere((u) => u.occupies(col, row));
+                      onLongPressUnit?.call(boss);
+                    },
                   ),
                 )
               else if (isMoveReachable)
