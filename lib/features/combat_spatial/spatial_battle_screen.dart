@@ -527,433 +527,470 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final targetOffset = target != null ? _getUnitCenterIsometricOffset(target) : const Offset(280, 200);
     final casterOffset = caster != null ? _getUnitCenterIsometricOffset(caster) : Offset(targetOffset.dx, targetOffset.dy + 80);
 
-    // Determine VFX visual flavor based on attack type & crit
-    String vfxType = 'slash';
-    Color primaryColor = const Color(0xFFFF5252);
-    Color secondaryColor = const Color(0xFFFF8A80);
-    int durationMs = 1100;
-
-    if (event.isAssistStrike) {
-      vfxType = 'slash';
-      primaryColor = const Color(0xFFFFD54F);
-      secondaryColor = const Color(0xFF00E5FF);
-      durationMs = 1450;
-      _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
-    } else if (event.isWallSplat) {
-      vfxType = 'shatter';
-      primaryColor = const Color(0xFFFF9100);
-      secondaryColor = const Color(0xFFFF1744);
-      durationMs = 1200;
-      _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
-    } else if (event.isUnitCollision) {
-      vfxType = 'shockwave';
-      primaryColor = const Color(0xFFFF5252);
-      secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 1100;
-      _playSfx('Heavy Body Crunch 02.wav');
-    } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
-      vfxType = 'bloodnova';
-      primaryColor = const Color(0xFFFF1744);
-      secondaryColor = const Color(0xFFD50000);
-      durationMs = 1450;
-      _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
-    } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
-      vfxType = 'slash';
-      primaryColor = const Color(0xFFFFD54F);
-      secondaryColor = const Color(0xFFFF1744);
-      durationMs = 1300;
-      _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
-    } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
-      vfxType = 'slash';
-      primaryColor = const Color(0xFF00E5FF);
-      secondaryColor = const Color(0xFFFF1744);
-      durationMs = 1200;
-      _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
-    } else if (event.skillName.contains('Celestial Surge')) {
-      vfxType = 'shockwave';
-      primaryColor = const Color(0xFF00E5FF);
-      secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 1350;
-      _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
-    } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
-      vfxType = 'bloodsiphon';
-      primaryColor = const Color(0xFFFF5252);
-      secondaryColor = const Color(0xFF880E4F);
-      durationMs = 1200;
-      _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
-    } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
-      vfxType = 'shatter';
-      primaryColor = const Color(0xFFFFD54F);
-      secondaryColor = const Color(0xFF00E5FF);
-      durationMs = 1350;
-      _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
-    } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
-      vfxType = 'arrow';
-      primaryColor = const Color(0xFFFFD54F);
-      secondaryColor = const Color(0xFFFF8A80);
-      durationMs = 950;
-      _playSfx('Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav');
-    } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
-      vfxType = 'firebolt';
-      primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
-      secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 1100;
-      _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
-    } else if (event.isHeal || event.skillName.contains('Phalanx')) {
-      vfxType = 'shockwave';
-      primaryColor = const Color(0xFF00E5FF);
-      secondaryColor = const Color(0xFF80D8FF);
-      durationMs = 1200;
-      _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
-    } else if (event.isCrit) {
-      vfxType = 'slash';
-      primaryColor = const Color(0xFFFF1744);
-      secondaryColor = const Color(0xFFFFD54F);
-      durationMs = 1300;
-      _playSfx('GOREBone_Bone Breaks Celery 01_JSE_GMP.wav');
-    } else {
-      _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
-    }
-
-    final newVfx = _CombatVfx(
-      id: 'vfx_${event.id}_$nowMs',
-      startOffset: casterOffset,
-      targetOffset: targetOffset,
-      primaryColor: primaryColor,
-      secondaryColor: secondaryColor,
-      type: vfxType,
-      durationMs: durationMs,
-      createdMs: nowMs,
-    );
-
-    // Spawn secondary target impact flashes/shockwaves for AOE / Cleave hits
-    final List<_CombatVfx> secondaryVfxList = [];
-    if (event.secondaryTargetHits.isNotEmpty) {
-      event.secondaryTargetHits.forEach((secId, secDmg) {
-        final secUnit = allUnits.where((u) => u.id == secId).firstOrNull;
-        if (secUnit != null) {
-          final secOffset = _getUnitCenterIsometricOffset(secUnit);
-          secondaryVfxList.add(_CombatVfx(
-            id: 'vfx_${event.id}_sec_${secId}_$nowMs',
-            startOffset: targetOffset,
-            targetOffset: secOffset,
-            primaryColor: primaryColor.withValues(alpha: 0.9),
-            secondaryColor: secondaryColor.withValues(alpha: 0.8),
-            type: vfxType == 'beam' ? 'shockwave' : vfxType,
-            durationMs: (durationMs * 0.85).round(),
-            createdMs: nowMs,
-          ));
-        }
-      });
-    }
-
-    // Visceral Thematic Death Bursts & Ragdoll Dissolves on Unit Defeat
-    if (target != null && !target.isAlive) {
-      final isBoss = target.id == 'gorgoroth_boss' || target.footprint != UnitFootprint.single1x1;
-      final String deathType = isBoss
-          ? 'death_boss'
-          : (target.bleedStacks > 0
-              ? 'death_bleed'
-              : (event.isHolyOrMagic ? 'death_solar' : 'death_kinetic'));
-      final Color deathColor = isBoss
-          ? const Color(0xFFFF3D00)
-          : (deathType == 'death_bleed'
-              ? const Color(0xFFFF1744)
-              : (deathType == 'death_solar' ? const Color(0xFFFFD54F) : const Color(0xFF90A4AE)));
-
-      _activeVfx.add(_CombatVfx(
-        id: 'death__',
-        startOffset: targetOffset,
-        targetOffset: targetOffset,
-        primaryColor: deathColor,
-        secondaryColor: isBoss ? const Color(0xFFFFD54F) : Colors.white70,
-        type: deathType,
-        durationMs: isBoss ? 1200 : 750,
-        createdMs: nowMs,
-      ));
-
-      if (isBoss) {
-        _triggerScreenShake(intensity: 14.0);
-        _triggerHitStop(durationMs: 250);
-        _triggerCameraImpactZoom(zoomScale: 1.15, durationMs: 1000);
-      }
-    }
-
-    // Check if this attack was a lethal finisher against the last enemy in wave/battle
-    final bool isLethalFinisher = target != null && !target.isPlayer && !target.isAlive && _engine.enemyUnits.where((u) => u.isAlive).isEmpty;
-    if (isLethalFinisher) {
-      _isSlowMoFinisher = true;
-      _triggerCameraImpactZoom(zoomScale: 1.09, durationMs: 900);
-      _playSfx('sfx_victory.wav');
-      final slowMoTimer = Timer(const Duration(milliseconds: 1000), () {
-        if (mounted) {
-          setState(() {
-            _isSlowMoFinisher = false;
-          });
-        }
-      });
-      _animTimers.add(slowMoTimer);
-    }
-
-    // Check if event is a player Ultimate Burst or Signature Skill
     final bool isUltimate = event.id.startsWith('ult_');
+    final bool isSignature = event.isSignatureSkill;
+    final bool hasNamedSkill = event.skillName.isNotEmpty &&
+        !event.isAssistStrike &&
+        !event.isWallSplat &&
+        !event.isUnitCollision &&
+        !event.skillName.toLowerCase().contains('basic strike') &&
+        !event.skillName.toLowerCase().contains('attack');
+
+    // Stage 1 Announcement Banner Duration:
+    // Display skill/ultimate herald first, then completely dissolve before playing attack animations & damage numbers!
+    int bannerDurationMs = 0;
     if (isUltimate && caster != null && caster.isPlayer) {
-      _activeUltimateUnit = caster;
-      _playSfx('sfx_spell.wav');
-    } else if (event.isSignatureSkill && caster != null) {
-      _activeSignatureUnit = caster;
-      _playSfx('sfx_spell.wav');
+      bannerDurationMs = 950;
+    } else if (isSignature && caster != null) {
+      bannerDurationMs = 750;
+    } else if (hasNamedSkill) {
+      bannerDurationMs = 650;
     }
 
-    // Trigger short Tactical Synergy Callout Banners
-    String? synergyText;
-    Color synergyColor = const Color(0xFFFFD54F);
-    final bool isBloodnova = event.skillName.contains('Bloodnova') || (event.skillName.contains('Vitae Eruption'));
-    if (isBloodnova) {
-      synergyText = '🩸 BLEED DETONATION!';
-      synergyColor = const Color(0xFFFF1744);
-    } else if (event.skillName.contains('Phalanx') || event.skillName.contains('Intercept')) {
-      synergyText = '🛡️ VANGUARD INTERCEPT!';
-      synergyColor = const Color(0xFF00E5FF);
-    } else if (event.isCrit && event.bleedStacks > 0) {
-      synergyText = '🩸 FLANKING CRIT EXPLOIT!';
-      synergyColor = const Color(0xFFFF9100);
-    } else if (event.skillName.contains('Shatter') || event.skillName.contains('SHATTERS')) {
-      synergyText = '⚡ AEGIS SHATTER!';
-      synergyColor = const Color(0xFFFFD54F);
-    }
+    void executePhysicalImpact() {
+      if (!mounted) return;
 
-    if (synergyText != null) {
-      _activeSynergyBannerText = synergyText;
-      _activeSynergyBannerColor = synergyColor;
-      Timer(const Duration(milliseconds: 1400), () {
-        if (mounted && _activeSynergyBannerText == synergyText) {
-          setState(() {
-            _activeSynergyBannerText = null;
-          });
-        }
+      // 1. Clear any active cut-in banner so the battlefield and damage numbers are completely unblocked!
+      setState(() {
+        _activeUltimateUnit = null;
+        _activeSignatureUnit = null;
+        _activeSkillName = null;
+        _activeSkillCaster = null;
+        _activeSkillCasterName = null;
       });
-    }
 
-    // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
-    final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
-    final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
+      final impactNowMs = DateTime.now().millisecondsSinceEpoch;
 
-    // Note: Keep the battlefield camera stationary; individual units lunge and shake on impact
-    // Dynamic Kinetic Camera Zoom & Hit-Stop on Crits / Ultimates / Boss Heavy Strikes
-    if (isHeavyImpact) {
-      // Kinetic Hit-Stop micro-freeze: 120ms on ultimates, 80ms on crits & boss strikes
-      _triggerHitStop(durationMs: isUltimate ? 120 : (isBossStrike ? 90 : 75));
-      // Action Cam Zoom on Ultimates (Suggestion 3)
-      _triggerCameraImpactZoom(
-        zoomScale: isUltimate ? 1.14 : (isBossStrike ? 1.07 : 1.04),
-        durationMs: isUltimate ? 600 : 280,
-      );
-      _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
-      _groundRipples.add(_GroundShockwaveRipple(
-        id: 'ripple_${event.id}_$nowMs',
-        origin: targetOffset,
-        color: (isBossStrike || isBloodnova || event.bleedStacks > 0)
-            ? const Color(0xFFFF1744) // Deep crimson necrotic/bleed shockwave
-            : (event.isHolyOrMagic || event.skillName.contains('Solar') || event.skillName.contains('Dawnbound') || event.skillName.contains('Brand'))
-                ? const Color(0xFFFFD54F) // Brilliant golden solar flash
-                : (event.isCrit ? const Color(0xFFFF9100) : const Color(0xFF00E5FF)),
-        maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
-        createdMs: nowMs,
-        durationMs: 650,
-      ));
-    }
+      // Determine VFX visual flavor based on attack type & crit
+      String vfxType = 'slash';
+      Color primaryColor = const Color(0xFFFF5252);
+      Color secondaryColor = const Color(0xFFFF8A80);
+      int durationMs = 1100;
 
-    // Spawn invocation rune at caster's plinth for active skill cast
-    final casterRuneVfx = _CombatVfx(
-      id: 'vfx_${event.id}_rune_$nowMs',
-      startOffset: casterOffset,
-      targetOffset: casterOffset,
-      primaryColor: primaryColor,
-      secondaryColor: secondaryColor,
-      type: 'rune_invocation',
-      durationMs: 700,
-      createdMs: nowMs,
-    );
-
-    setState(() {
-      _activeVfx.add(newVfx);
-      _activeVfx.add(casterRuneVfx);
-      _activeVfx.addAll(secondaryVfxList);
-      _attackingUnitId = event.attackerId;
-      _damagedUnitId = event.targetId;
-      _damagedUnitIds.clear();
-      _damagedUnitIds.add(event.targetId);
-      if (event.secondaryTargetHits.isNotEmpty) {
-        _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
-      }
-      _activeSkillName = event.skillName;
-      _activeSkillCasterName = event.attackerName;
-      _activeSkillCaster = caster;
-      _isPlayerSkillBanner = event.isPlayerAttacker;
-
-      // Construct distinct styled floating pop
-      String popText;
-      Color popColor;
-      Color popBorder;
-      double popSize = 11.0;
-      bool isCrit = event.isCrit || (target?.isStaggered == true);
-
-      if (event.isHeal) {
-        if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
-          popText = '+60 🛡️ AEGIS';
-          popColor = const Color(0xFF80D8FF);
-          popBorder = const Color(0xFF00E5FF);
-        } else if (event.skillName == 'Stoke the Embers') {
-          popText = '+2 ⚡ FOCUS';
-          popColor = const Color(0xFFFFD54F);
-          popBorder = const Color(0xFFFFC107);
-        } else {
-          popText = '+HEAL';
-          popColor = const Color(0xFF69F0AE);
-          popBorder = const Color(0xFF00E676);
-        }
+      if (event.isAssistStrike) {
+        vfxType = 'slash';
+        primaryColor = const Color(0xFFFFD54F);
+        secondaryColor = const Color(0xFF00E5FF);
+        durationMs = 1450;
+        _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
+      } else if (event.isWallSplat) {
+        vfxType = 'shatter';
+        primaryColor = const Color(0xFFFF9100);
+        secondaryColor = const Color(0xFFFF1744);
+        durationMs = 1200;
+        _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
+      } else if (event.isUnitCollision) {
+        vfxType = 'shockwave';
+        primaryColor = const Color(0xFFFF5252);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 1100;
+        _playSfx('Heavy Body Crunch 02.wav');
+      } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
+        vfxType = 'bloodnova';
+        primaryColor = const Color(0xFFFF1744);
+        secondaryColor = const Color(0xFFD50000);
+        durationMs = 1450;
+        _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
+      } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
+        vfxType = 'slash';
+        primaryColor = const Color(0xFFFFD54F);
+        secondaryColor = const Color(0xFFFF1744);
+        durationMs = 1300;
+        _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
+      } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
+        vfxType = 'slash';
+        primaryColor = const Color(0xFF00E5FF);
+        secondaryColor = const Color(0xFFFF1744);
+        durationMs = 1200;
+        _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
+      } else if (event.skillName.contains('Celestial Surge')) {
+        vfxType = 'shockwave';
+        primaryColor = const Color(0xFF00E5FF);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 1350;
+        _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
+      } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
+        vfxType = 'bloodsiphon';
+        primaryColor = const Color(0xFFFF5252);
+        secondaryColor = const Color(0xFF880E4F);
+        durationMs = 1200;
+        _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
+      } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
+        vfxType = 'shatter';
+        primaryColor = const Color(0xFFFFD54F);
+        secondaryColor = const Color(0xFF00E5FF);
+        durationMs = 1350;
+        _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
+      } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
+        vfxType = 'arrow';
+        primaryColor = const Color(0xFFFFD54F);
+        secondaryColor = const Color(0xFFFF8A80);
+        durationMs = 950;
+        _playSfx('Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav');
+      } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
+        vfxType = 'firebolt';
+        primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 1100;
+        _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
+      } else if (event.isHeal || event.skillName.contains('Phalanx')) {
+        vfxType = 'shockwave';
+        primaryColor = const Color(0xFF00E5FF);
+        secondaryColor = const Color(0xFF80D8FF);
+        durationMs = 1200;
+        _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
+      } else if (event.isCrit) {
+        vfxType = 'slash';
+        primaryColor = const Color(0xFFFF1744);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 1300;
+        _playSfx('GOREBone_Bone Breaks Celery 01_JSE_GMP.wav');
       } else {
-        if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
-          popText = '🩸 -${event.damage} BLOODNOVA!';
-          popColor = const Color(0xFFFF1744);
-          popBorder = const Color(0xFF880E4F);
-          popSize = 13.0;
-        } else if (event.skillName.contains('Sanguine Siphon')) {
-          popText = '🩸 -${event.damage} (DRAIN +3🩸)';
-          popColor = const Color(0xFFFF5252);
-          popBorder = const Color(0xFFB71C1C);
-          popSize = 12.0;
-        } else if (isCrit) {
-          popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '★ -${event.damage} CRIT!';
-          popColor = const Color(0xFFFFD54F);
-          popBorder = const Color(0xFFFF9100);
-          popSize = 14.5;
-        } else if (event.bleedStacks > 0) {
-          popText = '🩸 -${event.damage} (+${event.bleedStacks} Bleed)';
-          popColor = const Color(0xFFFF3D00);
-          popBorder = const Color(0xFFDD2C00);
-        } else {
-          popText = '-${event.damage}';
-          popColor = const Color(0xFFFF8A80);
-          popBorder = const Color(0xFFD50000);
-        }
+        _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
       }
 
-      _unitFloatingPops[event.targetId] = popText;
+      final newVfx = _CombatVfx(
+        id: 'vfx_${event.id}_$impactNowMs',
+        startOffset: casterOffset,
+        targetOffset: targetOffset,
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        type: vfxType,
+        durationMs: durationMs,
+        createdMs: impactNowMs,
+      );
 
-      // Allow natural stacking by not wiping existing active pops immediately
-      final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
-      final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (existingCount * 8.0);
-
-      _floatingPops.add(_FloatingCombatText(
-        id: 'pop_' + event.id + '_' + nowMs.toString(),
-        unitId: event.targetId,
-        text: popText,
-        color: popColor,
-        borderColor: popBorder,
-        fontSize: popSize,
-        isCrit: isCrit,
-        createdMs: nowMs,
-        durationMs: isCrit ? 2200 : 1750,
-        horizontalDrift: drift,
-      ));
-
-      // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
-      if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
-        final graftText = '🧬 ' + (event.graftedTraitProc ?? '');
-        _unitFloatingPops[event.attackerId] = graftText;
-        _floatingPops.add(_FloatingCombatText(
-          id: 'pop_graft_' + event.id + '_' + nowMs.toString(),
-          unitId: event.attackerId,
-          text: graftText,
-          color: const Color(0xFFEA80FC),
-          borderColor: const Color(0xFFD500F9),
-          fontSize: 10.5,
-          isCrit: false,
-          createdMs: nowMs,
-          durationMs: 1900,
-          horizontalDrift: 12.0,
-        ));
-      }
-
-      // Push floating popups for all secondary targets hit by multi-target / AOE spells
+      // Spawn secondary target impact flashes/shockwaves for AOE / Cleave hits
+      final List<_CombatVfx> secondaryVfxList = [];
       if (event.secondaryTargetHits.isNotEmpty) {
-        int secIndex = 0;
         event.secondaryTargetHits.forEach((secId, secDmg) {
-          final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
-          final secText = isSecBlood ? '🩸 - SPLASH' : '- CLEAVE';
-          _unitFloatingPops[secId] = secText;
-          secIndex++;
-          _floatingPops.add(_FloatingCombatText(
-            id: 'pop_' + event.id + '_' + secId + '_' + nowMs.toString(),
-            unitId: secId,
-            text: secText,
-            color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
-            borderColor: isSecBlood ? const Color(0xFF880E4F) : const Color(0xFFD50000),
-            fontSize: 11.5,
-            isCrit: false,
-            createdMs: nowMs,
-            durationMs: 1800,
-            horizontalDrift: (secIndex % 2 == 0 ? 10.0 : -10.0),
-          ));
-        });
-      }
-    });
-
-    // Clean up VFX after its duration
-    final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
-      if (mounted) {
-        setState(() {
-          _activeVfx.removeWhere((v) => v.id == newVfx.id || v.id == casterRuneVfx.id || secondaryVfxList.any((s) => s.id == v.id));
-          _floatingPops.removeWhere((p) => p.isExpired);
-          _groundRipples.removeWhere((r) => r.isExpired);
-        });
-      }
-    });
-    _animTimers.add(tVfx);
-
-    // Reset visual lunge & floating pops after 1100ms
-    final t1 = Timer(const Duration(milliseconds: 1600), () {
-      if (mounted) {
-        setState(() {
-          _attackingUnitId = null;
-          _damagedUnitId = null;
-          _damagedUnitIds.clear();
-          _unitFloatingPops.remove(event.targetId);
-          if (event.secondaryTargetHits.isNotEmpty) {
-            for (final sId in event.secondaryTargetHits.keys) {
-              _unitFloatingPops.remove(sId);
-            }
+          final secUnit = allUnits.where((u) => u.id == secId).firstOrNull;
+          if (secUnit != null) {
+            final secOffset = _getUnitCenterIsometricOffset(secUnit);
+            secondaryVfxList.add(_CombatVfx(
+              id: 'vfx_${event.id}_sec_${secId}_$impactNowMs',
+              startOffset: targetOffset,
+              targetOffset: secOffset,
+              primaryColor: primaryColor.withValues(alpha: 0.9),
+              secondaryColor: secondaryColor.withValues(alpha: 0.8),
+              type: vfxType == 'beam' ? 'shockwave' : vfxType,
+              durationMs: (durationMs * 0.85).round(),
+              createdMs: impactNowMs,
+            ));
           }
         });
       }
-    });
-    _animTimers.add(t1);
 
-    // Dismiss banner & resume combat ticks: extended pacing window to clearly absorb animations & floating text
-    final int pauseWindowMs = (isUltimate || event.isSignatureSkill) ? 2200 : (event.isAssistStrike || event.isKnockback ? 1200 : 1600);
-    final t2 = Timer(Duration(milliseconds: pauseWindowMs), () {
-      if (mounted) {
-        setState(() {
-          _activeSkillName = null;
-          _activeSkillCaster = null;
-          _activeUltimateUnit = null;
-          _activeSignatureUnit = null;
-        });
-        _isActionSequenceRunning = false;
-        if (_actionEventQueue.isNotEmpty) {
-          // 120ms staging gap between consecutive actions so attacks don't abruptly cut each other off
-          final tNext = Timer(const Duration(milliseconds: 120), () {
-            if (mounted) _drainNextCombatEvent();
-          });
-          _animTimers.add(tNext);
-        } else {
-          _engine.clearActiveAction();
+      // Visceral Thematic Death Bursts & Ragdoll Dissolves on Unit Defeat
+      if (target != null && !target.isAlive) {
+        final isBoss = target.id == 'gorgoroth_boss' || target.footprint != UnitFootprint.single1x1;
+        final String deathType = isBoss
+            ? 'death_boss'
+            : (target.bleedStacks > 0
+                ? 'death_bleed'
+                : (event.isHolyOrMagic ? 'death_solar' : 'death_kinetic'));
+        final Color deathColor = isBoss
+            ? const Color(0xFFFF3D00)
+            : (deathType == 'death_bleed'
+                ? const Color(0xFFFF1744)
+                : (deathType == 'death_solar' ? const Color(0xFFFFD54F) : const Color(0xFF90A4AE)));
+
+        _activeVfx.add(_CombatVfx(
+          id: 'death_${target.id}_$impactNowMs',
+          startOffset: targetOffset,
+          targetOffset: targetOffset,
+          primaryColor: deathColor,
+          secondaryColor: isBoss ? const Color(0xFFFFD54F) : Colors.white70,
+          type: deathType,
+          durationMs: isBoss ? 1200 : 750,
+          createdMs: impactNowMs,
+        ));
+
+        if (isBoss) {
+          _triggerScreenShake(intensity: 14.0);
+          _triggerHitStop(durationMs: 250);
+          _triggerCameraImpactZoom(zoomScale: 1.15, durationMs: 1000);
         }
       }
-    });
-    _animTimers.add(t2);
+
+      // Check if this attack was a lethal finisher against the last enemy in wave/battle
+      final bool isLethalFinisher = target != null && !target.isPlayer && !target.isAlive && _engine.enemyUnits.where((u) => u.isAlive).isEmpty;
+      if (isLethalFinisher) {
+        _isSlowMoFinisher = true;
+        _triggerCameraImpactZoom(zoomScale: 1.09, durationMs: 900);
+        _playSfx('sfx_victory.wav');
+        final slowMoTimer = Timer(const Duration(milliseconds: 1000), () {
+          if (mounted) {
+            setState(() {
+              _isSlowMoFinisher = false;
+            });
+          }
+        });
+        _animTimers.add(slowMoTimer);
+      }
+
+      // Trigger short Tactical Synergy Callout Banners
+      String? synergyText;
+      Color synergyColor = const Color(0xFFFFD54F);
+      final bool isBloodnova = event.skillName.contains('Bloodnova') || (event.skillName.contains('Vitae Eruption'));
+      if (isBloodnova) {
+        synergyText = '🩸 BLEED DETONATION!';
+        synergyColor = const Color(0xFFFF1744);
+      } else if (event.skillName.contains('Phalanx') || event.skillName.contains('Intercept')) {
+        synergyText = '🛡️ VANGUARD INTERCEPT!';
+        synergyColor = const Color(0xFF00E5FF);
+      } else if (event.isCrit && event.bleedStacks > 0) {
+        synergyText = '🩸 FLANKING CRIT EXPLOIT!';
+        synergyColor = const Color(0xFFFF9100);
+      } else if (event.skillName.contains('Shatter') || event.skillName.contains('SHATTERS')) {
+        synergyText = '⚡ AEGIS SHATTER!';
+        synergyColor = const Color(0xFFFFD54F);
+      }
+
+      if (synergyText != null) {
+        _activeSynergyBannerText = synergyText;
+        _activeSynergyBannerColor = synergyColor;
+        Timer(const Duration(milliseconds: 1400), () {
+          if (mounted && _activeSynergyBannerText == synergyText) {
+            setState(() {
+              _activeSynergyBannerText = null;
+            });
+          }
+        });
+      }
+
+      // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
+      final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
+      final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
+
+      if (isHeavyImpact) {
+        _triggerHitStop(durationMs: isUltimate ? 120 : (isBossStrike ? 90 : 75));
+        _triggerCameraImpactZoom(
+          zoomScale: isUltimate ? 1.14 : (isBossStrike ? 1.07 : 1.04),
+          durationMs: isUltimate ? 600 : 280,
+        );
+        _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
+        _groundRipples.add(_GroundShockwaveRipple(
+          id: 'ripple_${event.id}_$impactNowMs',
+          origin: targetOffset,
+          color: (isBossStrike || isBloodnova || event.bleedStacks > 0)
+              ? const Color(0xFFFF1744)
+              : (event.isHolyOrMagic || event.skillName.contains('Solar') || event.skillName.contains('Dawnbound') || event.skillName.contains('Brand'))
+                  ? const Color(0xFFFFD54F)
+                  : (event.isCrit ? const Color(0xFFFF9100) : const Color(0xFF00E5FF)),
+          maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
+          createdMs: impactNowMs,
+          durationMs: 650,
+        ));
+      }
+
+      setState(() {
+        _activeVfx.add(newVfx);
+        _activeVfx.addAll(secondaryVfxList);
+        _attackingUnitId = event.attackerId;
+        _damagedUnitId = event.targetId;
+        _damagedUnitIds.clear();
+        _damagedUnitIds.add(event.targetId);
+        if (event.secondaryTargetHits.isNotEmpty) {
+          _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
+        }
+
+        // Construct distinct styled floating pop
+        String popText;
+        Color popColor;
+        Color popBorder;
+        double popSize = 11.0;
+        bool isCrit = event.isCrit || (target?.isStaggered == true);
+
+        if (event.isHeal) {
+          if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
+            popText = '+60 🛡️ AEGIS';
+            popColor = const Color(0xFF80D8FF);
+            popBorder = const Color(0xFF00E5FF);
+          } else if (event.skillName == 'Stoke the Embers') {
+            popText = '+2 ⚡ FOCUS';
+            popColor = const Color(0xFFFFD54F);
+            popBorder = const Color(0xFFFFC107);
+          } else {
+            popText = '+HEAL';
+            popColor = const Color(0xFF69F0AE);
+            popBorder = const Color(0xFF00E676);
+          }
+        } else {
+          if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
+            popText = '🩸 -${event.damage} BLOODNOVA!';
+            popColor = const Color(0xFFFF1744);
+            popBorder = const Color(0xFF880E4F);
+            popSize = 13.0;
+          } else if (event.skillName.contains('Sanguine Siphon')) {
+            popText = '🩸 -${event.damage} (DRAIN +3🩸)';
+            popColor = const Color(0xFFFF5252);
+            popBorder = const Color(0xFFB71C1C);
+            popSize = 12.0;
+          } else if (isCrit) {
+            popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '★ -${event.damage} CRIT!';
+            popColor = const Color(0xFFFFD54F);
+            popBorder = const Color(0xFFFF9100);
+            popSize = 14.5;
+          } else if (event.bleedStacks > 0) {
+            popText = '🩸 -${event.damage} (+${event.bleedStacks} Bleed)';
+            popColor = const Color(0xFFFF3D00);
+            popBorder = const Color(0xFFDD2C00);
+          } else {
+            popText = '-${event.damage}';
+            popColor = const Color(0xFFFF8A80);
+            popBorder = const Color(0xFFD50000);
+          }
+        }
+
+        _unitFloatingPops[event.targetId] = popText;
+
+        // Allow natural stacking by not wiping existing active pops immediately
+        final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
+        final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (existingCount * 8.0);
+
+        _floatingPops.add(_FloatingCombatText(
+          id: 'pop_${event.id}_$impactNowMs',
+          unitId: event.targetId,
+          text: popText,
+          color: popColor,
+          borderColor: popBorder,
+          fontSize: popSize,
+          isCrit: isCrit,
+          createdMs: impactNowMs,
+          durationMs: isCrit ? 2200 : 1750,
+          horizontalDrift: drift,
+        ));
+
+        // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
+        if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
+          final graftText = '🧬 ${event.graftedTraitProc ?? ''}';
+          _unitFloatingPops[event.attackerId] = graftText;
+          _floatingPops.add(_FloatingCombatText(
+            id: 'pop_graft_${event.id}_$impactNowMs',
+            unitId: event.attackerId,
+            text: graftText,
+            color: const Color(0xFFEA80FC),
+            borderColor: const Color(0xFFD500F9),
+            fontSize: 10.5,
+            isCrit: false,
+            createdMs: impactNowMs,
+            durationMs: 1900,
+            horizontalDrift: 12.0,
+          ));
+        }
+
+        // Push floating popups for all secondary targets hit by multi-target / AOE spells
+        if (event.secondaryTargetHits.isNotEmpty) {
+          int secIndex = 0;
+          event.secondaryTargetHits.forEach((secId, secDmg) {
+            final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
+            final secText = isSecBlood ? '🩸 - SPLASH' : '- CLEAVE';
+            _unitFloatingPops[secId] = secText;
+            secIndex++;
+            _floatingPops.add(_FloatingCombatText(
+              id: 'pop_${event.id}_${secId}_$impactNowMs',
+              unitId: secId,
+              text: secText,
+              color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
+              borderColor: isSecBlood ? const Color(0xFF880E4F) : const Color(0xFFD50000),
+              fontSize: 11.5,
+              isCrit: false,
+              createdMs: impactNowMs,
+              durationMs: 1800,
+              horizontalDrift: (secIndex % 2 == 0 ? 10.0 : -10.0),
+            ));
+          });
+        }
+      });
+
+      // Clean up VFX after its duration
+      final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
+        if (mounted) {
+          setState(() {
+            _activeVfx.removeWhere((v) => v.id == newVfx.id || secondaryVfxList.any((s) => s.id == v.id));
+            _floatingPops.removeWhere((p) => p.isExpired);
+            _groundRipples.removeWhere((r) => r.isExpired);
+          });
+        }
+      });
+      _animTimers.add(tVfx);
+
+      // Reset visual lunge & floating pops after 1400ms
+      final t1 = Timer(const Duration(milliseconds: 1400), () {
+        if (mounted) {
+          setState(() {
+            _attackingUnitId = null;
+            _damagedUnitId = null;
+            _damagedUnitIds.clear();
+            _unitFloatingPops.remove(event.targetId);
+            if (event.secondaryTargetHits.isNotEmpty) {
+              for (final sId in event.secondaryTargetHits.keys) {
+                _unitFloatingPops.remove(sId);
+              }
+            }
+          });
+        }
+      });
+      _animTimers.add(t1);
+
+      // Conclude action sequence and advance to next event
+      final int animRestMs = (isUltimate || isSignature) ? 1500 : (event.isAssistStrike || event.isKnockback ? 950 : 1200);
+      final t2 = Timer(Duration(milliseconds: animRestMs), () {
+        if (mounted) {
+          _isActionSequenceRunning = false;
+          if (_actionEventQueue.isNotEmpty) {
+            // 100ms staging gap between consecutive actions so attacks don't abruptly cut each other off
+            final tNext = Timer(const Duration(milliseconds: 100), () {
+              if (mounted) _drainNextCombatEvent();
+            });
+            _animTimers.add(tNext);
+          } else {
+            _engine.clearActiveAction();
+          }
+        }
+      });
+      _animTimers.add(t2);
+    }
+
+    // STAGE 1: Display Banner first if skill is an Ultimate, Signature, or Named Spell
+    if (bannerDurationMs > 0) {
+      setState(() {
+        if (isUltimate && caster != null && caster.isPlayer) {
+          _activeUltimateUnit = caster;
+          _playSfx('sfx_spell.wav');
+        } else if (isSignature && caster != null) {
+          _activeSignatureUnit = caster;
+          _activeSkillName = event.skillName;
+          _playSfx('sfx_spell.wav');
+        } else {
+          _activeSkillName = event.skillName;
+          _activeSkillCasterName = event.attackerName;
+          _activeSkillCaster = caster;
+          _isPlayerSkillBanner = event.isPlayerAttacker;
+          _playSfx('sfx_spell.wav');
+        }
+        // Channeling invocation rune under caster's plinth during announcement
+        _activeVfx.add(_CombatVfx(
+          id: 'vfx_${event.id}_rune_$nowMs',
+          startOffset: casterOffset,
+          targetOffset: casterOffset,
+          primaryColor: const Color(0xFFFFD54F),
+          secondaryColor: const Color(0xFF00E5FF),
+          type: 'rune_invocation',
+          durationMs: bannerDurationMs,
+          createdMs: nowMs,
+        ));
+      });
+
+      // Once banner has been displayed, dismiss it and trigger the full-screen unobstructed attack animation!
+      final bannerTimer = Timer(Duration(milliseconds: bannerDurationMs), () {
+        executePhysicalImpact();
+      });
+      _animTimers.add(bannerTimer);
+    } else {
+      executePhysicalImpact();
+    }
   }
 
   void _startLoop() {

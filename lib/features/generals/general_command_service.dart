@@ -119,6 +119,45 @@ class GeneralProfile {
     requiredPhylacteryRank: 1,
   );
 
+  static const GeneralOrderDefinition solarAegisOrder = GeneralOrderDefinition(
+    id: 'solar_aegis',
+    name: 'SOLAR AEGIS',
+    focusCost: 2,
+    description: 'Envelop targeted ally in a 400 HP radiant barrier that absorbs damage and cleanses debuffs.',
+    icon: Icons.brightness_high,
+    requiresTargetAlly: true,
+    requiredPhylacteryRank: 1,
+  );
+
+  static const GeneralOrderDefinition purgingLightOrder = GeneralOrderDefinition(
+    id: 'purging_light',
+    name: 'PURGING LIGHT',
+    focusCost: 2,
+    description: 'Channel searing sunlight dealing 250 Holy DMG plus bonus true damage equal to 50% target Armor.',
+    icon: Icons.flare,
+    requiresTargetEnemy: true,
+    requiredPhylacteryRank: 2,
+  );
+
+  static const GeneralOrderDefinition dawnResurgenceOrder = GeneralOrderDefinition(
+    id: 'dawn_resurgence',
+    name: 'DAWN RESURGENCE',
+    focusCost: 3,
+    description: 'Resurrect fallen ally with 50% HP and grant all frontline allies +30 Armor.',
+    icon: Icons.wb_sunny,
+    requiresTargetAlly: true,
+    requiredPhylacteryRank: 3,
+  );
+
+  static const GeneralOrderDefinition hallowedGroundOrder = GeneralOrderDefinition(
+    id: 'hallowed_ground',
+    name: 'HALLOWED GROUND',
+    focusCost: 1,
+    description: 'Consecrate the vanguard lane: frontline allies gain +25% Armor and reflect 15% damage.',
+    icon: Icons.add_moderator,
+    requiredPhylacteryRank: 1,
+  );
+
   static const List<GeneralProfile> allGenerals = [
     GeneralProfile(
       type: GeneralType.vladislav,
@@ -375,6 +414,10 @@ class GeneralCommandService extends ChangeNotifier {
     GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'stand_resolute'),
     GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
     GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'smite_the_wicked'),
+    GeneralProfile.solarAegisOrder,
+    GeneralProfile.purgingLightOrder,
+    GeneralProfile.dawnResurgenceOrder,
+    GeneralProfile.hallowedGroundOrder,
     // Malakor
     GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'corpse_burst'),
     GeneralProfile.getByType(GeneralType.malakor).orders.firstWhere((o) => o.id == 'virulent_cascade'),
@@ -406,6 +449,18 @@ class GeneralCommandService extends ChangeNotifier {
         o.id != 'disrupting_cleave' &&
         o.id != 'blood_boil').toList();
 
+    if (type == GeneralType.valeria) {
+      return [
+        ...signatureOrders,
+        GeneralProfile.solarAegisOrder,
+        GeneralProfile.purgingLightOrder,
+        GeneralProfile.dawnResurgenceOrder,
+        GeneralProfile.hallowedGroundOrder,
+        GeneralProfile.ironBulwarkOrder,
+        GeneralProfile.disruptingCleaveOrder,
+        GeneralProfile.sanguineRevivalOrder,
+      ];
+    }
     return [
       ...signatureOrders,
       GeneralProfile.rendFleshOrder,
@@ -630,10 +685,9 @@ class GeneralCommandService extends ChangeNotifier {
   }
 
   void _validateOrderUnlocked(String orderId) {
-    final order = currentProfile.orders.firstWhere(
-      (o) => o.id == orderId,
-      orElse: () => throw ArgumentError('Unknown order $orderId for ${currentProfile.name}.'),
-    );
+    final order = currentProfile.orders.where((o) => o.id == orderId).firstOrNull ??
+        findOrderById(orderId) ??
+        (throw ArgumentError('Unknown order $orderId for ${currentProfile.name}.'));
     if (!isOrderUnlocked(order)) {
       throw StateError(
         'Order ${order.name} is sealed! Requires Phylactery Rank ${order.requiredPhylacteryRank}. Anoint ${currentProfile.name} in the Phylactery.',
@@ -676,11 +730,11 @@ class GeneralCommandService extends ChangeNotifier {
           GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
           GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'retributive_stride'),
           GeneralProfile.getByType(GeneralType.valeria).orders.firstWhere((o) => o.id == 'smite_the_wicked'),
+          GeneralProfile.solarAegisOrder,
+          GeneralProfile.purgingLightOrder,
+          GeneralProfile.hallowedGroundOrder,
+          GeneralProfile.dawnResurgenceOrder,
           GeneralProfile.ironBulwarkOrder,
-          GeneralProfile.ironBulwarkOrder,
-          GeneralProfile.disruptingCleaveOrder,
-          GeneralProfile.disruptingCleaveOrder,
-          GeneralProfile.sanguineRevivalOrder,
         ]; // Exactly 10 cards
       case GeneralType.malakor:
         return [
@@ -1414,6 +1468,186 @@ class GeneralCommandService extends ChangeNotifier {
       focusSpent: cost,
       remainingFocus: _currentFocus,
       summary: 'Radiant Smite channeled total armor ($totalBrigadeArmor DEF) dealing $radiantDamage holy damage to ${target.name}!',
+      updatedAllies: allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Solar Aegis (Cost: 2 Focus)
+  /// Envelop target ally in a 400 HP radiant barrier that absorbs damage and cleanses 1 debuff.
+  OrderResult executeSolarAegis(String targetAllyId) {
+    _validateOrderUnlocked('solar_aegis');
+    const int cost = 2;
+    _spendFocus(cost);
+
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final int allyIdx = allies.indexWhere((u) => u.id == targetAllyId && u.isAlive);
+    if (allyIdx == -1) {
+      throw ArgumentError('Target ally $targetAllyId not found or already defeated.');
+    }
+
+    final target = allies[allyIdx];
+    final int shieldAmount = (400 * potencyMultiplier).round();
+    final updatedEffects = List<StatusEffect>.of(target.activeEffects);
+
+    final debuffIdx = updatedEffects.indexWhere((e) =>
+        e.type == StatusEffectType.bleed ||
+        e.type == StatusEffectType.blight ||
+        e.type == StatusEffectType.burn ||
+        e.type == StatusEffectType.stun);
+    if (debuffIdx != -1) {
+      updatedEffects.removeAt(debuffIdx);
+    }
+    updatedEffects.add(StatusEffect(
+      type: StatusEffectType.shield,
+      durationTurns: 3,
+      value: shieldAmount,
+    ));
+
+    allies[allyIdx] = target.copyWith(activeEffects: updatedEffects);
+
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('solar_aegis');
+
+    return OrderResult(
+      orderId: 'solar_aegis',
+      orderName: 'Solar Aegis',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Blessed ${target.name} with Solar Aegis (+$shieldAmount Shield and cleansed debuffs)!',
+      updatedAllies: allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Purging Light (Cost: 2 Focus)
+  /// Channel searing sunlight dealing 250 Holy DMG plus bonus true damage equal to 50% target Armor.
+  OrderResult executePurgingLight(String targetEnemyId) {
+    _validateOrderUnlocked('purging_light');
+    const int cost = 2;
+    _spendFocus(cost);
+
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+
+    final int enemyIdx = enemies.indexWhere((u) => u.id == targetEnemyId && u.isAlive);
+    if (enemyIdx == -1) {
+      throw ArgumentError('Target enemy $targetEnemyId not found or already defeated.');
+    }
+
+    final target = enemies[enemyIdx];
+    final int baseHoly = (250 * potencyMultiplier).round();
+    final int armorBonusTrueDmg = (target.defense * 0.50).round();
+    final double prr = CombatMath.calculatePrr(target.defense);
+    final int netHoly = max(1, (baseHoly * (1.0 - prr)).round());
+    final int totalDmg = netHoly + armorBonusTrueDmg;
+    final int newHp = max(0, target.currentHp - totalDmg);
+
+    enemies[enemyIdx] = target.copyWith(currentHp: newHp);
+
+    _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('purging_light');
+
+    return OrderResult(
+      orderId: 'purging_light',
+      orderName: 'Purging Light',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Purging Light pierced ${target.name} for $totalDmg Holy DMG ($netHoly holy + $armorBonusTrueDmg true damage)!',
+      updatedAllies: allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Dawn Resurgence (Cost: 3 Focus)
+  /// Resurrect fallen ally with 50% HP and grant all frontline allies +30 Armor.
+  /// Strictly blocked during Terminal Collapse.
+  OrderResult executeDawnResurgence(String targetAllyId) {
+    if (tickManager.areRevivesDisabled) {
+      throw StateError('Revives are permanently disabled during Terminal Collapse (The Ashen Reckoning).');
+    }
+    _validateOrderUnlocked('dawn_resurgence');
+    const int cost = 3;
+    _spendFocus(cost);
+
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    final int allyIdx = allies.indexWhere((u) => u.id == targetAllyId && !u.isAlive);
+    if (allyIdx == -1) {
+      throw ArgumentError('Target ally $targetAllyId is either not found or already alive.');
+    }
+
+    final fallen = allies[allyIdx];
+    final int revivedHp = max(1, (fallen.maxHp * 0.50).round());
+    final updatedEffects = List<StatusEffect>.of(fallen.activeEffects);
+    updatedEffects.add(const StatusEffect(
+      type: StatusEffectType.invulnerable,
+      durationTurns: 1,
+    ));
+
+    allies[allyIdx] = fallen.copyWith(
+      currentHp: revivedHp,
+      reviveCount: fallen.reviveCount + 1,
+      activeEffects: updatedEffects,
+    );
+
+    for (int i = 0; i < allies.length; i++) {
+      if (allies[i].isAlive && allies[i].isVanguard) {
+        allies[i] = allies[i].copyWith(defense: allies[i].defense + 30);
+      }
+    }
+
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('dawn_resurgence');
+
+    return OrderResult(
+      orderId: 'dawn_resurgence',
+      orderName: 'Dawn Resurgence',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Dawn Resurgence revives ${fallen.name} with $revivedHp HP and fortifies Vanguard with +30 Armor!',
+      updatedAllies: allies,
+      updatedEnemies: enemies,
+    );
+  }
+
+  /// Hallowed Ground (Cost: 1 Focus)
+  /// Consecrate the vanguard lane: frontline allies gain +25% Armor and reflect 15% damage.
+  OrderResult executeHallowedGround() {
+    _validateOrderUnlocked('hallowed_ground');
+    const int cost = 1;
+    _spendFocus(cost);
+
+    final List<UnitEntity> allies = List.of(tickManager.allies);
+    int fortifiedCount = 0;
+    for (int i = 0; i < allies.length; i++) {
+      if (allies[i].isAlive && allies[i].isVanguard) {
+        final ally = allies[i];
+        final int armorBoost = ((ally.defense * 0.25) * potencyMultiplier).round();
+        final updatedEffects = List<StatusEffect>.of(ally.activeEffects);
+        updatedEffects.add(const StatusEffect(
+          type: StatusEffectType.defenseUp,
+          durationTurns: 2,
+        ));
+        allies[i] = ally.copyWith(
+          defense: ally.defense + armorBoost,
+          activeEffects: updatedEffects,
+        );
+        fortifiedCount++;
+      }
+    }
+
+    final List<UnitEntity> enemies = List.of(tickManager.enemies);
+    _applyStateToTickManager(allies, enemies);
+    _onCardPlayed('hallowed_ground');
+
+    return OrderResult(
+      orderId: 'hallowed_ground',
+      orderName: 'Hallowed Ground',
+      focusSpent: cost,
+      remainingFocus: _currentFocus,
+      summary: 'Hallowed Ground sanctified $fortifiedCount Vanguard allies (+25% Armor & Retribution)!',
       updatedAllies: allies,
       updatedEnemies: enemies,
     );

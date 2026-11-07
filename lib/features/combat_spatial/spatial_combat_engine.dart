@@ -2401,6 +2401,59 @@ class SpatialCombatEngine extends ChangeNotifier {
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
       pattern = TargetPattern.stAshlarCross;
       addLog('★ SIGNATURE SKILL: ${unit.name} weaves $skillName on ${target.name} for $dmg DMG (+3 Poison & Vulnerable)!');
+    } else if (key.contains('void_bound') || (key.contains('sentinel') && key.contains('obsidian'))) {
+      final rawDmg = (unit.effectiveAttack * 1.40).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      target.armor = max(0, target.armor - 20);
+      unit.aegisShield += 35;
+      unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      for (final other in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.currentDepth == target.currentDepth)) {
+        final shock = other.takeDamage(30, isPhysical: false);
+        secondaryHits[other.id] = shock;
+      }
+      pattern = TargetPattern.horizontalRowScythe;
+      addLog('★ SIGNATURE SKILL: ${unit.name} triggers $skillName for $dmg DMG, pulses arcane shockwave, and gains +35 Aegis!');
+    } else if (key.contains('void_ripper') || key.contains('shadow_flayer')) {
+      final lowestEhpTarget = opposingSquad.where((u) => u.isAlive).toList()
+        ..sort((a, b) => a.ehp.compareTo(b.ehp));
+      final actualTarget = lowestEhpTarget.firstOrNull ?? target;
+      final rawDmg = (unit.effectiveAttack * 1.65).round();
+      dmg = actualTarget.takeDamage(rawDmg, isPhysical: true);
+      actualTarget.bleedStacks += 2;
+      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2000);
+      pattern = TargetPattern.reachMidToFront;
+      addLog('★ SIGNATURE SKILL: ${unit.name} phases behind ${actualTarget.name} with $skillName for $dmg CRIT DMG (+2 Bleed, +2,000 AP)!');
+    } else if (key.contains('void_ray') || key.contains('acolyte_slinger')) {
+      final rawDmg = (unit.effectiveAttack * 1.55).round();
+      dmg = target.takeDamage(rawDmg, ignoreArmor: true, isPhysical: false);
+      target.sunderArmor(0.20);
+      pattern = TargetPattern.piercingColumnSkewer;
+      addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName piercing ${target.name} for $dmg True DMG & sunders 20% Armor!');
+    } else if (key.contains('arch_warlock') || key.contains('cultist_apprentice')) {
+      final rawDmg = (unit.effectiveAttack * 1.50).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      target.currentAp = max(0, target.currentAp - 2000);
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      for (final other in opposingSquad.where((u) => u.isAlive && u.id != target.id).take(2)) {
+        final pull = other.takeDamage(35, isPhysical: false);
+        other.currentAp = max(0, other.currentAp - 1000);
+        secondaryHits[other.id] = pull;
+      }
+      pattern = TargetPattern.stAshlarCross;
+      addLog('★ SIGNATURE SKILL: ${unit.name} creates $skillName on ${target.name} for $dmg DMG (Gravity Singularity pulls enemy line)!');
+    } else if (key.contains('dark_gate') || key.contains('chanter')) {
+      final rawDmg = (unit.effectiveAttack * 1.30).round();
+      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      final allies = friendlySquad.where((u) => u.isAlive).toList()
+        ..sort((a, b) => a.currentAp.compareTo(b.currentAp));
+      final lowestApAlly = allies.firstOrNull;
+      if (lowestApAlly != null) {
+        lowestApAlly.currentAp = min(SpatialCombatEngine.tickThreshold, lowestApAlly.currentAp + 3000);
+        lowestApAlly.aegisShield += 35;
+        lowestApAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      }
+      pattern = TargetPattern.stAshlarCross;
+      addLog('★ SIGNATURE SKILL: ${unit.name} opens $skillName for $dmg DMG and grants +3,000 AP & +35 Aegis to ${lowestApAlly?.name ?? unit.name}!');
     } else if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
       final rawDmg = (unit.effectiveAttack * 1.35).round();
       dmg = target.takeDamage(rawDmg, isPhysical: true);
@@ -3828,6 +3881,136 @@ class SpatialCombatEngine extends ChangeNotifier {
         secondaryTargetHits: eruptionHits,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
+    } else if (card.id == 'solar_aegis') {
+      final recipient = targetUnit ??
+          playerUnits.where((u) => u.isAlive && u.currentDepth == RowDepth.front).firstOrNull ??
+          playerUnits.where((u) => u.isAlive).firstOrNull;
+      if (recipient != null) {
+        final shieldGain = (400 * (commandService?.potencyMultiplier ?? 1.0)).round();
+        recipient.aegisShield += shieldGain;
+        recipient.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        recipient.bleedStacks = 0;
+        recipient.poisonStacks = 0;
+        recipient.burnDuration = 0;
+        lastBannerMessage = '☀️ SOLAR AEGIS: +$shieldGain Aegis Shield & Debuffs Cleansed on ${recipient.name}!';
+        addLog('CAST: Solar Aegis warded ${recipient.name} (+$shieldGain Shield, cleansed all debuffs)!');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_solar_aegis',
+          attackerId: 'player_valeria',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
+          targetId: recipient.id,
+          targetName: recipient.name,
+          damage: 0,
+          isHeal: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'purging_light') {
+      final target = targetUnit ??
+          enemyUnits.where((u) => u.isAlive).firstOrNull;
+      if (target != null) {
+        final baseHoly = (250 * (commandService?.potencyMultiplier ?? 1.0)).round();
+        final armorTrue = (target.armor * 0.50).round();
+        final totalDmg = target.takeDamage(baseHoly, isPhysical: false) + armorTrue;
+        if (armorTrue > 0) target.hp = max(0, target.hp - armorTrue);
+        lastBannerMessage = '☀️ PURGING LIGHT: $totalDmg Holy & True DMG to ${target.name}!';
+        addLog('CAST: Purging Light pierced ${target.name} for $totalDmg DMG ($baseHoly Holy + $armorTrue True DMG)!');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_purging_light',
+          attackerId: 'player_valeria',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
+          targetId: target.id,
+          targetName: target.name,
+          damage: totalDmg,
+          isCrit: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'dawn_resurgence') {
+      if (isTerminalCollapseActive) {
+        lastBannerMessage = '⚠️ TERMINAL COLLAPSE: Revives are locked!';
+        addLog('CAST FAILED: Dawn Resurgence cannot pierce the Ashen Miasma during Terminal Collapse!');
+        return false;
+      }
+      final fallen = playerUnits.where((u) => !u.isAlive).firstOrNull;
+      if (fallen != null) {
+        final revivedHp = (fallen.maxHp * 0.50).round();
+        fallen.hp = revivedHp;
+        fallen.aegisShield += 30;
+        fallen.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        for (final ally in playerUnits.where((u) => u.isAlive && u.currentDepth == RowDepth.front)) {
+          ally.armor += 30;
+        }
+        lastBannerMessage = '☀️ DAWN RESURGENCE: ${fallen.name} REVIVED with $revivedHp HP (+30 Vanguard Armor)!';
+        addLog('CAST: Dawn Resurgence revives ${fallen.name} (+$revivedHp HP) and reinforces the frontline!');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_dawn_resurgence',
+          attackerId: 'player_valeria',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
+          targetId: fallen.id,
+          targetName: fallen.name,
+          damage: 0,
+          isHeal: true,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+    } else if (card.id == 'hallowed_ground') {
+      int buffed = 0;
+      for (final ally in playerUnits.where((u) => u.isAlive && u.currentDepth == RowDepth.front)) {
+        final armorGain = (ally.armor * 0.25).round();
+        ally.armor += max(15, armorGain);
+        ally.aegisShield += 25;
+        ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        buffed++;
+      }
+      lastBannerMessage = '☀️ HALLOWED GROUND: Consecrated $buffed Frontline Allies (+25% Armor & +25 Aegis)!';
+      addLog('CAST: Hallowed Ground sanctified $buffed Vanguard allies (+25% Armor, +25 Aegis Barrier)!');
+
+      dispatchAction(SpatialActionEvent(
+        id: 'card_${currentTick}_hallowed_ground',
+        attackerId: 'player_valeria',
+        attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+        skillName: card.name,
+        targetId: 'frontline_row',
+        targetName: 'Frontline Sanctum',
+        damage: 0,
+        isHeal: true,
+        isPlayerAttacker: true,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    } else if (card.id == 'retributive_stride') {
+      int totalDmg = 0;
+      final livingVanguard = playerUnits.where((u) => u.isAlive && u.currentDepth == RowDepth.front).toList();
+      final target = targetUnit ?? enemyUnits.where((u) => u.isAlive).firstOrNull;
+      if (target != null && livingVanguard.isNotEmpty) {
+        for (final v in livingVanguard) {
+          totalDmg += (v.effectiveAttack * 0.75).round();
+        }
+        final dmgTaken = target.takeDamage(totalDmg);
+        lastBannerMessage = '⚔️ RETRIBUTIVE STRIDE: Vanguard counter-strike deals $dmgTaken DMG to ${target.name}!';
+        addLog('CAST: Retributive Stride triggered $dmgTaken physical damage on ${target.name}.');
+
+        dispatchAction(SpatialActionEvent(
+          id: 'card_${currentTick}_retributive_stride',
+          attackerId: 'player_valeria',
+          attackerName: commandService?.currentProfile.name.toUpperCase() ?? 'VALERIA',
+          skillName: card.name,
+          targetId: target.id,
+          targetName: target.name,
+          damage: dmgTaken,
+          isPlayerAttacker: true,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
     }
 
     // Check if casting this card cleared the current wave and remaining waves exist

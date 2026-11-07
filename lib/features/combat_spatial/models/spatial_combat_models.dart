@@ -573,6 +573,21 @@ class CombatUnitState {
     if (key.contains('valeria')) return 'Aegis of the Iron Legion';
     if (key.contains('malakor')) return 'Solar Judgment';
     if (key.contains('morrigan')) return 'Blighted Miasma Hex';
+    if (key.contains('void_bound') || key.contains('sentinel') || key.contains('obsidian_sentinel')) {
+      return 'Rift Shockwave Pulse';
+    }
+    if (key.contains('shadow_flayer') || key.contains('void_ripper') || key.contains('ripper')) {
+      return 'Phase Shadow Rend';
+    }
+    if (key.contains('acolyte_slinger') || key.contains('void_ray')) {
+      return 'Continuous Void Beam';
+    }
+    if (key.contains('cultist_apprentice') || key.contains('arch_warlock')) {
+      return 'Singularity Gravity Pull';
+    }
+    if (key.contains('chanter') || key.contains('dark_gate')) {
+      return 'Dimensional Rift Surge';
+    }
     if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
       return 'Concussive Shield Slam';
     }
@@ -618,6 +633,21 @@ class CombatUnitState {
     }
     if (key.contains('morrigan')) {
       return '145% Nature DMG + inflicts 3 Poison stacks and Vulnerable.';
+    }
+    if (key.contains('void_bound') || key.contains('sentinel') || key.contains('obsidian_sentinel')) {
+      return '135% ATK slam + converts 20% incoming damage into retaliatory arcane shockwave.';
+    }
+    if (key.contains('shadow_flayer') || key.contains('void_ripper') || key.contains('ripper')) {
+      return '165% Critical strike from stealth + blinks behind lowest EHP foe (+40% Crit chance).';
+    }
+    if (key.contains('acolyte_slinger') || key.contains('void_ray')) {
+      return '150% Void Beam piercing 50% Armor + ramps damage consecutively by +10%.';
+    }
+    if (key.contains('cultist_apprentice') || key.contains('arch_warlock')) {
+      return '145% Gravity Singularity pulling opposing foes into concentrated row cluster.';
+    }
+    if (key.contains('chanter') || key.contains('dark_gate')) {
+      return 'Dimensional Anchor granting +3,000 AP and +35 Aegis to the lowest-AP ally.';
     }
     if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
       return '135% ATK bash + shreds 15 Armor, staggers -1,500 AP, and grants +25 Aegis Shield.';
@@ -678,6 +708,9 @@ class CombatUnitState {
   String get battleChant {
     final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
     if (key.contains('valeria')) return 'By the Holy Ash of the Dawnbound, shatter and yield!';
+    if (key.contains('void') || key.contains('rift') || key.contains('shadow_flayer') || key.contains('obsidian')) {
+      return 'The rift shivers... reality bows to the abyssal fold!';
+    }
     if (key.contains('vladislav')) return 'The blood of our ancestors hungers... tithe is due!';
     if (key.contains('malakor')) return 'Purge the blight! No ash shall outlive our righteous pyre!';
     if (key.contains('sanguine_blade')) return 'Let flesh rend, let their veins weep crimson.';

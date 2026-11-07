@@ -7,6 +7,7 @@ enum SummonBannerType {
   consecratedSigil,
   cryptCovenant,
   commanderCovenant,
+  voidCovenant,
 }
 
 class BannerConfig {
@@ -121,6 +122,22 @@ class SummoningService {
       bannerBadge: 'PROGENITOR COVENANT',
       themeColorHex: '#FF1744',
     ),
+    SummonBannerType.voidCovenant: const BannerConfig(
+      type: SummonBannerType.voidCovenant,
+      title: 'VOID INCURSION & RIFT GLASS',
+      subtitle: 'Occult Runic Warp Transmutation',
+      loreDescription:
+          'Shatter resonant obsidian geodes infused with abyssal void energy. Summon rift guardians, phase assassins, gravity warlock masters, and commanders.',
+      currencyName: 'Bloodline Sigils',
+      singleCost: 1,
+      multiCost: 9, // 10 pulls for 9 sigils (10% discount)
+      usesSigils: true,
+      gen1Rate: 0.45,
+      gen2Rate: 0.40,
+      gen3Rate: 0.15,
+      bannerBadge: 'ABYSSAL RIFT',
+      themeColorHex: '#E040FB',
+    ),
   };
 
   /// Performs a single (1x) or multi (10x) summon based on count and selected banner.
@@ -178,6 +195,8 @@ class SummoningService {
 
     if (banner.type == SummonBannerType.commanderCovenant) {
       return _generateCommanderOrArchon(generation, archetype, timestamp, rng);
+    } else if (banner.type == SummonBannerType.voidCovenant) {
+      return _generateVoidCultSpecialist(generation, archetype, timestamp, rng);
     } else if (banner.type == SummonBannerType.cryptCovenant) {
       return _generateCryptSpecialist(generation, archetype, timestamp, rng);
     } else {
@@ -567,6 +586,124 @@ class SummoningService {
           lineageAncestors: generation > 1 ? ['lich_dominus'] : const [],
           plinthMaterial: generation >= 3 ? PlinthMaterial.gold : (generation == 2 ? PlinthMaterial.obsidian : PlinthMaterial.iron),
           customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png',
+        );
+    }
+  }
+
+  static UnitEntity _generateVoidCultSpecialist(
+    int generation,
+    Archetype archetype,
+    int timestamp,
+    Random rng,
+  ) {
+    final statMult = 1.0 + (generation - 1) * 0.35;
+    final String genPrefix = generation == 1 ? 'Initiate' : (generation == 2 ? 'Rift-Touched' : 'Obsidian Archon');
+
+    switch (archetype) {
+      case Archetype.juggernaut:
+        return UnitEntity(
+          id: 'summon_void_jug_$timestamp',
+          speciesId: generation >= 3 ? 'obsidian_sentinel' : 'void_bound_thrall',
+          name: '$genPrefix Void Sentinel',
+          generation: generation,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front1,
+          level: 1,
+          maxLevel: 10 * generation,
+          currentHp: (920 * statMult).round(),
+          maxHp: (920 * statMult).round(),
+          attack: (110 * statMult).round(),
+          defense: (145 * statMult).round(),
+          speed: (88 * statMult).round(),
+          nativeTraitId: 'rift_plating',
+          graftedTraitId: generation >= 3 ? 'iron_bastion' : null,
+          lineageAncestors: generation > 1 ? ['void_bound_thrall'] : const [],
+          plinthMaterial: PlinthMaterial.obsidian,
+        );
+      case Archetype.assassin:
+      case Archetype.skirmisher:
+        return UnitEntity(
+          id: 'summon_void_asn_$timestamp',
+          speciesId: generation >= 3 ? 'void_ripper' : 'shadow_flayer',
+          name: '$genPrefix Void Ripper',
+          generation: generation,
+          archetype: Archetype.assassin,
+          slot: FormationSlot.front2,
+          level: 1,
+          maxLevel: 10 * generation,
+          currentHp: (680 * statMult).round(),
+          maxHp: (680 * statMult).round(),
+          attack: (155 * statMult).round(),
+          defense: (70 * statMult).round(),
+          speed: (130 * statMult).round(),
+          critRate: 0.25 + (generation * 0.04),
+          critDamage: 1.65,
+          nativeTraitId: 'phase_shadow_rend',
+          graftedTraitId: generation >= 3 ? 'rend_flesh' : null,
+          lineageAncestors: generation > 1 ? ['shadow_flayer'] : const [],
+          plinthMaterial: PlinthMaterial.obsidian,
+        );
+      case Archetype.marksman:
+        return UnitEntity(
+          id: 'summon_void_mrk_$timestamp',
+          speciesId: generation >= 3 ? 'void_ray_stalker' : 'acolyte_slinger',
+          name: '$genPrefix Void Ray Stalker',
+          generation: generation,
+          archetype: Archetype.marksman,
+          slot: FormationSlot.back1,
+          level: 1,
+          maxLevel: 10 * generation,
+          currentHp: (590 * statMult).round(),
+          maxHp: (590 * statMult).round(),
+          attack: (170 * statMult).round(),
+          defense: (60 * statMult).round(),
+          speed: (112 * statMult).round(),
+          critRate: 0.22,
+          critDamage: 1.65,
+          nativeTraitId: 'void_beam_charge',
+          graftedTraitId: generation >= 3 ? 'keen_eye' : null,
+          lineageAncestors: generation > 1 ? ['acolyte_slinger'] : const [],
+          plinthMaterial: PlinthMaterial.obsidian,
+        );
+      case Archetype.occultist:
+        return UnitEntity(
+          id: 'summon_void_occ_$timestamp',
+          speciesId: generation >= 3 ? 'blight_arch_warlock' : 'cultist_apprentice',
+          name: '$genPrefix Void Arch-Warlock',
+          generation: generation,
+          archetype: Archetype.occultist,
+          slot: FormationSlot.back2,
+          level: 1,
+          maxLevel: 10 * generation,
+          currentHp: (570 * statMult).round(),
+          maxHp: (570 * statMult).round(),
+          attack: (165 * statMult).round(),
+          defense: (65 * statMult).round(),
+          speed: (95 * statMult).round(),
+          nativeTraitId: 'singularity_pull',
+          graftedTraitId: generation >= 3 ? 'shadow_bolt' : null,
+          lineageAncestors: generation > 1 ? ['cultist_apprentice'] : const [],
+          plinthMaterial: PlinthMaterial.obsidian,
+        );
+      case Archetype.support:
+        return UnitEntity(
+          id: 'summon_void_sup_$timestamp',
+          speciesId: generation >= 3 ? 'herald_dark_gate' : 'chanter_void',
+          name: '$genPrefix Dark Gate Herald',
+          generation: generation,
+          archetype: Archetype.support,
+          slot: FormationSlot.front3,
+          level: 1,
+          maxLevel: 10 * generation,
+          currentHp: (740 * statMult).round(),
+          maxHp: (740 * statMult).round(),
+          attack: (115 * statMult).round(),
+          defense: (88 * statMult).round(),
+          speed: (104 * statMult).round(),
+          nativeTraitId: 'dimensional_rift_surge',
+          graftedTraitId: generation >= 3 ? 'sanguine_mend' : null,
+          lineageAncestors: generation > 1 ? ['chanter_void'] : const [],
+          plinthMaterial: PlinthMaterial.obsidian,
         );
     }
   }

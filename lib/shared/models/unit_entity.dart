@@ -459,6 +459,8 @@ class UnitEntity {
         : 'assets/images/iron_footman_g1.png';
   }
 
+  String get faction => factionName;
+
   String get factionName {
     if (isBoss) return 'Primordial Titans';
     if (speciesId.contains('hound') ||
@@ -467,6 +469,19 @@ class UnitEntity {
         speciesId.contains('cerberus') ||
         speciesId.contains('boar')) {
       return 'Corrupted Beasts';
+    }
+    if (speciesId.contains('void') ||
+        speciesId.contains('cult') ||
+        speciesId.contains('rift') ||
+        speciesId.contains('shadow_flayer') ||
+        speciesId.contains('acolyte_slinger') ||
+        speciesId.contains('chanter') ||
+        speciesId.contains('dark_gate') ||
+        speciesId.contains('obsidian') ||
+        name.contains('Void') ||
+        name.contains('Rift') ||
+        name.contains('Obsidian')) {
+      return 'Occult Void Cult';
     }
     if (speciesId.contains('ghoul') ||
         speciesId.contains('plague') ||
@@ -478,12 +493,6 @@ class UnitEntity {
         name.contains('Husk') ||
         archetype == Archetype.occultist) {
       return 'Crypt Stalkers';
-    }
-    if (speciesId.contains('void') ||
-        speciesId.contains('cult') ||
-        speciesId.contains('rift') ||
-        name.contains('Void')) {
-      return 'Occult Void Cult';
     }
     return 'Ash Legion';
   }

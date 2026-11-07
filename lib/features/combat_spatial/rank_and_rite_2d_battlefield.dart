@@ -179,7 +179,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
 
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
     // Slight rank-to-rank horizontal overlap so formations look tight and compact like Wartune
-    final double rankOverlapMargin = -(tileWidth * 0.16).clamp(8.0, 24.0);
+    final double overlapStep = (tileWidth * 0.16).clamp(8.0, 24.0);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -193,26 +193,17 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         // Midline (Row 1): stepped back into terrain (-14px)
         // Backline (Row 2): stepped deepest into horizon (-28px)
         final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -14.0 : -28.0);
-
-        // Z-Index ordering so Frontline units paint in front of Midline/Backline units
-        // Row 0 = priority 3 (drawn on top), Row 1 = priority 2, Row 2 = priority 1
-        final int rankZIndex = (row == 0 ? 3 : (row == 1 ? 2 : 1));
+        final double rankDepthOffsetX = index > 0 ? (isPlayer ? -overlapStep * index : overlapStep * index) : 0.0;
 
         return Transform.translate(
-          offset: Offset(0, rankDepthOffsetY),
-          child: Container(
-            margin: EdgeInsets.only(
-              left: index > 0 ? (isPlayer ? 0 : rankOverlapMargin) : 0,
-              right: index > 0 ? (isPlayer ? rankOverlapMargin : 0) : 0,
-            ),
-            child: SizedBox(
-              width: tileWidth,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(3, (col) {
-                  return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
-                }),
-              ),
+          offset: Offset(rankDepthOffsetX, rankDepthOffsetY),
+          child: SizedBox(
+            width: tileWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (col) {
+                return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
+              }),
             ),
           ),
         );
