@@ -180,34 +180,126 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
     // Slight rank-to-rank horizontal overlap so formations look tight and compact like Wartune
     final double overlapStep = (tileWidth * 0.16).clamp(8.0, 24.0);
+    final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
+    final multiUnits = units.where((u) => u.isAlive && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1)).toList();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: rankOrder.asMap().entries.map((entry) {
-        final int index = entry.key;
-        final int row = entry.value;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: rankOrder.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final int row = entry.value;
 
-        // Natural 2.5D Wartune Stage Depth Staggering:
-        // Frontline (Row 0): at bottom ground baseline (offset 0)
-        // Midline (Row 1): stepped back into terrain (-14px)
-        // Backline (Row 2): stepped deepest into horizon (-28px)
-        final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -14.0 : -28.0);
-        final double rankDepthOffsetX = index > 0 ? (isPlayer ? -overlapStep * index : overlapStep * index) : 0.0;
+            // Natural 2.5D Wartune Stage Depth Staggering:
+            // Frontline (Row 0): at bottom ground baseline (offset 0)
+            // Midline (Row 1): stepped back into terrain (-14px)
+            // Backline (Row 2): stepped deepest into horizon (-28px)
+            final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -14.0 : -28.0);
+            final double rankDepthOffsetX = index > 0 ? -overlapStep * index : 0.0;
 
-        return Transform.translate(
-          offset: Offset(rankDepthOffsetX, rankDepthOffsetY),
-          child: SizedBox(
-            width: tileWidth,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (col) {
-                return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
-              }),
+            return Transform.translate(
+              offset: Offset(rankDepthOffsetX, rankDepthOffsetY),
+              child: SizedBox(
+                width: tileWidth,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (col) {
+                    return _build2DGridTile(col: col, row: row, isPlayer: isPlayer);
+                  }),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        // Multi-Node Behemoth / Colossus Boss Layer (Gorgoroth, World Titans)
+        // Renders ONE single commanding Boss Miniature positioned centrally over its multi-node footprint!
+        ...multiUnits.map((multiUnit) {
+          double minX = double.infinity;
+          double maxX = -double.infinity;
+          double minY = double.infinity;
+          double maxY = -double.infinity;
+
+          for (final node in multiUnit.occupiedNodes) {
+            final int rankIdx = rankOrder.indexOf(node.row);
+            if (rankIdx == -1) continue;
+            final double colLeft = rankIdx * tileWidth - (overlapStep * rankIdx);
+            final double colRight = colLeft + tileWidth;
+            final double rankDepthOffsetY = node.row == 0 ? 0.0 : (node.row == 1 ? -14.0 : -28.0);
+            final double tileTop = node.column * tileHeight + rankDepthOffsetY;
+            final double tileBottom = tileTop + tileHeight;
+
+            if (colLeft < minX) minX = colLeft;
+            if (colRight > maxX) maxX = colRight;
+            if (tileTop < minY) minY = tileTop;
+            if (tileBottom > maxY) maxY = tileBottom;
+          }
+
+          if (minX == double.infinity) return const SizedBox.shrink();
+
+          final double centerX = (minX + maxX) / 2;
+          final double centerY = (minY + maxY) / 2;
+          final double bossSpanWidth = tileWidth * (multiUnit.footprint == UnitFootprint.quadColossus2x2 ? 2.2 : (multiUnit.occupiedNodes.length > 2 ? 2.0 : 1.6));
+          final double bossSpanHeight = tileHeight * 2.0;
+
+          final double bossLeft = centerX - (bossSpanWidth / 2);
+          final double bossTop = centerY - (bossSpanHeight / 2);
+
+          final bool isSelected = isPlayer ? (selectedUnitId == multiUnit.id) : (selectedEnemyUnitId == multiUnit.id);
+          final anchorNode = multiUnit.occupiedNodes.isNotEmpty ? multiUnit.occupiedNodes.first : const GridNode(column: 1, row: 0);
+
+          return Positioned(
+            left: bossLeft,
+            top: bossTop,
+            width: bossSpanWidth,
+            height: bossSpanHeight,
+            child: DragTarget<String>(
+              onWillAcceptWithDetails: (details) {
+                onTileHover(anchorNode.column, anchorNode.row, isPlayer);
+                return true;
+              },
+              onLeave: (_) => onClearHover(),
+              onAcceptWithDetails: (details) {
+                final data = details.data;
+                if (data.startsWith('card:')) {
+                  final cardId = data.replaceFirst('card:', '');
+                  onCastCard(cardId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                } else if (data.startsWith('ultimate:')) {
+                  final ultId = data.replaceFirst('ultimate:', '');
+                  onCastUltimate(ultId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                }
+                onClearHover();
+              },
+              builder: (context, candidateData, rejectedData) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    if (isPlayer) {
+                      onSelectPlayerUnit(multiUnit.id);
+                    } else {
+                      onSelectEnemyUnit(multiUnit.id);
+                    }
+                  },
+                  onDoubleTap: () => onLongPressUnit?.call(multiUnit),
+                  onLongPress: () => onLongPressUnit?.call(multiUnit),
+                  child: Center(
+                    child: buildUnitMiniature(
+                      multiUnit,
+                      tileWidth: tileWidth,
+                      tileHeight: tileHeight,
+                      colGap: 0,
+                      isSelected: isSelected || candidateData.isNotEmpty,
+                    ),
+                  ),
+                );
+              },
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }),
+      ],
     );
   }
 
@@ -218,6 +310,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   }) {
     final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
     final occupant = units.where((u) => (u.isAlive || u.isSolidObstacle) && u.occupies(col, row)).firstOrNull;
+    final bool isMultiNodeBoss = occupant != null && (occupant.occupiedNodes.length > 1 || occupant.footprint != UnitFootprint.single1x1);
     final bool isSelected = occupant != null && (isPlayer ? (selectedUnitId == occupant.id) : (selectedEnemyUnitId == occupant.id));
     final bool isHovered = hoveredTileCol == col && hoveredTileRow == row && isHoveredPlayerSide == isPlayer;
     final bool isSecondaryCleave = occupant != null && !isPlayer && (secondaryTargetEnemyIds?.contains(occupant.id) ?? false);
@@ -230,7 +323,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       (u) => u.isAlive && u.occupiedNodes.isNotEmpty && engine.resolveProjectedTarget(u)?.id == occupant?.id,
     ).firstOrNull;
     final bool isTargetedInPreBattle = engine.isPreBattlePhase && !isPlayer && projectedAttacker != null && occupant != null;
-    final bool isFlankedInPreBattle = isTargetedInPreBattle && !engine.isCoveredByVanguard(occupant!, trajectory: AttackTrajectory.flanking);
+    final bool isFlankedInPreBattle = isTargetedInPreBattle && !engine.isCoveredByVanguard(occupant, trajectory: AttackTrajectory.flanking);
 
     // Movement validity for selected ally
     final selectedAlly = selectedUnitId != null ? engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull : null;
@@ -559,7 +652,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3b. Primary Target Lock Reticle Badge
-              if (!isPlayer && isSelected && occupant != null)
+              if (!isPlayer && isSelected && (!isMultiNodeBoss || (occupant.occupiedNodes.isNotEmpty && occupant.occupiedNodes.first.column == col && occupant.occupiedNodes.first.row == row)))
                 Positioned(
                   top: 2,
                   child: Container(
@@ -587,7 +680,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3c. Secondary Cleave / Splash Target Badge
-              if (!isPlayer && isSecondaryCleave && !isSelected && occupant != null)
+              if (!isPlayer && isSecondaryCleave && !isSelected)
                 Positioned(
                   top: 2,
                   child: Container(
@@ -651,7 +744,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 5. Standing Unit Miniature (Grounded on the perspective plinth)
-              if (occupant != null)
+              // Standard 1x1 units render on their plinth. Multi-node behemoths (e.g. 2x2 Gorgoroth)
+              // render ONE unified giant miniature centered across their multi-node footprint in _buildSquadTerritory!
+              if (occupant != null && !isMultiNodeBoss)
                 Center(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -674,6 +769,40 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       tileHeight: tileHeight,
                       colGap: 0,
                       isSelected: isSelected,
+                    ),
+                  ),
+                )
+              else if (isMultiNodeBoss)
+                Center(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (isPlayer) {
+                        onSelectPlayerUnit(occupant.id);
+                      } else {
+                        onSelectEnemyUnit(occupant.id);
+                      }
+                    },
+                    onDoubleTap: () => onLongPressUnit?.call(occupant),
+                    onLongPress: () => onLongPressUnit?.call(occupant),
+                    child: Container(
+                      width: plinthW * 0.88,
+                      height: plinthH * 0.88,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.elliptical(plinthW * 0.44, plinthH * 0.44)),
+                        color: isSelected ? const Color(0x33FF1744) : const Color(0x15FF5252),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFFFF1744) : const Color(0x66FF5252),
+                          width: isSelected ? 1.4 : 0.8,
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.shield_outlined,
+                          size: 13,
+                          color: isSelected ? const Color(0xFFFF5252) : const Color(0x77FF8A80),
+                        ),
+                      ),
                     ),
                   ),
                 )
