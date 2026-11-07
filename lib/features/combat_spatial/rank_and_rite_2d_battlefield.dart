@@ -216,7 +216,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
         ),
 
         // Multi-Node Behemoth / Colossus Boss Layer (Gorgoroth, World Titans)
-        // Renders ONE single commanding Boss Miniature positioned centrally over its multi-node footprint!
+        // Renders ONE single commanding Boss Miniature positioned centrally over its multi-node footprint
+        // with a unified grand Colossus territorial base and single overhead badge!
         ...multiUnits.map((multiUnit) {
           double minX = double.infinity;
           double maxX = -double.infinity;
@@ -242,13 +243,19 @@ class RankAndRite2DBattlefield extends StatelessWidget {
 
           final double centerX = (minX + maxX) / 2;
           final double centerY = (minY + maxY) / 2;
-          final double bossSpanWidth = tileWidth * (multiUnit.footprint == UnitFootprint.quadColossus2x2 ? 2.2 : (multiUnit.occupiedNodes.length > 2 ? 2.0 : 1.6));
-          final double bossSpanHeight = tileHeight * 2.0;
+          final bool isQuadColossus = multiUnit.footprint == UnitFootprint.quadColossus2x2;
+          final double bossSpanWidth = tileWidth * (isQuadColossus ? 2.3 : 1.8);
+          final double bossSpanHeight = tileHeight * 2.8;
 
+          // Natural Ground Baseline for the multi-node footprint:
+          // In 2.5D perspective, the central ground contact baseline of the 2x2 territory is at (minY + maxY)/2 + (tileHeight * 0.38)
+          final double groundBaselineY = centerY + (tileHeight * 0.38);
+          // Position boss so its bottom lava pedestal lands on groundBaselineY:
+          final double bossTop = groundBaselineY - bossSpanHeight + 8;
           final double bossLeft = centerX - (bossSpanWidth / 2);
-          final double bossTop = centerY - (bossSpanHeight / 2);
 
           final bool isSelected = isPlayer ? (selectedUnitId == multiUnit.id) : (selectedEnemyUnitId == multiUnit.id);
+          final bool isSecondaryCleave = !isPlayer && (secondaryTargetEnemyIds?.contains(multiUnit.id) ?? false);
           final anchorNode = multiUnit.occupiedNodes.isNotEmpty ? multiUnit.occupiedNodes.first : const GridNode(column: 1, row: 0);
 
           return Positioned(
@@ -256,46 +263,156 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             top: bossTop,
             width: bossSpanWidth,
             height: bossSpanHeight,
-            child: DragTarget<String>(
-              onWillAcceptWithDetails: (details) {
-                onTileHover(anchorNode.column, anchorNode.row, isPlayer);
-                return true;
-              },
-              onLeave: (_) => onClearHover(),
-              onAcceptWithDetails: (details) {
-                final data = details.data;
-                if (data.startsWith('card:')) {
-                  final cardId = data.replaceFirst('card:', '');
-                  onCastCard(cardId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
-                } else if (data.startsWith('ultimate:')) {
-                  final ultId = data.replaceFirst('ultimate:', '');
-                  onCastUltimate(ultId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
-                }
-                onClearHover();
-              },
-              builder: (context, candidateData, rejectedData) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    if (isPlayer) {
-                      onSelectPlayerUnit(multiUnit.id);
-                    } else {
-                      onSelectEnemyUnit(multiUnit.id);
-                    }
-                  },
-                  onDoubleTap: () => onLongPressUnit?.call(multiUnit),
-                  onLongPress: () => onLongPressUnit?.call(multiUnit),
-                  child: Center(
-                    child: buildUnitMiniature(
-                      multiUnit,
-                      tileWidth: tileWidth,
-                      tileHeight: tileHeight,
-                      colGap: 0,
-                      isSelected: isSelected || candidateData.isNotEmpty,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                // 1. Unified Grand Colossus Territorial Base Plinth (Single commanding base under the boss)
+                Positioned(
+                  bottom: 2,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: bossSpanWidth * 0.92,
+                      height: tileHeight * 0.48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.elliptical(bossSpanWidth * 0.46, tileHeight * 0.24)),
+                        gradient: RadialGradient(
+                          center: const Alignment(0, -0.15),
+                          radius: 0.85,
+                          colors: isSelected
+                              ? [
+                                  const Color(0x66FF1744),
+                                  const Color(0x221B0709),
+                                  Colors.transparent,
+                                ]
+                              : (isSecondaryCleave
+                                  ? [
+                                      const Color(0x55FF9100),
+                                      const Color(0x221B0709),
+                                      Colors.transparent,
+                                  ]
+                                  : [
+                                      const Color(0x3538151A),
+                                      const Color(0x151B0709),
+                                      Colors.transparent,
+                                  ]),
+                        ),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFFFF1744)
+                              : (isSecondaryCleave ? const Color(0xFFFF9100) : const Color(0x55FF5252)),
+                          width: isSelected ? 2.2 : (isSecondaryCleave ? 1.8 : 1.0),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.70),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                          if (isSelected)
+                            const BoxShadow(
+                              color: Color(0x99FF1744),
+                              blurRadius: 16,
+                              spreadRadius: 2,
+                            )
+                          else if (isSecondaryCleave)
+                            const BoxShadow(
+                              color: Color(0x88FF9100),
+                              blurRadius: 14,
+                              spreadRadius: 2,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                );
-              },
+                ),
+
+                // 2. DragTarget & Single Boss Miniature
+                DragTarget<String>(
+                  onWillAcceptWithDetails: (details) {
+                    onTileHover(anchorNode.column, anchorNode.row, isPlayer);
+                    return true;
+                  },
+                  onLeave: (_) => onClearHover(),
+                  onAcceptWithDetails: (details) {
+                    final data = details.data;
+                    if (data.startsWith('card:')) {
+                      final cardId = data.replaceFirst('card:', '');
+                      onCastCard(cardId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                    } else if (data.startsWith('ultimate:')) {
+                      final ultId = data.replaceFirst('ultimate:', '');
+                      onCastUltimate(ultId, targetUnit: multiUnit, targetCol: anchorNode.column, targetRow: anchorNode.row);
+                    }
+                    onClearHover();
+                  },
+                  builder: (context, candidateData, rejectedData) {
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (isPlayer) {
+                          onSelectPlayerUnit(multiUnit.id);
+                        } else {
+                          onSelectEnemyUnit(multiUnit.id);
+                        }
+                      },
+                      onDoubleTap: () => onLongPressUnit?.call(multiUnit),
+                      onLongPress: () => onLongPressUnit?.call(multiUnit),
+                      child: Center(
+                        child: buildUnitMiniature(
+                          multiUnit,
+                          tileWidth: tileWidth,
+                          tileHeight: tileHeight,
+                          colGap: 0,
+                          isSelected: isSelected || candidateData.isNotEmpty,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // 3. Single Overhead Target / Cleave Badge (Positioned once at the top of the giant boss)
+                if (isSelected || isSecondaryCleave)
+                  Positioned(
+                    top: -18,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFB71C1C) : const Color(0xFFE65100),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFFFF5252) : const Color(0xFFFFB74D),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isSelected ? const Color(0x99FF1744) : const Color(0x88FF9100),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected ? Icons.gps_fixed : Icons.flash_on,
+                            size: 9,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            isSelected ? 'TARGET LOCK' : '⚔️ CLEAVE SPLASH',
+                            style: const TextStyle(
+                              fontSize: 7.0,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           );
         }),
@@ -384,7 +501,12 @@ class RankAndRite2DBattlefield extends StatelessWidget {
 
         final bool isNecroticMire = isPlayer && engine.necroticMireNodes.any((n) => n.column == col && n.row == row);
         final bool isTurnActiveUnit = occupant != null && engine.activeActingUnit?.id == occupant.id;
-        if (isTelegraphed) {
+        if (isMultiNodeBoss) {
+          // Multi-node colossus boss territory: Individual ground tiles stay unlit
+          // The single unified boss entity renders the grand Colossus territorial base!
+          plinthRimColor = Colors.transparent;
+          plinthGlowColor = Colors.transparent;
+        } else if (isTelegraphed) {
           plinthRimColor = const Color(0xFFFF1744);
           plinthGlowColor = const Color(0xFFFF1744).withValues(alpha: 0.75);
         } else if (isNecroticMire) {
@@ -435,9 +557,10 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               // 1. Natural Flat Battlefield Ground Plinth (Tabletop Perspective Base)
-              Positioned(
-                bottom: 8,
-                child: Container(
+              if (!isMultiNodeBoss)
+                Positioned(
+                  bottom: 8,
+                  child: Container(
                   width: plinthW,
                   height: plinthH,
                   decoration: BoxDecoration(
@@ -680,7 +803,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 3c. Secondary Cleave / Splash Target Badge
-              if (!isPlayer && isSecondaryCleave && !isSelected)
+              if (!isPlayer && isSecondaryCleave && !isSelected && !isMultiNodeBoss)
                 Positioned(
                   top: 2,
                   child: Container(
@@ -773,7 +896,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 )
               else if (isMultiNodeBoss)
-                Center(
+                Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
@@ -785,25 +908,6 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     },
                     onDoubleTap: () => onLongPressUnit?.call(occupant),
                     onLongPress: () => onLongPressUnit?.call(occupant),
-                    child: Container(
-                      width: plinthW * 0.88,
-                      height: plinthH * 0.88,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.all(Radius.elliptical(plinthW * 0.44, plinthH * 0.44)),
-                        color: isSelected ? const Color(0x33FF1744) : const Color(0x15FF5252),
-                        border: Border.all(
-                          color: isSelected ? const Color(0xFFFF1744) : const Color(0x66FF5252),
-                          width: isSelected ? 1.4 : 0.8,
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.shield_outlined,
-                          size: 13,
-                          color: isSelected ? const Color(0xFFFF5252) : const Color(0x77FF8A80),
-                        ),
-                      ),
-                    ),
                   ),
                 )
               else if (isMoveReachable)

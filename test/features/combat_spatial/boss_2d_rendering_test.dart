@@ -6,7 +6,7 @@ import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dar
 
 void main() {
   group('Colossus Behemoth (Gorgoroth) 2D Tactical Battlefield Tests', () {
-    testWidgets('Gorgoroth 2x2 boss renders exactly ONE unified miniature instead of 4 duplicates', (tester) async {
+    testWidgets('Gorgoroth 2x2 boss renders exactly ONE unified miniature with clean single base', (tester) async {
       final engine = SpatialCombatEngine();
       final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
 
@@ -70,16 +70,17 @@ void main() {
       expect(find.byKey(const Key('gorgoroth_single_miniature')), findsOneWidget);
       expect(miniatureBuildCount, equals(1));
 
-      // Key Verification: The ground tiles for Gorgoroth's territory display the Colossus shield plinth indicator
-      expect(find.byIcon(Icons.shield_outlined), findsNWidgets(4));
+      // Key Verification: No duplicate mini-shield icons on individual tiles
+      expect(find.byIcon(Icons.shield_outlined), findsNothing);
 
+      // Key Verification: Tapping the unified Colossus miniature selects Gorgoroth
       await tester.tap(find.byKey(const Key('gorgoroth_single_miniature')));
       await tester.pump(const Duration(milliseconds: 400));
       expect(selectedEnemyId, equals('gorgoroth_boss'));
 
-      // Key Verification: Tapping any ground tile in Gorgoroth's territory also selects Gorgoroth
+      // Key Verification: Tapping on any ground coordinate in Gorgoroth's territory forwards selection to Gorgoroth
       selectedEnemyId = null;
-      await tester.tap(find.byIcon(Icons.shield_outlined).first, warnIfMissed: false);
+      await tester.tap(find.text('C1:R0').last, warnIfMissed: false);
       await tester.pump(const Duration(milliseconds: 400));
       expect(selectedEnemyId, equals('gorgoroth_boss'));
     });

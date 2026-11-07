@@ -26,7 +26,7 @@ void main() {
 
       // Backline sunSmith has direct physical line of sight blocked if a frontline unit stands in that column
       // Place footman in Col 4, Row 0 directly in front of sunSmith
-      footman.repositionTo([const GridNode(column: 4, row: 0)], apPenalty: 0);
+      footman.repositionTo([GridNode(column: sunSmith.occupiedNodes.first.column, row: 0)], apPenalty: 0);
       expect(engine.hasLineOfSight(zealot, sunSmith, trajectory: AttackTrajectory.directPhysical), isFalse);
 
       // Lobbed Magic ignores Line of Sight obstructions

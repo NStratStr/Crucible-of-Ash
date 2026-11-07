@@ -2110,8 +2110,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
                 _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile),
 
-              // Ultimate Burst Pop-Out Mini-Slate Dock (Player-Initiated Drag)
-              _buildUltimatePopOutDock(isLandscapeMobile: isLandscapeMobile),
+              
 
               // Tactical Card Hand & Burn Pit (Sculptor Tray)
               _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
@@ -6584,49 +6583,83 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ),
 
             // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Crimson Slash, Fire/Light Shield, Sun Magic Circle)
-            // User requested: Shield is sized appropriately to encompass unit (2.3x tileWidth / 2.9x tileHeight),
-            // plays the one-shot eruption animation, and then transitions into a static luminous shield barrier overlay!
+            // Encompasses the entire character model with a luminous radiant Aegis barrier dome
             if (unit.aegisShield > 0)
-              Positioned.fill(
+              Positioned(
+                bottom: isBoss ? 4 : 2,
                 child: IgnorePointer(
-                  child: Center(
-                    child: Builder(
-                      builder: (context) {
-                        // User requested: Enlarge shield animation and remove second yellow circle
-                        final shieldWidth = isBoss ? bossSpanWidth * 2.2 : (tileWidth * 3.1).clamp(120.0, 350.0);
-                        final shieldHeight = isBoss ? (tileHeight * 4.4) : (tileHeight * 3.9).clamp(130.0, 390.0);
-                        final nowMs = DateTime.now().millisecondsSinceEpoch;
-                        final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
+                  child: Builder(
+                    builder: (context) {
+                      final double shieldWidth = isBoss
+                          ? (bossSpanWidth * 1.35)
+                          : (modelWidth * 1.55).clamp(130.0, 240.0);
+                      final double shieldHeight = isBoss
+                          ? (modelHeight * 1.15)
+                          : (modelHeight * 1.40).clamp(130.0, 240.0);
+                      final nowMs = DateTime.now().millisecondsSinceEpoch;
+                      final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
 
-                        if (isInitialCasting) {
-                          return SizedBox(
-                            width: shieldWidth,
-                            height: shieldHeight,
-                            child: const SpriteSheetAnimation(
-                              assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
-                              columns: 3,
-                              rows: 3,
-                              totalFrames: 9,
-                              duration: Duration(milliseconds: 1000),
-                              loop: false,
-                              fit: BoxFit.contain,
+                      return SizedBox(
+                        width: shieldWidth,
+                        height: shieldHeight,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Radiant Aegis Barrier Dome Aura
+                            Container(
+                              width: shieldWidth * 0.86,
+                              height: shieldHeight * 0.86,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    const Color(0xFFFFD54F).withValues(alpha: 0.20),
+                                    const Color(0xFF00E5FF).withValues(alpha: 0.14),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.2, 0.7, 1.0],
+                                ),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD54F).withValues(alpha: 0.50),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFD54F).withValues(alpha: 0.35),
+                                    blurRadius: 14,
+                                    spreadRadius: 2,
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        } else {
-                          return SizedBox(
-                            width: shieldWidth,
-                            height: shieldHeight,
-                            child: Image.asset(
-                              'assets/animations/vfx/fire_shield_static.png',
-                              fit: BoxFit.contain,
-                              width: shieldWidth,
-                              height: shieldHeight,
-                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                            ),
-                          );
-                        }
-                      },
-                    ),
+
+                            // Dynamic Sprite VFX / Static Barrier
+                            if (isInitialCasting)
+                              SpriteSheetAnimation(
+                                assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                                columns: 3,
+                                rows: 3,
+                                totalFrames: 9,
+                                duration: const Duration(milliseconds: 1000),
+                                loop: false,
+                                fit: BoxFit.contain,
+                              )
+                            else
+                              Image.asset(
+                                'assets/animations/vfx/fire_shield_static.png',
+                                fit: BoxFit.contain,
+                                width: shieldWidth,
+                                height: shieldHeight,
+                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -7678,251 +7711,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           _openUnitInspectorDialog(unit);
         },
         child: cardWidget,
-      ),
-    );
-  }
-
-  /// Ultimate Burst Pop-Out Mini-Slate Dock (HUD pull-out tray)
-  Widget _buildUltimatePopOutDock({bool isLandscapeMobile = false}) {
-    final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
-    if (livingAllies.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 2 : 4),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D0D14),
-        border: Border(top: BorderSide(color: Color(0xFF222230), width: 1.0)),
-      ),
-      child: Row(
-        children: [
-          // Crest & Label
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.bolt, color: Color(0xFFFFD54F), size: 14),
-              const SizedBox(width: 4),
-              Text(
-                'ULTIMATES',
-                style: TextStyle(
-                  fontSize: 9.0,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.8,
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: SizedBox(
-              height: isLandscapeMobile ? 36 : 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: livingAllies.length,
-                separatorBuilder: (context, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final unit = livingAllies[index];
-                  return _buildUltimateMiniSlate(unit);
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUltimateMiniSlate(CombatUnitState unit) {
-    final isReady = unit.isUltimateReady;
-    final double gaugePct = (unit.ultimateGauge / 100.0).clamp(0.0, 1.0);
-    final isSelected = _selectedUltimateUnitId == unit.id;
-
-    final Widget slateWidget = Container(
-      width: 130,
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-      decoration: BoxDecoration(
-        color: isReady
-            ? const Color(0xFF2E200C).withValues(alpha: 0.98)
-            : const Color(0xFF14141E).withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isReady
-              ? const Color(0xFFFFD54F)
-              : (isSelected ? const Color(0xFF00E5FF) : Colors.white12),
-          width: isReady ? 1.6 : 0.8,
-        ),
-        boxShadow: isReady
-            ? const [
-                BoxShadow(
-                  color: Color(0x66FFD54F),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        children: [
-          // Unit Portrait in Gothic Frame
-          Container(
-            width: 30,
-            height: 38,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: isReady ? const Color(0xFFFFD54F) : Colors.white24,
-                width: 0.8,
-              ),
-              color: Colors.black45,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: Image.asset(
-                unit.assetPath,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.shield, color: Colors.white38, size: 16),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Info & Meter
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        unit.name.split(' ').first.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 8.0,
-                          fontWeight: FontWeight.bold,
-                          color: isReady ? const Color(0xFFFFE082) : Colors.white70,
-                          letterSpacing: 0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      'Lv.${unit.level}',
-                      style: const TextStyle(
-                        fontSize: 7.0,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFFFD54F),
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '⚡ ${unit.ultimateTitle.toUpperCase()}',
-                  style: TextStyle(
-                    fontSize: 7.2,
-                    fontWeight: FontWeight.w900,
-                    color: isReady ? const Color(0xFFFFD54F) : const Color(0xFF80D8FF),
-                    letterSpacing: 0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 1),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isReady ? 'TAP TO CAST!' : '${unit.ultimateGauge}%',
-                      style: TextStyle(
-                        fontSize: 6.8,
-                        fontWeight: FontWeight.w900,
-                        color: isReady ? const Color(0xFFFFD54F) : Colors.white38,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    if (isReady)
-                      const Icon(Icons.touch_app, size: 8, color: Color(0xFFFFD54F)),
-                  ],
-                ),
-                const SizedBox(height: 1.5),
-                // Progress Bar
-                Container(
-                  height: 2.5,
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: gaugePct,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isReady ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                        borderRadius: BorderRadius.circular(1.5),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return GestureDetector(
-      onTap: () {
-        if (isReady && !_engine.isPreBattlePhase) {
-          _playSfx('sfx_spell.wav');
-          _engine.castUltimate(unit.id);
-        } else {
-          setState(() {
-            _selectedUnitId = unit.id;
-            _selectedEnemyUnitId = null;
-          });
-        }
-      },
-      child: slateWidget,
-    );
-
-    // When charged, unit portrait can be dragged onto the battlefield with 30% tactical bullet-time
-    return Draggable<String>(
-      data: 'ultimate:${unit.id}',
-      onDragStarted: () {
-        setState(() {
-          _draggedUltimateUnitId = unit.id;
-          _selectedUltimateUnitId = null;
-          _selectedCardId = null;
-          _selectedUnitId = null;
-        });
-        _engine.setBulletTime(true);
-      },
-      onDragEnd: (_) {
-        setState(() {
-          _draggedUltimateUnitId = null;
-          _hoveredTileGRow = null;
-          _hoveredTileCol = null;
-        });
-        _engine.setBulletTime(false);
-      },
-      feedback: Material(
-        color: Colors.transparent,
-        child: Transform.scale(
-          scale: 1.15,
-          child: slateWidget,
-        ),
-      ),
-      child: GestureDetector(
-        onTap: () {
-          // If clicked, cast on default primary target
-          _engine.castUltimate(unit.id);
-        },
-        child: slateWidget,
       ),
     );
   }
@@ -9042,7 +8830,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), fontSize: 11),
                   ),
                   TextSpan(
-                    text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Immediate battle opening access)',
+                    text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Skill-based cooldown, ready at battle opening)',
                     style: const TextStyle(color: Colors.white70, fontSize: 10),
                   ),
                 ],
@@ -9052,7 +8840,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               label: Text(
                 unit.isUltimateReady
                     ? '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
-                    : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateGauge}% Gauge)',
+                    : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateCooldown} Turns CD)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 8.5,
