@@ -55,7 +55,7 @@ void main() {
 
     test('3. Vanguard Cover Rule: -25% damage from direct frontal attacks, Flanking ignores Cover', () {
       final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
-      final blade = engine.playerUnits.firstWhere((u) => u.id == 'crypt_stalker');
+      final blade = engine.playerUnits.firstWhere((u) => u.id == 'blood_scribe');
 
       // Place Iron Footman (Vanguard) at Col 3, Row 0 (Frontline)
       footman.repositionTo([const GridNode(column: 3, row: 0)], apPenalty: 0);
@@ -89,7 +89,7 @@ void main() {
     });
 
     test('4. Displacement & Collision Physics: Knockback lane shift & Kinetic Splat on obstacle', () {
-      final blade = engine.playerUnits.firstWhere((u) => u.id == 'crypt_stalker');
+      final blade = engine.playerUnits.firstWhere((u) => u.id == 'blood_scribe');
       final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
 
       // Place Blade at Col 2, Row 0 and Footman at Col 2, Row 1 (Obstacle in path)

@@ -1868,7 +1868,7 @@ class StarterBrigades {
         speed: 110,
         nativeTraitId: 'pyre_infusion',
         lineageAncestors: [],
-        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-03-SUP-G3 Alchemist.png',
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png',
       ),
       const UnitEntity(
         id: 'pyre_zealot',
@@ -1886,7 +1886,7 @@ class StarterBrigades {
         speed: 105,
         nativeTraitId: 'vicious_strike',
         lineageAncestors: [],
-        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-01-VGD-G1 Ghoul.png',
+        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png',
       ),
     ];
   }

@@ -522,8 +522,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           plinthRimColor = const Color(0xFF00E5FF);
           plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.6);
         } else if (isMoveReachable) {
-          plinthRimColor = const Color(0xFF00E676);
-          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.4);
+          plinthRimColor = const Color(0xFF00E676).withValues(alpha: 0.35);
+          plinthGlowColor = Colors.transparent;
         } else if (occupant != null) {
           if (hasVanguardCover) {
             plinthRimColor = const Color(0xFF00E5FF);

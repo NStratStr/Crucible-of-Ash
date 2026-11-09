@@ -551,7 +551,15 @@ class SpatialCombatEngine extends ChangeNotifier {
       final double morriganSpeedMult = activeGen == GeneralType.morrigan ? 1.10 : 1.0;
       final double valeriaArmorMult = activeGen == GeneralType.valeria ? 1.25 : 1.0;
 
-      for (int i = 0; i < min(5, playerEntities.length); i++) {
+      // Tactical 3-Unit Formation (Ash Sculptor Commander + 2 Minions)
+      final autoFormationNodes = [
+        const GridNode(column: 1, row: 0), // Slot 0: Ash Sculptor (Frontline Mid)
+        const GridNode(column: 0, row: 0), // Slot 1: Vanguard Minion (Frontline Top)
+        const GridNode(column: 1, row: 2), // Slot 2: Caster Minion (Backline Mid)
+      ];
+
+      final int squadCount = min(3, playerEntities.length);
+      for (int i = 0; i < squadCount; i++) {
         final p = playerEntities[i];
 
         // Apply Equipped Relic Bonuses, Plinth Material Passives, & Active Commander Aura
@@ -567,15 +575,18 @@ class SpatialCombatEngine extends ChangeNotifier {
         final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult * morriganSpeedMult).round();
         final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
 
-        // Identify the Commander Protagonist (lead slot or commander species)
+        // Identify the Commander Protagonist (lead slot)
         final bool isCommanderLead = (i == 0) ||
             p.speciesId.contains('vladislav') ||
             p.speciesId.contains('ash_sculptor') ||
             p.id.contains('vladislav') ||
             p.id.contains('ash_sculptor');
 
+        final String unitId = isCommanderLead ? 'ash_sculptor' : p.id;
+        final autoNode = autoFormationNodes[i];
+
         playerUnits.add(CombatUnitState(
-          id: isCommanderLead ? 'ash_sculptor' : p.id,
+          id: unitId,
           name: isCommanderLead ? 'The Ash Sculptor' : p.name,
           templateId: isCommanderLead ? 'ash_sculptor' : p.speciesId,
           isPlayer: true,
@@ -584,7 +595,9 @@ class SpatialCombatEngine extends ChangeNotifier {
           customAssetPath: isCommanderLead ? 'assets/images/ash_sculptor_idle.png' : p.customAvatarAsset,
           footprint: UnitFootprint.single1x1,
           archetype: isCommanderLead ? UnitArchetype.vanguardMelee : mapArchetypeToSpatial(p.archetype),
-          occupiedNodes: [], // Spawn on Staging Reserve Dock for player tactical placement before battle
+          occupiedNodes: [
+            GridNode(column: autoNode.column, row: autoNode.row, occupantUnitId: unitId),
+          ],
           level: p.level,
           maxHp: effectiveMaxHp,
           hp: effectiveHp,
@@ -1002,7 +1015,8 @@ class SpatialCombatEngine extends ChangeNotifier {
       ultimateCooldown: 0,
     );
 
-    playerUnits.addAll([ashSculptor, tombstoneSentinel, cryptStalker, bloodScribe]);
+    // 1 Commander + 2 Minions Formation
+    playerUnits.addAll([ashSculptor, tombstoneSentinel, bloodScribe]);
 
     // Cards Setup
     hand.addAll([
