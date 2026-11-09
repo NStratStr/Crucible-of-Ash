@@ -117,9 +117,10 @@ class StarterBrigades {
   static List<UnitEntity> createAshLegionPlayerSquad() {
     return [
       const UnitEntity(
-        id: 'ash_vladislav_01',
-        speciesId: 'commander_vladislav',
-        name: 'Lord Vladislav',
+        id: 'ash_sculptor_01',
+        speciesId: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
         generation: 1,
         archetype: Archetype.assassin,
         slot: FormationSlot.front1,

@@ -172,7 +172,17 @@ class _AppShellState extends State<AppShell> {
       _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
       if (saved.allies.isNotEmpty) {
-        _tickManager.updateSquads(allies: saved.allies);
+        final migratedAllies = saved.allies.map((u) {
+          if (u.id.contains('vladislav') || u.speciesId.contains('vladislav') || u == saved.allies.first) {
+            return u.copyWith(
+              name: 'The Ash Sculptor',
+              speciesId: 'ash_sculptor',
+              customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
+            );
+          }
+          return u;
+        }).toList();
+        _tickManager.updateSquads(allies: migratedAllies);
       }
       if (saved.reserveInventory.isNotEmpty) {
         _inventory = List.from(saved.reserveInventory);
@@ -372,11 +382,21 @@ class _AppShellState extends State<AppShell> {
       isReachable: true,
     );
 
-    // If all allies were fallen, revive squad before entering
-    if (_tickManager.allies.every((u) => !u.isAlive)) {
-      final revived = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
-      _tickManager.updateSquads(allies: revived);
-    }
+    // Ensure lead commander is The Ash Sculptor with full HP
+    final updatedAllies = _tickManager.allies.map((u) {
+      if (u.id.contains('vladislav') || u.speciesId.contains('vladislav') || u == _tickManager.allies.first) {
+        return u.copyWith(
+          name: 'The Ash Sculptor',
+          speciesId: 'ash_sculptor',
+          customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
+          currentHp: u.currentHp <= 0 ? u.maxHp : u.currentHp,
+        );
+      } else if (u.currentHp <= 0) {
+        return u.copyWith(currentHp: u.maxHp);
+      }
+      return u;
+    }).toList();
+    _tickManager.updateSquads(allies: updatedAllies);
 
     _activeNode = bossNode;
     _activeEnemyWaves = [bossEnemies];

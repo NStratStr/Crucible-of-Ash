@@ -567,13 +567,23 @@ class SpatialCombatEngine extends ChangeNotifier {
         final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult * morriganSpeedMult).round();
         final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
 
+        // Identify the Commander Protagonist (lead slot or commander species)
+        final bool isCommanderLead = (i == 0) ||
+            p.speciesId.contains('vladislav') ||
+            p.speciesId.contains('ash_sculptor') ||
+            p.id.contains('vladislav') ||
+            p.id.contains('ash_sculptor');
+
         playerUnits.add(CombatUnitState(
-          id: p.id,
-          name: p.name,
-          templateId: p.speciesId,
+          id: isCommanderLead ? 'ash_sculptor' : p.id,
+          name: isCommanderLead ? 'The Ash Sculptor' : p.name,
+          templateId: isCommanderLead ? 'ash_sculptor' : p.speciesId,
           isPlayer: true,
+          isAshSculptor: isCommanderLead,
+          crucibleCinders: isCommanderLead ? 45 : 0,
+          customAssetPath: isCommanderLead ? 'assets/images/ash_sculptor_idle.png' : p.customAvatarAsset,
           footprint: UnitFootprint.single1x1,
-          archetype: mapArchetypeToSpatial(p.archetype),
+          archetype: isCommanderLead ? UnitArchetype.vanguardMelee : mapArchetypeToSpatial(p.archetype),
           occupiedNodes: [], // Spawn on Staging Reserve Dock for player tactical placement before battle
           level: p.level,
           maxHp: effectiveMaxHp,
@@ -582,7 +592,6 @@ class SpatialCombatEngine extends ChangeNotifier {
           armor: effectiveDef,
           attack: effectiveAtk,
           speed: effectiveSpd,
-          customAssetPath: p.customAvatarAsset,
           nativeTraitId: p.nativeTraitId,
           graftedTraitId: effectiveGraftId,
           chiseledTraitIds: p.chiseledTraitIds,
