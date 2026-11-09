@@ -5890,20 +5890,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                           child: (isAttacking && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
-                              ? SpriteSheetAnimation(
-                                  assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
-                                  columns: 3,
-                                  rows: 2,
-                                  totalFrames: 6,
-                                  duration: const Duration(milliseconds: 950),
-                                  loop: false,
-                                  fit: BoxFit.contain,
-                                  fallback: Image.asset(
-                                    unit.assetPath,
-                                    fit: BoxFit.contain,
-                                    alignment: Alignment.bottomCenter,
-                                  ),
-                                )
+                              ? (_activeSkillName == 'Obsidian Bastion'
+                                  ? Image.asset(
+                                      'assets/images/ash_sculptor_shield_burst.png',
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.bottomCenter,
+                                    )
+                                  : SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: const Duration(milliseconds: 950),
+                                      loop: false,
+                                      fit: BoxFit.contain,
+                                      fallback: Image.asset(
+                                        unit.assetPath,
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
+                                    ))
+                              : (isDamaged && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
+                                  ? Image.asset(
+                                      'assets/images/ash_sculptor_hit.png',
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.bottomCenter,
+                                    )
                               : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
                                   ? SpriteSheetAnimation(
                                       assetPath: 'assets/animations/valeria_slash_sheet.png',
