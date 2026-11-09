@@ -513,7 +513,7 @@ class CombatUnitState {
       return 'assets/images/flayed_butcher.png';
     }
     if (key.contains('ash_sculptor') || key.contains('grave_warden')) {
-      return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
+      return 'assets/images/ash_sculptor_idle.png';
     }
     if (key.contains('vladislav')) {
       return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';

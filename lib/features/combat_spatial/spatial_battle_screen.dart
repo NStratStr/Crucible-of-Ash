@@ -5757,7 +5757,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     // transparent padding. We scale Valeria to 0.88 so her physical figure matches the 1:1 footprint of the others!
     double unitScaleMultiplier = 1.0;
     final path = unit.assetPath.toLowerCase();
-    if (unit.id == 'lady_valeria' || path.contains('valeria')) {
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor' || path.contains('ash_sculptor')) {
+      unitScaleMultiplier = 1.18; // Heroic commander scale
+    } else if (unit.id == 'lady_valeria' || path.contains('valeria')) {
       unitScaleMultiplier = 0.95; // Crisp full-bleed canvas
     } else if (path.contains('ghoul')) {
       unitScaleMultiplier = 1.15; // Low crouch
@@ -5870,16 +5872,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       BlendMode.srcATop,
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
-                          child: (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
+                          child: (isAttacking && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
                               ? SpriteSheetAnimation(
-                                  assetPath: 'assets/animations/valeria_slash_sheet.png',
+                                  assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
                                   columns: 3,
                                   rows: 2,
                                   totalFrames: 6,
-                                  duration: const Duration(milliseconds: 1400),
+                                  duration: const Duration(milliseconds: 1100),
                                   loop: false,
                                   fit: BoxFit.contain,
                                 )
+                              : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/valeria_slash_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: const Duration(milliseconds: 1400),
+                                      loop: false,
+                                      fit: BoxFit.contain,
+                                    )
                               : Image.asset(
                                   unit.assetPath,
                                   fit: BoxFit.contain,
