@@ -12,8 +12,8 @@ void main() {
     });
 
     test('1. Grid & Coordinates: 5 Columns x 3 Ranks & Line of Sight logic', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
-      final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
+      final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'blood_scribe');
       final zealot = engine.enemyUnits.firstWhere((u) => u.id == 'pyre_zealot');
 
       // Col 3, Row 0 (Frontline) vs Col 4, Row 2 (Backline)
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('2. Turn Loop & Turn Meter: TM accumulation, pause at 10,000 TM, action vs reposition costs', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
       footman.currentAp = 9920; // 9,920 TM
       footman.speed = 80;
 
@@ -54,8 +54,8 @@ void main() {
     });
 
     test('3. Vanguard Cover Rule: -25% damage from direct frontal attacks, Flanking ignores Cover', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
-      final blade = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
+      final blade = engine.playerUnits.firstWhere((u) => u.id == 'crypt_stalker');
 
       // Place Iron Footman (Vanguard) at Col 3, Row 0 (Frontline)
       footman.repositionTo([const GridNode(column: 3, row: 0)], apPenalty: 0);
@@ -89,8 +89,8 @@ void main() {
     });
 
     test('4. Displacement & Collision Physics: Knockback lane shift & Kinetic Splat on obstacle', () {
-      final blade = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade');
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final blade = engine.playerUnits.firstWhere((u) => u.id == 'crypt_stalker');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
 
       // Place Blade at Col 2, Row 0 and Footman at Col 2, Row 1 (Obstacle in path)
       blade.repositionTo([const GridNode(column: 2, row: 0)], apPenalty: 0);
@@ -111,7 +111,7 @@ void main() {
     });
 
     test('5. Death & Petrified Plinths: Petrifies at 0 HP with 3 durability hits until shattered', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
       footman.repositionTo([const GridNode(column: 1, row: 0)], apPenalty: 0);
 
       // Reduce HP to 0 -> Petrifies into solid stone plinth
@@ -157,7 +157,7 @@ void main() {
       expect(secondCast, isFalse);
 
       // Executing unit turn resets the Tuning Slip limit for the next turn
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'tombstone_sentinel');
       engine.executeUnitAction(footman, isReposition: false);
       expect(engine.hasCastTuningSlipThisTurn, isFalse);
     });

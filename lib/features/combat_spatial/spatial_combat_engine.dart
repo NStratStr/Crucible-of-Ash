@@ -905,88 +905,95 @@ class SpatialCombatEngine extends ChangeNotifier {
     enemyUnits.addAll([gorgoroth, cinderWitch, pyreZealot]);
 
     // --- PLAYER SQUAD: ASH & STONE ORDER ---
-    // Lady Valeria: 1x1 Commander in Col 2 Frontline (Col index 1, Row 0)
-    final valeria = CombatUnitState(
-      id: 'lady_valeria',
-      name: 'Lady Valeria',
-      templateId: 'lady_valeria',
+    // --- PLAYER SQUAD: THE ASH SCULPTOR & SCULPTED RETINUE ---
+    // 1. The Ash Sculptor: Commander protagonist (Grave Warden Archetype)
+    final ashSculptor = CombatUnitState(
+      id: 'ash_sculptor',
+      name: 'The Ash Sculptor',
+      templateId: 'ash_sculptor',
+      isPlayer: true,
+      isAshSculptor: true,
+      crucibleCinders: 45,
+      archetype: UnitArchetype.vanguardMelee,
+      footprint: UnitFootprint.single1x1,
+      occupiedNodes: [
+        const GridNode(column: 1, row: 0, occupantUnitId: 'ash_sculptor'),
+      ],
+      maxHp: 640,
+      hp: 640,
+      maxArmor: 60,
+      armor: 60,
+      attack: 88,
+      speed: 90,
+      ultimateGauge: 100,
+      ultimateCooldown: 0,
+    );
+
+    // 2. Tombstone Sentinel: Frontline Protector Retinue (Living Rampart)
+    final tombstoneSentinel = CombatUnitState(
+      id: 'tombstone_sentinel',
+      name: 'Tombstone Sentinel',
+      templateId: 'tombstone_sentinel',
       isPlayer: true,
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 1, row: 0, occupantUnitId: 'lady_valeria'),
+        const GridNode(column: 0, row: 0, occupantUnitId: 'tombstone_sentinel'),
       ],
-      maxHp: 560,
-      hp: 560,
+      maxHp: 520,
+      hp: 520,
       maxArmor: 55,
       armor: 55,
-      attack: 74,
-      speed: 85,
-      ultimateGauge: 100, ultimateCooldown: 0,
-    );
-
-    // Iron Footman: 1x1 Vanguard in Col 4 Frontline (Col index 3, Row 0)
-    final ironFootman = CombatUnitState(
-      id: 'iron_footman',
-      name: 'Iron Footman',
-      templateId: 'iron_footman',
-      isPlayer: true,
-      archetype: UnitArchetype.vanguardMelee,
-      footprint: UnitFootprint.single1x1,
-      occupiedNodes: [
-        const GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'),
-      ],
-      maxHp: 450,
-      hp: 450,
-      maxArmor: 45,
-      armor: 45,
-      attack: 60,
+      attack: 58,
       speed: 80,
-      ultimateGauge: 100, ultimateCooldown: 0,
+      ultimateGauge: 100,
+      ultimateCooldown: 0,
     );
 
-    // Sanguine Blade: 1x1 Midline in Col 4 Midline (Col index 3, Row 1)
-    final sanguineBlade = CombatUnitState(
-      id: 'sanguine_blade',
-      name: 'Sanguine Blade',
-      templateId: 'sanguine_blade',
+    // 3. Crypt Stalker: Opportunist Flanker Retinue (Shadow Ambush on Brands/Crits)
+    final cryptStalker = CombatUnitState(
+      id: 'crypt_stalker',
+      name: 'Crypt Stalker',
+      templateId: 'crypt_stalker',
       isPlayer: true,
       archetype: UnitArchetype.reachMidline,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 1, row: 1, occupantUnitId: 'sanguine_blade'),
+        const GridNode(column: 0, row: 1, occupantUnitId: 'crypt_stalker'),
       ],
       moveRange: 2,
-      maxHp: 310,
-      hp: 310,
-      maxArmor: 20,
-      armor: 20,
-      attack: 78,
+      maxHp: 340,
+      hp: 340,
+      maxArmor: 25,
+      armor: 25,
+      attack: 82,
       speed: 120,
-      ultimateGauge: 100, ultimateCooldown: 0,
+      ultimateGauge: 100,
+      ultimateCooldown: 0,
     );
 
-    // Sun-Smith Artificer: 1x1 Arcanum in Col 5 Backline (Col index 4, Row 2)
-    final sunSmith = CombatUnitState(
-      id: 'sun_smith',
-      name: 'Sun-Smith Artificer',
-      templateId: 'sun_smith',
+    // 4. Blood Scribe: Occult Catalyst Retinue (Cinder Conduit feeds +10 Cinders to Sculptor)
+    final bloodScribe = CombatUnitState(
+      id: 'blood_scribe',
+      name: 'Blood Scribe',
+      templateId: 'blood_scribe',
       isPlayer: true,
       archetype: UnitArchetype.backlineCaster,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 2, row: 2, occupantUnitId: 'sun_smith'),
+        const GridNode(column: 1, row: 2, occupantUnitId: 'blood_scribe'),
       ],
-      maxHp: 280,
-      hp: 280,
-      maxArmor: 15,
-      armor: 15,
-      attack: 70,
-      speed: 95,
-      ultimateGauge: 100, ultimateCooldown: 0,
+      maxHp: 310,
+      hp: 310,
+      maxArmor: 20,
+      armor: 20,
+      attack: 75,
+      speed: 100,
+      ultimateGauge: 100,
+      ultimateCooldown: 0,
     );
 
-    playerUnits.addAll([valeria, ironFootman, sanguineBlade, sunSmith]);
+    playerUnits.addAll([ashSculptor, tombstoneSentinel, cryptStalker, bloodScribe]);
 
     // Cards Setup
     hand.addAll([
@@ -1988,6 +1995,11 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   void _executeUnitTurn(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
+    // --- Ash Sculptor Commander Action System ---
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
+      _executeAshSculptorTurn(unit, explicitTarget: explicitTarget, actionType: actionType);
+      return;
+    }
     if (unit.id == 'pyre_zealot') {
       // Pyre Zealot: Winds up 60-tick (2.0s) telegraphed piercing skewer down its column
       // Highlights target nodes with a red tinge, giving 2s to reposition (50% AP) or shield
@@ -2650,6 +2662,134 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   /// Adaptive Posture System: Resolves action based on Vanguard's current physical row depth
+    /// GDD Modern Wartune: Ash Sculptor Commander Tactical Actions
+  void _executeAshSculptorTurn(CombatUnitState sculptor, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
+    final opposingSquad = enemyUnits;
+    final validTarget = (explicitTarget != null && explicitTarget.isAlive)
+        ? explicitTarget
+        : _resolveColumnTarget(unitCol: sculptor.occupiedNodes.firstOrNull?.column ?? 1, targetingPlayers: false) ??
+            opposingSquad.where((u) => u.isAlive).firstOrNull;
+
+    if (validTarget == null) return;
+
+    if (actionType == 'sundering_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
+      // 1. Sundering Brand: Spends 30 Cinders, 175% ATK DMG, shatters 50% Armor for 2 turns
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
+      final rawDmg = (sculptor.effectiveAttack * 1.75).round();
+      final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+      validTarget.armor = (validTarget.armor * 0.50).round();
+      validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 60); // 2s vulnerable
+
+      addLog('ASH SCULPTOR: Sundering Brand scorches ${validTarget.name} for $dmg DMG & shatters 50% Armor!');
+      dispatchAction(SpatialActionEvent(
+        id: 'brand_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Sundering Brand',
+        targetId: validTarget.id,
+        targetName: validTarget.name,
+        damage: dmg,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+      // Trigger Crypt Stalker Opportunist Synergy:
+      _triggerCryptStalkerAmbush(validTarget);
+
+    } else if (actionType == 'obsidian_bastion') {
+      // 2. Obsidian Bastion: Spends 25 Cinders, grants 25% max HP Aegis Shield to Sculptor and adjacent allies
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 25);
+      final shieldAmt = (sculptor.maxHp * 0.25).round();
+      sculptor.aegisShield += shieldAmt;
+
+      for (final ally in playerUnits.where((u) => u.isAlive && u.id != sculptor.id)) {
+        ally.aegisShield += (shieldAmt * 0.65).round();
+      }
+
+      addLog('ASH SCULPTOR: Obsidian Bastion projects +$shieldAmt Aegis barrier across the commander retinue!');
+      dispatchAction(SpatialActionEvent(
+        id: 'bastion_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Obsidian Bastion',
+        targetId: sculptor.id,
+        targetName: 'Squad Aegis',
+        damage: 0,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'cataclysmic_pyre' || (actionType == 'ultimate' && sculptor.isCataclysmicPyreReady)) {
+      // 3. Cataclysmic Pyre: Spends 80 Cinders, AoE 250% ATK damage to ALL enemies + burns
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 80);
+      final rawDmg = (sculptor.effectiveAttack * 2.50).round();
+      int totalPyreDmg = 0;
+
+      for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
+        final dmg = enemy.takeDamage(rawDmg, isPhysical: false);
+        enemy.burnDuration = max(enemy.burnDuration, 90); // 3s burn
+        totalPyreDmg += dmg;
+      }
+
+      addLog('ASH SCULPTOR: CATACLYSMIC PYRE erupts across all enemy ranks for $totalPyreDmg total fire DMG!');
+      dispatchAction(SpatialActionEvent(
+        id: 'pyre_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Cataclysmic Pyre',
+        targetId: validTarget.id,
+        targetName: 'All Enemy Ranks',
+        damage: totalPyreDmg,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.horizontalRowScythe,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else {
+      // 4. Default / Cinder Strike: Generates +15 Cinders, deals 100% ATK DMG
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+      final dmg = validTarget.takeDamage(sculptor.effectiveAttack, isPhysical: true);
+
+      addLog('ASH SCULPTOR: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+15 Cinders -> ${sculptor.crucibleCinders}/100)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'strike_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Cinder Strike',
+        targetId: validTarget.id,
+        targetName: validTarget.name,
+        damage: dmg,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+    }
+
+    sculptor.actionCycleCount++;
+    advanceToNextWaveIfPending();
+  }
+
+  /// Retinue Companion Synergy 1: Blood Scribe channels +10 Cinders to Ash Sculptor on cast
+  void _channelBloodScribeCinders() {
+    final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+    if (sculptor != null && sculptor.isAlive) {
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 10);
+      addLog('  ★ [RETINUE CONDUIT] Blood Scribe channels +10 Cinders to the Ash Sculptor (${sculptor.crucibleCinders}/100)!');
+    }
+  }
+
+  /// Retinue Companion Synergy 2: Crypt Stalker free reaction ambush on Branded / Critical targets
+  void _triggerCryptStalkerAmbush(CombatUnitState target) {
+    final stalker = playerUnits.where((u) => u.id == 'crypt_stalker' && u.isAlive).firstOrNull;
+    if (stalker != null && target.isAlive) {
+      final stalkerDmg = target.takeDamage((stalker.effectiveAttack * 0.85).round(), isPhysical: true);
+      target.bleedStacks += 2;
+      addLog('  ⚡ [RETINUE AMBUSH] Crypt Stalker shadow-pounces ${target.name} for $stalkerDmg DMG (+2 Bleed)!');
+    }
+  }
+
   void _executeVanguardAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
     final col = unit.occupiedNodes.first.column;
     final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
@@ -2826,6 +2966,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Adaptive Posture System: Resolves action for Backline Casters
   void _executeCasterAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
+    if (unit.id == 'blood_scribe') _channelBloodScribeCinders();
     final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
     if (unit.currentDepth == RowDepth.front) {
       // Point-Blank Vulnerability:

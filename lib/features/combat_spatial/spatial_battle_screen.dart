@@ -8578,7 +8578,333 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   /// 1. Cast 1 Tuning Slip from Sculptor Tray (Vitae pool <= 7).
   /// 2. Attack / Cast Signature Skill (100% TM cost -> 0 TM).
   /// 3. Reposition (1-tile shift, 25% TM cost -> 7,500 TM retained).
+    /// GDD Modern Wartune: The Ash Sculptor Commander Action Tray
+  Widget _buildSculptorCommanderTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
+    final explicitTarget = _selectedEnemyUnitId != null
+        ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
+        : _getSmartDefaultTarget();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isNarrow = constraints.maxWidth < 650;
+        final bool isPyreReady = unit.crucibleCinders >= 80;
+
+        Widget buildCinderMeter() {
+          return Container(
+            height: isNarrow ? 14 : 16,
+            width: isNarrow ? 100 : 150,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1210),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00),
+                width: isPyreReady ? 1.4 : 0.8,
+              ),
+              boxShadow: isPyreReady
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFFF6D00).withValues(alpha: 0.6),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Stack(
+                children: [
+                  FractionallySizedBox(
+                    widthFactor: (unit.crucibleCinders / 100.0).clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFD84315), Color(0xFFFF6D00), Color(0xFFFFD54F)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: Text(
+                      '${unit.crucibleCinders} / 100 CINDERS',
+                      style: const TextStyle(
+                        fontSize: 7.0,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        Widget buildActionButton({
+          required String title,
+          required String subtitle,
+          required IconData icon,
+          required Color activeColor,
+          required Color borderColor,
+          required bool isEnabled,
+          required VoidCallback? onPressed,
+          required String tooltipMessage,
+        }) {
+          return Tooltip(
+            preferBelow: false,
+            message: tooltipMessage,
+            child: SizedBox(
+              height: isNarrow ? 40 : 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isEnabled ? activeColor : const Color(0xFF1E1924),
+                  foregroundColor: isEnabled ? Colors.white : Colors.white38,
+                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: BorderSide(color: isEnabled ? borderColor : Colors.white12, width: 1.0),
+                  ),
+                ),
+                onPressed: isEnabled ? onPressed : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: isNarrow ? 11 : 13, color: isEnabled ? Colors.white : Colors.white38),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: isNarrow ? 8.0 : 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: isEnabled ? Colors.white : Colors.white38,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: isNarrow ? 6.5 : 7.5,
+                        color: isEnabled ? Colors.white70 : Colors.white24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 12, vertical: isNarrow ? 5 : 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B1926),
+            border: Border(
+              top: BorderSide(
+                color: isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00),
+                width: isPyreReady ? 2.0 : 1.5,
+              ),
+              bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00)).withValues(alpha: 0.2),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Status Row: Avatar + Name + Cinder Gauge + Target
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.asset(
+                        unit.assetPath,
+                        width: isNarrow ? 22 : 28,
+                        height: isNarrow ? 22 : 28,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFFFFD54F), size: 18),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6D00),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text(
+                        'COMMANDER',
+                        style: TextStyle(fontSize: 7.0, color: Colors.black, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      unit.name.toUpperCase(),
+                      style: TextStyle(
+                        color: const Color(0xFFFFD54F),
+                        fontSize: isNarrow ? 10.0 : 11.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    buildCinderMeter(),
+                    const Spacer(),
+                    if (explicitTarget != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3E1E24),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.gps_fixed, size: 9, color: Color(0xFFFF8A80)),
+                            const SizedBox(width: 3),
+                            Text(
+                              explicitTarget.name,
+                              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 8.0, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Action Buttons Row: 4 Commander Abilities
+              Row(
+                children: [
+                  // 1. Cinder Strike
+                  Expanded(
+                    child: buildActionButton(
+                      title: 'STRIKE',
+                      subtitle: '+15 Cinders',
+                      icon: Icons.sports_mma,
+                      activeColor: const Color(0xFFB3261E),
+                      borderColor: const Color(0xFFFF8A80),
+                      isEnabled: true,
+                      tooltipMessage: 'Cinder Strike: Cleaves frontline target and generates +15 Crucible Cinders.',
+                      onPressed: () {
+                        setState(() {
+                          _engine.executeUnitAction(
+                            unit,
+                            isReposition: false,
+                            explicitTarget: explicitTarget,
+                            actionType: 'cinder_strike',
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 2. Sundering Brand
+                  Expanded(
+                    child: buildActionButton(
+                      title: 'BRAND',
+                      subtitle: '30 Cinders',
+                      icon: Icons.local_fire_department,
+                      activeColor: const Color(0xFFC2185B),
+                      borderColor: const Color(0xFFFF4081),
+                      isEnabled: unit.crucibleCinders >= 30,
+                      tooltipMessage: 'Sundering Brand: Consumes 30 Cinders. 175% ATK DMG, shatters 50% enemy armor & triggers Crypt Stalker reaction ambush!',
+                      onPressed: () {
+                        setState(() {
+                          _engine.executeUnitAction(
+                            unit,
+                            isReposition: false,
+                            explicitTarget: explicitTarget,
+                            actionType: 'sundering_brand',
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 3. Obsidian Bastion
+                  Expanded(
+                    child: buildActionButton(
+                      title: 'BASTION',
+                      subtitle: '25 Cinders',
+                      icon: Icons.shield,
+                      activeColor: const Color(0xFF00695C),
+                      borderColor: const Color(0xFF00BFA5),
+                      isEnabled: unit.crucibleCinders >= 25,
+                      tooltipMessage: 'Obsidian Bastion: Consumes 25 Cinders. Shields Sculptor and retinue companions with an Aegis barrier.',
+                      onPressed: () {
+                        setState(() {
+                          _engine.executeUnitAction(
+                            unit,
+                            isReposition: false,
+                            explicitTarget: explicitTarget,
+                            actionType: 'obsidian_bastion',
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 4. Cataclysmic Pyre
+                  Expanded(
+                    child: buildActionButton(
+                      title: 'PYRE APEX',
+                      subtitle: '80 Cinders',
+                      icon: Icons.bolt,
+                      activeColor: isPyreReady ? const Color(0xFFFF6D00) : const Color(0xFF3E2723),
+                      borderColor: isPyreReady ? const Color(0xFFFFD54F) : Colors.white24,
+                      isEnabled: isPyreReady,
+                      tooltipMessage: 'Cataclysmic Pyre: APEX FINISHER! Consumes 80 Cinders. Unleashes screen-shattering 250% ATK fire nova across all enemy ranks!',
+                      onPressed: () {
+                        setState(() {
+                          _engine.executeUnitAction(
+                            unit,
+                            isReposition: false,
+                            explicitTarget: explicitTarget,
+                            actionType: 'cataclysmic_pyre',
+                          );
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTurnActionDecisionTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
+      return _buildSculptorCommanderTray(unit, isLandscapeMobile: isLandscapeMobile);
+    }
+
     final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
     final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
     final explicitTarget = _selectedEnemyUnitId != null

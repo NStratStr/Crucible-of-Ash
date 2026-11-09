@@ -259,6 +259,13 @@ class CombatUnitState {
   int ultimateGauge; // 0 to 100%
   int ultimateCooldown; // 0 = Ultimate Burst Ready! Turn-based cooldown (active at battle start)
   bool get isUltimateReady => ultimateCooldown <= 0;
+  /// Crucible Cinders resource (0 to 100) for the Ash Sculptor commander abilities
+  int crucibleCinders;
+  bool isAshSculptor;
+  bool get isCinderStrikeReady => true;
+  bool get isSunderingBrandReady => crucibleCinders >= 30;
+  bool get isObsidianBastionReady => crucibleCinders >= 25;
+  bool get isCataclysmicPyreReady => crucibleCinders >= 80;
   int shieldAppliedMs; // timestamp when aegisShield was applied (for one-shot spell animation -> static overlay transition)
   bool isSlagCarapaceActive;
   SpatialTelegraphIntent? pendingIntent;
@@ -338,6 +345,8 @@ class CombatUnitState {
     this.invulnerabilityTicks = 0,
     this.ultimateGauge = 100,
     this.ultimateCooldown = 0,
+    this.crucibleCinders = 35,
+    this.isAshSculptor = false,
     this.shieldAppliedMs = 0,
     this.isSlagCarapaceActive = false,
     this.maxStagger = 0,
@@ -502,6 +511,9 @@ class CombatUnitState {
     final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
     if (key.contains('gorgoroth') || key.contains('chapter_titan') || key.contains('world_titan')) {
       return 'assets/images/flayed_butcher.png';
+    }
+    if (key.contains('ash_sculptor') || key.contains('grave_warden')) {
+      return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
     }
     if (key.contains('vladislav')) {
       return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
