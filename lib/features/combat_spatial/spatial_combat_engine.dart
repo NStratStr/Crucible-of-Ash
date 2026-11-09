@@ -2662,7 +2662,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   /// Adaptive Posture System: Resolves action based on Vanguard's current physical row depth
-    /// GDD Modern Wartune: Ash Sculptor Commander Tactical Actions
+    /// Crucible Commander System: Ash Sculptor Commander Tactical Actions
   void _executeAshSculptorTurn(CombatUnitState sculptor, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
     final opposingSquad = enemyUnits;
     final validTarget = (explicitTarget != null && explicitTarget.isAlive)

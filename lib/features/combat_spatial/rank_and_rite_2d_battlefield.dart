@@ -178,7 +178,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   }
 
   Widget _buildSquadTerritory({required bool isPlayer, required List<int> rankOrder}) {
-    // Slight rank-to-rank horizontal overlap so formations look tight and compact like Wartune
+    // Slight rank-to-rank horizontal overlap so formations look tight and compact and cohesive
     final double overlapStep = (tileWidth * 0.16).clamp(8.0, 24.0);
     final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
     final multiUnits = units.where((u) => u.isAlive && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1)).toList();
@@ -193,7 +193,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             final int index = entry.key;
             final int row = entry.value;
 
-            // Natural 2.5D Wartune Stage Depth Staggering:
+            // Natural 2.5D Stage Depth Staggering:
             // Frontline (Row 0): at bottom ground baseline (offset 0)
             // Midline (Row 1): stepped back into terrain (-14px)
             // Backline (Row 2): stepped deepest into horizon (-28px)

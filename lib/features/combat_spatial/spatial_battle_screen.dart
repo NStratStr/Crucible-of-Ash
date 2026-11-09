@@ -5782,7 +5782,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final double baseWidth = isBoss ? bossSpanWidth * 0.70 : (tileWidth - 12) * unitScaleMultiplier;
     final double baseHeight = isBoss ? 38 : (16 * unitScaleMultiplier);
     // Units scale dynamically with tile size for commanding visual presence
-    // Elegant Wartune-style stage proportions:
+    // Elegant Grand battlefield stage proportions:
     // Slightly enlarged characters stand handsomely grounded on their plinths with heroic presence!
     final double modelWidth = (isBoss ? bossSpanWidth * 1.15 : tileWidth * 1.08 * unitScaleMultiplier).clamp(52.0, 300.0);
     final double modelHeight = (isBoss
@@ -8590,7 +8590,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   /// 1. Cast 1 Tuning Slip from Sculptor Tray (Vitae pool <= 7).
   /// 2. Attack / Cast Signature Skill (100% TM cost -> 0 TM).
   /// 3. Reposition (1-tile shift, 25% TM cost -> 7,500 TM retained).
-    /// GDD Modern Wartune: The Ash Sculptor Commander Action Tray
+    /// Crucible Commander System: The Ash Sculptor Commander Action Tray
   Widget _buildSculptorCommanderTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
     final explicitTarget = _selectedEnemyUnitId != null
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
