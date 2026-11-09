@@ -8121,6 +8121,28 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
+      if (actionType == 'basic' || actionType == 'cinder_strike') {
+        setState(() {
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'cinder_strike');
+        });
+      } else if (actionType == 'signature' || actionType == 'sundering_brand') {
+        if (unit.crucibleCinders < 30) return;
+        setState(() {
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'sundering_brand');
+        });
+      } else if (actionType == 'obsidian_bastion') {
+        if (unit.crucibleCinders < 25) return;
+        setState(() {
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'obsidian_bastion');
+        });
+      } else if (actionType == 'ultimate' || actionType == 'cataclysmic_pyre') {
+        if (unit.crucibleCinders < 80) return;
+        _startForgeStrikeFinisher(unit, explicitTarget);
+      }
+      return;
+    }
+
     if (actionType == 'signature' && !unit.isSignatureReady) return;
     if (actionType == 'ultimate' && !unit.isUltimateReady) return;
 
@@ -8137,21 +8159,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   KeyEventResult _handleBattleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    // Key '1': Basic Attack
+    // Key '1': Strike (+15 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
-      _executeHotkeyedAction('basic');
+      _executeHotkeyedAction('cinder_strike');
       return KeyEventResult.handled;
     }
 
-    // Key '2': Signature Skill
+    // Key '2': Sundering Brand (30 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
-      _executeHotkeyedAction('signature');
+      _executeHotkeyedAction('sundering_brand');
       return KeyEventResult.handled;
     }
 
-    // Key '3': Ultimate Ability
+    // Key '3': Obsidian Bastion (25 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
-      _executeHotkeyedAction('ultimate');
+      _executeHotkeyedAction('obsidian_bastion');
+      return KeyEventResult.handled;
+    }
+
+    // Key '4': Cataclysmic Pyre Apex (80 Cinders)
+    if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
+      _executeHotkeyedAction('cataclysmic_pyre');
       return KeyEventResult.handled;
     }
 
@@ -8499,9 +8527,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   Widget _buildTurnActionDecisionTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
-    if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
-      return _buildSculptorCommanderTray(unit, isLandscapeMobile: isLandscapeMobile);
-    }
+    final sculptor = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ?? unit;
+    return _buildSculptorCommanderTray(sculptor, isLandscapeMobile: isLandscapeMobile);
+  }
+
+  // Legacy manual unit tray (retired in Crucible Commander mode)
+  Widget _buildLegacyUnitTurnTrayUnused(CombatUnitState unit, {bool isLandscapeMobile = false}) {
 
     final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
     final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;

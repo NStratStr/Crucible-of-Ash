@@ -104,5 +104,32 @@ void main() {
       expect(enemyTarget.hp, lessThan(hpBefore));
       expect(sculptor.crucibleCinders, 20); // 100 - 80
     });
+
+    test('Retinue minions execute turns autonomously and channel +10 Cinders without pausing for legacy turn tray', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+      engine.isPreBattlePhase = false;
+
+      final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
+      final minion = engine.playerUnits.firstWhere((u) => !u.isAshSculptor);
+
+      sculptor.currentAp = 0;
+      sculptor.crucibleCinders = 45;
+      minion.currentAp = 9950; // Will reach 10,000 TM on next tick
+
+      engine.stepTick();
+
+      // Minion should NOT pause turn execution for legacy UI tray
+      expect(engine.isTurnExecutionPaused, isFalse);
+      // Minion should have acted automatically and channeled +10 Cinders to the Ash Sculptor
+      expect(minion.currentAp, lessThan(10000));
+      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(55));
+
+      // Now bring The Ash Sculptor to 10,000 TM -> SHOULD pause for Commander Tray decision
+      sculptor.currentAp = 9950;
+      engine.stepTick();
+      expect(engine.isTurnExecutionPaused, isTrue);
+      expect(engine.activeActingUnit?.id, equals('ash_sculptor'));
+    });
   });
 }

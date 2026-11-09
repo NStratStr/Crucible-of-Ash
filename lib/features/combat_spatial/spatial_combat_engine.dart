@@ -584,6 +584,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         final String unitId = isCommanderLead ? 'ash_sculptor' : p.id;
         final autoNode = autoFormationNodes[i];
+        final int finalSpeed = isCommanderLead ? max(115, effectiveSpd) : effectiveSpd;
 
         playerUnits.add(CombatUnitState(
           id: unitId,
@@ -604,7 +605,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           maxArmor: effectiveDef,
           armor: effectiveDef,
           attack: effectiveAtk,
-          speed: effectiveSpd,
+          speed: finalSpeed,
           nativeTraitId: p.nativeTraitId,
           graftedTraitId: effectiveGraftId,
           chiseledTraitIds: p.chiseledTraitIds,
@@ -987,7 +988,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       maxArmor: 60,
       armor: 60,
       attack: 88,
-      speed: 90,
+      speed: 115,
       ultimateGauge: 100,
       ultimateCooldown: 0,
     );
@@ -1541,19 +1542,24 @@ class SpatialCombatEngine extends ChangeNotifier {
     for (final unit in readyUnits) {
       if (!unit.isAlive || unit.currentAp < tickThreshold) continue;
 
-      // Rank & Rite Spec Sec 2: When an ally reaches 10,000 TM, pause execution for player decision (unless Auto is on)
-      if (unit.isPlayer && !isAutoBattleMode) {
+      // Crucible Commander System: Only The Ash Sculptor (Commander) pauses for manual player input.
+      // Retinue companions act autonomously on their turns and channel +10 Crucible Cinders to the Sculptor!
+      final bool isSculptorCommander = unit.isAshSculptor || unit.id == 'ash_sculptor';
+      if (unit.isPlayer && isSculptorCommander && !isAutoBattleMode) {
         activeActingUnit = unit;
         isTurnExecutionPaused = true;
         hasCastTuningSlipThisTurn = false;
         isRunning = false;
-        addLog('⚡ TURN READY: ${unit.name} reached 10,000 TM! Tactical decision required.');
+        addLog('⚡ COMMANDER TURN READY: ${unit.name} reached 10,000 TM! Select Crucible Action.');
         notifyListeners();
         return; // Halt stepTick immediately!
       }
 
-      // Automated resolution for enemies (and for allies in Auto mode)
+      // Automated resolution for enemies, retinue companions, and Auto-Battle mode
       unit.currentAp -= tickThreshold; // Consume turn
+      if (unit.isPlayer && !isSculptorCommander) {
+        _channelRetinueCinders(unit);
+      }
       _executeUnitTurn(unit);
       if (isActionPauseEnabled && activeActionEvent != null) {
         break;
@@ -2842,22 +2848,22 @@ class SpatialCombatEngine extends ChangeNotifier {
     advanceToNextWaveIfPending();
   }
 
-  /// Retinue Companion Synergy 1: Blood Scribe channels +10 Cinders to Ash Sculptor on cast
-  void _channelBloodScribeCinders() {
+  /// Retinue Companion Synergy 1: Retinue companions channel +10 Cinders to Ash Sculptor on turn
+  void _channelRetinueCinders(CombatUnitState companion) {
     final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
     if (sculptor != null && sculptor.isAlive) {
       sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 10);
-      addLog('  ★ [RETINUE CONDUIT] Blood Scribe channels +10 Cinders to the Ash Sculptor (${sculptor.crucibleCinders}/100)!');
+      addLog('  ★ [RETINUE CONDUIT] ${companion.name} channels +10 Cinders to the Ash Sculptor (${sculptor.crucibleCinders}/100)!');
     }
   }
 
-  /// Retinue Companion Synergy 2: Crypt Stalker free reaction ambush on Branded / Critical targets
+  /// Retinue Companion Synergy 2: Retinue Striker free reaction ambush on Branded / Critical targets
   void _triggerCryptStalkerAmbush(CombatUnitState target) {
-    final stalker = playerUnits.where((u) => u.id == 'crypt_stalker' && u.isAlive).firstOrNull;
+    final stalker = playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive && (u.id == 'crypt_stalker' || u.archetype == UnitArchetype.reachMidline)).firstOrNull;
     if (stalker != null && target.isAlive) {
       final stalkerDmg = target.takeDamage((stalker.effectiveAttack * 0.85).round(), isPhysical: true);
       target.bleedStacks += 2;
-      addLog('  ⚡ [RETINUE AMBUSH] Crypt Stalker shadow-pounces ${target.name} for $stalkerDmg DMG (+2 Bleed)!');
+      addLog('  ⚡ [RETINUE AMBUSH] ${stalker.name} shadow-pounces ${target.name} for $stalkerDmg DMG (+2 Bleed)!');
     }
   }
 
@@ -3037,7 +3043,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Adaptive Posture System: Resolves action for Backline Casters
   void _executeCasterAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
-    if (unit.id == 'blood_scribe') _channelBloodScribeCinders();
+    if (unit.id == 'blood_scribe') _channelRetinueCinders(unit);
     final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
     if (unit.currentDepth == RowDepth.front) {
       // Point-Blank Vulnerability:
