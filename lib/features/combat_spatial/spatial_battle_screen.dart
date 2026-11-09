@@ -238,6 +238,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   static const int _maxSfxPlayers = 4;
   bool _isMuted = false;
   bool _isDockCollapsed = false;
+  bool _isLogDrawerVisible = false;
   bool _hasBossEnraged = false;
   bool _wasBossStaggered = false;
   EncounterPhase _lastObservedPhase = EncounterPhase.standard;
@@ -1427,9 +1428,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                       // Dynamically calculate optimal tile dimensions for 3 Ranks x 3 Lanes
                       // Total board has 6 ranks + clash buffer (~6.5 tile widths) and 3 lanes (3 tile heights).
-                      final double target2DWidth = (availW / 7.2).clamp(70.0, 160.0);
-                      // Exactly 3 lanes: sized cleanly along the terrain ground plane, preserving the epic skyline!
-                      final double target2DHeight = (availH / 3.9).clamp(54.0, 110.0);
+                      // Option 1: Expanded battlefield scale filling the arena grandly
+                      final double target2DWidth = (availW / 6.4).clamp(84.0, 190.0);
+                      final double target2DHeight = (availH / 3.3).clamp(68.0, 135.0);
 
                       final bool isDesktop = availW >= 700;
                       final double tileWidth = isDesktop ? 170.0 : 118.0;
@@ -2060,65 +2061,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // Collapsible Minimal HUD Toggle Handle
-            if (!_engine.isPreBattlePhase)
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isDockCollapsed = !_isDockCollapsed;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF14141E).withValues(alpha: 0.85),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                        border: Border.all(color: Colors.white24, width: 0.8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _isDockCollapsed ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                            size: 13,
-                            color: const Color(0xFFFFD54F),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            _isDockCollapsed ? 'EXPAND CARDS' : 'COLLAPSE',
-                            style: const TextStyle(fontSize: 7.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-            // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Combat Docks (Ultimates & Grimoire Hand)
+            // Option 1: Clean Turn-Based Hero HUD
+            // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Turn Action Tray & Pacing Bar
             if (_engine.isPreBattlePhase)
               Transform.translate(
                 offset: const Offset(0, -10.0),
                 child: _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile),
               )
-            else if (!_isDockCollapsed) ...[
-              // Rank & Rite Spec Sec 2: Turn Action Decision Tray (When Turn Meter reaches 10,000 TM)
+            else ...[
+              // Active Turn Decision Tray (when player hero reaches 10,000 TM) vs Battle Pacing Bar
               if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
-                _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile),
-
-              
-
-              // Tactical Card Hand & Burn Pit (Sculptor Tray)
-              _buildTacticalHandDock(isLandscapeMobile: isLandscapeMobile),
+                _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile)
+              else
+                _buildCombatPacingStatusTray(isLandscapeMobile: isLandscapeMobile),
             ],
 
-            // Live 30 Hz Combat Event Log (Hidden in Zen Mode and Mobile Landscape)
-            if (!_isZenMode && !isLandscapeMobile)
-              _buildCombatLogConsole(),
+            // Slide-up Combat Chronicle Log Drawer (On-demand inspection overlay)
+            if (_isLogDrawerVisible)
+              _buildLogDrawerOverlay(isLandscapeMobile: isLandscapeMobile),
           ],
         ),
       ),
@@ -8683,20 +8643,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
                           ),
                         ),
-                        if (_engine.hasCastTuningSlipThisTurn) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF4CAF50),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: const Text(
-                              'SLIP CAST',
-                              style: TextStyle(fontSize: 6.5, color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF37474F),
+                            borderRadius: BorderRadius.circular(2),
+                            border: Border.all(color: const Color(0xFF90A4AE), width: 0.5),
                           ),
-                        ],
+                          child: Text(
+                            unit.archetype.name.toUpperCase(),
+                            style: const TextStyle(fontSize: 6.5, color: Color(0xFFECEFF1), fontWeight: FontWeight.bold),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -9015,6 +8974,279 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  /// Option 1: Sleek Combat Pacing & Flow Bar (Active during non-player turns & tick progression)
+  Widget _buildCombatPacingStatusTray({bool isLandscapeMobile = false}) {
+    final actingEnemy = _engine.enemyUnits.where((u) => u.isAlive && u.id == _attackingUnitId).firstOrNull;
+    final nextReadyUnit = [..._engine.playerUnits, ..._engine.enemyUnits]
+        .where((u) => u.isAlive)
+        .toList()
+      ..sort((a, b) => b.currentAp.compareTo(a.currentAp));
+    final nextUnit = nextReadyUnit.firstOrNull;
+
+    return Container(
+      height: isLandscapeMobile ? 42.0 : 46.0,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101018).withValues(alpha: 0.95),
+        border: Border(
+          top: BorderSide(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 1.2),
+          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, -2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Left: Battle Phase / Turn Status
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: actingEnemy != null ? const Color(0xFF38151A) : const Color(0xFF17202A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: actingEnemy != null ? const Color(0xFFFF5252) : const Color(0xFF00E5FF),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Icon(
+                    actingEnemy != null ? Icons.sports_mma : Icons.hourglass_top,
+                    size: 13,
+                    color: actingEnemy != null ? const Color(0xFFFF8A80) : const Color(0xFF80D8FF),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        actingEnemy != null
+                            ? '⚔️ ENEMY TURN: ${actingEnemy.name.toUpperCase()}'
+                            : (nextUnit != null
+                                ? '⏳ INITIATIVE ADVANCING (Next: ${nextUnit.name})'
+                                : '⚔️ BATTLE IN PROGRESS'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: actingEnemy != null ? const Color(0xFFFF8A80) : const Color(0xFFFFD54F),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      Text(
+                        nextUnit != null
+                            ? '${nextUnit.name}: ${nextUnit.currentAp} / 10,000 TM (${((nextUnit.currentAp / 10000) * 100).toInt()}%)'
+                            : 'Synchronizing discrete 30 Hz ticks',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54, fontSize: 8.0, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Right Controls: Speed Toggle, Auto-Battle Toggle, Battle Log
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Combat Pacing Speed Button
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _engine.cycleCombatSpeed();
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1B2A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.5), width: 0.8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.speed, size: 12, color: Color(0xFFFFD54F)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_engine.combatPacingSpeed.toStringAsFixed(1)}x',
+                        style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFFFFD54F)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Auto-Battle Toggle Button
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _engine.isAutoBattleMode = !_engine.isAutoBattleMode;
+                    if (_engine.isAutoBattleMode && _engine.isTurnExecutionPaused) {
+                      _engine.isTurnExecutionPaused = false;
+                      _engine.isRunning = true;
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _engine.isAutoBattleMode ? const Color(0xFF1B5E20) : const Color(0xFF1B1B2A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _engine.isAutoBattleMode ? const Color(0xFF00E676) : Colors.white24,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _engine.isAutoBattleMode ? Icons.smart_toy : Icons.smart_toy_outlined,
+                        size: 12,
+                        color: _engine.isAutoBattleMode ? Colors.white : Colors.white54,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _engine.isAutoBattleMode ? 'AUTO ON' : 'AUTO',
+                        style: TextStyle(
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.bold,
+                          color: _engine.isAutoBattleMode ? Colors.white : Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+
+              // Slide-up Combat Log Toggle Button
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isLogDrawerVisible = !_isLogDrawerVisible;
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isLogDrawerVisible ? const Color(0xFF2C1E10) : const Color(0xFF1B1B2A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _isLogDrawerVisible ? const Color(0xFFFFB74D) : Colors.white24,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.receipt_long,
+                        size: 12,
+                        color: _isLogDrawerVisible ? const Color(0xFFFFB74D) : Colors.white70,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'LOG',
+                        style: TextStyle(
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.bold,
+                          color: _isLogDrawerVisible ? const Color(0xFFFFB74D) : Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Option 1: On-Demand Slide-Up Battle Chronicle Log Overlay
+  Widget _buildLogDrawerOverlay({bool isLandscapeMobile = false}) {
+    return Container(
+      height: isLandscapeMobile ? 100 : 130,
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xF00A0A14),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.5), width: 1.0),
+        boxShadow: const [
+          BoxShadow(color: Colors.black87, blurRadius: 14, spreadRadius: 2),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: const BoxDecoration(
+              color: Color(0xFF141422),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.receipt_long, size: 12, color: Color(0xFFFFD54F)),
+                    SizedBox(width: 5),
+                    Text(
+                      'COMBAT CHRONICLE (30 Hz DISCRETE)',
+                      style: TextStyle(color: Color(0xFFFFD54F), fontSize: 8.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _isLogDrawerVisible = false),
+                  child: const Icon(Icons.close, size: 14, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              itemCount: _engine.combatLogs.length,
+              itemBuilder: (context, idx) {
+                final log = _engine.combatLogs[_engine.combatLogs.length - 1 - idx];
+                final isCrit = log.contains('CRITICAL') || log.contains('SHATTERS') || log.contains('CRIT');
+                final isTelegraph = log.contains('TELEGRAPH') || log.contains('⚠️');
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1.0),
+                  child: Text(
+                    log,
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      color: isCrit
+                          ? const Color(0xFFFFD54F)
+                          : (isTelegraph ? const Color(0xFFFF5252) : Colors.white70),
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],

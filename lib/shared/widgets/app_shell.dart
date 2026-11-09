@@ -2019,7 +2019,8 @@ class _AppShellState extends State<AppShell> {
     ];
 
     final isCompactLandscape = MediaQuery.of(context).size.height < 550;
-    final hideBottomBar = _currentIndex == 1 && isCompactLandscape;
+    // Option 1: Hide global nav bar during battle so tactical arena has 100% immersive focus
+    final hideBottomBar = _currentIndex == 1;
 
     return Scaffold(
       body: SafeArea(
