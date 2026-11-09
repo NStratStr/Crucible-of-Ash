@@ -616,6 +616,47 @@ class SpatialCombatEngine extends ChangeNotifier {
           lifestealBonus: relicBonuses.bonusLifesteal,
         ));
       }
+
+      // Guarantee tactical 3-unit squad (Ash Sculptor Commander + 2 Minions) even if saved brigade had solo unit
+      if (playerUnits.length < 2) {
+        playerUnits.add(CombatUnitState(
+          id: 'tombstone_sentinel',
+          name: 'Tombstone Sentinel',
+          templateId: 'tombstone_sentinel',
+          isPlayer: true,
+          archetype: UnitArchetype.vanguardMelee,
+          footprint: UnitFootprint.single1x1,
+          occupiedNodes: const [
+            GridNode(column: 0, row: 0, occupantUnitId: 'tombstone_sentinel'),
+          ],
+          maxHp: 560,
+          hp: 560,
+          maxArmor: 70,
+          armor: 70,
+          attack: 60,
+          speed: 80,
+          aegisShield: 40,
+        ));
+      }
+      if (playerUnits.length < 3) {
+        playerUnits.add(CombatUnitState(
+          id: 'blood_scribe',
+          name: 'Blood Scribe',
+          templateId: 'blood_scribe',
+          isPlayer: true,
+          archetype: UnitArchetype.backlineCaster,
+          footprint: UnitFootprint.single1x1,
+          occupiedNodes: const [
+            GridNode(column: 1, row: 2, occupantUnitId: 'blood_scribe'),
+          ],
+          maxHp: 380,
+          hp: 380,
+          maxArmor: 20,
+          armor: 20,
+          attack: 75,
+          speed: 95,
+        ));
+      }
     } else {
       // Default fallback player squad (Ash & Stone Order)
       setupSunderAtAshenGate();
@@ -2744,10 +2785,12 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
 
-    } else if (actionType == 'cataclysmic_pyre' || (actionType == 'ultimate' && sculptor.isCataclysmicPyreReady)) {
-      // 3. Cataclysmic Pyre: Spends 80 Cinders, AoE 250% ATK damage to ALL enemies + burns
+    } else if (actionType == 'cataclysmic_pyre' || actionType == 'cataclysmic_pyre_crit' || (actionType == 'ultimate' && sculptor.isCataclysmicPyreReady)) {
+      // 3. Cataclysmic Pyre (Apex Finisher): Spends 80 Cinders, AoE 250% (or 350% Perfect Forge Crit) ATK damage to ALL enemies + burns
+      final bool isForgeCrit = actionType == 'cataclysmic_pyre_crit';
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 80);
-      final rawDmg = (sculptor.effectiveAttack * 2.50).round();
+      final double mult = isForgeCrit ? 3.50 : 2.50;
+      final rawDmg = (sculptor.effectiveAttack * mult).round();
       int totalPyreDmg = 0;
 
       for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
@@ -2756,15 +2799,20 @@ class SpatialCombatEngine extends ChangeNotifier {
         totalPyreDmg += dmg;
       }
 
-      addLog('ASH SCULPTOR: CATACLYSMIC PYRE erupts across all enemy ranks for $totalPyreDmg total fire DMG!');
+      if (isForgeCrit) {
+        addLog('🔥 CRUCIBLE APEX OVERDRIVE: PERFECT FORGE STRIKE! Cataclysmic Pyre supercharged to 350% ATK ($totalPyreDmg fire DMG)!');
+      } else {
+        addLog('ASH SCULPTOR: CATACLYSMIC PYRE erupts across all enemy ranks for $totalPyreDmg total fire DMG!');
+      }
       dispatchAction(SpatialActionEvent(
         id: 'pyre_${currentTick}_${sculptor.id}',
         attackerId: sculptor.id,
         attackerName: sculptor.name,
-        skillName: 'Cataclysmic Pyre',
+        skillName: isForgeCrit ? 'Cataclysmic Pyre (PERFECT FORGE!)' : 'Cataclysmic Pyre',
         targetId: validTarget.id,
         targetName: 'All Enemy Ranks',
         damage: totalPyreDmg,
+        isCrit: isForgeCrit,
         isPlayerAttacker: true,
         pattern: TargetPattern.horizontalRowScythe,
         timestampMs: DateTime.now().millisecondsSinceEpoch,

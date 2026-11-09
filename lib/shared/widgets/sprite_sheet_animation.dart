@@ -6,6 +6,19 @@ import 'package:flutter/services.dart';
 /// Decodes and renders sprite sheets of any column x row dimensions.
 /// Supports both one-shot attack VFX and looping animations.
 class SpriteSheetAnimation extends StatefulWidget {
+  /// Pre-decodes a spritesheet into the global texture cache so it plays instantly with 0ms delay.
+  static Future<void> precache(String assetPath) async {
+    if (_SpriteSheetAnimationState._globalImageCache.containsKey(assetPath)) return;
+    try {
+      final ByteData data = await rootBundle.load(assetPath);
+      final ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final ui.FrameInfo frameInfo = await codec.getNextFrame();
+      _SpriteSheetAnimationState._globalImageCache[assetPath] = frameInfo.image;
+    } catch (e) {
+      debugPrint('Failed to precache sprite sheet $assetPath: $e');
+    }
+  }
+
   final String assetPath;
   final int columns;
   final int rows;
@@ -16,6 +29,7 @@ class SpriteSheetAnimation extends StatefulWidget {
   final BoxFit fit;
   final BlendMode? blendMode;
   final Color? colorFilter;
+  final Widget? fallback;
 
   const SpriteSheetAnimation({
     super.key,
@@ -29,6 +43,7 @@ class SpriteSheetAnimation extends StatefulWidget {
     this.fit = BoxFit.contain,
     this.blendMode,
     this.colorFilter,
+    this.fallback,
   }) : totalFrames = totalFrames ?? (columns * rows);
 
   @override
@@ -111,7 +126,7 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _image == null) {
-      return const SizedBox.shrink();
+      return widget.fallback ?? const SizedBox.shrink();
     }
 
     return AnimatedBuilder(

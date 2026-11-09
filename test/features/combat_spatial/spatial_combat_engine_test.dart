@@ -36,7 +36,7 @@ void main() {
         engine.stepTick();
       }
 
-      final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      final sunSmith = engine.playerUnits.firstWhere((u) => (u.isAshSculptor || u.id == 'sun_smith' || u.id == 'ash_sculptor'));
       expect(sunSmith.hp, lessThan(280)); // Pyre Zealot 2s telegraphed hit
 
       final gorgoroth = engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss');
@@ -143,7 +143,7 @@ void main() {
     });
 
     test('Adaptive Posture System: Vanguard in Midline performs Shockwave Tremor and advances forward', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       // Shift Footman to Midline (Col 2, Row 1)
       footman.occupiedNodes.clear();
       footman.occupiedNodes.add(const GridNode(column: 1, row: 1, occupantUnitId: 'iron_footman'));
@@ -168,7 +168,7 @@ void main() {
     });
 
     test('Adaptive Posture System: Vanguard knocked to Backline casts Braced Bulwark and fills Ultimate gauge', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria');
 
       // Place Valeria at Frontline Col 2 (Row 0) and Footman at Backline Col 2 (Row 2)
@@ -196,7 +196,7 @@ void main() {
     });
 
     test('Adaptive Posture System: Displaced Caster in Frontline fires Point-Blank Panic Discharge', () {
-      final sunSmith = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      final sunSmith = engine.playerUnits.firstWhere((u) => (u.isAshSculptor || u.id == 'sun_smith' || u.id == 'ash_sculptor'));
       // Drag Sun-Smith into Frontline (Col 2, Row 0) facing Gorgoroth
       sunSmith.occupiedNodes.clear();
       sunSmith.occupiedNodes.add(const GridNode(column: 1, row: 0, occupantUnitId: 'sun_smith'));
@@ -268,7 +268,7 @@ void main() {
     test('Tactical Formation Swap: Swaps two friendly units for 0 AP in Pre-Battle and 50% AP in Live Combat', () {
       expect(engine.isPreBattlePhase, isTrue);
       final valeria = engine.playerUnits.firstWhere((u) => u.id == 'lady_valeria'); // Col 1, Row 0
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman'); // Col 3, Row 0
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman')); // Col 3, Row 0
       final sanguine = engine.playerUnits.firstWhere((u) => u.id == 'sanguine_blade'); // Col 3, Row 1
 
       // Pre-Battle Swap across columns (0 AP)
@@ -289,7 +289,7 @@ void main() {
     });
 
     test('Multi-Target Trajectory Projection: Resolves secondary cleave targets when Hold the Line is active', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       // Place Footman at Col 0, Row 0 (adjacent to Gorgoroth at Col 1, Row 0)
       footman.occupiedNodes.clear();
       footman.occupiedNodes.add(const GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'));
@@ -301,7 +301,7 @@ void main() {
     });
 
     test('Inert Vessel Downed State: Unit converts to 0 HP inert vessel, AP freezes, and blocks direct walk', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       footman.currentAp = 4000;
       footman.takeDamage(1000, ignoreArmor: true); // Lethal damage
 
@@ -357,7 +357,7 @@ void main() {
     });
 
     test('Infused Vitae Revive Mechanics: Revives downed unit, applies Soul Fracture, and grants 6-tick invulnerability', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       final originalMaxHp = footman.maxHp;
       footman.takeDamage(1000, ignoreArmor: true); // Downed
       expect(footman.isDowned, isTrue);
@@ -395,7 +395,7 @@ void main() {
     });
 
     test('Status Effect Matrix: Poison deals true damage, decays Attack and Speed by 2% per stack', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       final baseAtk = footman.attack;
       final baseSpd = footman.speed;
 
@@ -413,7 +413,7 @@ void main() {
     });
 
     test('Status Effect Matrix: Freeze pauses AP, and physical strike shatters for 15% Max HP bonus damage', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       footman.freezeDuration = 90; // 3 seconds freeze
       expect(footman.isFrozen, isTrue);
 
@@ -432,7 +432,7 @@ void main() {
     });
 
     test('Status Effect Matrix: Vulnerable amplifies incoming damage by 25%', () {
-      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final footman = engine.playerUnits.firstWhere((u) => (u.id == 'tombstone_sentinel' || u.id == 'iron_footman'));
       footman.armor = 0; // Remove armor reduction to test pure multiplier
 
       final normalDmg = footman.takeDamage(100);
@@ -600,7 +600,7 @@ void main() {
       engine.isPreBattlePhase = false;
 
       // Damage a player ally
-      final ally = engine.playerUnits.firstWhere((u) => u.id == 'sun_smith');
+      final ally = engine.playerUnits.firstWhere((u) => (u.isAshSculptor || u.id == 'sun_smith' || u.id == 'ash_sculptor'));
       ally.hp = 100;
       expect(ally.hp, equals(100));
 
@@ -847,7 +847,7 @@ void main() {
       );
       expect(goldUnit.plinthMaterial, equals(PlinthMaterial.gold));
 
-      engine.swapPlayerUnit('iron_footman', goldUnit);
+      engine.swapPlayerUnit('tombstone_sentinel', goldUnit);
       final swapped = engine.playerUnits.firstWhere((u) => u.id == 'gold_sovereign');
       expect(swapped.maxHp, equals(1100)); // 1000 * 1.10
       expect(swapped.attack, equals(220)); // 200 * 1.10

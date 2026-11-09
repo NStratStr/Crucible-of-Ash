@@ -231,6 +231,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   double _battlefieldCameraZoom = 1.0;
   bool _isSlowMoFinisher = false;
 
+  // Option 3: Interactive Forge Strike Tactile Finisher
+  bool _isForgeStrikeActive = false;
+  double _forgeStrikeProgress = 0.0;
+  Timer? _forgeStrikeTimer;
+  bool _forgeStrikeHit = false;
+  bool _forgeStrikeIsPerfect = false;
+  CombatUnitState? _forgeStrikeUnit;
+  CombatUnitState? _forgeStrikeTarget;
+
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
   final List<AudioPlayer> _sfxPlayers = [];
@@ -280,6 +289,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   void initState() {
     super.initState();
     _battlefieldFocusNode = FocusNode();
+    SpriteSheetAnimation.precache('assets/animations/ash_sculptor_attack_sheet.png');
+    SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -760,17 +771,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         });
       }
 
-      // Camera Hit-Shake & Ground Ripple Shockwaves for heavy hits, boss strikes, crits, and bloodnovas
+      // Option 1: Visceral Hit Feedback - Camera Hit-Shake, Impact Hit-Stop & Ground Ripple Shockwaves
       final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
-      final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || event.skillName.contains('Smite') || event.skillName.contains('Cataclysm') || event.secondaryTargetHits.length >= 2;
+      final bool isSculptorStrike = event.attackerId == 'ash_sculptor' || event.skillName.contains('Cinder') || event.skillName.contains('Sundering') || event.skillName.contains('Bastion') || event.skillName.contains('Pyre') || event.skillName.contains('Cataclysmic');
+      final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
+      final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
+
+      final double shakeIntensity = isApexStrike
+          ? (event.isCrit ? 24.0 : 18.0)
+          : (event.isCrit
+              ? 16.0
+              : (isSculptorStrike
+                  ? 12.0
+                  : (isBossStrike ? 10.0 : 6.0)));
+      _triggerScreenShake(intensity: shakeIntensity);
 
       if (isHeavyImpact) {
-        _triggerHitStop(durationMs: isUltimate ? 120 : (isBossStrike ? 90 : 75));
+        _triggerHitStop(durationMs: isApexStrike ? 140 : (isUltimate ? 120 : (isSculptorStrike ? 85 : 70)));
         _triggerCameraImpactZoom(
-          zoomScale: isUltimate ? 1.14 : (isBossStrike ? 1.07 : 1.04),
-          durationMs: isUltimate ? 600 : 280,
+          zoomScale: isApexStrike ? 1.18 : (isUltimate ? 1.14 : (isSculptorStrike ? 1.08 : 1.04)),
+          durationMs: isApexStrike ? 650 : (isUltimate ? 600 : 280),
         );
-        _triggerScreenShake(intensity: isUltimate ? 9.0 : (isBossStrike ? 8.0 : (event.isCrit ? 6.5 : 5.0)));
         _groundRipples.add(_GroundShockwaveRipple(
           id: 'ripple_${event.id}_$impactNowMs',
           origin: targetOffset,
@@ -1034,6 +1055,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   @override
   void dispose() {
+    _forgeStrikeTimer?.cancel();
     _battlefieldFocusNode.dispose();
     _loopTimer?.cancel();
     for (final t in _animTimers) {
@@ -2042,6 +2064,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           ),
                         ),
                       ),
+                    ),
+
+                  // Option 3: Interactive Forge Strike Tactile Finisher Overlay
+                  if (_isForgeStrikeActive)
+                    Positioned.fill(
+                      child: _buildForgeStrikeOverlay(),
                     ),
                 ],
               ),
@@ -5733,12 +5761,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isDamaged = _damagedUnitId == unit.id || _damagedUnitIds.contains(unit.id);
     final String? floatingPop = _unitFloatingPops[unit.id];
 
-    // Lunge forward across clash line during attack
-    final double lungeY = _is2DGridView ? 0.0 : (isAttacking ? (unit.isPlayer ? -16.0 : 16.0) : 0.0);
-    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 34.0 : -34.0) : 0.0;
+    // Lunge forward across clash line during attack with heroic elevation arc
+    final double lungeY = _is2DGridView ? (isAttacking ? -16.0 : 0.0) : (isAttacking ? (unit.isPlayer ? -20.0 : 20.0) : 0.0);
+    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 64.0 : -48.0) : 0.0;
     // Directional knockback recoil when taking a hit (pushed backward away from enemy strike)
-    final double hitRecoilX = isDamaged ? (unit.isPlayer ? -8.0 : 8.0) : 0.0;
-    final double hitShakeY = isDamaged ? -3.0 : 0.0;
+    final double hitRecoilX = isDamaged ? (unit.isPlayer ? -20.0 : 20.0) : 0.0;
+    final double hitShakeY = isDamaged ? -6.0 : 0.0;
 
     // Normalization multipliers:
     // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
@@ -5829,19 +5857,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: unit.isDowned ? 2 : 6,
+              bottom: isAttacking ? 0 : (unit.isDowned ? 2 : 6),
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 500),
+                duration: const Duration(milliseconds: 300),
                 opacity: unit.isDowned ? 0.68 : 1.0,
                 child: AnimatedScale(
-                  duration: const Duration(milliseconds: 500),
-                  scale: unit.isDowned ? 0.94 : 1.0,
-                  curve: Curves.easeOutCubic,
+                  duration: const Duration(milliseconds: 180),
+                  scale: unit.isDowned ? 0.94 : (isAttacking ? 1.35 : 1.0),
+                  curve: Curves.easeOutBack,
                   child: SizedBox(
-                    width: modelWidth,
-                    height: modelHeight,
+                    width: isAttacking ? (modelWidth * 1.65).clamp(90.0, 260.0) : modelWidth,
+                    height: isAttacking ? (modelHeight * 1.65).clamp(90.0, 260.0) : modelHeight,
                     child: Stack(
                       alignment: Alignment.bottomCenter,
+                      clipBehavior: Clip.none,
                       children: [
                         // Main Character Sprite (with Stone Petrification / Hit-Flash color filter)
                         ColorFiltered(
@@ -5855,8 +5884,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               : (isDamaged
                                   ? ColorFilter.mode(
                                       (floatingPop != null && floatingPop.contains('CRIT'))
-                                          ? const Color(0xCCFFFFFF) // Blinding white crit flash
-                                          : const Color(0x99FF3D00), // Fiery crimson-amber impact flash
+                                          ? const Color(0xEEFFFFFF) // Blinding white crit flash
+                                          : const Color(0xDDFF5722), // Fiery molten impact flash
                                       BlendMode.srcATop,
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
@@ -5866,9 +5895,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   columns: 3,
                                   rows: 2,
                                   totalFrames: 6,
-                                  duration: const Duration(milliseconds: 1100),
+                                  duration: const Duration(milliseconds: 950),
                                   loop: false,
                                   fit: BoxFit.contain,
+                                  fallback: Image.asset(
+                                    unit.assetPath,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.bottomCenter,
+                                  ),
                                 )
                               : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
                                   ? SpriteSheetAnimation(
@@ -5879,6 +5913,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       duration: const Duration(milliseconds: 1400),
                                       loop: false,
                                       fit: BoxFit.contain,
+                                      fallback: Image.asset(
+                                        unit.assetPath,
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
                                     )
                               : Image.asset(
                                   unit.assetPath,
@@ -8501,14 +8540,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       isEnabled: isPyreReady,
                       tooltipMessage: 'Cataclysmic Pyre: APEX FINISHER! Consumes 80 Cinders. Unleashes screen-shattering 250% ATK fire nova across all enemy ranks!',
                       onPressed: () {
-                        setState(() {
-                          _engine.executeUnitAction(
-                            unit,
-                            isReposition: false,
-                            explicitTarget: explicitTarget,
-                            actionType: 'cataclysmic_pyre',
-                          );
-                        });
+                        _startForgeStrikeFinisher(unit, explicitTarget);
                       },
                     ),
                   ),
@@ -9514,10 +9546,288 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       ),
     );
   }
+
+  // =========================================================================
+  // OPTION 3: INTERACTIVE FORGE STRIKE TACTILE FINISHER
+  // =========================================================================
+
+  void _startForgeStrikeFinisher(CombatUnitState unit, CombatUnitState? explicitTarget) {
+    if (_engine.isAutoBattleMode) {
+      _engine.executeUnitAction(
+        unit,
+        isReposition: false,
+        explicitTarget: explicitTarget,
+        actionType: 'cataclysmic_pyre_crit',
+      );
+      return;
+    }
+
+    setState(() {
+      _isForgeStrikeActive = true;
+      _forgeStrikeProgress = 0.0;
+      _forgeStrikeHit = false;
+      _forgeStrikeIsPerfect = false;
+      _forgeStrikeUnit = unit;
+      _forgeStrikeTarget = explicitTarget;
+    });
+
+    const int totalSteps = 60;
+    const int stepDurationMs = 16; // ~1000ms total
+    int currentStep = 0;
+
+    _forgeStrikeTimer?.cancel();
+    _forgeStrikeTimer = Timer.periodic(const Duration(milliseconds: stepDurationMs), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      currentStep++;
+      final progress = currentStep / totalSteps;
+      if (progress >= 1.0) {
+        timer.cancel();
+        if (!_forgeStrikeHit) {
+          _resolveForgeStrike(isManualTap: false);
+        }
+      } else {
+        setState(() {
+          _forgeStrikeProgress = progress;
+        });
+      }
+    });
+  }
+
+  void _resolveForgeStrike({required bool isManualTap}) {
+    if (_forgeStrikeHit) return;
+    _forgeStrikeTimer?.cancel();
+
+    // Sweet spot: 0.58 to 0.88 progress (anvil ring alignment!)
+    final bool isPerfect = isManualTap && (_forgeStrikeProgress >= 0.58 && _forgeStrikeProgress <= 0.88);
+
+    setState(() {
+      _forgeStrikeHit = true;
+      _forgeStrikeIsPerfect = isPerfect;
+    });
+
+    if (isPerfect) {
+      _triggerScreenShake(intensity: 24.0);
+    } else {
+      _triggerScreenShake(intensity: 12.0);
+    }
+
+    Timer(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      setState(() {
+        _isForgeStrikeActive = false;
+      });
+      if (_forgeStrikeUnit != null) {
+        _engine.executeUnitAction(
+          _forgeStrikeUnit!,
+          isReposition: false,
+          explicitTarget: _forgeStrikeTarget,
+          actionType: isPerfect ? 'cataclysmic_pyre_crit' : 'cataclysmic_pyre',
+        );
+      }
+    });
+  }
+
+  Widget _buildForgeStrikeOverlay() {
+    final bool inSweetSpot = _forgeStrikeProgress >= 0.58 && _forgeStrikeProgress <= 0.88;
+    // Ring scales from 210px down to 80px
+    final double ringSize = (210.0 - (_forgeStrikeProgress * 130.0)).clamp(80.0, 220.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (!_forgeStrikeHit) {
+          _resolveForgeStrike(isManualTap: true);
+        }
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            colors: [
+              Color(0xDD210A04),
+              Color(0xF4080302),
+            ],
+            radius: 0.95,
+          ),
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header Title
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.fireplace, color: Color(0xFFFFD54F), size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        'CRUCIBLE FORGE STRIKE'.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2.0,
+                          shadows: [
+                            Shadow(color: Color(0xFFFF6D00), blurRadius: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap when the molten ring collapses into the runic anvil!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 11,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Tactile Anvil Target Beat
+                  SizedBox(
+                    width: 230,
+                    height: 230,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Static Outer Runering
+                        Container(
+                          width: 220,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFFF6D00).withValues(alpha: 0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+
+                        // Golden Sweet Spot Anvil Ring (Impact Target Zone)
+                        Container(
+                          width: 110,
+                          height: 110,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: inSweetSpot ? const Color(0xFFFFFF00) : const Color(0xFFFFD54F),
+                              width: inSweetSpot ? 4.5 : 3.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (inSweetSpot ? const Color(0xFFFFD700) : const Color(0xFFFF8F00)).withValues(alpha: 0.5),
+                                blurRadius: inSweetSpot ? 24 : 10,
+                                spreadRadius: inSweetSpot ? 4 : 1,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Contracting Molten Ring
+                        Container(
+                          width: ringSize,
+                          height: ringSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: inSweetSpot
+                                  ? const Color(0xFFFFF59D)
+                                  : (_forgeStrikeHit ? const Color(0xFFFFAB91) : const Color(0xFFFF3D00)),
+                              width: inSweetSpot ? 4.5 : 3.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (inSweetSpot ? const Color(0xFFFFF176) : const Color(0xFFFF3D00)).withValues(alpha: 0.6),
+                                blurRadius: 14,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Center Anvil Sigil Icon
+                        Icon(
+                          Icons.shield,
+                          size: 44,
+                          color: inSweetSpot ? const Color(0xFFFFFF8D) : const Color(0xFFFFD54F),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Hit Feedback / Banner
+                  if (_forgeStrikeHit) ...[
+                    Text(
+                      _forgeStrikeIsPerfect ? '⚡ PERFECT FORGE! (350% CRIT) ⚡' : '🔥 FORGE STRIKE (250% ATK) 🔥',
+                      style: TextStyle(
+                        color: _forgeStrikeIsPerfect ? const Color(0xFFFFF59D) : const Color(0xFFFF9E80),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        shadows: [
+                          Shadow(
+                            color: _forgeStrikeIsPerfect ? const Color(0xFFFFD700) : const Color(0xFFFF3D00),
+                            blurRadius: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // Tactile Strike Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.flash_on, color: Colors.black, size: 20),
+                        label: const Text(
+                          'STRIKE THE ANVIL NOW!',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: inSweetSpot ? const Color(0xFFFFF176) : const Color(0xFFFF8F00),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 8,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              color: inSweetSpot ? Colors.white : const Color(0xFFFFD54F),
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (!_forgeStrikeHit) {
+                            _resolveForgeStrike(isManualTap: true);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 }
 
-/// 2.5D Isometric Diamond Tile Plinth Painter
-/// Inspired by the tactical tabletop grid presentation in The Banner Saga & Dragonheir: Silent Gods.
 class IsometricDiamondTilePainter extends CustomPainter {
   final Color fillColor;
   final Color borderColor;

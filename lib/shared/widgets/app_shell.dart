@@ -182,6 +182,13 @@ class _AppShellState extends State<AppShell> {
           }
           return u;
         }).toList();
+
+        if (migratedAllies.length < 3) {
+          final defaultSquad = StarterBrigades.createAshLegionPlayerSquad();
+          for (final companion in defaultSquad.skip(migratedAllies.length).take(3 - migratedAllies.length)) {
+            migratedAllies.add(companion);
+          }
+        }
         _tickManager.updateSquads(allies: migratedAllies);
       }
       if (saved.reserveInventory.isNotEmpty) {
