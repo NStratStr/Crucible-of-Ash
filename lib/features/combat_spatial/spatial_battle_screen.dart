@@ -1440,7 +1440,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final double tile2DHeight = target2DHeight;
 
                       return Align(
-                        alignment: Alignment.bottomCenter, // Grounded firmly onto the bottom terrain baseline like Wartune
+                        alignment: isDesktop ? Alignment.bottomCenter : Alignment.center,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.bottomCenter,
@@ -2918,7 +2918,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   fit: BoxFit.cover,
                                   alignment: Alignment.topCenter,
                                   errorBuilder: (_, __, ___) => Icon(
-                                    isAlly ? Icons.shield : Icons.dangerous,
+                                    isAlly ? Icons.shield : Icons.security,
                                     size: 11,
                                     color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
                                   ),
@@ -5311,7 +5311,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
                   errorBuilder: (_, __, ___) => Icon(
-                    _isPlayerSkillBanner ? Icons.shield : Icons.dangerous,
+                    _isPlayerSkillBanner ? Icons.shield : Icons.security,
                     color: themeColor,
                     size: 16,
                   ),
@@ -5886,7 +5886,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   alignment: Alignment.bottomCenter,
                                   filterQuality: FilterQuality.medium,
                                   errorBuilder: (context, error, stackTrace) => Icon(
-                                    unit.isPlayer ? Icons.shield : Icons.dangerous,
+                                    unit.isPlayer ? Icons.shield : Icons.security,
                                     color: factionColor,
                                     size: isBoss ? 48 : 36,
                                   ),
@@ -8579,405 +8579,620 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   /// 2. Attack / Cast Signature Skill (100% TM cost -> 0 TM).
   /// 3. Reposition (1-tile shift, 25% TM cost -> 7,500 TM retained).
   Widget _buildTurnActionDecisionTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
-    final double trayHeight = isLandscapeMobile ? 64.0 : 86.0;
     final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
     final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
     final explicitTarget = _selectedEnemyUnitId != null
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B1926),
-        border: Border(
-          top: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
-          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
+    // Helper: Action 1 - Basic Attack
+    Widget buildBasicButton({required bool isNarrow}) {
+      return Tooltip(
+        preferBelow: false,
+        verticalOffset: 28,
+        waitDuration: Duration.zero,
+        showDuration: const Duration(seconds: 4),
+        triggerMode: TooltipTriggerMode.tap,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1014),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
+          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Unit Avatar & Turn Ready Indicator
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F0F1A),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+        richMessage: TextSpan(
+          children: [
+            const TextSpan(
+              text: '⚔️ BASIC ATTACK\n',
+              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF8A80), fontSize: 11),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.asset(
-                    unit.assetPath,
-                    width: isLandscapeMobile ? 28 : 38,
-                    height: isLandscapeMobile ? 28 : 38,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 24),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD54F),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: const Text(
-                            'TURN READY (10,000 TM)',
-                            style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF37474F),
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFF90A4AE), width: 0.5),
-                          ),
-                          child: Text(
-                            unit.archetype.name.toUpperCase(),
-                            style: const TextStyle(fontSize: 6.5, color: Color(0xFFECEFF1), fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      unit.name.toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      'Col ${curCol + 1}, Row ${curRow == 0 ? "Front" : (curRow == 1 ? "Mid" : "Back")}',
-                      style: const TextStyle(color: Colors.white54, fontSize: 8.5),
-                    ),
-                  ],
-                ),
-              ],
+            TextSpan(
+              text: 'Deals 100% Attack (${unit.effectiveAttack} DMG) to frontline/column target.\nCharges +15% Ultimate Gauge.',
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
             ),
-          ),
-          const SizedBox(width: 12),
-
-          // Action 1: BASIC ATTACK (Always Ready / Standard TM Cost)
-          Expanded(
-            child: Tooltip(
-              preferBelow: false,
-              verticalOffset: 28,
-              waitDuration: Duration.zero,
-              showDuration: const Duration(seconds: 4),
-              triggerMode: TooltipTriggerMode.tap,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1014),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
-                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-              ),
-              richMessage: TextSpan(
-                children: [
-                  const TextSpan(
-                    text: '⚔️ BASIC ATTACK\n',
-                    style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF8A80), fontSize: 11),
-                  ),
-                  TextSpan(
-                    text: 'Deals 100% Attack (${unit.effectiveAttack} DMG) to frontline/column target.\nCharges +15% Ultimate Gauge.',
-                    style: const TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-              icon: const Icon(Icons.sports_mma, size: 14),
-              label: Text(
-                '⚔️ [1] BASIC ATTACK\n',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.15),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB3261E),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  side: const BorderSide(color: Color(0xFFFF8A80), width: 1.2),
-                ),
-              ),
-              onPressed: () {
-                setState(() {
-                  _engine.executeUnitAction(
-                    unit,
-                    isReposition: false,
-                    explicitTarget: explicitTarget,
-                    actionType: 'basic',
-                  );
-                });
-              },
-            ),
-          ),
+          ],
         ),
-          const SizedBox(width: 6),
-
-          // Action 2: SIGNATURE SKILL (With cooldown tracking)
-          Expanded(
-            child: Tooltip(
-              preferBelow: false,
-              verticalOffset: 28,
-              waitDuration: Duration.zero,
-              showDuration: const Duration(seconds: 4),
-              triggerMode: TooltipTriggerMode.tap,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1026),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFEA80FC), width: 1.2),
-                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-              ),
-              richMessage: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '★ [2] ${unit.signatureSkillName.toUpperCase()}\n',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEA80FC), fontSize: 11),
-                  ),
-                  TextSpan(
-                    text: '${unit.signatureSkillDescription}\nCooldown: 2 Turns (Charges +25% Ultimate Gauge)',
-                    style: const TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-                icon: Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
-                label: Text(
-                  unit.isSignatureReady
-                      ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
-                      : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w900,
-                    height: 1.15,
-                    color: unit.isSignatureReady ? Colors.white : Colors.white54,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(
-                      color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
-                      width: 1.2,
-                    ),
-                  ),
-                ),
-                onPressed: unit.isSignatureReady
-                    ? () {
-                        setState(() {
-                          _engine.executeUnitAction(
-                            unit,
-                            isReposition: false,
-                            explicitTarget: explicitTarget,
-                            actionType: 'signature',
-                          );
-                        });
-                      }
-                    : null,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // Action 3: ULTIMATE ABILITY (With Cooldown / Ready state)
-          Expanded(
-            child: Tooltip(
-              preferBelow: false,
-              verticalOffset: 28,
-              waitDuration: Duration.zero,
-              showDuration: const Duration(seconds: 4),
-              triggerMode: TooltipTriggerMode.tap,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF262010),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
-                boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-              ),
-              richMessage: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '⚡ ${unit.ultimateTitle.toUpperCase()}\n',
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), fontSize: 11),
-                  ),
-                  TextSpan(
-                    text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Skill-based cooldown, ready at battle opening)',
-                    style: const TextStyle(color: Colors.white70, fontSize: 10),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-              icon: Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
-              label: Text(
-                unit.isUltimateReady
-                    ? '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
-                    : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateCooldown} Turns CD)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w900,
-                  height: 1.15,
-                  color: unit.isUltimateReady ? const Color(0xFF212121) : Colors.white54,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: unit.isUltimateReady ? const Color(0xFFFFD54F) : const Color(0xFF262C38),
-                foregroundColor: unit.isUltimateReady ? Colors.black : Colors.white54,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  side: BorderSide(
-                    color: unit.isUltimateReady ? const Color(0xFFFFE082) : Colors.white24,
-                    width: 1.2,
-                  ),
-                ),
-              ),
-              onPressed: unit.isUltimateReady
-                  ? () {
-                      setState(() {
-                        _engine.executeUnitAction(
-                          unit,
-                          isReposition: false,
-                          explicitTarget: explicitTarget,
-                          actionType: 'ultimate',
-                        );
-                      });
-                    }
-                  : null,
-            ),
-          ),
-        ),
-          const SizedBox(width: 6),
-
-          // Action 4: REPOSITION / SHIFT (25% TM Cost -> 7,500 TM retained)
-          SizedBox(
-            width: isLandscapeMobile ? 86 : 96,
-            child: PopupMenuButton<String>(
-              tooltip: 'Shift 1 tile along rank or column',
-              color: const Color(0xFF1E1E2C),
+        child: SizedBox(
+          height: isNarrow ? 40 : null,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFB3261E),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
-                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+                side: const BorderSide(color: Color(0xFFFF8A80), width: 1.2),
               ),
-              onSelected: (dir) {
-                int targetCol = curCol;
-                int targetRow = curRow;
-                if (dir == 'front' && curRow > 0) targetRow--;
-                if (dir == 'back' && curRow < 2) targetRow++;
-                if (dir == 'left' && curCol > 0) targetCol--;
-                if (dir == 'right' && curCol < 4) targetCol++;
+            ),
+            onPressed: () {
+              setState(() {
+                _engine.executeUnitAction(
+                  unit,
+                  isReposition: false,
+                  explicitTarget: explicitTarget,
+                  actionType: 'basic',
+                );
+              });
+            },
+            child: isNarrow
+                ? const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sports_mma, size: 11, color: Colors.white),
+                          SizedBox(width: 2),
+                          Text(
+                            'BASIC',
+                            style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        '100% TM',
+                        style: TextStyle(fontSize: 6.5, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.sports_mma, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        '⚔️ [1] BASIC ATTACK\n(STRIKE)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.15),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    }
 
-                setState(() {
-                  _engine.executeUnitAction(
-                    unit,
-                    isReposition: true,
-                    shiftCol: targetCol,
-                    shiftRow: targetRow,
-                  );
-                });
-              },
-              itemBuilder: (context) => [
-                if (curRow > 0)
-                  const PopupMenuItem(
-                    value: 'front',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_upward, color: Color(0xFF00E5FF), size: 14),
-                        SizedBox(width: 8),
-                        Text('Advance to Frontline', style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                if (curRow < 2)
-                  const PopupMenuItem(
-                    value: 'back',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_downward, color: Color(0xFF00E5FF), size: 14),
-                        SizedBox(width: 8),
-                        Text('Fall Back 1 Rank', style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                if (curCol > 0)
-                  const PopupMenuItem(
-                    value: 'left',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_back, color: Color(0xFF00E5FF), size: 14),
-                        SizedBox(width: 8),
-                        Text('Shift Left (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-                if (curCol < 4)
-                  const PopupMenuItem(
-                    value: 'right',
-                    child: Row(
-                      children: [
-                        Icon(Icons.arrow_forward, color: Color(0xFF00E5FF), size: 14),
-                        SizedBox(width: 8),
-                        Text('Shift Right (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ],
-                    ),
-                  ),
-              ],
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF006064),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 14),
-                        SizedBox(width: 2),
-                        Text(
-                          'SHIFT',
-                          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: Color(0xFFE0F7FA)),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 1),
-                    Text(
-                      '25% Cost',
-                      style: TextStyle(fontSize: 7.5, color: Color(0xFF80DEEA), fontWeight: FontWeight.bold),
-                    ),
-                  ],
+    // Helper: Action 2 - Signature Skill
+    Widget buildSignatureButton({required bool isNarrow}) {
+      return Tooltip(
+        preferBelow: false,
+        verticalOffset: 28,
+        waitDuration: Duration.zero,
+        showDuration: const Duration(seconds: 4),
+        triggerMode: TooltipTriggerMode.tap,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1026),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFEA80FC), width: 1.2),
+          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
+        ),
+        richMessage: TextSpan(
+          children: [
+            TextSpan(
+              text: '★ [2] ${unit.signatureSkillName.toUpperCase()}\n',
+              style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEA80FC), fontSize: 11),
+            ),
+            TextSpan(
+              text: '${unit.signatureSkillDescription}\nCooldown: 2 Turns (Charges +25% Ultimate Gauge)',
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: isNarrow ? 40 : null,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+                side: BorderSide(
+                  color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
+                  width: 1.2,
                 ),
               ),
             ),
+            onPressed: unit.isSignatureReady
+                ? () {
+                    setState(() {
+                      _engine.executeUnitAction(
+                        unit,
+                        isReposition: false,
+                        explicitTarget: explicitTarget,
+                        actionType: 'signature',
+                      );
+                    });
+                  }
+                : null,
+            child: isNarrow
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 11, color: Colors.white),
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              unit.signatureSkillName.toUpperCase(),
+                              style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Colors.white),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        unit.isSignatureReady ? 'READY' : '${unit.signatureCooldown}T CD',
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          color: unit.isSignatureReady ? const Color(0xFFE1BEE7) : Colors.white38,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        unit.isSignatureReady
+                            ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
+                            : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                          color: unit.isSignatureReady ? Colors.white : Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
+        ),
+      );
+    }
+
+    // Helper: Action 3 - Ultimate Ability
+    Widget buildUltimateButton({required bool isNarrow}) {
+      return Tooltip(
+        preferBelow: false,
+        verticalOffset: 28,
+        waitDuration: Duration.zero,
+        showDuration: const Duration(seconds: 4),
+        triggerMode: TooltipTriggerMode.tap,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF262010),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
+        ),
+        richMessage: TextSpan(
+          children: [
+            TextSpan(
+              text: '⚡ ${unit.ultimateTitle.toUpperCase()}\n',
+              style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), fontSize: 11),
+            ),
+            TextSpan(
+              text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Skill-based cooldown, ready at battle opening)',
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: isNarrow ? 40 : null,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: unit.isUltimateReady ? const Color(0xFFFFD54F) : const Color(0xFF262C38),
+              foregroundColor: unit.isUltimateReady ? Colors.black : Colors.white54,
+              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+                side: BorderSide(
+                  color: unit.isUltimateReady ? const Color(0xFFFFE082) : Colors.white24,
+                  width: 1.2,
+                ),
+              ),
+            ),
+            onPressed: unit.isUltimateReady
+                ? () {
+                    setState(() {
+                      _engine.executeUnitAction(
+                        unit,
+                        isReposition: false,
+                        explicitTarget: explicitTarget,
+                        actionType: 'ultimate',
+                      );
+                    });
+                  }
+                : null,
+            child: isNarrow
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top,
+                              size: 11, color: unit.isUltimateReady ? Colors.black : Colors.white38),
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              unit.ultimateTitle.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 8.0,
+                                fontWeight: FontWeight.w900,
+                                color: unit.isUltimateReady ? Colors.black : Colors.white54,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        unit.isUltimateReady ? 'READY' : '${unit.ultimateCooldown}T CD',
+                        style: TextStyle(
+                          fontSize: 6.5,
+                          color: unit.isUltimateReady ? const Color(0xFF3E2723) : Colors.white38,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        unit.isUltimateReady
+                            ? '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
+                            : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateCooldown} Turns CD)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.15,
+                          color: unit.isUltimateReady ? const Color(0xFF212121) : Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    }
+
+    // Helper: Action 4 - Shift / Reposition
+    Widget buildShiftButton({required bool isNarrow}) {
+      return PopupMenuButton<String>(
+        tooltip: 'Shift 1 tile along rank or column',
+        color: const Color(0xFF1E1E2C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
+        ),
+        onSelected: (dir) {
+          int targetCol = curCol;
+          int targetRow = curRow;
+          if (dir == 'front' && curRow > 0) targetRow--;
+          if (dir == 'back' && curRow < 2) targetRow++;
+          if (dir == 'left' && curCol > 0) targetCol--;
+          if (dir == 'right' && curCol < 4) targetCol++;
+
+          setState(() {
+            _engine.executeUnitAction(
+              unit,
+              isReposition: true,
+              shiftCol: targetCol,
+              shiftRow: targetRow,
+            );
+          });
+        },
+        itemBuilder: (context) => [
+          if (curRow > 0)
+            const PopupMenuItem(
+              value: 'front',
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_upward, color: Color(0xFF00E5FF), size: 14),
+                  SizedBox(width: 8),
+                  Text('Advance to Frontline', style: TextStyle(color: Colors.white, fontSize: 11)),
+                ],
+              ),
+            ),
+          if (curRow < 2)
+            const PopupMenuItem(
+              value: 'back',
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_downward, color: Color(0xFF00E5FF), size: 14),
+                  SizedBox(width: 8),
+                  Text('Fall Back 1 Rank', style: TextStyle(color: Colors.white, fontSize: 11)),
+                ],
+              ),
+            ),
+          if (curCol > 0)
+            const PopupMenuItem(
+              value: 'left',
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_back, color: Color(0xFF00E5FF), size: 14),
+                  SizedBox(width: 8),
+                  Text('Shift Left (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
+                ],
+              ),
+            ),
+          if (curCol < 4)
+            const PopupMenuItem(
+              value: 'right',
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_forward, color: Color(0xFF00E5FF), size: 14),
+                  SizedBox(width: 8),
+                  Text('Shift Right (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
+                ],
+              ),
+            ),
         ],
-      ),
+        child: Container(
+          height: isNarrow ? 40 : null,
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 4, vertical: isNarrow ? 2 : 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF006064),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 12),
+                  const SizedBox(width: 2),
+                  Text(
+                    'SHIFT',
+                    style: TextStyle(fontSize: isNarrow ? 8.5 : 9.5, fontWeight: FontWeight.w900, color: const Color(0xFFE0F7FA)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '25% TM',
+                style: TextStyle(fontSize: isNarrow ? 6.5 : 7.5, color: const Color(0xFF80DEEA), fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isNarrow = constraints.maxWidth < 650;
+
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 10, vertical: isNarrow ? 5 : 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B1926),
+            border: Border(
+              top: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
+              bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: isNarrow
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tier 1: Hero Header & Target Bar (Ultra-clean, 20px)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.asset(
+                              unit.assetPath,
+                              width: 20,
+                              height: 20,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 16),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD54F),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: const Text(
+                              'TURN READY',
+                              style: TextStyle(fontSize: 7.0, color: Colors.black, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              unit.name.toUpperCase(),
+                              style: const TextStyle(color: Colors.white, fontSize: 10.0, fontWeight: FontWeight.w900),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (explicitTarget != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3E1E24),
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.gps_fixed, size: 8, color: Color(0xFFFF8A80)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    explicitTarget.name,
+                                    style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 7.5, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Tier 2: 4 Action Buttons spanning the full width
+                    Row(
+                      children: [
+                        Expanded(child: buildBasicButton(isNarrow: true)),
+                        const SizedBox(width: 4),
+                        Expanded(child: buildSignatureButton(isNarrow: true)),
+                        const SizedBox(width: 4),
+                        Expanded(child: buildUltimateButton(isNarrow: true)),
+                        const SizedBox(width: 4),
+                        Expanded(child: buildShiftButton(isNarrow: true)),
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    // Unit Avatar & Turn Ready Indicator (Desktop)
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F0F1A),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.asset(
+                              unit.assetPath,
+                              width: isLandscapeMobile ? 28 : 38,
+                              height: isLandscapeMobile ? 28 : 38,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 24),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFD54F),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                    child: const Text(
+                                      'TURN READY (10,000 TM)',
+                                      style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF37474F),
+                                      borderRadius: BorderRadius.circular(2),
+                                      border: Border.all(color: const Color(0xFF90A4AE), width: 0.5),
+                                    ),
+                                    child: Text(
+                                      unit.archetype.name.toUpperCase(),
+                                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFECEFF1), fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                unit.name.toUpperCase(),
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
+                              ),
+                              Text(
+                                'Col ${curCol + 1}, Row ${curRow == 0 ? "Front" : (curRow == 1 ? "Mid" : "Back")}',
+                                style: const TextStyle(color: Colors.white54, fontSize: 8.5),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    Expanded(child: buildBasicButton(isNarrow: false)),
+                    const SizedBox(width: 6),
+                    Expanded(child: buildSignatureButton(isNarrow: false)),
+                    const SizedBox(width: 6),
+                    Expanded(child: buildUltimateButton(isNarrow: false)),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: isLandscapeMobile ? 86 : 96,
+                      child: buildShiftButton(isNarrow: false),
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 
