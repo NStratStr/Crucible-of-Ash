@@ -193,12 +193,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             final int index = entry.key;
             final int row = entry.value;
 
-            // Natural 2.5D Stage Depth Staggering:
-            // Frontline (Row 0): at bottom ground baseline (offset 0)
-            // Midline (Row 1): stepped back into terrain (-14px)
-            // Backline (Row 2): stepped deepest into horizon (-28px)
-            final double rankDepthOffsetY = row == 0 ? 0.0 : (row == 1 ? -14.0 : -28.0);
-            final double rankDepthOffsetX = index > 0 ? -overlapStep * index : 0.0;
+            // Clean 2D Lane Alignment (Straight horizontal lanes, no fake diagonal offsets)
+            const double rankDepthOffsetY = 0.0;
+            const double rankDepthOffsetX = 0.0;
 
             return Transform.translate(
               offset: Offset(rankDepthOffsetX, rankDepthOffsetY),
@@ -466,6 +463,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     final double plinthH = (tileHeight * 0.28 * depthScale).clamp(14.0, 38.0);
 
     return DragTarget<String>(
+      key: Key('2d_tile_${isPlayer ? "player" : "enemy"}_c${col}_r$row'),
       onWillAcceptWithDetails: (details) {
         onTileHover(col, row, isPlayer);
         return true;
@@ -551,8 +549,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // 1. Natural Flat Battlefield Ground Plinth (Tabletop Perspective Base)
-              if (!isMultiNodeBoss)
+              // 1. Natural Ground Plinth (Only rendered under units or when dragging/hovering; never litters empty desert terrain!)
+              if (!isMultiNodeBoss && (occupant != null || isDropCandidate || isHovered || engine.isPreBattlePhase))
                 Positioned(
                   bottom: 8,
                   child: Container(
@@ -565,13 +563,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       radius: 0.85,
                       colors: isPlayer
                           ? [
-                              const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.60),
-                              const Color(0xFF0B1420).withValues(alpha: 0.90),
+                              const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.40),
+                              const Color(0xFF0B1420).withValues(alpha: 0.80),
                               Colors.transparent,
                             ]
                           : [
-                              const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.60),
-                              const Color(0xFF1B0709).withValues(alpha: 0.90),
+                              const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.40),
+                              const Color(0xFF1B0709).withValues(alpha: 0.80),
                               Colors.transparent,
                             ],
                     ),
@@ -580,11 +578,10 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       width: isTurnActiveUnit ? 2.4 : ((isSelected || isDropCandidate || isHovered) ? 1.8 : 1.0),
                     ),
                     boxShadow: [
-                      // Ground contact shadow
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.75),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withValues(alpha: 0.65),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
                       ),
                       if (plinthGlowColor != Colors.transparent)
                         BoxShadow(
@@ -619,22 +616,23 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
-              // 2. Subtle Coordinate Marker (Faintly etched into stone surface)
-              Positioned(
-                bottom: 11,
-                child: Opacity(
-                  opacity: (occupant != null || isHovered || isMoveReachable) ? 0.0 : 0.28,
-                  child: Text(
-                    'C$col:R$row',
-                    style: const TextStyle(
-                      fontSize: 7.5,
-                      color: Colors.white,
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
+              // Coordinate marker: ONLY shown when dragging a unit or hovering
+              if (isHovered || isDropCandidate)
+                Positioned(
+                  bottom: 11,
+                  child: Opacity(
+                    opacity: 0.6,
+                    child: Text(
+                      'C$col:R$row',
+                      style: const TextStyle(
+                        fontSize: 7.5,
+                        color: Color(0xFF80D8FF),
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
               // 2b. Telegraphed Enemy Threat Danger Zone Countdown & Hazard Overlay
               if (isTelegraphed)
@@ -704,27 +702,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   ),
                 ),
 
-              // 3. Vanguard Cover Badge (Rank & Rite Spec Sec 3)
-              if (hasVanguardCover)
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFF00E5FF).withValues(alpha: 0.4), blurRadius: 4),
-                      ],
-                    ),
-                    child: const Text(
-                      '🛡️ COVER -25%',
-                      style: TextStyle(fontSize: 6.8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                ),
+              // Vanguard cover is cleanly indicated by subtle blue plinth glow, no overhead badge clutter
 
               // 3b-pre. Pre-Battle Projected Target & Flank Reticle Badge
               if (!isMultiNodeBoss && isTargetedInPreBattle && !isSelected)

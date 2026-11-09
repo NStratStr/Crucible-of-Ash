@@ -80,7 +80,7 @@ void main() {
 
       // Key Verification: Tapping on any ground coordinate in Gorgoroth's territory forwards selection to Gorgoroth
       selectedEnemyId = null;
-      await tester.tap(find.text('C1:R0').last, warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('2d_tile_enemy_c1_r0')), warnIfMissed: false);
       await tester.pump(const Duration(milliseconds: 400));
       expect(selectedEnemyId, equals('gorgoroth_boss'));
     });

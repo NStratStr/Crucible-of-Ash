@@ -5847,6 +5847,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           : factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
                       blurRadius: isSelected || isAttacking ? 8 : 4,
                     ),
+                    if (unit.aegisShield > 0)
+                      BoxShadow(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.70),
+                        blurRadius: 10,
+                        spreadRadius: 1.5,
+                      ),
                   ],
                 ),
               ),
@@ -6174,7 +6180,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                               ),
                             ),
                           ),
-                          // Proportional White/Cyan Shield Overlay
+                          // Proportional White/Cyan Armor Overlay
                           if (unit.armor > 0)
                             FractionallySizedBox(
                               alignment: Alignment.centerLeft,
@@ -6184,6 +6190,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   color: Colors.white.withValues(alpha: 0.95),
                                   borderRadius: BorderRadius.circular(1),
                                   border: Border.all(color: const Color(0xFF00E5FF), width: 0.4),
+                                ),
+                              ),
+                            ),
+                          // Aegis Barrier Overlay (Sleek Cyan Bar)
+                          if (unit.aegisShield > 0)
+                            FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: (unit.aegisShield / max(1, unit.maxHp)).clamp(0.0, 1.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(1),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x9900E5FF), blurRadius: 3),
+                                  ],
                                 ),
                               ),
                             ),
@@ -6214,116 +6235,28 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 6. Active Ability Hit & Shield Sprite Sheet VFX (e.g. Radiant Celestial Aegis Dome Barrier)
-            // Fully encases the entire character model with a radiant arched forcefield dome from head to toe
+            // Aegis Shield Cast Burst (Brief 650ms impact pulse when barrier applied; never encases or hides unit!)
             if (unit.aegisShield > 0)
               Positioned(
-                bottom: 0,
+                bottom: 4,
                 child: IgnorePointer(
                   child: Builder(
                     builder: (context) {
-                      final double shieldWidth = isBoss
-                          ? (bossSpanWidth * 1.25)
-                          : (modelWidth * 1.55).clamp(140.0, 240.0);
-                      final double shieldHeight = isBoss
-                          ? (modelHeight * 1.15)
-                          : (modelHeight * 1.25).clamp(140.0, 260.0);
                       final nowMs = DateTime.now().millisecondsSinceEpoch;
-                      final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 1100;
+                      final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 700;
+                      if (!isInitialCasting) return const SizedBox.shrink();
 
                       return SizedBox(
-                        width: shieldWidth,
-                        height: shieldHeight,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          clipBehavior: Clip.none,
-                          children: [
-                            // Radiant Celestial Aegis Forcefield Dome
-                            Container(
-                              width: shieldWidth,
-                              height: shieldHeight,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(shieldWidth * 0.55),
-                                  bottom: Radius.circular(shieldWidth * 0.35),
-                                ),
-                                gradient: RadialGradient(
-                                  center: const Alignment(0, 0.05),
-                                  radius: 0.85,
-                                  colors: [
-                                    const Color(0xFF00E5FF).withValues(alpha: 0.22),
-                                    const Color(0xFFFFD54F).withValues(alpha: 0.15),
-                                    const Color(0xFF00B0FF).withValues(alpha: 0.08),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.2, 0.55, 0.85, 1.0],
-                                ),
-                                border: Border.all(
-                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.80),
-                                  width: 2.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF00E5FF).withValues(alpha: 0.45),
-                                    blurRadius: 18,
-                                    spreadRadius: 2,
-                                  ),
-                                  BoxShadow(
-                                    color: const Color(0xFFFFD54F).withValues(alpha: 0.30),
-                                    blurRadius: 12,
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Dynamic Sprite VFX during spell trigger
-                            if (isInitialCasting)
-                              SizedBox(
-                                width: shieldWidth * 1.1,
-                                height: shieldHeight * 1.1,
-                                child: SpriteSheetAnimation(
-                                  assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
-                                  columns: 3,
-                                  rows: 3,
-                                  totalFrames: 9,
-                                  duration: const Duration(milliseconds: 1000),
-                                  loop: false,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-
-                            // Top Runic Aegis Crest Badge
-                            Positioned(
-                              top: -10,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF004D40),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-                                  boxShadow: const [
-                                    BoxShadow(color: Color(0x9900E5FF), blurRadius: 6),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.shield, size: 9, color: Color(0xFF80D8FF)),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      'AEGIS ${unit.aegisShield}',
-                                      style: const TextStyle(
-                                        fontSize: 7.0,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                        letterSpacing: 0.4,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        width: (modelWidth * 1.15).clamp(80.0, 180.0),
+                        height: (modelHeight * 1.15).clamp(80.0, 180.0),
+                        child: SpriteSheetAnimation(
+                          assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                          columns: 3,
+                          rows: 3,
+                          totalFrames: 9,
+                          duration: const Duration(milliseconds: 650),
+                          loop: false,
+                          fit: BoxFit.contain,
                         ),
                       );
                     },
