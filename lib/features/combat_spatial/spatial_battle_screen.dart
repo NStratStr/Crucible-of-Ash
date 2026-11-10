@@ -2435,150 +2435,83 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                // 1. Commander Focus Crystal Bank with dynamic charge pips
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.bolt, color: Color(0xFF00E5FF), size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        'TEAM VITAE ${_engine.teamVitae}/${_engine.maxFocus}',
-                        style: const TextStyle(
-                          color: Color(0xFF00E5FF),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Visual Crystal Pips (Filled vs Empty)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(_engine.maxFocus, (index) {
-                          final isFilled = index < _engine.focus;
-                          final isCharging = index == _engine.focus;
-                          return Container(
-                            width: 8,
-                            height: 12,
-                            margin: const EdgeInsets.only(right: 3),
-                            decoration: BoxDecoration(
-                              color: isFilled
-                                  ? const Color(0xFF00E5FF)
-                                  : (isCharging
-                                      ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
-                                      : Colors.white10),
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(
-                                color: isFilled ? const Color(0xFF80D8FF) : Colors.white24,
-                                width: 0.8,
-                              ),
-                              boxShadow: isFilled
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
-                                        blurRadius: 4,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: isCharging
-                                ? FractionallySizedBox(
-                                    alignment: Alignment.bottomCenter,
-                                    heightFactor: focusProgress,
-                                    child: Container(
-                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.75),
-                                    ),
-                                  )
-                                : null,
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
+                // 1. Top Bar Crucible Cinders Fuel Gauge (Replacing legacy Team Vitae)
+                Builder(
+                  builder: (context) {
+                    final sculptor = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+                    final int cinders = sculptor?.crucibleCinders ?? 0;
+                    final double cinderRatio = (cinders / 100.0).clamp(0.0, 1.0);
+                    final bool isApexReady = cinders >= 80;
 
-                // 1b. Rank & Rite Turn Mode Toggle: TACTICAL TURN PAUSE vs AUTO BATTLE
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _engine.toggleAutoBattleMode();
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _engine.isAutoBattleMode
-                          ? const Color(0xFFEF6C00).withValues(alpha: 0.3)
-                          : const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _engine.isAutoBattleMode ? const Color(0xFFFF9800) : const Color(0xFF00E5FF),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _engine.isAutoBattleMode ? Icons.auto_mode : Icons.touch_app,
-                          color: _engine.isAutoBattleMode ? const Color(0xFFFFB74D) : const Color(0xFF80D8FF),
-                          size: 14,
+                    return Container(
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF190E0B),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isApexReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00).withValues(alpha: 0.85),
+                          width: isApexReady ? 1.5 : 1.0,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _engine.isAutoBattleMode ? 'AUTO-BATTLE' : 'TACTICAL TURNS',
-                          style: TextStyle(
-                            color: _engine.isAutoBattleMode ? const Color(0xFFFFB74D) : const Color(0xFF80D8FF),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 9.5,
-                            letterSpacing: 0.5,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isApexReady
+                                ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
+                                : const Color(0xFFFF5722).withValues(alpha: 0.25),
+                            blurRadius: isApexReady ? 8 : 4,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_fire_department,
+                            color: isApexReady ? const Color(0xFFFFD54F) : const Color(0xFFFF7043),
+                            size: 15,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'CINDERS: $cinders/100',
+                            style: TextStyle(
+                              color: isApexReady ? const Color(0xFFFFE082) : const Color(0xFFFFAB91),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 65,
+                            height: 8,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Stack(
+                                children: [
+                                  Container(color: Colors.white12),
+                                  FractionallySizedBox(
+                                    widthFactor: cinderRatio,
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFFD84315), Color(0xFFFF6D00), Color(0xFFFFD54F)],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 8),
 
                 // Ashen Reckoning Phase Clock Pill (GDD Sec 7.1)
                 _buildAshenReckoningPill(),
-                const SizedBox(width: 8),
-
-                // 1d. Live Action & Battle Pacing Counter (User Requested)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B2430),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: const Color(0xFF64B5F6).withValues(alpha: 0.6),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flash_on, color: Color(0xFF64B5F6), size: 13),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ACTIONS:  • ROUND: ',
-                        style: const TextStyle(
-                          color: Color(0xFFBBDEFB),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 9.5,
-                          fontFamily: 'monospace',
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(width: 8),
 
                 // 1c. 2D / 2.5D View Mode Toggle
@@ -8299,49 +8232,93 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         final bool isApexReady = unit.crucibleCinders >= 80;
 
         Widget buildCinderMeter() {
+          final int curCinders = unit.crucibleCinders;
+          final double ratio = (curCinders / 100.0).clamp(0.0, 1.0);
+          final bool isApexReady = curCinders >= 80;
+
           return Container(
-            height: isNarrow ? 14 : 16,
-            width: isNarrow ? 90 : 140,
+            height: isNarrow ? 18 : 22,
+            constraints: BoxConstraints(
+              minWidth: isNarrow ? 110 : 160,
+              maxWidth: isNarrow ? 150 : 220,
+            ),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1210),
-              borderRadius: BorderRadius.circular(4),
+              color: const Color(0xFF140C0A),
+              borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: isApexReady ? const Color(0xFFFFD54F) : disc.primaryColor,
-                width: isApexReady ? 1.4 : 0.8,
+                color: isApexReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00).withValues(alpha: 0.9),
+                width: isApexReady ? 1.6 : 1.0,
               ),
-              boxShadow: isApexReady
-                  ? [
-                      BoxShadow(
-                        color: disc.primaryColor.withValues(alpha: 0.6),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      )
-                    ]
-                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isApexReady
+                      ? const Color(0xFFFFD54F).withValues(alpha: 0.5)
+                      : const Color(0xFFFF5722).withValues(alpha: 0.3),
+                  blurRadius: isApexReady ? 10 : 6,
+                  spreadRadius: isApexReady ? 1 : 0,
+                ),
+              ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
+              borderRadius: BorderRadius.circular(4),
               child: Stack(
                 children: [
+                  // Background track
+                  Container(color: const Color(0xFF180F0D)),
+
+                  // Animated Molten Flame Fill
                   FractionallySizedBox(
-                    widthFactor: (unit.crucibleCinders / 100.0).clamp(0.0, 1.0),
+                    widthFactor: ratio,
                     child: Container(
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [disc.primaryColor.withValues(alpha: 0.7), disc.primaryColor, const Color(0xFFFFD54F)],
+                          colors: [
+                            Color(0xFF880E4F),
+                            Color(0xFFD84315),
+                            Color(0xFFFF6D00),
+                            Color(0xFFFFD54F),
+                          ],
                         ),
                       ),
                     ),
                   ),
+
+                  // Threshold notches (25, 30, 45, 80)
+                  ...[0.25, 0.30, 0.45, 0.80].map((notch) => Align(
+                    alignment: Alignment(notch * 2 - 1, 0),
+                    child: Container(
+                      width: 1.5,
+                      height: double.infinity,
+                      color: ratio >= notch
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : Colors.white24,
+                    ),
+                  )),
+
+                  // Center Label
                   Center(
-                    child: Text(
-                      '${unit.crucibleCinders} / 100 CINDERS',
-                      style: const TextStyle(
-                        fontSize: 7.0,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_fire_department,
+                          size: isNarrow ? 11 : 13,
+                          color: isApexReady ? const Color(0xFFFFD54F) : const Color(0xFFFFAB40),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '$curCinders / 100 CINDERS',
+                          style: TextStyle(
+                            fontSize: isNarrow ? 8.0 : 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.6,
+                            shadows: const [
+                              Shadow(color: Colors.black, blurRadius: 3),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -8357,59 +8334,160 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required Color activeColor,
           required Color borderColor,
           required bool isEnabled,
+          required double progress,
+          required bool isGenerator,
+          required bool isFinisher,
           required VoidCallback? onPressed,
           required String tooltipMessage,
         }) {
+          final double buttonHeight = isNarrow ? 44.0 : 50.0;
+
           return Tooltip(
             preferBelow: false,
             message: tooltipMessage,
-            child: SizedBox(
-              height: isNarrow ? 40 : 46,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isEnabled ? activeColor : const Color(0xFF1E1924),
-                  foregroundColor: isEnabled ? Colors.white : Colors.white38,
-                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(color: isEnabled ? borderColor : Colors.white12, width: 1.0),
+            child: InkWell(
+              onTap: isEnabled ? onPressed : null,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                height: buttonHeight,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131118),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isEnabled
+                        ? (isFinisher ? const Color(0xFFFFD54F) : borderColor)
+                        : (progress > 0 ? borderColor.withValues(alpha: 0.45) : Colors.white12),
+                    width: isEnabled ? (isFinisher ? 1.8 : 1.3) : 0.8,
                   ),
+                  boxShadow: isEnabled
+                      ? [
+                          BoxShadow(
+                            color: (isFinisher ? const Color(0xFFFFD54F) : activeColor).withValues(alpha: 0.45),
+                            blurRadius: isFinisher ? 10 : 6,
+                            spreadRadius: isFinisher ? 1 : 0,
+                          ),
+                        ]
+                      : null,
                 ),
-                onPressed: isEnabled ? onPressed : null,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, size: isNarrow ? 11 : 13, color: isEnabled ? Colors.white : Colors.white38),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: isNarrow ? 8.0 : 9.5,
-                              fontWeight: FontWeight.w900,
-                              color: isEnabled ? Colors.white : Colors.white38,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: Stack(
+                    children: [
+                      // 1. Vertical Molten "Building-Up" Fuel Fill
+                      if (progress > 0)
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: FractionallySizedBox(
+                            heightFactor: progress,
+                            widthFactor: 1.0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    activeColor.withValues(alpha: isEnabled ? 0.90 : 0.45),
+                                    activeColor.withValues(alpha: isEnabled ? 0.70 : 0.20),
+                                  ],
+                                ),
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: isNarrow ? 6.5 : 7.5,
-                        color: isEnabled ? Colors.white70 : Colors.white24,
-                        fontWeight: FontWeight.bold,
+
+                      // 2. Glowing Molten Meniscus Line at current charge level
+                      if (progress > 0 && progress < 1.0)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: (progress * buttonHeight) - 1.5,
+                          child: Container(
+                            height: 2.0,
+                            decoration: BoxDecoration(
+                              color: borderColor.withValues(alpha: 0.85),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: borderColor.withValues(alpha: 0.9),
+                                  blurRadius: 4,
+                                  spreadRadius: 0.5,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // 3. Button Content: Icon + Title + Subtitle
+                      Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 4, vertical: 2),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    icon,
+                                    size: isNarrow ? 11 : 13,
+                                    color: isEnabled
+                                        ? Colors.white
+                                        : (progress > 0.4 ? Colors.white70 : Colors.white38),
+                                  ),
+                                  const SizedBox(width: 2.5),
+                                  Flexible(
+                                    child: Text(
+                                      title,
+                                      style: TextStyle(
+                                        fontSize: isNarrow ? 7.8 : 9.0,
+                                        fontWeight: FontWeight.w900,
+                                        color: isEnabled
+                                            ? Colors.white
+                                            : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
+                                        letterSpacing: 0.3,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: TextStyle(
+                                  fontSize: isNarrow ? 6.2 : 7.2,
+                                  color: isEnabled
+                                      ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
+                                      : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+
+                      // 4. Subtle Shimmer / Radiant Overlay for Ready State
+                      if (isEnabled)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.12),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -8708,6 +8786,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   final bool isGenerator = skill.cinderCost == 0;
                   final int cinderYield = skill.rank >= 3 ? 10 : (skill.rank == 2 ? 8 : 6);
                   final bool isEnabled = isGenerator || (unit.crucibleCinders >= skill.cinderCost);
+                  final double progress = isGenerator
+                      ? 1.0
+                      : (unit.crucibleCinders / max(1, skill.cinderCost)).clamp(0.0, 1.0);
+
+                  final String subtitleText = isGenerator
+                      ? '+$cinderYield🔥 • STRIKE'
+                      : (isEnabled
+                          ? '${skill.cinderCost}🔥 • READY'
+                          : '${unit.crucibleCinders}/${skill.cinderCost}🔥 ${(progress * 100).toInt()}%');
 
                   return Expanded(
                     child: Padding(
@@ -8716,9 +8803,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         title: isNarrow && skill.name.length > 7
                             ? '${skill.name.substring(0, 6)}.'
                             : skill.name.toUpperCase(),
-                        subtitle: isGenerator
-                            ? '+$cinderYield🔥 • R${skill.rank}'
-                            : '${skill.cinderCost}🔥 • R${skill.rank}',
+                        subtitle: subtitleText,
                         icon: skill.icon,
                         activeColor: isFinisher
                             ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
@@ -8727,6 +8812,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             ? (isEnabled ? skill.borderColor : Colors.white24)
                             : skill.borderColor,
                         isEnabled: isEnabled,
+                        progress: progress,
+                        isGenerator: isGenerator,
+                        isFinisher: isFinisher,
                         tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
                         onPressed: () {
                           if (isFinisher) {
