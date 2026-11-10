@@ -22,6 +22,7 @@ class CrucibleSkillNode {
   final List<String> rankDescriptions;
   final double baseMultiplier;
   final int maxRank;
+  final double cooldownSeconds;
 
   int rank; // Current rank (0 = locked, 1..maxRank = unlocked/upgraded)
 
@@ -40,6 +41,7 @@ class CrucibleSkillNode {
     required this.baseMultiplier,
     this.maxRank = 3,
     this.rank = 1,
+    this.cooldownSeconds = 6.0,
   });
 
   bool get isUnlocked => rank > 0;
@@ -49,6 +51,12 @@ class CrucibleSkillNode {
     if (rank <= 1) return baseMultiplier;
     if (rank == 2) return baseMultiplier * 1.25;
     return baseMultiplier * 1.50; // Rank 3
+  }
+
+  double get effectiveCooldownSeconds {
+    if (rank <= 1) return cooldownSeconds;
+    if (rank == 2) return (cooldownSeconds * 0.90); // 10% CDR
+    return (cooldownSeconds * 0.80); // 20% CDR at Rank 3
   }
 
   String get currentRankDescription {
@@ -77,6 +85,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 1,
       cinderCost: 0,
+      cooldownSeconds: 1.5,
       icon: Icons.sports_mma,
       primaryColor: const Color(0xFFB3261E),
       borderColor: const Color(0xFFFF8A80),
@@ -96,6 +105,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 2,
       cinderCost: 30,
+      cooldownSeconds: 6.0,
       icon: Icons.local_fire_department,
       primaryColor: const Color(0xFFC2185B),
       borderColor: const Color(0xFFFF4081),
@@ -115,6 +125,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 3,
       cinderCost: 25,
+      cooldownSeconds: 9.0,
       icon: Icons.shield,
       primaryColor: const Color(0xFF00695C),
       borderColor: const Color(0xFF00BFA5),
@@ -134,6 +145,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 4,
       cinderCost: 45,
+      cooldownSeconds: 12.0,
       icon: Icons.cyclone,
       primaryColor: const Color(0xFFE65100),
       borderColor: const Color(0xFFFFAB40),
@@ -153,6 +165,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 5,
       cinderCost: 80,
+      cooldownSeconds: 20.0,
       icon: Icons.bolt,
       primaryColor: const Color(0xFFFF6D00),
       borderColor: const Color(0xFFFFD54F),
@@ -175,6 +188,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.iron,
       defaultSlot: 1,
       cinderCost: 0,
+      cooldownSeconds: 1.5,
       icon: Icons.shield,
       primaryColor: const Color(0xFF5D4037),
       borderColor: const Color(0xFFFFD54F),
@@ -194,6 +208,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.iron,
       defaultSlot: 2,
       cinderCost: 30,
+      cooldownSeconds: 6.0,
       icon: Icons.wb_sunny,
       primaryColor: const Color(0xFFF57F17),
       borderColor: const Color(0xFFFFD54F),
@@ -213,6 +228,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.iron,
       defaultSlot: 3,
       cinderCost: 25,
+      cooldownSeconds: 9.0,
       icon: Icons.security,
       primaryColor: const Color(0xFF37474F),
       borderColor: const Color(0xFF81D4FA),
@@ -232,6 +248,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.iron,
       defaultSlot: 4,
       cinderCost: 45,
+      cooldownSeconds: 12.0,
       icon: Icons.gavel,
       primaryColor: const Color(0xFFFF8F00),
       borderColor: const Color(0xFFFFE082),
@@ -251,6 +268,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.iron,
       defaultSlot: 5,
       cinderCost: 80,
+      cooldownSeconds: 20.0,
       icon: Icons.flash_on,
       primaryColor: const Color(0xFFFFB300),
       borderColor: const Color(0xFFFFF176),
@@ -273,6 +291,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 1,
       cinderCost: 0,
+      cooldownSeconds: 1.5,
       icon: Icons.bloodtype,
       primaryColor: const Color(0xFF880E4F),
       borderColor: const Color(0xFFFF5252),
@@ -292,6 +311,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 2,
       cinderCost: 30,
+      cooldownSeconds: 6.0,
       icon: Icons.whatshot,
       primaryColor: const Color(0xFFC2185B),
       borderColor: const Color(0xFFFF4081),
@@ -311,6 +331,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 3,
       cinderCost: 25,
+      cooldownSeconds: 9.0,
       icon: Icons.all_inclusive,
       primaryColor: const Color(0xFF4A148C),
       borderColor: const Color(0xFFEA80FC),
@@ -330,6 +351,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 4,
       cinderCost: 45,
+      cooldownSeconds: 12.0,
       icon: Icons.water_drop,
       primaryColor: const Color(0xFFAD1457),
       borderColor: const Color(0xFFFF4081),
@@ -349,6 +371,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 5,
       cinderCost: 80,
+      cooldownSeconds: 20.0,
       icon: Icons.storm,
       primaryColor: const Color(0xFFB71C1C),
       borderColor: const Color(0xFFFF1744),
@@ -371,6 +394,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.mire,
       defaultSlot: 1,
       cinderCost: 0,
+      cooldownSeconds: 1.5,
       icon: Icons.coronavirus,
       primaryColor: const Color(0xFF1B5E20),
       borderColor: const Color(0xFF69F0AE),
@@ -390,6 +414,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.mire,
       defaultSlot: 2,
       cinderCost: 30,
+      cooldownSeconds: 6.0,
       icon: Icons.bubble_chart,
       primaryColor: const Color(0xFF2E7D32),
       borderColor: const Color(0xFF00E676),
@@ -409,6 +434,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.mire,
       defaultSlot: 3,
       cinderCost: 25,
+      cooldownSeconds: 9.0,
       icon: Icons.healing,
       primaryColor: const Color(0xFF004D40),
       borderColor: const Color(0xFF64FFDA),
@@ -428,6 +454,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.mire,
       defaultSlot: 4,
       cinderCost: 45,
+      cooldownSeconds: 12.0,
       icon: Icons.grass,
       primaryColor: const Color(0xFF00796B),
       borderColor: const Color(0xFF80CBC4),
@@ -447,6 +474,7 @@ class CrucibleSkillTreeState {
       discipline: CrucibleSkillDiscipline.mire,
       defaultSlot: 5,
       cinderCost: 80,
+      cooldownSeconds: 20.0,
       icon: Icons.eco,
       primaryColor: const Color(0xFF00C853),
       borderColor: const Color(0xFFB9F6CA),
@@ -527,5 +555,68 @@ class CrucibleSkillTreeState {
 
   List<CrucibleSkillNode> getSkillsForDiscipline(CrucibleSkillDiscipline discipline) {
     return allSkills.values.where((s) => s.discipline == discipline).toList();
+  }
+
+  // ==========================================
+  // REAL-TIME / TURN COOLDOWN TRACKING SYSTEM
+  // ==========================================
+  final Map<String, double> remainingCooldowns = {};
+
+  double getCooldownRemaining(String skillId) {
+    return remainingCooldowns[skillId] ?? 0.0;
+  }
+
+  double getCooldownRemainingForSlot(int slotIndex) {
+    final skill = getSkillInSlot(slotIndex);
+    if (skill == null) return 0.0;
+    return getCooldownRemaining(skill.id);
+  }
+
+  void startCooldown(String skillId, double seconds) {
+    if (seconds > 0.0) {
+      remainingCooldowns[skillId] = seconds;
+    }
+  }
+
+  void updateCooldowns(double deltaSeconds) {
+    if (remainingCooldowns.isEmpty) return;
+    final keys = remainingCooldowns.keys.toList();
+    for (final key in keys) {
+      final cur = remainingCooldowns[key] ?? 0.0;
+      final next = cur - deltaSeconds;
+      if (next <= 0.01) {
+        remainingCooldowns.remove(key);
+      } else {
+        remainingCooldowns[key] = next;
+      }
+    }
+  }
+
+  void resetAllCooldowns() {
+    remainingCooldowns.clear();
+  }
+
+  CrucibleSkillNode? findSkillForAction(String actionType) {
+    for (final skill in allSkills.values) {
+      if (skill.actionType == actionType) return skill;
+    }
+    // Prefix & Finisher fuzzy matching
+    for (final skill in allSkills.values) {
+      if (actionType.startsWith(skill.actionType) || skill.actionType.startsWith(actionType)) {
+        return skill;
+      }
+    }
+    if (actionType.contains('pyre') ||
+        actionType.contains('cataclysmic') ||
+        actionType.contains('apex') ||
+        actionType.contains('wrath') ||
+        actionType.contains('spore') ||
+        actionType.contains('exsanguination')) {
+      return getSkillInSlot(4);
+    }
+    if (actionType == 'cleave' || actionType == 'forge_cleave' || actionType == 'slam' || actionType == 'rend' || actionType == 'touch') {
+      return getSkillInSlot(0);
+    }
+    return null;
   }
 }

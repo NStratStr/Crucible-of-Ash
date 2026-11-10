@@ -14,6 +14,7 @@ import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import 'models/crucible_skill_tree_models.dart';
 import 'crucible_skill_tree_dialog.dart';
+import 'crucible_sanctuary_upgrade_dialog.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
@@ -2021,6 +2022,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         ),
                                       ),
+                                      if (_engine.isVictory)
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.auto_fix_high, size: 14, color: Colors.white),
+                                          label: const Text(
+                                            'UPGRADE SQUAD & SCULPTOR',
+                                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFFF6D00),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            elevation: 4,
+                                          ),
+                                          onPressed: () {
+                                            CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
+                                              setState(() {});
+                                            });
+                                          },
+                                        ),
                                       if (_engine.isVictory && widget.onVictory != null)
                                         ElevatedButton.icon(
                                           icon: const Icon(Icons.arrow_forward, size: 14, color: Colors.white),
@@ -6806,6 +6826,41 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                   ],
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () {
+                      CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
+                        setState(() {});
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E241E),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFFFFAB40).withValues(alpha: 0.8),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.auto_fix_high, size: 11, color: Color(0xFFFFAB40)),
+                          SizedBox(width: 3),
+                          Text(
+                            'UPGRADES',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Color(0xFFFFAB40),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -8195,6 +8250,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       return KeyEventResult.handled;
     }
 
+    // Key 'U': Open Crucible Reforging Sanctuary & Upgrades
+    if (event.logicalKey == LogicalKeyboardKey.keyU) {
+      CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
+        setState(() {});
+      });
+      return KeyEventResult.handled;
+    }
+
     // Key 'Tab': Cycle Enemy Target
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       _cycleNextEnemyTarget();
@@ -8337,6 +8400,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required double progress,
           required bool isGenerator,
           required bool isFinisher,
+          required double cooldownRemaining,
           required VoidCallback? onPressed,
           required String tooltipMessage,
         }) {
@@ -8486,6 +8550,39 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             ),
                           ),
                         ),
+
+                      // 5. Cooldown Dark Veil & Timer
+                      if (cooldownRemaining > 0)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0D0A14).withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.timer_outlined, size: 9, color: Color(0xFFFF8A80)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${cooldownRemaining.toStringAsFixed(1)}s',
+                                      style: const TextStyle(
+                                        fontSize: 7.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFFFF8A80),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -8574,6 +8671,48 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       ),
                     ),
+                    if (_engine.isBulwarkOathActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B2A20),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFF81C784).withValues(alpha: 0.6), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.shield, size: 9, color: Color(0xFF81C784)),
+                            SizedBox(width: 2),
+                            Text(
+                              'BULWARK (+25 ARM, -15% DMG)',
+                              style: TextStyle(fontSize: 7.2, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_engine.isStalkerKeenEdgeActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E1B20),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)),
+                            SizedBox(width: 2),
+                            Text(
+                              'STALKER (+15% CRIT, +4🔥)',
+                              style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
                     const Spacer(),
                     if (explicitTarget != null && !isNarrow)
                       Container(
@@ -8640,6 +8779,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             Text(
                               'TREE',
                               style: TextStyle(color: Color(0xFFFFD54F), fontSize: 8.0, fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
+                          setState(() {});
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E241E),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFFAB40).withValues(alpha: 0.8), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.auto_fix_high, size: 9, color: Color(0xFFFFAB40)),
+                            SizedBox(width: 3),
+                            Text(
+                              'UPGRADE',
+                              style: TextStyle(color: Color(0xFFFFAB40), fontSize: 8.0, fontWeight: FontWeight.w900),
                             ),
                           ],
                         ),
@@ -8785,16 +8952,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   final bool isFinisher = skill.cinderCost >= 80;
                   final bool isGenerator = skill.cinderCost == 0;
                   final int cinderYield = skill.rank >= 3 ? 10 : (skill.rank == 2 ? 8 : 6);
-                  final bool isEnabled = isGenerator || (unit.crucibleCinders >= skill.cinderCost);
+                  final double cdRemaining = _engine.skillTreeState.getCooldownRemaining(skill.id);
+                  final bool isOnCooldown = cdRemaining > 0.0;
+                  final bool isEnabled = !isOnCooldown && (isGenerator || (unit.crucibleCinders >= skill.cinderCost));
                   final double progress = isGenerator
                       ? 1.0
                       : (unit.crucibleCinders / max(1, skill.cinderCost)).clamp(0.0, 1.0);
 
-                  final String subtitleText = isGenerator
-                      ? '+$cinderYield🔥 • STRIKE'
-                      : (isEnabled
-                          ? '${skill.cinderCost}🔥 • READY'
-                          : '${unit.crucibleCinders}/${skill.cinderCost}🔥 ${(progress * 100).toInt()}%');
+                  final String subtitleText = isOnCooldown
+                      ? '${cdRemaining.toStringAsFixed(1)}s CD'
+                      : (isGenerator
+                          ? '+$cinderYield🔥 • STRIKE'
+                          : (isEnabled
+                              ? '${skill.cinderCost}🔥 • READY'
+                              : '${unit.crucibleCinders}/${skill.cinderCost}🔥 ${(progress * 100).toInt()}%'));
 
                   return Expanded(
                     child: Padding(
@@ -8815,6 +8986,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         progress: progress,
                         isGenerator: isGenerator,
                         isFinisher: isFinisher,
+                        cooldownRemaining: cdRemaining,
                         tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
                         onPressed: () {
                           if (isFinisher) {

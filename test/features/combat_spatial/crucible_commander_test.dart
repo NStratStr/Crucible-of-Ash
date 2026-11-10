@@ -291,7 +291,122 @@ void main() {
       final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
       sculptor.crucibleCinders = 50;
       engine.executeUnitAction(sculptor, actionType: 'ember_whirlwind');
-      expect(sculptor.crucibleCinders, equals(5)); // 50 - 45 = 5
+      expect(sculptor.crucibleCinders, anyOf(equals(5), equals(9))); // 50 - 45 = 5 (+4 if Stalker Keen Edge crits)
+    });
+
+    test('Each Commander Skill has explicit cooldown and is blocked while on cooldown', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+      final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
+      sculptor.crucibleCinders = 0;
+
+      // Slot 1: Forge Cleave has 1.5s cooldown
+      final cleave = engine.skillTreeState.getSkillInSlot(0)!;
+      expect(cleave.effectiveCooldownSeconds, equals(1.5));
+      expect(engine.skillTreeState.getCooldownRemaining(cleave.id), equals(0.0));
+
+      // Execute Forge Cleave
+      engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
+      expect(sculptor.crucibleCinders, equals(6)); // Generated 6 cinders
+      expect(engine.skillTreeState.getCooldownRemaining(cleave.id), greaterThan(0.0));
+
+      // Attempting to execute while on cooldown is blocked
+      final cindersBefore = sculptor.crucibleCinders;
+      engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
+      expect(sculptor.crucibleCinders, equals(cindersBefore), reason: 'Should not generate cinders while on cooldown');
+
+      // Ticking simulation decrements cooldown
+      engine.skillTreeState.updateCooldowns(1.6);
+      expect(engine.skillTreeState.getCooldownRemaining(cleave.id), equals(0.0));
+
+      // Off cooldown: can execute again!
+      engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
+      expect(sculptor.crucibleCinders, equals(cindersBefore + 6));
+    });
+
+    test('Minions have unique basic attacks, 3-turn signatures, and passives to the Sculptor', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final duelist = engine.playerUnits.firstWhere((u) => u.id == 'grave_duelist');
+      final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
+
+      // 1. Retinue Passives given to Sculptor while minions live
+      expect(engine.isBulwarkOathActive, isTrue);
+      expect(engine.isStalkerKeenEdgeActive, isTrue);
+
+      // Simulation tick applies Bulwark Oath (-15% damage taken) to Sculptor
+      engine.stepTick();
+      expect(sculptor.damageReductionMultiplier, equals(0.85));
+
+      // 2. Iron Footman unique basic attack (Shieldbash Cleave): -12 Armor Shred & +15 Aegis Barrier
+      final dummyTarget = engine.enemyUnits.firstWhere((u) => u.isAlive);
+      final initialArmor = dummyTarget.armor;
+      final initialShield = footman.aegisShield;
+
+      // Force footman basic attack
+      footman.signatureCooldown = 3;
+      engine.executeUnitAction(footman, explicitTarget: dummyTarget, actionType: 'auto');
+      expect(dummyTarget.armor, equals(initialArmor - 12));
+      expect(footman.aegisShield, equals(initialShield + 15));
+
+      // 3. Iron Footman signature skill (Bastion\'s Aegis): grants +40 Aegis to BOTH Footman AND Sculptor
+      final sculptorShieldBefore = sculptor.aegisShield;
+      final footmanShieldBefore = footman.aegisShield;
+      footman.signatureCooldown = 0; // Ready!
+      engine.executeCompanionSignature('iron_footman', explicitTarget: dummyTarget);
+      expect(footman.aegisShield, equals(footmanShieldBefore + 40));
+      expect(sculptor.aegisShield, equals(sculptorShieldBefore + 40));
+      expect(footman.signatureCooldown, equals(3));
+
+      // 4. Grave Duelist signature skill (Phantom Ambush): channels +12 Cinders to the Sculptor
+      sculptor.crucibleCinders = 10;
+      duelist.signatureCooldown = 0; // Ready!
+      engine.executeCompanionSignature('grave_duelist', explicitTarget: dummyTarget);
+      expect(sculptor.crucibleCinders, equals(22)); // 10 + 12
+      expect(duelist.signatureCooldown, equals(3));
+    });
+
+    test('Crypt Resource drops and upgrading Minions and Sculptor', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      // Starting wallet amounts
+      expect(engine.unboundAshWallet, greaterThanOrEqualTo(600));
+      expect(engine.distilledVitaeWallet, greaterThanOrEqualTo(60));
+
+      final footman = engine.playerUnits.firstWhere((u) => u.id == 'iron_footman');
+      final initialHp = footman.maxHp;
+      final initialAtk = footman.attack;
+      final ashBefore = engine.unboundAshWallet;
+
+      // Upgrade Minion (costs 120 Ash)
+      final success = engine.upgradeMinion('iron_footman');
+      expect(success, isTrue);
+      expect(footman.maxHp, equals(initialHp + 150));
+      expect(footman.attack, equals(initialAtk + 25));
+      expect(engine.unboundAshWallet, equals(ashBefore - 120));
+
+      // Upgrade Sculptor Furnace (costs 200 Ash & 20 Vitae)
+      final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
+      final sculptorHpBefore = sculptor.maxHp;
+      final sculptorAtkBefore = sculptor.attack;
+      final vitaeBefore = engine.distilledVitaeWallet;
+
+      final ascendSuccess = engine.upgradeSculptorFurnace();
+      expect(ascendSuccess, isTrue);
+      expect(sculptor.maxHp, equals(sculptorHpBefore + 200));
+      expect(sculptor.attack, equals(sculptorAtkBefore + 30));
+      expect(engine.distilledVitaeWallet, equals(vitaeBefore - 20));
+
+      // Upgrade Commander Skill (costs 15 Vitae)
+      final cleave = engine.skillTreeState.allSkills['ash_cleave']!;
+      expect(cleave.rank, equals(1));
+      final skillUpgradeSuccess = engine.upgradeCommanderSkill('ash_cleave');
+      expect(skillUpgradeSuccess, isTrue);
+      expect(cleave.rank, equals(2));
+      expect(engine.distilledVitaeWallet, equals(vitaeBefore - 20 - 15));
     });
   });
 }

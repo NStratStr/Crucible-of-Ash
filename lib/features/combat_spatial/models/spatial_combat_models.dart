@@ -313,6 +313,7 @@ class CombatUnitState {
   double apRateMultiplier; // Kinetic Gyro / Piston Joint AP accumulation rate
   double ultimateChargeBonus; // Ultimate / Focus generation
   double lifestealBonus; // Sanguine Lifesteal on strike
+  double damageReductionMultiplier;
 
   CombatUnitState({
     required this.id,
@@ -324,6 +325,7 @@ class CombatUnitState {
     required this.occupiedNodes,
     bool? isDisplacementImmune,
     this.moveRange = 1,
+    this.damageReductionMultiplier = 1.0,
     this.level = 10,
     this.currentAp = 0,
     required this.maxHp,
@@ -875,6 +877,9 @@ class CombatUnitState {
 
     if (isSlagCarapaceActive && armor > 0) {
       finalDmg *= 0.50; // -50% damage while Slag Carapace armor holds
+    }
+    if (damageReductionMultiplier < 1.0) {
+      finalDmg *= damageReductionMultiplier.clamp(0.10, 1.0);
     }
     if (!ignoreArmor) {
       final effectiveReduction = (physicalReductionRatio * (1.0 - armorPenetration.clamp(0.0, 1.0))).clamp(0.0, 0.90);

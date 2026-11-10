@@ -162,6 +162,74 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
+  // ==========================================
+  // RETINUE PASSIVES & CRYPT WALLET SYSTEM
+  // ==========================================
+  bool get isBulwarkOathActive => playerUnits.any((u) => (u.id == 'iron_footman' || u.templateId == 'iron_footman') && u.isAlive);
+  bool get isStalkerKeenEdgeActive => playerUnits.any((u) => (u.id == 'grave_duelist' || u.templateId == 'grave_duelist') && u.isAlive);
+
+  int unboundAshWallet = 600;
+  int distilledVitaeWallet = 60;
+  int petrifiedPlinthsWallet = 12;
+  bool hasClaimedEncounterVictoryLoot = false;
+
+  void claimVictoryRewards() {
+    if (!isVictory || hasClaimedEncounterVictoryLoot) return;
+    unboundAshWallet += rewardUnboundAsh;
+    distilledVitaeWallet += rewardDistilledVitae;
+    petrifiedPlinthsWallet += rewardPetrifiedPlinths;
+    hasClaimedEncounterVictoryLoot = true;
+    addLog('💎 VICTORY SPOILS CLAIMED: +$rewardUnboundAsh Ash, +$rewardDistilledVitae Vitae, +$rewardPetrifiedPlinths Plinths!');
+    notifyListeners();
+  }
+
+  bool upgradeMinion(String minionId) {
+    const int costAsh = 120;
+    if (unboundAshWallet < costAsh) return false;
+    final unit = playerUnits.where((u) => u.id == minionId).firstOrNull;
+    if (unit == null) return false;
+
+    unboundAshWallet -= costAsh;
+    unit.maxHp += 150;
+    unit.hp = min(unit.maxHp, unit.hp + 150);
+    unit.attack += 25;
+    unit.maxArmor += 10;
+    unit.armor += 10;
+    addLog('⚒️ RETINUE REFORGED: ${unit.name} upgraded to Lv.${unit.level + 1} (+150 HP, +25 ATK, +10 Armor)!');
+    notifyListeners();
+    return true;
+  }
+
+  bool upgradeSculptorFurnace() {
+    const int costAsh = 200;
+    const int costVitae = 20;
+    if (unboundAshWallet < costAsh || distilledVitaeWallet < costVitae) return false;
+    final sculptor = playerUnits.where((u) => u.isAshSculptor).firstOrNull;
+    if (sculptor == null) return false;
+
+    unboundAshWallet -= costAsh;
+    distilledVitaeWallet -= costVitae;
+    sculptor.attack += 30;
+    sculptor.maxHp += 200;
+    sculptor.hp = min(sculptor.maxHp, sculptor.hp + 200);
+    addLog('🔥 FORGE CRUCIBLE ASCENSION: The Ash Sculptor ascended (+30 ATK, +200 HP)!');
+    notifyListeners();
+    return true;
+  }
+
+  bool upgradeCommanderSkill(String skillId) {
+    const int costVitae = 15;
+    if (distilledVitaeWallet < costVitae) return false;
+    final skill = skillTreeState.allSkills[skillId];
+    if (skill == null || !skill.canUpgrade) return false;
+
+    distilledVitaeWallet -= costVitae;
+    skill.rank++;
+    addLog('⚡ SKILL TRANSCENDENCE: ${skill.name} upgraded to Rank ${skill.rank}!');
+    notifyListeners();
+    return true;
+  }
+
   /// GDD Section 7.1 & 7.2: The Ashen Reckoning & Pacing Enrage Engine
   int phaseElapsedTicks = 0;
   final Set<double> _triggeredBossHpThresholds = {};
@@ -545,6 +613,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     focus = isBoss ? 5 : 3;
     maxFocus = isBoss ? 8 : 7;
     isBulletTime = false;
+    hasClaimedEncounterVictoryLoot = false;
+    skillTreeState.resetAllCooldowns();
 
     // --- POPULATE ENEMY UNITS ONTO SPATIAL GRID ---
     _spawnEnemyWaveEntities(
@@ -960,6 +1030,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     focus = 3;
     maxFocus = 7;
     isBulletTime = false;
+    hasClaimedEncounterVictoryLoot = false;
+    skillTreeState.resetAllCooldowns();
 
     // --- ENEMY SQUAD: PYRE SYNOD COHORT ---
     // Gorgoroth the Flayed: 2x2 Quad-Colossus Behemoth Boss occupying 4 tiles (Cols 1-2, Rows 0-1)
@@ -1054,9 +1126,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       ultimateCooldown: 0,
     );
 
-    // 2. Tombstone Sentinel: Frontline Protector Retinue (Living Rampart)
+    // 2. Iron Footman: Frontline Protector Retinue (Living Rampart)
     final tombstoneSentinel = CombatUnitState(
-      id: 'tombstone_sentinel',
+      id: 'iron_footman',
       name: 'Iron Footman',
       templateId: 'iron_footman',
       customAssetPath: 'assets/images/iron_footman_idle.png',
@@ -1064,7 +1136,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 0, row: 0, occupantUnitId: 'tombstone_sentinel'),
+        const GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'),
       ],
       maxHp: 520,
       hp: 520,
@@ -1077,16 +1149,17 @@ class SpatialCombatEngine extends ChangeNotifier {
       ultimateCooldown: 0,
     );
 
-    // 3. Crypt Stalker: Opportunist Flanker Retinue (Shadow Ambush on Brands/Crits)
+    // 3. Grave Duelist: Opportunist Flanker Retinue (Shadow Ambush on Brands/Crits)
     final cryptStalker = CombatUnitState(
-      id: 'crypt_stalker',
-      name: 'Crypt Stalker',
-      templateId: 'crypt_stalker',
+      id: 'grave_duelist',
+      name: 'Grave Duelist',
+      templateId: 'grave_duelist',
+      customAssetPath: 'assets/images/grave_duelist.png',
       isPlayer: true,
       archetype: UnitArchetype.reachMidline,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
-        const GridNode(column: 0, row: 1, occupantUnitId: 'crypt_stalker'),
+        const GridNode(column: 0, row: 1, occupantUnitId: 'grave_duelist'),
       ],
       moveRange: 2,
       maxHp: 340,
@@ -1122,7 +1195,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     );
 
     // 1 Commander + 2 Minions Formation
-    playerUnits.addAll([ashSculptor, tombstoneSentinel, bloodScribe]);
+    playerUnits.addAll([ashSculptor, tombstoneSentinel, cryptStalker]);
 
     // Cards Setup
     hand.addAll([
@@ -1240,6 +1313,9 @@ class SpatialCombatEngine extends ChangeNotifier {
   void stepTick() {
     // If encounter is already decided, halt simulation immediately!
     if (isVictory || isDefeat) {
+      if (isVictory && !hasClaimedEncounterVictoryLoot) {
+        claimVictoryRewards();
+      }
       isRunning = false;
       return;
     }
@@ -1257,6 +1333,15 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
 
     currentTick++;
+
+    // Advance Commander Skill Cooldowns (30 ticks = 1 second)
+    skillTreeState.updateCooldowns(1.0 / 30.0);
+
+    // Apply Active Minion Retinue Passives to Ash Sculptor
+    final sculptor = playerUnits.where((u) => u.isAshSculptor).firstOrNull;
+    if (sculptor != null) {
+      sculptor.damageReductionMultiplier = isBulwarkOathActive ? 0.85 : 1.0;
+    }
 
     // Advance GDD Sec 7.1 Pacing Clock during active battle
     if (isRunning && !isPreBattlePhase && !isVictory && !isDefeat) {
@@ -2623,20 +2708,34 @@ class SpatialCombatEngine extends ChangeNotifier {
       pattern = TargetPattern.stAshlarCross;
       addLog('★ SIGNATURE SKILL: ${unit.name} opens $skillName for $dmg DMG and grants +3,000 AP & +35 Aegis to ${lowestApAlly?.name ?? unit.name}!');
     } else if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
-      final rawDmg = (unit.effectiveAttack * 1.35).round();
+      final rawDmg = (unit.effectiveAttack * 1.45).round();
       dmg = target.takeDamage(rawDmg, isPhysical: true);
-      target.armor = max(0, target.armor - 15);
-      target.currentAp = max(0, target.currentAp - 1500);
-      unit.aegisShield += 25; unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
-      addLog('★ SIGNATURE SKILL: ${unit.name} slams ${target.name} with $skillName for $dmg DMG (-15 Armor, -1,500 AP, +25 Aegis)!');
+      target.armor = max(0, target.armor - 20);
+      target.currentAp = max(0, target.currentAp - 2000);
+      unit.aegisShield += 40;
+      unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      // Bastion's Aegis: also shields the Ash Sculptor!
+      final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+      if (sculptor != null) {
+        sculptor.aegisShield += 40;
+        sculptor.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      }
+      addLog('★ SIGNATURE SKILL: ${unit.name} [BASTION\'S AEGIS] slams ${target.name} for $dmg DMG (-20 Armor, -2,000 AP) and shields both himself AND the Ash Sculptor (+40 Aegis)!');
+      lastBannerMessage = '🛡️ BASTION\'S AEGIS: Iron Footman warded the Ash Sculptor (+40 Aegis)!';
     } else if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
-      final rawDmg = (unit.effectiveAttack * 1.50).round();
+      final rawDmg = (unit.effectiveAttack * 1.85).round();
       dmg = target.takeDamage(rawDmg, isPhysical: true);
-      appliedBleed = 2;
+      appliedBleed = 3;
       target.bleedStacks += appliedBleed;
-      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2000);
+      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2500);
+      // Phantom Ambush: channels +12 Cinders directly to the Ash Sculptor!
+      final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+      if (sculptor != null) {
+        sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 12);
+      }
       pattern = TargetPattern.reachMidToFront;
-      addLog('★ SIGNATURE SKILL: ${unit.name} executes $skillName on ${target.name} for $dmg CRIT DMG (+2 Bleed, +2,000 AP)!');
+      addLog('★ SIGNATURE SKILL: ${unit.name} [PHANTOM AMBUSH] crits ${target.name} for $dmg DMG (+3 Bleed) and channels +12 Cinders to the Ash Sculptor!');
+      lastBannerMessage = '🗡️ PHANTOM AMBUSH: Grave Duelist channeled +12 Cinders to the Sculptor!';
     } else if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
       final rawDmg = (unit.effectiveAttack * 1.55).round();
       dmg = target.takeDamage(rawDmg, ignoreArmor: true, isPhysical: true);
@@ -2689,7 +2788,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     // Signature Skills accelerate Ultimate Gauge by +25%
     unit.ultimateGauge = min(100, unit.ultimateGauge + 25);
-    unit.signatureCooldown = 2; // Reset to 2 basic actions until next Signature Skill
+    unit.signatureCooldown = 3; // Reset to 3 basic actions until next Signature Skill
     unit.actionCycleCount++;
 
     final graftProc = _applyGraftedTraitProc(unit, target, dmg);
@@ -2765,7 +2864,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest')) {
         skillName = isBacklineMarksman ? 'Armor-Piercing Bolt' : 'Heavy Crossbow Volley';
       } else if (unit.templateId == 'grave_duelist' || unit.name.toLowerCase().contains('duelist')) {
-        skillName = isFlankingBonus ? 'Riposte Evisceration' : 'Dueling Thrust';
+        skillName = isFlankingBonus ? 'Riposte Evisceration' : 'Flensing Twin-Thrust';
+        if (target.bleedStacks > appliedBleed) {
+          final bonusDmg = (dmg * 0.30).round();
+          target.takeDamage(bonusDmg, isPhysical: true);
+          unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 1500);
+          addLog('🗡️ GRAVE DUELIST [FLENSING RIPOSTE] exploits bleeding flesh for +$bonusDmg CRIT DMG & +1,500 AP tempo!');
+        }
       } else {
         skillName = isFlankingBonus ? 'Flanking Strike' : 'Skirmish Thrust';
       }
@@ -2813,6 +2918,23 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     if (validTarget == null) return;
     final activeGen = commandService?.activeGeneralType ?? GeneralType.malakor;
+
+    // Crucible Commander Cooldown Validation & Trigger
+    final matchedSkill = skillTreeState.findSkillForAction(actionType);
+    if (matchedSkill != null) {
+      final cdRemaining = skillTreeState.getCooldownRemaining(matchedSkill.id);
+      if (cdRemaining > 0) {
+        addLog('⏳ ${matchedSkill.name.toUpperCase()} is on COOLDOWN (${cdRemaining.toStringAsFixed(1)}s remaining)!');
+        return;
+      }
+      skillTreeState.startCooldown(matchedSkill.id, matchedSkill.effectiveCooldownSeconds);
+    }
+
+    // Minion Retinue Passive: Stalker Keen Edge (+15% Crit chance, +4 Cinders on Crit)
+    if (isStalkerKeenEdgeActive && (Random().nextDouble() < 0.15)) {
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
+      addLog('🗡️ [STALKER KEEN EDGE] The Ash Sculptor crits and channels +4 bonus Cinders -> ${sculptor.crucibleCinders}/100!');
+    }
 
     if (actionType == 'forge_cleave' || actionType == 'cleave' || actionType == 'cold_iron_slam' || actionType == 'siphon_rend' || actionType == 'corrosive_touch') {
       // --- SKILL 1: 0 CINDERS (BUILDER / CINDER GENERATOR - ALWAYS AVAILABLE) ---
@@ -3387,9 +3509,11 @@ class SpatialCombatEngine extends ChangeNotifier {
             unit.hasStanceBonusReady = false; // Consumed
             addLog('${unit.name} [HOLD THE LINE] unleashes $skillName for $dmg DMG, resetting 1,500 AP!');
             lastBannerMessage = '🛡️ HOLD THE LINE: ${unit.name} unleashed $skillName cleaving frontline!';
-          } else if (unit.id == 'iron_footman' && target.id != 'gorgoroth_boss') {
-            target.stunDuration = 30; // 1s stun
-            addLog('${unit.name} [BRAWL STANCE] bashes ${target.name} for $dmg DMG & STUNS for 1s!');
+          } else if (unit.id == 'iron_footman' || unit.templateId == 'iron_footman') {
+            target.armor = max(0, target.armor - 12);
+            unit.aegisShield += 15;
+            unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+            addLog('🛡️ ${unit.name} [SHIELDBASH CLEAVE] strikes ${target.name} for $dmg DMG (-12 Armor Shred, +15 Aegis Barrier to self)!');
           } else {
             addLog('${unit.name} [BRAWL STANCE] strikes ${target.name} for $dmg DMG (100% Impact).');
           }
