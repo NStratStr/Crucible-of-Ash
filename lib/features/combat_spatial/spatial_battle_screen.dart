@@ -290,6 +290,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     super.initState();
     _battlefieldFocusNode = FocusNode();
     SpriteSheetAnimation.precache('assets/animations/ash_sculptor_attack_sheet.png');
+    SpriteSheetAnimation.precache('assets/animations/ash_sculptor_defend_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
@@ -5900,30 +5901,53 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                           child: (isAttacking && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
                               ? (_activeSkillName == 'Obsidian Bastion'
-                                  ? Image.asset(
-                                      'assets/images/ash_sculptor_shield_burst.png',
-                                      fit: BoxFit.contain,
-                                      alignment: Alignment.bottomCenter,
-                                    )
-                                  : SpriteSheetAnimation(
-                                      assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/ash_sculptor_defend_sheet.png',
                                       columns: 3,
                                       rows: 2,
                                       totalFrames: 6,
-                                      duration: const Duration(milliseconds: 950),
+                                      duration: const Duration(milliseconds: 850),
                                       loop: false,
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
-                                        unit.assetPath,
+                                        'assets/images/ash_sculptor_shield_burst.png',
                                         fit: BoxFit.contain,
                                         alignment: Alignment.bottomCenter,
                                       ),
+                                    )
+                                  : OverflowBox(
+                                      maxWidth: modelHeight * 1.5,
+                                      maxHeight: modelHeight,
+                                      alignment: Alignment.bottomCenter,
+                                      child: SpriteSheetAnimation(
+                                        assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
+                                        columns: 3,
+                                        rows: 2,
+                                        totalFrames: 6,
+                                        duration: const Duration(milliseconds: 900),
+                                        loop: false,
+                                        fit: BoxFit.contain,
+                                        fallback: Image.asset(
+                                          unit.assetPath,
+                                          fit: BoxFit.contain,
+                                          alignment: Alignment.bottomCenter,
+                                        ),
+                                      ),
                                     ))
                               : (isDamaged && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
-                                  ? Image.asset(
-                                      'assets/images/ash_sculptor_hit.png',
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/ash_sculptor_defend_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: const Duration(milliseconds: 650),
+                                      loop: false,
                                       fit: BoxFit.contain,
-                                      alignment: Alignment.bottomCenter,
+                                      fallback: Image.asset(
+                                        'assets/images/ash_sculptor_hit.png',
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
                                     )
                               : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
                                   ? SpriteSheetAnimation(

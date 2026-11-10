@@ -575,27 +575,38 @@ class SpatialCombatEngine extends ChangeNotifier {
         final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult * morriganSpeedMult).round();
         final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
 
-        // Identify the Commander Protagonist (lead slot)
+        // Identify the Commander Protagonist (lead slot) and Vanguard Footman (slot 1)
         final bool isCommanderLead = (i == 0) ||
             p.speciesId.contains('vladislav') ||
             p.speciesId.contains('ash_sculptor') ||
             p.id.contains('vladislav') ||
             p.id.contains('ash_sculptor');
+        final bool isFootmanCompanion = !isCommanderLead && (i == 1);
 
-        final String unitId = isCommanderLead ? 'ash_sculptor' : p.id;
+        final String unitId = isCommanderLead
+            ? 'ash_sculptor'
+            : (isFootmanCompanion ? 'iron_footman' : p.id);
         final autoNode = autoFormationNodes[i];
         final int finalSpeed = isCommanderLead ? max(115, effectiveSpd) : effectiveSpd;
 
         playerUnits.add(CombatUnitState(
           id: unitId,
-          name: isCommanderLead ? 'The Ash Sculptor' : p.name,
-          templateId: isCommanderLead ? 'ash_sculptor' : p.speciesId,
+          name: isCommanderLead
+              ? 'The Ash Sculptor'
+              : (isFootmanCompanion ? 'Iron Footman' : p.name),
+          templateId: isCommanderLead
+              ? 'ash_sculptor'
+              : (isFootmanCompanion ? 'iron_footman' : p.speciesId),
           isPlayer: true,
           isAshSculptor: isCommanderLead,
           crucibleCinders: isCommanderLead ? 45 : 0,
-          customAssetPath: isCommanderLead ? 'assets/images/ash_sculptor_idle.png' : p.customAvatarAsset,
+          customAssetPath: isCommanderLead
+              ? 'assets/images/ash_sculptor_idle.png'
+              : (isFootmanCompanion ? 'assets/images/iron_footman_idle.png' : p.customAvatarAsset),
           footprint: UnitFootprint.single1x1,
-          archetype: isCommanderLead ? UnitArchetype.vanguardMelee : mapArchetypeToSpatial(p.archetype),
+          archetype: (isCommanderLead || isFootmanCompanion)
+              ? UnitArchetype.vanguardMelee
+              : mapArchetypeToSpatial(p.archetype),
           occupiedNodes: [
             GridNode(column: autoNode.column, row: autoNode.row, occupantUnitId: unitId),
           ],
@@ -623,7 +634,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         playerUnits.add(CombatUnitState(
           id: 'tombstone_sentinel',
           name: 'Tombstone Sentinel',
-          templateId: 'tombstone_sentinel',
+          templateId: 'iron_footman',
+          customAssetPath: 'assets/images/iron_footman_idle.png',
           isPlayer: true,
           archetype: UnitArchetype.vanguardMelee,
           footprint: UnitFootprint.single1x1,
@@ -996,8 +1008,9 @@ class SpatialCombatEngine extends ChangeNotifier {
     // 2. Tombstone Sentinel: Frontline Protector Retinue (Living Rampart)
     final tombstoneSentinel = CombatUnitState(
       id: 'tombstone_sentinel',
-      name: 'Tombstone Sentinel',
-      templateId: 'tombstone_sentinel',
+      name: 'Iron Footman',
+      templateId: 'iron_footman',
+      customAssetPath: 'assets/images/iron_footman_idle.png',
       isPlayer: true,
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
@@ -1561,7 +1574,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         _channelRetinueCinders(unit);
       }
       _executeUnitTurn(unit);
-      if (isActionPauseEnabled && activeActionEvent != null) {
+      if (isActionPauseEnabled) {
         break;
       }
     }

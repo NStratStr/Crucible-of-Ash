@@ -172,29 +172,35 @@ class _AppShellState extends State<AppShell> {
       _clearedGauntletTrials.addAll(saved.clearedGauntletTrials);
 
       if (saved.allies.isNotEmpty) {
-        final migratedAllies = saved.allies.map((u) {
-          if (u.id.contains('vladislav') || u.speciesId.contains('vladislav') || u == saved.allies.first) {
-            return u.copyWith(
-              name: 'The Ash Sculptor',
-              speciesId: 'ash_sculptor',
-              customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
-            );
-          }
-          return u;
-        }).toList();
-
-        if (migratedAllies.length < 3) {
-          final defaultSquad = StarterBrigades.createAshLegionPlayerSquad();
-          for (final companion in defaultSquad.skip(migratedAllies.length).take(3 - migratedAllies.length)) {
-            migratedAllies.add(companion);
-          }
-        }
+        final migratedAllies = _migrateToSculptorAndFootmanRetinue(saved.allies);
         _tickManager.updateSquads(allies: migratedAllies);
       }
       if (saved.reserveInventory.isNotEmpty) {
         _inventory = List.from(saved.reserveInventory);
       }
     });
+  }
+
+  List<UnitEntity> _migrateToSculptorAndFootmanRetinue(List<UnitEntity> rawAllies) {
+    final defaultSquad = StarterBrigades.createAshLegionPlayerSquad();
+    final List<UnitEntity> result = List.from(rawAllies);
+    while (result.length < 3) {
+      result.add(defaultSquad[result.length]);
+    }
+    // Slot 0: Always The Ash Sculptor Commander
+    result[0] = result[0].copyWith(
+      name: 'The Ash Sculptor',
+      speciesId: 'ash_sculptor',
+      customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
+    );
+    // Slot 1: Always the animated Iron Footman Vanguard companion
+    result[1] = result[1].copyWith(
+      name: 'Iron Footman',
+      speciesId: 'iron_footman',
+      archetype: Archetype.juggernaut,
+      customAvatarAsset: 'assets/images/iron_footman_idle.png',
+    );
+    return result;
   }
 
   Future<void> _loadPersistedState() async {
@@ -230,7 +236,9 @@ class _AppShellState extends State<AppShell> {
           List<UnitEntity> alliesToRestore = saved.allies;
           // Ensure the player's saved active commander is present in the squad if allies were empty
           if (alliesToRestore.isEmpty) {
-            alliesToRestore = StarterBrigades.createSoloStarterSquad(_activeGeneralType);
+            alliesToRestore = StarterBrigades.createAshLegionPlayerSquad().take(3).toList();
+          } else {
+            alliesToRestore = _migrateToSculptorAndFootmanRetinue(alliesToRestore);
           }
 
           if (alliesToRestore.isNotEmpty) {
