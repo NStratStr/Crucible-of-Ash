@@ -125,11 +125,23 @@ void main() {
       expect(minion.currentAp, lessThan(10000));
       expect(sculptor.crucibleCinders, greaterThanOrEqualTo(55));
 
-      // Now bring The Ash Sculptor to 10,000 TM -> SHOULD pause for Commander Tray decision
+      // Clear action pause so next tick can resolve
+      engine.activeActionEvent = null;
+
+      // Now bring The Ash Sculptor to 10,000 TM -> attacks automatically at interval for +15 Cinders!
+      final cindersBefore = sculptor.crucibleCinders;
       sculptor.currentAp = 9950;
       engine.stepTick();
-      expect(engine.isTurnExecutionPaused, isTrue);
-      expect(engine.activeActingUnit?.id, equals('ash_sculptor'));
+      expect(engine.isTurnExecutionPaused, isFalse);
+      expect(sculptor.currentAp, lessThan(10000));
+      expect(sculptor.crucibleCinders, equals(cindersBefore + 15));
+
+      // Spending 15 Cinders on Forge Cleave executes immediately without resetting interval TM
+      sculptor.currentAp = 6400;
+      final cindersBeforeCleave = sculptor.crucibleCinders;
+      engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
+      expect(sculptor.crucibleCinders, equals(cindersBeforeCleave - 15));
+      expect(sculptor.currentAp, equals(6400));
     });
   });
 }

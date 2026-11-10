@@ -2087,9 +2087,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 child: _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile),
               )
             else ...[
-              // Active Turn Decision Tray (when player hero reaches 10,000 TM) vs Battle Pacing Bar
-              if (_engine.isTurnExecutionPaused && _engine.activeActingUnit != null && !_engine.isAutoBattleMode)
-                _buildTurnActionDecisionTray(_engine.activeActingUnit!, isLandscapeMobile: isLandscapeMobile)
+              // Always-visible Crucible Commander Cinders Tray during active interval combat
+              if (_engine.playerUnits.isNotEmpty)
+                _buildSculptorCommanderTray(
+                  _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ??
+                      _engine.playerUnits.first,
+                  isLandscapeMobile: isLandscapeMobile,
+                )
               else
                 _buildCombatPacingStatusTray(isLandscapeMobile: isLandscapeMobile),
             ],
@@ -8164,16 +8168,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _executeHotkeyedAction(String actionType) {
-    if (!_engine.isTurnExecutionPaused || _engine.activeActingUnit == null) return;
-    final unit = _engine.activeActingUnit!;
+    final unit = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ??
+        _engine.activeActingUnit;
+    if (unit == null || !unit.isAlive) return;
     final explicitTarget = _selectedEnemyUnitId != null
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
     if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
-      if (actionType == 'basic' || actionType == 'cinder_strike') {
+      if (actionType == 'basic' || actionType == 'cinder_strike' || actionType == 'forge_cleave') {
+        if (unit.crucibleCinders < 15) return;
         setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'cinder_strike');
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'forge_cleave');
         });
       } else if (actionType == 'signature' || actionType == 'sundering_brand') {
         if (unit.crucibleCinders < 30) return;
@@ -8450,9 +8456,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                     const SizedBox(width: 8),
                     buildCinderMeter(),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141824),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 0.8),
+                      ),
+                      child: Text(
+                        '⚔️ AUTO +15🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
+                        style: const TextStyle(
+                          fontSize: 7.5,
+                          color: Color(0xFF80D8FF),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
                     const Spacer(),
-                    if (explicitTarget != null)
+                    if (explicitTarget != null && !isNarrow)
                       Container(
+                        margin: const EdgeInsets.only(right: 6),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFF3E1E24),
@@ -8472,30 +8496,71 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           ],
                         ),
                       ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _engine.cycleCombatSpeed();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF232538),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.6), width: 0.8),
+                        ),
+                        child: Text(
+                          '${_engine.combatPacingSpeed.toStringAsFixed(1)}x',
+                          style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 8.0, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _isLogDrawerVisible = !_isLogDrawerVisible;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: _isLogDrawerVisible ? const Color(0xFF37474F) : const Color(0xFF232538),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white24, width: 0.8),
+                        ),
+                        child: const Text(
+                          'LOG',
+                          style: TextStyle(color: Colors.white70, fontSize: 8.0, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
 
-              // Action Buttons Row: 4 Commander Abilities
+              // Action Buttons Row: 4 Active Cinder Commander Abilities
               Row(
                 children: [
-                  // 1. Cinder Strike
+                  // 1. Forge Cleave (15 Cinders)
                   Expanded(
                     child: buildActionButton(
-                      title: 'STRIKE',
-                      subtitle: '+15 Cinders',
+                      title: 'CLEAVE',
+                      subtitle: '15 Cinders',
                       icon: Icons.sports_mma,
                       activeColor: const Color(0xFFB3261E),
                       borderColor: const Color(0xFFFF8A80),
-                      isEnabled: true,
-                      tooltipMessage: 'Cinder Strike: Cleaves frontline target and generates +15 Crucible Cinders.',
+                      isEnabled: unit.crucibleCinders >= 15,
+                      tooltipMessage: 'Forge Cleave: Consumes 15 Cinders for an immediate 140% ATK heavy cleave (+1 Bleed). Or wait for your free Auto-Strike (+15 Cinders)!',
                       onPressed: () {
                         setState(() {
                           _engine.executeUnitAction(
                             unit,
                             isReposition: false,
                             explicitTarget: explicitTarget,
-                            actionType: 'cinder_strike',
+                            actionType: 'forge_cleave',
                           );
                         });
                       },

@@ -1555,25 +1555,18 @@ class SpatialCombatEngine extends ChangeNotifier {
     for (final unit in readyUnits) {
       if (!unit.isAlive || unit.currentAp < tickThreshold) continue;
 
-      // Crucible Commander System: Only The Ash Sculptor (Commander) pauses for manual player input.
-      // Retinue companions act autonomously on their turns and channel +10 Crucible Cinders to the Sculptor!
+      // Crucible Commander Interval Loop:
+      // The Ash Sculptor, retinue companions, and enemies all attack automatically at intervals
+      // when reaching 10,000 TM. The Ash Sculptor's interval basic attack grants +15 Cinders,
+      // and retinue companions channel +10 Cinders, while the player strategically decides
+      // when to spend Cinders on active Commander skills or wait for interval attacks!
       final bool isSculptorCommander = unit.isAshSculptor || unit.id == 'ash_sculptor';
-      if (unit.isPlayer && isSculptorCommander && !isAutoBattleMode) {
-        activeActingUnit = unit;
-        isTurnExecutionPaused = true;
-        hasCastTuningSlipThisTurn = false;
-        isRunning = false;
-        addLog('⚡ COMMANDER TURN READY: ${unit.name} reached 10,000 TM! Select Crucible Action.');
-        notifyListeners();
-        return; // Halt stepTick immediately!
-      }
 
-      // Automated resolution for enemies, retinue companions, and Auto-Battle mode
-      unit.currentAp -= tickThreshold; // Consume turn
+      unit.currentAp -= tickThreshold; // Consume interval turn
       if (unit.isPlayer && !isSculptorCommander) {
         _channelRetinueCinders(unit);
       }
-      _executeUnitTurn(unit);
+      _executeUnitTurn(unit, actionType: isSculptorCommander ? 'cinder_strike' : 'auto');
       if (isActionPauseEnabled) {
         break;
       }
@@ -2066,7 +2059,14 @@ class SpatialCombatEngine extends ChangeNotifier {
       unit.currentAp = 0;
     } else {
       _executeUnitTurn(unit, explicitTarget: explicitTarget, actionType: actionType);
-      unit.currentAp = 0; // Skill / Attack consumes full TM (100% cost per Spec Sec 2)
+      final bool isActiveCinderSkill = actionType == 'forge_cleave' ||
+          actionType == 'sundering_brand' ||
+          actionType == 'obsidian_bastion' ||
+          actionType == 'cataclysmic_pyre' ||
+          actionType == 'cataclysmic_pyre_crit';
+      if (!isActiveCinderSkill) {
+        unit.currentAp = 0;
+      }
     }
     playerTurnDecisionsCount++;
     hasCastTuningSlipThisTurn = false;
@@ -2755,7 +2755,30 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     if (validTarget == null) return;
 
-    if (actionType == 'sundering_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
+    if (actionType == 'forge_cleave') {
+      // 0. Forge Cleave: Spends 15 Cinders for an immediate on-demand 140% ATK heavy strike (+1 Bleed)
+      if (sculptor.crucibleCinders < 15) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 15);
+      final rawDmg = (sculptor.effectiveAttack * 1.40).round();
+      final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+      validTarget.bleedStacks += 1;
+
+      addLog('ASH SCULPTOR: Forge Cleave strikes ${validTarget.name} for $dmg DMG (-15 Cinders)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'cleave_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Forge Cleave',
+        targetId: validTarget.id,
+        targetName: validTarget.name,
+        damage: dmg,
+        bleedStacks: 1,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'sundering_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
       // 1. Sundering Brand: Spends 30 Cinders, 175% ATK DMG, shatters 50% Armor for 2 turns
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
       final rawDmg = (sculptor.effectiveAttack * 1.75).round();
