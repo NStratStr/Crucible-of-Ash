@@ -1042,7 +1042,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           _hitStopRemainingMs = max(0, _hitStopRemainingMs - baseIntervalMs);
           _tickAccumulator = 0.0;
         } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
-          // Pause all AP generation and tick accumulation while watching a skill/attack in action!
+          // Cooldown timers continue counting down smoothly during skill execution!
+          _engine.skillTreeState.updateCooldowns((baseIntervalMs / 1000.0) * _engine.combatPacingSpeed);
+          // Other units pause attacking until it is their turn order
           _tickAccumulator = 0.0;
         } else {
           _tickAccumulator += _engine.simulationSpeed;
@@ -5977,7 +5979,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       (unit.isAshSculptor ||
                                           unit.id == 'ash_sculptor' ||
                                           unit.templateId == 'ash_sculptor' ||
-                                          unit.assetPath.toLowerCase().contains('ash_sculptor')))
+                                          unit.templateId.contains('sculptor') ||
+                                          unit.name.contains('Sculptor') ||
+                                          unit.assetPath.toLowerCase().contains('ash_sculptor') ||
+                                          unit.assetPath.toLowerCase().contains('sculptor')))
                                   ? SpriteSheetAnimation(
                                       assetPath: 'assets/animations/ash_sculptor_idle_sheet.png',
                                       columns: 3,
@@ -11694,7 +11699,7 @@ class SculptorDisciplineVisuals {
     switch (general) {
       case GeneralType.valeria:
         return const SculptorDisciplineVisuals(
-          title: 'THE IRON SCULPTOR',
+          title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFFFFD54F),
           s1Title: 'IRON SLAM',
           s1Sub: '15 Cinders',
@@ -11727,7 +11732,7 @@ class SculptorDisciplineVisuals {
         );
       case GeneralType.vladislav:
         return const SculptorDisciplineVisuals(
-          title: 'THE SANGUINE SCULPTOR',
+          title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFFFF1744),
           s1Title: 'SIPHON REND',
           s1Sub: '15 Cinders',
@@ -11760,7 +11765,7 @@ class SculptorDisciplineVisuals {
         );
       case GeneralType.morrigan:
         return const SculptorDisciplineVisuals(
-          title: 'THE MIRE SCULPTOR',
+          title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFF00E676),
           s1Title: 'CORROSIVE TOUCH',
           s1Sub: '15 Cinders',

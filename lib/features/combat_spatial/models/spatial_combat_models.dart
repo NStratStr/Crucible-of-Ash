@@ -507,6 +507,9 @@ class CombatUnitState {
 
   /// High-resolution miniature cutout asset path matching Dark Fantasy art roster
   String get assetPath {
+    if (isAshSculptor || id == 'ash_sculptor' || templateId == 'ash_sculptor' || templateId.contains('sculptor') || name.contains('Sculptor')) {
+      return 'assets/images/ash_sculptor_idle.png';
+    }
     if (customAssetPath != null && customAssetPath!.isNotEmpty) {
       return customAssetPath!;
     }

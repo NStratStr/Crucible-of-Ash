@@ -699,22 +699,10 @@ class SpatialCombatEngine extends ChangeNotifier {
              p.id.contains('sculptor') ||
              p.id.contains('vladislav'));
 
-        String commanderName = 'The Ash Sculptor';
-        String commanderAsset = 'assets/images/ash_sculptor_idle.png';
-        String commanderTemplate = 'ash_sculptor';
-        if (activeGen == GeneralType.valeria) {
-          commanderName = 'The Iron Sculptor';
-          commanderAsset = 'assets/images/Ash Legion/lady_valeria_g1.png';
-          commanderTemplate = 'iron_sculptor';
-        } else if (activeGen == GeneralType.vladislav) {
-          commanderName = 'The Sanguine Sculptor';
-          commanderAsset = 'assets/images/lord_vladislav.png';
-          commanderTemplate = 'sanguine_sculptor';
-        } else if (activeGen == GeneralType.morrigan) {
-          commanderName = 'The Mire Sculptor';
-          commanderAsset = 'assets/images/Mire Coven/[MIR-CMD-G1] Swamp-Witch Morbida (Initiate Commander).png';
-          commanderTemplate = 'mire_sculptor';
-        }
+        // The protagonist commander is ALWAYS The Ash Sculptor (original knight)
+        const String commanderName = 'The Ash Sculptor';
+        const String commanderAsset = 'assets/images/ash_sculptor_idle.png';
+        const String commanderTemplate = 'ash_sculptor';
 
         final String unitId = isCommanderLead
             ? 'ash_sculptor'
@@ -1362,16 +1350,17 @@ class SpatialCombatEngine extends ChangeNotifier {
       return;
     }
 
-    // If a skill or attack cut-in is currently resolving on screen, pause tick progression
-    // so players and enemies have kinetic focus and readability!
+    // Advance Commander Skill Cooldowns (30 ticks = 1 second)
+    // Cooldown timers continue ticking uninterrupted during active combat!
+    skillTreeState.updateCooldowns(1.0 / 30.0);
+
+    // If a skill or attack cut-in is currently resolving on screen, pause other unit attacks
+    // so other units only attack cleanly when it is their turn in turn order!
     if (isActionPauseEnabled && activeActionEvent != null) {
       return;
     }
 
     currentTick++;
-
-    // Advance Commander Skill Cooldowns (30 ticks = 1 second)
-    skillTreeState.updateCooldowns(1.0 / 30.0);
 
     // Apply Active Minion Retinue Passives & Keystone: Slag Fortress
     final bool hasLivingMinion = playerUnits.any((u) => !u.isAshSculptor && u.isAlive);
