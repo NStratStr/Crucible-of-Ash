@@ -1,3 +1,4 @@
+import 'crucible_skill_tree_dialog.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'models/crucible_skill_tree_models.dart';
@@ -149,6 +150,45 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
                           style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF80D8FF)),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      CrucibleSkillTreeDialog.show(context, engine);
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF162B20),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF69F0AE), width: 0.9),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.account_tree_rounded, size: 12, color: Color(0xFF69F0AE)),
+                          const SizedBox(width: 4),
+                          Text(
+                            engine.skillTreeState.availableSkillPoints > 0
+                                ? 'SKILL TREE (${engine.skillTreeState.availableSkillPoints}★)'
+                                : 'SKILL TREE',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF69F0AE),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -605,6 +645,30 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
           ),
         ),
         const SizedBox(height: 14),
+
+        // Open Full Skill Tree Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              CrucibleSkillTreeDialog.show(context, engine);
+            },
+            icon: const Icon(Icons.account_tree_rounded, color: Color(0xFF69F0AE), size: 16),
+            label: Text(
+              engine.skillTreeState.availableSkillPoints > 0
+                  ? 'OPEN CRUCIBLE SKILL TREE (${engine.skillTreeState.availableSkillPoints}★ POINTS UNSPENT)'
+                  : 'OPEN FULL CRUCIBLE SKILL TREE (WRATH • BASTION • RESONANCE • VITAE • CALAMITY)',
+              style: const TextStyle(color: Color(0xFF69F0AE), fontWeight: FontWeight.w900, fontSize: 10),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF69F0AE), width: 1.2),
+              backgroundColor: const Color(0xFF0F2018),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+          ),
+        ),
 
         // Section Title: 5 Equipped Commander Skills
         const Text(

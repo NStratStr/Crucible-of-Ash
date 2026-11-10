@@ -15,6 +15,7 @@ import 'spatial_combat_engine.dart';
 import 'models/crucible_skill_tree_models.dart';
 import 'crucible_skill_tree_dialog.dart';
 import 'crucible_sanctuary_upgrade_dialog.dart';
+import 'crucible_retinue_squad_dialog.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
@@ -2532,6 +2533,52 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                 // Ashen Reckoning Phase Clock Pill (GDD Sec 7.1)
                 _buildAshenReckoningPill(),
+                const SizedBox(width: 8),
+
+                // Top-Bar Crucible Skill Tree Shortcut (Always accessible)
+                GestureDetector(
+                  onTap: () {
+                    _playSfx('sfx_card.wav');
+                    CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                      setState(() {});
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF162B20),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF69F0AE).withValues(alpha: 0.85),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.account_tree_rounded, color: Color(0xFF69F0AE), size: 13),
+                        const SizedBox(width: 4),
+                        Text(
+                          _engine.skillTreeState.availableSkillPoints > 0
+                              ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
+                              : 'SKILLS',
+                          style: const TextStyle(
+                            color: Color(0xFF69F0AE),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
 
                 // 1c. 2D / 2.5D View Mode Toggle
@@ -6323,6 +6370,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _openRosterSwapSheet(CombatUnitState? targetUnit) {
+    CrucibleRetinueSquadDialog.show(
+      context,
+      engine: _engine,
+      currentSquadUnits: _currentSquadUnits,
+      reserveUnits: _reserveUnits,
+      relicService: widget.relicService,
+      onSquadUpdated: (updatedSquad, updatedReserves) {
+        setState(() {
+          _currentSquadUnits = updatedSquad;
+          _reserveUnits = updatedReserves;
+        });
+        widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+      },
+    );
+    return;
     if (_reserveUnits.isEmpty) return;
     Archetype? filterArchetype;
     bool filterCommandersOnly = false;
@@ -6811,14 +6873,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     GestureDetector(
                       onTap: () {
                         _playSfx('sfx_card.wav');
-                        if (_engine.playerUnits.length < 5) {
-                          _openRosterSwapSheet(null);
-                        } else {
-                          final target = _selectedUnitId != null
-                              ? _engine.playerUnits.where((u) => u.id == _selectedUnitId).firstOrNull
-                              : _engine.playerUnits.firstOrNull;
-                          _openRosterSwapSheet(target);
-                        }
+                        CrucibleRetinueSquadDialog.show(
+                          context,
+                          engine: _engine,
+                          currentSquadUnits: _currentSquadUnits,
+                          reserveUnits: _reserveUnits,
+                          relicService: widget.relicService,
+                          onSquadUpdated: (updatedSquad, updatedReserves) {
+                            setState(() {
+                              _currentSquadUnits = updatedSquad;
+                              _reserveUnits = updatedReserves;
+                            });
+                            widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+                          },
+                        );
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -6858,6 +6926,50 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         ),
                       ),
                     ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () {
+                      _playSfx('sfx_card.wav');
+                      CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                        setState(() {});
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF162B20),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFF69F0AE).withValues(alpha: 0.85),
+                          width: 0.8,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.account_tree_rounded, size: 11, color: Color(0xFF69F0AE)),
+                          const SizedBox(width: 3),
+                          Text(
+                            _engine.skillTreeState.availableSkillPoints > 0
+                                ? 'SKILL TREE (${_engine.skillTreeState.availableSkillPoints}★)'
+                                : 'SKILL TREE',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: Color(0xFF69F0AE),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 4),
                   InkWell(
                     onTap: () {
