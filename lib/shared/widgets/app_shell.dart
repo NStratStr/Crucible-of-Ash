@@ -359,6 +359,7 @@ class _AppShellState extends State<AppShell> {
         turnMeter: 0.0,
         activeEffects: const [],
       )).toList();
+      allies = _migrateToSculptorAndFootmanRetinue(allies);
     } else {
       allies = StarterBrigades.createAshLegionPlayerSquad();
     }

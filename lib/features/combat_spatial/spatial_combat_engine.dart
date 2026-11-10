@@ -233,6 +233,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   /// GDD Section 7.1 & 7.2: The Ashen Reckoning & Pacing Enrage Engine
   int phaseElapsedTicks = 0;
   final Set<double> _triggeredBossHpThresholds = {};
+  final Set<String> _slainEnemyIds = {};
 
   bool get isEliteEncounter =>
       encounterTitle.toLowerCase().contains('elite') ||
@@ -608,6 +609,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     isSuddenDeathVictory = false;
     isSuddenDeathDefeat = false;
     _triggeredBossHpThresholds.clear();
+    _slainEnemyIds.clear();
     isRunning = false;
     isPreBattlePhase = true;
     focus = isBoss ? 5 : 3;
@@ -1337,10 +1339,34 @@ class SpatialCombatEngine extends ChangeNotifier {
     // Advance Commander Skill Cooldowns (30 ticks = 1 second)
     skillTreeState.updateCooldowns(1.0 / 30.0);
 
-    // Apply Active Minion Retinue Passives to Ash Sculptor
-    final sculptor = playerUnits.where((u) => u.isAshSculptor).firstOrNull;
-    if (sculptor != null) {
-      sculptor.damageReductionMultiplier = isBulwarkOathActive ? 0.85 : 1.0;
+    // Apply Active Minion Retinue Passives & Keystone: Slag Fortress
+    final bool hasLivingMinion = playerUnits.any((u) => !u.isAshSculptor && u.isAlive);
+    final bool isSlagFortress = skillTreeState.isSlagFortressActive && hasLivingMinion;
+    for (final p in playerUnits.where((u) => u.isAlive)) {
+      if (p.isAshSculptor) {
+        final double bulwarkMult = isBulwarkOathActive ? 0.85 : 1.0;
+        final double fortressMult = isSlagFortress ? 0.80 : 1.0;
+        p.damageReductionMultiplier = bulwarkMult * fortressMult;
+      } else if (isSlagFortress) {
+        p.damageReductionMultiplier = 0.80;
+      } else {
+        p.damageReductionMultiplier = 1.0;
+      }
+    }
+
+    // Keystone: Molten Overdrive (+15 Cinders & +2,500 AP when enemy is slain)
+    for (final enemy in enemyUnits.where((e) => !e.isAlive)) {
+      if (!_slainEnemyIds.contains(enemy.id)) {
+        _slainEnemyIds.add(enemy.id);
+        if (skillTreeState.isMoltenOverdriveActive) {
+          final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+          if (sculptor != null) {
+            sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+            sculptor.currentAp = min(SpatialCombatEngine.tickThreshold, sculptor.currentAp + 2500);
+            addLog('🔥 [MOLTEN OVERDRIVE] ${enemy.name} slain! Ash Sculptor gains +15 Cinders (-> ${sculptor.crucibleCinders}/100) & +2,500 AP!');
+          }
+        }
+      }
     }
 
     // Advance GDD Sec 7.1 Pacing Clock during active battle
@@ -2789,6 +2815,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     // Signature Skills accelerate Ultimate Gauge by +25%
     unit.ultimateGauge = min(100, unit.ultimateGauge + 25);
     unit.signatureCooldown = 3; // Reset to 3 basic actions until next Signature Skill
+    if (unit.isPlayer && !unit.isAshSculptor && skillTreeState.isCrucibleSymbiosisActive) {
+      final sc = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+      if (sc != null) {
+        sc.crucibleCinders = min(100, sc.crucibleCinders + 3);
+        addLog('⚡ [CRUCIBLE SYMBIOSIS] ${unit.name} strike channels +3 Cinders to the Sculptor (-> ${sc.crucibleCinders}/100)!');
+      }
+    }
     unit.actionCycleCount++;
 
     final graftProc = _applyGraftedTraitProc(unit, target, dmg);
@@ -2857,6 +2890,13 @@ class SpatialCombatEngine extends ChangeNotifier {
 
       // Ultimate charge: +15% per basic action
       unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+          if (unit.isPlayer && !unit.isAshSculptor && skillTreeState.isCrucibleSymbiosisActive) {
+            final sc = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+            if (sc != null) {
+              sc.crucibleCinders = min(100, sc.crucibleCinders + 3);
+              addLog('⚡ [CRUCIBLE SYMBIOSIS] ${unit.name} strike channels +3 Cinders to the Sculptor (-> ${sc.crucibleCinders}/100)!');
+            }
+          }
 
       String skillName;
       if (unit.id == 'sanguine_blade') {
@@ -2886,6 +2926,13 @@ class SpatialCombatEngine extends ChangeNotifier {
         addLog('${unit.name} executes $skillName on ${target.name} for $dmg DMG & $appliedBleed BLEED stacks.');
       }
 
+      if (unit.isPlayer && !unit.isAshSculptor && skillTreeState.isCrucibleSymbiosisActive) {
+        final sc = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sc != null) {
+          sc.crucibleCinders = min(100, sc.crucibleCinders + 3);
+          addLog('⚡ [CRUCIBLE SYMBIOSIS] ${unit.name} strike channels +3 Cinders to the Sculptor (-> ${sc.crucibleCinders}/100)!');
+        }
+      }
       final graftProc = _applyGraftedTraitProc(unit, target, dmg);
       _applyStatusSynergies(unit, target, dmg, isPhysical: true);
 
@@ -3835,7 +3882,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         bool placed = false;
         // Search preferred row first, then others
         for (final r in [preferredRow, 0, 1, 2]) {
-          for (int c = 0; c < 5; c++) {
+          for (int c = 0; c < 3; c++) {
             final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(c, r));
             if (!isOccupied) {
               unit.occupiedNodes.clear();
@@ -3914,7 +3961,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           : (unit.archetype == UnitArchetype.backlineCaster ? 2 : 1);
       bool placed = false;
       for (final r in [preferredRow, 0, 1, 2]) {
-        for (int c = 0; c < 5; c++) {
+        for (int c = 0; c < 3; c++) {
           final isOccupied = playerUnits.any((u) => u.isAlive && u.occupies(c, r));
           if (!isOccupied) {
             unit.occupiedNodes.clear();

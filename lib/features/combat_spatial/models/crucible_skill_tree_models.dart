@@ -8,10 +8,18 @@ enum CrucibleSkillDiscipline {
   mire,
 }
 
+enum CrucibleSkillBranch {
+  wrath,      // Attack / Offense (Crimson & Embers)
+  bastion,    // Defense / Protection (Iron & Stone)
+  resonance,  // Hybrid / Retinue Synergy (Amethyst & Blood)
+  apex,       // Crown Finishers (White-Gold Overdrive)
+}
+
 class CrucibleSkillNode {
   final String id;
   final String name;
   final CrucibleSkillDiscipline discipline;
+  final CrucibleSkillBranch branch;
   final int defaultSlot; // 1 to 5
   final int cinderCost;
   final IconData icon;
@@ -30,6 +38,7 @@ class CrucibleSkillNode {
     required this.id,
     required this.name,
     required this.discipline,
+    this.branch = CrucibleSkillBranch.wrath,
     required this.defaultSlot,
     required this.cinderCost,
     required this.icon,
@@ -81,6 +90,7 @@ class CrucibleSkillTreeState {
     // ==========================================
     allSkills['ash_cleave'] = CrucibleSkillNode(
       id: 'ash_cleave',
+      branch: CrucibleSkillBranch.wrath,
       name: 'Forge Cleave',
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 1,
@@ -103,6 +113,7 @@ class CrucibleSkillTreeState {
       id: 'ash_brand',
       name: 'Sundering Brand',
       discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.wrath,
       defaultSlot: 2,
       cinderCost: 30,
       cooldownSeconds: 6.0,
@@ -121,6 +132,7 @@ class CrucibleSkillTreeState {
 
     allSkills['ash_bastion'] = CrucibleSkillNode(
       id: 'ash_bastion',
+      branch: CrucibleSkillBranch.bastion,
       name: 'Obsidian Bastion',
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 3,
@@ -143,6 +155,7 @@ class CrucibleSkillTreeState {
       id: 'ash_whirlwind',
       name: 'Ember Whirlwind',
       discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.wrath,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -161,6 +174,7 @@ class CrucibleSkillTreeState {
 
     allSkills['ash_pyre'] = CrucibleSkillNode(
       id: 'ash_pyre',
+      branch: CrucibleSkillBranch.apex,
       name: 'Cataclysmic Pyre',
       discipline: CrucibleSkillDiscipline.ash,
       defaultSlot: 5,
@@ -186,6 +200,7 @@ class CrucibleSkillTreeState {
       id: 'iron_slam',
       name: 'Cold Iron Slam',
       discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.bastion,
       defaultSlot: 1,
       cinderCost: 0,
       cooldownSeconds: 1.5,
@@ -206,6 +221,7 @@ class CrucibleSkillTreeState {
       id: 'iron_judgment',
       name: 'Sundering Judgment',
       discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.wrath,
       defaultSlot: 2,
       cinderCost: 30,
       cooldownSeconds: 6.0,
@@ -226,6 +242,7 @@ class CrucibleSkillTreeState {
       id: 'iron_bulwark',
       name: 'Iron Bulwark',
       discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.bastion,
       defaultSlot: 3,
       cinderCost: 25,
       cooldownSeconds: 9.0,
@@ -246,6 +263,7 @@ class CrucibleSkillTreeState {
       id: 'iron_retribution',
       name: 'Dawn Retribution',
       discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.bastion,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -266,6 +284,7 @@ class CrucibleSkillTreeState {
       id: 'iron_wrath',
       name: 'Wrath of Dawnbound',
       discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.apex,
       defaultSlot: 5,
       cinderCost: 80,
       cooldownSeconds: 20.0,
@@ -287,6 +306,7 @@ class CrucibleSkillTreeState {
     // ==========================================
     allSkills['sanguine_rend'] = CrucibleSkillNode(
       id: 'sanguine_rend',
+      branch: CrucibleSkillBranch.resonance,
       name: 'Siphon Rend',
       discipline: CrucibleSkillDiscipline.sanguine,
       defaultSlot: 1,
@@ -309,6 +329,7 @@ class CrucibleSkillTreeState {
       id: 'sanguine_brand',
       name: 'Crimson Brand',
       discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.wrath,
       defaultSlot: 2,
       cinderCost: 30,
       cooldownSeconds: 6.0,
@@ -329,6 +350,7 @@ class CrucibleSkillTreeState {
       id: 'sanguine_tether',
       name: 'Vein Tether',
       discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.resonance,
       defaultSlot: 3,
       cinderCost: 25,
       cooldownSeconds: 9.0,
@@ -349,6 +371,7 @@ class CrucibleSkillTreeState {
       id: 'sanguine_vortex',
       name: 'Blood Vortex',
       discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.resonance,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -369,6 +392,7 @@ class CrucibleSkillTreeState {
       id: 'sanguine_apex',
       name: 'Exsanguination Apex',
       discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.apex,
       defaultSlot: 5,
       cinderCost: 80,
       cooldownSeconds: 20.0,
@@ -392,6 +416,7 @@ class CrucibleSkillTreeState {
       id: 'mire_touch',
       name: 'Corrosive Touch',
       discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.resonance,
       defaultSlot: 1,
       cinderCost: 0,
       cooldownSeconds: 1.5,
@@ -412,6 +437,7 @@ class CrucibleSkillTreeState {
       id: 'mire_brand',
       name: 'Miasmic Brand',
       discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.resonance,
       defaultSlot: 2,
       cinderCost: 30,
       cooldownSeconds: 6.0,
@@ -432,6 +458,7 @@ class CrucibleSkillTreeState {
       id: 'mire_ward',
       name: 'Bone Ward',
       discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.bastion,
       defaultSlot: 3,
       cinderCost: 25,
       cooldownSeconds: 9.0,
@@ -452,6 +479,7 @@ class CrucibleSkillTreeState {
       id: 'mire_catacomb',
       name: 'Ossuary Catacomb',
       discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.wrath,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -472,6 +500,7 @@ class CrucibleSkillTreeState {
       id: 'mire_apex',
       name: 'Cataclysmic Spore',
       discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.apex,
       defaultSlot: 5,
       cinderCost: 80,
       cooldownSeconds: 20.0,
@@ -551,6 +580,32 @@ class CrucibleSkillTreeState {
     skill.rank++;
     availableSkillPoints--;
     return true;
+  }
+
+
+  // ==========================================
+  // 3-BRANCH ARCHETYPE & KEYSTONE PASSIVES
+  // ==========================================
+  int getPointsSpentInBranch(CrucibleSkillBranch branch) {
+    int total = 0;
+    for (final skill in allSkills.values) {
+      if (skill.branch == branch && skill.rank > 1) {
+        total += (skill.rank - 1);
+      }
+    }
+    return total;
+  }
+
+  int get wrathPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.wrath);
+  int get bastionPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.bastion);
+  int get resonancePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.resonance);
+
+  bool get isMoltenOverdriveActive => wrathPointsSpent >= 3;
+  bool get isSlagFortressActive => bastionPointsSpent >= 3;
+  bool get isCrucibleSymbiosisActive => resonancePointsSpent >= 3;
+
+  List<CrucibleSkillNode> getSkillsForBranch(CrucibleSkillBranch branch) {
+    return allSkills.values.where((s) => s.branch == branch).toList();
   }
 
   List<CrucibleSkillNode> getSkillsForDiscipline(CrucibleSkillDiscipline discipline) {

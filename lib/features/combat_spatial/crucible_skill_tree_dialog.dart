@@ -24,95 +24,77 @@ class CrucibleSkillTreeDialog extends StatefulWidget {
 }
 
 class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
-  CrucibleSkillDiscipline _selectedDiscipline = CrucibleSkillDiscipline.ash;
+  CrucibleSkillBranch _selectedBranch = CrucibleSkillBranch.wrath;
   String? _selectedSkillId;
 
   @override
   void initState() {
     super.initState();
-    // Default selected discipline to active general's primary discipline
-    final gen = widget.engine.activeGeneralType;
-    switch (gen) {
-      case GeneralType.valeria:
-        _selectedDiscipline = CrucibleSkillDiscipline.iron;
-        _selectedSkillId = 'iron_slam';
-        break;
-      case GeneralType.vladislav:
-        _selectedDiscipline = CrucibleSkillDiscipline.sanguine;
-        _selectedSkillId = 'sanguine_rend';
-        break;
-      case GeneralType.morrigan:
-        _selectedDiscipline = CrucibleSkillDiscipline.mire;
-        _selectedSkillId = 'mire_touch';
-        break;
-      case GeneralType.malakor:
-        _selectedDiscipline = CrucibleSkillDiscipline.ash;
-        _selectedSkillId = 'ash_cleave';
-        break;
+    _selectedSkillId = 'ash_cleave';
+  }
+
+  Color _getBranchColor(CrucibleSkillBranch b) {
+    switch (b) {
+      case CrucibleSkillBranch.wrath:
+        return const Color(0xFFFF5252); // Crimson / Fire
+      case CrucibleSkillBranch.bastion:
+        return const Color(0xFF00E5FF); // Cyan / Cold Iron / Shield
+      case CrucibleSkillBranch.resonance:
+        return const Color(0xFFE040FB); // Amethyst / Blood / Hybrid
+      case CrucibleSkillBranch.apex:
+        return const Color(0xFFFFD54F); // Molten Gold
     }
   }
 
-  Color _getDisciplineColor(CrucibleSkillDiscipline d) {
-    switch (d) {
-      case CrucibleSkillDiscipline.ash:
-        return const Color(0xFFFF6D00);
-      case CrucibleSkillDiscipline.iron:
-        return const Color(0xFFFFD54F);
-      case CrucibleSkillDiscipline.sanguine:
-        return const Color(0xFFFF1744);
-      case CrucibleSkillDiscipline.mire:
-        return const Color(0xFF00E676);
+  String _getBranchTitle(CrucibleSkillBranch b) {
+    switch (b) {
+      case CrucibleSkillBranch.wrath:
+        return 'PATH OF WRATH (ATTACK)';
+      case CrucibleSkillBranch.bastion:
+        return 'PATH OF BASTION (DEFENSE)';
+      case CrucibleSkillBranch.resonance:
+        return 'PATH OF RESONANCE (HYBRID)';
+      case CrucibleSkillBranch.apex:
+        return 'APEX FINISHERS (CROWN)';
     }
   }
 
-  String _getDisciplineTitle(CrucibleSkillDiscipline d) {
-    switch (d) {
-      case CrucibleSkillDiscipline.ash:
-        return 'ASH & PYRE';
-      case CrucibleSkillDiscipline.iron:
-        return 'COLD IRON';
-      case CrucibleSkillDiscipline.sanguine:
-        return 'SANGUINE TITHE';
-      case CrucibleSkillDiscipline.mire:
-        return 'MIRE OCCULT';
-    }
-  }
-
-  IconData _getDisciplineIcon(CrucibleSkillDiscipline d) {
-    switch (d) {
-      case CrucibleSkillDiscipline.ash:
-        return Icons.local_fire_department;
-      case CrucibleSkillDiscipline.iron:
-        return Icons.shield;
-      case CrucibleSkillDiscipline.sanguine:
-        return Icons.bloodtype;
-      case CrucibleSkillDiscipline.mire:
-        return Icons.eco;
+  IconData _getBranchIcon(CrucibleSkillBranch b) {
+    switch (b) {
+      case CrucibleSkillBranch.wrath:
+        return Icons.sports_mma;
+      case CrucibleSkillBranch.bastion:
+        return Icons.security;
+      case CrucibleSkillBranch.resonance:
+        return Icons.all_inclusive;
+      case CrucibleSkillBranch.apex:
+        return Icons.bolt;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = widget.engine.skillTreeState;
-    final skillsInDiscipline = state.getSkillsForDiscipline(_selectedDiscipline);
-    final selectedSkill = _selectedSkillId != null ? state.allSkills[_selectedSkillId] : skillsInDiscipline.firstOrNull;
+    final skillsInBranch = state.getSkillsForBranch(_selectedBranch);
+    final selectedSkill = _selectedSkillId != null ? state.allSkills[_selectedSkillId] : skillsInBranch.firstOrNull;
 
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
-        width: 820,
-        height: 600,
+        width: 860,
+        height: 620,
         decoration: BoxDecoration(
           color: const Color(0xFF10121A),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _getDisciplineColor(_selectedDiscipline).withValues(alpha: 0.6), width: 1.5),
+          border: Border.all(color: _getBranchColor(_selectedBranch).withValues(alpha: 0.6), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.8),
+              color: _getBranchColor(_selectedBranch).withValues(alpha: 0.25),
               blurRadius: 20,
-              spreadRadius: 4,
+              spreadRadius: 2,
             ),
+            const BoxShadow(color: Colors.black87, blurRadius: 24),
           ],
         ),
         child: Column(
@@ -123,17 +105,17 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
             // 5 Equipped Slots Bar
             _buildEquippedSlotsRow(state),
 
-            // Discipline Tabs
-            _buildDisciplineTabs(),
+            // 3-Branch Archetype Tabs + Crown Apex
+            _buildBranchTabs(state),
 
-            // Main Body: Skill Tree Pathway (Left) + Skill Inspector (Right)
+            // Main Body: Branch Pathway & Keystone (Left) + Skill Inspector (Right)
             Expanded(
               child: Row(
                 children: [
-                  // Left: Discipline Skills Pathway
+                  // Left: Branch Skills & Keystone Card
                   Expanded(
                     flex: 5,
-                    child: _buildSkillTreeGrid(skillsInDiscipline, state),
+                    child: _buildBranchSkillPathway(skillsInBranch, state),
                   ),
 
                   // Divider
@@ -156,19 +138,19 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
   Widget _buildHeader(CrucibleSkillTreeState state) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161822),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF161822),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
         border: Border(bottom: BorderSide(color: Colors.white12, width: 1)),
       ),
       child: Row(
         children: [
-          Icon(Icons.account_tree, color: _getDisciplineColor(_selectedDiscipline), size: 20),
+          Icon(Icons.account_tree, color: _getBranchColor(_selectedBranch), size: 20),
           const SizedBox(width: 8),
           const Text(
-            'CRUCIBLE SKILL GRIMOIRE',
+            'CRUCIBLE ARCHETYPE SKILL GRIMOIRE',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
               color: Color(0xFFFFD54F),
               letterSpacing: 1.2,
@@ -218,7 +200,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       child: Row(
         children: [
           const Text(
-            'ACTIVE LOADOUT (5 SKILLS):',
+            'ACTIVE TRAY (5 SLOTS):',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
@@ -252,7 +234,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                         if (skill != null) {
                           setState(() {
                             _selectedSkillId = skill.id;
-                            _selectedDiscipline = skill.discipline;
+                            _selectedBranch = skill.branch;
                           });
                         }
                       },
@@ -286,7 +268,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    '${skill.cinderCost}🔥 • Rank ${skill.rank}',
+                                    '${skill.cinderCost}🔥 • R${skill.rank}',
                                     style: TextStyle(fontSize: 7.0, color: skill.borderColor),
                                   ),
                                 ],
@@ -312,20 +294,21 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
     );
   }
 
-  Widget _buildDisciplineTabs() {
+  Widget _buildBranchTabs(CrucibleSkillTreeState state) {
     return Container(
       color: const Color(0xFF141720),
       child: Row(
-        children: CrucibleSkillDiscipline.values.map((disc) {
-          final isSelected = disc == _selectedDiscipline;
-          final color = _getDisciplineColor(disc);
+        children: CrucibleSkillBranch.values.map((branch) {
+          final isSelected = branch == _selectedBranch;
+          final color = _getBranchColor(branch);
+          final pointsSpent = state.getPointsSpentInBranch(branch);
 
           return Expanded(
             child: InkWell(
               onTap: () {
                 setState(() {
-                  _selectedDiscipline = disc;
-                  final skills = widget.engine.skillTreeState.getSkillsForDiscipline(disc);
+                  _selectedBranch = branch;
+                  final skills = state.getSkillsForBranch(branch);
                   _selectedSkillId = skills.firstOrNull?.id;
                 });
               },
@@ -343,16 +326,31 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(_getDisciplineIcon(disc), size: 14, color: isSelected ? color : Colors.white54),
+                    Icon(_getBranchIcon(branch), size: 14, color: isSelected ? color : Colors.white54),
                     const SizedBox(width: 6),
-                    Text(
-                      _getDisciplineTitle(disc),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: isSelected ? color : Colors.white60,
-                        letterSpacing: 0.8,
-                      ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getBranchTitle(branch),
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: isSelected ? color : Colors.white60,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        if (branch != CrucibleSkillBranch.apex)
+                          Text(
+                            '$pointsSpent pts invested',
+                            style: TextStyle(
+                              fontSize: 7.5,
+                              color: pointsSpent >= 3 ? const Color(0xFFFFD54F) : Colors.white38,
+                              fontWeight: pointsSpent >= 3 ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -364,107 +362,229 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
     );
   }
 
-  Widget _buildSkillTreeGrid(List<CrucibleSkillNode> skills, CrucibleSkillTreeState state) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: skills.length,
-      itemBuilder: (context, index) {
-        final skill = skills[index];
-        final isSelected = skill.id == _selectedSkillId;
-        final isEquipped = state.equippedSkillIds.contains(skill.id);
-        final slotNumber = state.equippedSkillIds.indexOf(skill.id) + 1;
+  Widget _buildBranchSkillPathway(List<CrucibleSkillNode> skills, CrucibleSkillTreeState state) {
+    Widget? keystoneWidget;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? skill.primaryColor.withValues(alpha: 0.20) : const Color(0xFF181B26),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isSelected
-                  ? const Color(0xFFFFD54F)
-                  : (isEquipped ? skill.borderColor : Colors.white12),
-              width: isSelected ? 1.5 : 1.0,
+    if (_selectedBranch == CrucibleSkillBranch.wrath) {
+      final bool isActive = state.isMoltenOverdriveActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'MOLTEN OVERDRIVE (KEYSTONE)',
+        summary: 'Slaying any enemy grants the Ash Sculptor +15 Cinders and refunds +2,500 AP tempo.',
+        pointsRequired: 3,
+        currentPoints: state.wrathPointsSpent,
+        isActive: isActive,
+        color: const Color(0xFFFF5252),
+        icon: Icons.local_fire_department,
+      );
+    } else if (_selectedBranch == CrucibleSkillBranch.bastion) {
+      final bool isActive = state.isSlagFortressActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'SLAG FORTRESS (KEYSTONE)',
+        summary: 'While at least 1 minion is alive, all incoming squad damage is reduced by 20% and Aegis shields do not decay.',
+        pointsRequired: 3,
+        currentPoints: state.bastionPointsSpent,
+        isActive: isActive,
+        color: const Color(0xFF00E5FF),
+        icon: Icons.shield,
+      );
+    } else if (_selectedBranch == CrucibleSkillBranch.resonance) {
+      final bool isActive = state.isCrucibleSymbiosisActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'CRUCIBLE SYMBIOSIS (KEYSTONE)',
+        summary: 'Whenever a retinue companion attacks or uses a skill, they channel +3 bonus Cinders to the Sculptor.',
+        pointsRequired: 3,
+        currentPoints: state.resonancePointsSpent,
+        isActive: isActive,
+        color: const Color(0xFFE040FB),
+        icon: Icons.all_inclusive,
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        if (keystoneWidget != null) ...[
+          keystoneWidget,
+          const SizedBox(height: 10),
+        ],
+        ...skills.map((skill) {
+          final isSelected = skill.id == _selectedSkillId;
+          final isEquipped = state.equippedSkillIds.contains(skill.id);
+          final slotNumber = state.equippedSkillIds.indexOf(skill.id) + 1;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? skill.primaryColor.withValues(alpha: 0.20) : const Color(0xFF181B26),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFFFFD54F)
+                    : (isEquipped ? skill.borderColor : Colors.white12),
+                width: isSelected ? 1.5 : 1.0,
+              ),
             ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            onTap: () {
-              setState(() {
-                _selectedSkillId = skill.id;
-              });
-            },
-            leading: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: skill.primaryColor,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: skill.borderColor, width: 1),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              onTap: () {
+                setState(() {
+                  _selectedSkillId = skill.id;
+                });
+              },
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: skill.primaryColor,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: skill.borderColor, width: 1),
+                    ),
+                    child: Icon(skill.icon, color: Colors.white, size: 20),
                   ),
-                  child: Icon(skill.icon, color: Colors.white, size: 20),
-                ),
-                if (isEquipped)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(2.5),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFFD54F),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '$slotNumber',
-                        style: const TextStyle(fontSize: 8.0, color: Colors.black, fontWeight: FontWeight.bold),
+                  if (isEquipped)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFD54F),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$slotNumber',
+                          style: const TextStyle(fontSize: 8.0, color: Colors.black, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
+                ],
+              ),
+              title: Row(
+                children: [
+                  Text(
+                    skill.name,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-              ],
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF263238),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(
+                      '${skill.cinderCost}🔥 • ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s CD',
+                      style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: skill.rank >= skill.maxRank ? const Color(0xFF00C853) : const Color(0xFF37474F),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(
+                      'Rank ${skill.rank}/${skill.maxRank}',
+                      style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                skill.summary,
+                style: const TextStyle(fontSize: 9.5, color: Colors.white60),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            title: Row(
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildKeystoneCard({
+    required String title,
+    required String summary,
+    required int pointsRequired,
+    required int currentPoints,
+    required bool isActive,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isActive ? color.withValues(alpha: 0.15) : const Color(0xFF14121A),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isActive ? color : Colors.white24,
+          width: isActive ? 1.4 : 0.8,
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: isActive ? color : Colors.white38, size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        color: isActive ? Colors.white : Colors.white70,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isActive ? color : const Color(0xFF263238),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        isActive ? '⚡ KEYSTONE UNLOCKED' : '🔒 REQUIRES $pointsRequired PTS ($currentPoints/$pointsRequired)',
+                        style: TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w900,
+                          color: isActive ? Colors.black : Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
                 Text(
-                  skill.name,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF263238),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${skill.cinderCost} Cinders',
-                    style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: skill.rank >= skill.maxRank ? const Color(0xFF00C853) : const Color(0xFF37474F),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    'Rank ${skill.rank}/${skill.maxRank}',
-                    style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.w900),
+                  summary,
+                  style: TextStyle(
+                    fontSize: 8.5,
+                    color: isActive ? Colors.white70 : Colors.white38,
                   ),
                 ),
               ],
-            ),
-            subtitle: Text(
-              skill.summary,
-              style: const TextStyle(fontSize: 9.5, color: Colors.white60),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -511,8 +631,8 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
                     ),
                     Text(
-                      'Cost: ${skill.cinderCost} Cinders • Discipline: ${_getDisciplineTitle(skill.discipline)}',
-                      style: TextStyle(fontSize: 9.5, color: skill.borderColor, fontWeight: FontWeight.bold),
+                      'Cost: ${skill.cinderCost}🔥 • CD: ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s • Branch: ${_getBranchTitle(skill.branch)}',
+                      style: TextStyle(fontSize: 9.0, color: skill.borderColor, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -523,7 +643,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           const SizedBox(height: 12),
           Text(
             skill.summary,
-            style: const TextStyle(fontSize: 11, color: Colors.white70, height: 1.3),
+            style: const TextStyle(fontSize: 10.5, color: Colors.white70, height: 1.3),
           ),
 
           const SizedBox(height: 14),
@@ -568,7 +688,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                         child: Text(
                           skill.rankDescriptions[idx],
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 9.0,
                             color: isUnlocked ? Colors.white : Colors.white38,
                             fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                           ),
@@ -586,7 +706,6 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           // Action Buttons: Upgrade Rank & Equip to Slots 1..5
           Row(
             children: [
-              // Upgrade Button
               Expanded(
                 child: SizedBox(
                   height: 38,
