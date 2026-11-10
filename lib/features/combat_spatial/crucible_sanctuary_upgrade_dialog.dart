@@ -215,29 +215,96 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
   }
 
   Widget _buildMinionCard(CombatUnitState minion) {
-    final bool isFootman = minion.id == 'iron_footman' || minion.templateId == 'iron_footman';
-    final bool isDuelist = minion.id == 'grave_duelist' || minion.templateId == 'grave_duelist';
+    final String key = '${minion.id.toLowerCase()}_${minion.templateId.toLowerCase()}';
+    final bool isFootman = key.contains('footman');
+    final bool isDuelist = key.contains('duelist');
+    final bool isReaver = key.contains('reaver');
+    final bool isSentinel = key.contains('sentinel');
+    final bool isScribe = key.contains('scribe');
+    final bool isChanter = key.contains('chanter');
+    final bool isMedicus = key.contains('medicus') || key.contains('cleric');
+    final bool isArbalest = key.contains('arbalest') || key.contains('mortar');
 
-    final String basicTitle = isFootman ? 'Shieldbash Cleave' : (isDuelist ? 'Flensing Twin-Thrust' : 'Skirmish Thrust');
+    final String basicTitle = isFootman ? 'Shieldbash Cleave'
+        : (isDuelist ? 'Flensing Twin-Thrust'
+        : (isReaver ? 'Molten Execution'
+        : (isSentinel ? 'Tectonic Impact'
+        : (isScribe ? 'Arterial Siphon'
+        : (isChanter ? 'Curse of Inertia'
+        : (isMedicus ? 'Mending Luminescence'
+        : (isArbalest ? 'Piercing Volley' : 'Skirmish Thrust')))))));
+
     final String basicDesc = isFootman
         ? 'Strikes foe for 115% ATK, permanently shreds -12 Armor & grants +15 Aegis Barrier to self.'
         : (isDuelist
-            ? 'Strikes foe for 120% ATK + 2 Bleeds. Deals +30% CRIT damage & refunds +1,500 AP against bleeding targets.'
-            : 'Basic strike against frontline enemies.');
+            ? 'Strikes foe for 120% ATK + 2 Bleeds. Deals +30% CRIT & refunds +1,500 AP on bleeding foes.'
+            : (isReaver
+                ? 'Heavy slash dealing 130% ATK (+35% bonus execution damage against targets below 50% HP).'
+                : (isSentinel
+                    ? '125% ATK heavy slam. Stuns target if target has >= 30 Armor and shreds -15 Armor.'
+                    : (isScribe
+                        ? 'Drains 110% ATK from target, converting 25% of damage dealt into team healing.'
+                        : (isChanter
+                            ? 'Applies Slow hex, reducing target Action Gauge accumulation rate by -25%.'
+                            : (isMedicus
+                                ? 'Strikes foe for 95% ATK and restores +45 HP (+15% Max HP) to lowest ally.'
+                                : (isArbalest
+                                    ? 'Fires armor-piercing projectile penetrating through the target entire column.'
+                                    : 'Basic strike against frontline enemies.')))))));
 
-    final String sigTitle = isFootman ? "Bastion's Aegis" : (isDuelist ? 'Phantom Flank Ambush' : minion.signatureSkillName);
+    final String sigTitle = isFootman ? "Bastion's Aegis"
+        : (isDuelist ? 'Phantom Ambush'
+        : (isReaver ? 'Rending Decapitation'
+        : (isSentinel ? 'Tectonic Fortress'
+        : (isScribe ? 'Sanguine Wellspring'
+        : (isChanter ? 'Chronos Miasma'
+        : (isMedicus ? 'Purifying Bloom'
+        : (isArbalest ? 'Cluster Mortar' : minion.signatureSkillName)))))));
+
     final String sigDesc = isFootman
         ? "Auto-triggers every 3 turns: Slams greatshield, granting +40 Aegis Barrier to BOTH self AND the Ash Sculptor + staggers foes by -2,000 AP."
         : (isDuelist
             ? "Auto-triggers every 3 turns: Blinks behind target for 185% ATK CRIT (+3 Bleeds) and channels +12 Cinders directly into the Sculptor."
-            : "Auto-triggers signature skill every 3 actions.");
+            : (isReaver
+                ? "Auto-triggers every 3 turns: Unleashes 240% True DMG execute on lowest HP foe + grants +15 Cinders on kill."
+                : (isSentinel
+                    ? "Auto-triggers every 3 turns: Grants +35 Aegis Barrier to all allies & intercepts 50% damage directed at Sculptor."
+                    : (isScribe
+                        ? "Auto-triggers every 3 turns: Heals all allies for 25% Max HP & channels +8 Cinders directly to the Sculptor."
+                        : (isChanter
+                            ? "Auto-triggers every 3 turns: Halts enemy AP gauges by -3,000 AP & grants 3s Haste to all allies."
+                            : (isMedicus
+                                ? "Auto-triggers every 3 turns: Cleanses all debuffs across the squad and heals all allies for 35% Max HP."
+                                : (isArbalest
+                                    ? "Auto-triggers every 3 turns: Blankets all 3 enemy columns with fire, dealing 160% AoE DMG."
+                                    : "Auto-triggers signature skill every 3 actions.")))))));
 
-    final String passiveTitle = isFootman ? 'Bulwark Oath' : (isDuelist ? "Stalker's Keen Edge" : 'Retinue Bond');
+    final String passiveTitle = isFootman ? 'Bulwark Oath'
+        : (isDuelist ? "Stalker's Keen Edge"
+        : (isReaver ? "Reaver's Ferocity"
+        : (isSentinel ? 'Grave Carapace'
+        : (isScribe ? 'Vitae Bond'
+        : (isChanter ? 'Temporal Weft'
+        : (isMedicus ? 'Aura of Vitality'
+        : (isArbalest ? 'Siege Resonator' : 'Retinue Bond')))))));
+
     final String passiveDesc = isFootman
         ? 'While Iron Footman is alive: The Ash Sculptor gains +25 Armor and takes 15% reduced damage from all sources.'
         : (isDuelist
             ? 'While Grave Duelist is alive: The Ash Sculptor gains +15% Critical Chance and generates +4 bonus Cinders on critical strikes.'
-            : 'Passively empowers commander.');
+            : (isReaver
+                ? 'While Pyre Reaver is alive: The Ash Sculptor gains +20% Attack Multiplier and +8 Cinders on enemy takedowns.'
+                : (isSentinel
+                    ? 'While Stone Sentinel is alive: The Ash Sculptor gains +35% Barrier Capacity and Stagger Immunity.'
+                    : (isScribe
+                        ? 'While Blood Scribe is alive: The Ash Sculptor gains +18% Lifesteal and +2 Cinders on bleed ticks.'
+                        : (isChanter
+                            ? 'While Miasma Chanter is alive: The Ash Sculptor gains -20% Skill Cooldowns and +2,000 AP tempo.'
+                            : (isMedicus
+                                ? 'While Sanctified Medicus is alive: The Ash Sculptor gains +25% Healing Power and +3% Max HP regen per tick.'
+                                : (isArbalest
+                                    ? 'While Cinder Arbalest is alive: The Ash Sculptor gains +25% AoE Damage and +1 AoE splash radius.'
+                                    : 'Passively empowers commander.')))))));
 
     final int upgradeCost = 120;
     final bool canUpgrade = widget.engine.unboundAshWallet >= upgradeCost;
@@ -466,20 +533,50 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
                         if (engine.isBulwarkOathActive)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1B5E20),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: const Text('🛡️ BULWARK OATH ACTIVE (+25 ARM, -15% DMG)', style: TextStyle(color: Color(0xFFB9F6CA), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                            decoration: BoxDecoration(color: const Color(0xFF1B5E20), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🛡️ BULWARK (+25 ARM, -15% DMG)', style: TextStyle(color: Color(0xFFB9F6CA), fontSize: 7.5, fontWeight: FontWeight.bold)),
                           ),
                         if (engine.isStalkerKeenEdgeActive)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFB71C1C),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: const Text('🗡️ STALKER KEEN EDGE ACTIVE (+15% CRIT, +4🔥)', style: TextStyle(color: Color(0xFFFF8A80), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                            decoration: BoxDecoration(color: const Color(0xFFB71C1C), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🗡️ STALKER (+15% CRIT, +4🔥)', style: TextStyle(color: Color(0xFFFF8A80), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isReaverFerocityActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFFE65100), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🔥 REAVER (+20% ATK, +8🔥 ON KILL)', style: TextStyle(color: Color(0xFFFFE0B2), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isGraveCarapaceActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFF006064), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🗿 SENTINEL (+35% AEGIS, STAGGER IMMUNE)', style: TextStyle(color: Color(0xFF80DEEA), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isVitaeBondActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFF4A148C), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🩸 VITAE (+18% LIFESTEAL, +2🔥 BLEED)', style: TextStyle(color: Color(0xFFE1BEE7), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isTemporalWeftActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFF1A237E), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('⏳ TEMPORAL (-20% CDR, +2,000 AP)', style: TextStyle(color: Color(0xFFC5CAE9), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isAuraOfVitalityActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFF004D40), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('✨ MEDICUS (+25% HEAL, +3% REGEN)', style: TextStyle(color: Color(0xFFA7FFEB), fontSize: 7.5, fontWeight: FontWeight.bold)),
+                          ),
+                        if (engine.isSiegeResonatorActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(color: const Color(0xFFBF360C), borderRadius: BorderRadius.circular(3)),
+                            child: const Text('🎯 ARBALEST (+25% AOE DMG, +1 RADIUS)', style: TextStyle(color: Color(0xFFFFCCBC), fontSize: 7.5, fontWeight: FontWeight.bold)),
                           ),
                       ],
                     ),

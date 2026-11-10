@@ -8696,22 +8696,36 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E1B20),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)),
-                            SizedBox(width: 2),
-                            Text(
-                              'STALKER (+15% CRIT, +4🔥)',
-                              style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
+                        decoration: BoxDecoration(color: const Color(0xFF2E1B20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)), SizedBox(width: 2), Text('STALKER (+15% CRIT, +4🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold))]),
+                      ),
+                    if (_engine.isReaverFerocityActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF3E2010), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.whatshot, size: 9, color: Color(0xFFFFB74D)), SizedBox(width: 2), Text('REAVER (+20% ATK, +8🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFE0B2), fontWeight: FontWeight.bold))]),
+                      ),
+                    if (_engine.isGraveCarapaceActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF10282E), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF4DD0E1).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.shield, size: 9, color: Color(0xFF4DD0E1)), SizedBox(width: 2), Text('SENTINEL (+35% AEGIS)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE0F7FA), fontWeight: FontWeight.bold))]),
+                      ),
+                    if (_engine.isAuraOfVitalityActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF102E20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF69F0AE).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.favorite, size: 9, color: Color(0xFF69F0AE)), SizedBox(width: 2), Text('MEDICUS (+25% HEAL, +3% REGEN)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE8F5E9), fontWeight: FontWeight.bold))]),
+                      ),
+                    if (_engine.isSiegeResonatorActive && !isNarrow)
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF3E1A10), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF7043).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.filter_hdr, size: 9, color: Color(0xFFFF7043)), SizedBox(width: 2), Text('ARBALEST (+25% AOE)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFEBE5), fontWeight: FontWeight.bold))]),
                       ),
                     const Spacer(),
                     if (explicitTarget != null && !isNarrow)

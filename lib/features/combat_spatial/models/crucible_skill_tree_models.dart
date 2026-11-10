@@ -9,9 +9,11 @@ enum CrucibleSkillDiscipline {
 }
 
 enum CrucibleSkillBranch {
-  wrath,      // Attack / Offense (Crimson & Embers)
+  wrath,      // Attack / Single-Target Execution (Crimson & Embers)
   bastion,    // Defense / Protection (Iron & Stone)
   resonance,  // Hybrid / Retinue Synergy (Amethyst & Blood)
+  vitae,      // Healing / Restoration (Emerald & Life Vitae)
+  calamity,   // AoE / Area Cleaves & Novas (Amber & Volcanic Storms)
   apex,       // Crown Finishers (White-Gold Overdrive)
 }
 
@@ -155,7 +157,7 @@ class CrucibleSkillTreeState {
       id: 'ash_whirlwind',
       name: 'Ember Whirlwind',
       discipline: CrucibleSkillDiscipline.ash,
-      branch: CrucibleSkillBranch.wrath,
+      branch: CrucibleSkillBranch.calamity,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -371,7 +373,7 @@ class CrucibleSkillTreeState {
       id: 'sanguine_vortex',
       name: 'Blood Vortex',
       discipline: CrucibleSkillDiscipline.sanguine,
-      branch: CrucibleSkillBranch.resonance,
+      branch: CrucibleSkillBranch.calamity,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -479,7 +481,7 @@ class CrucibleSkillTreeState {
       id: 'mire_catacomb',
       name: 'Ossuary Catacomb',
       discipline: CrucibleSkillDiscipline.mire,
-      branch: CrucibleSkillBranch.wrath,
+      branch: CrucibleSkillBranch.calamity,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -516,6 +518,118 @@ class CrucibleSkillTreeState {
         'Rank 3: 370% (510% Perfect Forge Crit) Extinction Spore; instantly kills non-bosses with 5+ Poison.',
       ],
     );
+
+    // ==========================================
+    // 5. PATH OF CALAMITY (AoE / Storms)
+    // ==========================================
+    allSkills['calamity_nova'] = CrucibleSkillNode(
+      id: 'calamity_nova',
+      name: 'Sunburst Nova',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.calamity,
+      defaultSlot: 2,
+      cinderCost: 30,
+      cooldownSeconds: 6.0,
+      icon: Icons.wb_sunny,
+      primaryColor: const Color(0xFFFF9100),
+      borderColor: const Color(0xFFFFD54F),
+      actionType: 'calamity_nova',
+      summary: 'Radiant cataclysm blasting all 9 enemy tiles. Blinds foes and staggers turn gauges by -1,500 AP.',
+      baseMultiplier: 1.75,
+      rankDescriptions: [
+        'Rank 1: 175% ATK Holy Nova across all 9 tiles + 3s Blind + -1,500 AP stagger.',
+        'Rank 2: 215% ATK Nova + -2,500 AP stagger + shreds 25 Armor.',
+        'Rank 3: 260% ATK Nova + completely halts enemy Action Gauge accumulation for 2.5s.',
+      ],
+    );
+
+    // ==========================================
+    // 6. PATH OF VITAE (Healing & Restoration)
+    // ==========================================
+    allSkills['vitae_mending'] = CrucibleSkillNode(
+      id: 'vitae_mending',
+      name: 'Mending Ash',
+      discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.vitae,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 1.5,
+      icon: Icons.healing,
+      primaryColor: const Color(0xFF00E676),
+      borderColor: const Color(0xFFB9F6CA),
+      actionType: 'vitae_mending',
+      summary: 'Restorative strike consuming 0 Cinders. Generates +6 Cinders and heals lowest HP ally for +60 HP.',
+      baseMultiplier: 1.10,
+      rankDescriptions: [
+        'Rank 1: 110% ATK strike, generates +6 Cinders, mends lowest HP ally for +60 HP (+20% ATK).',
+        'Rank 2: 135% ATK strike, generates +8 Cinders, mends lowest HP ally for +110 HP (+30% ATK).',
+        'Rank 3: 165% ATK strike, generates +10 Cinders, mends squad frontline for +160 HP (+40% ATK).',
+      ],
+    );
+
+    allSkills['vitae_bloom'] = CrucibleSkillNode(
+      id: 'vitae_bloom',
+      name: 'Sanctified Bloom',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.vitae,
+      defaultSlot: 2,
+      cinderCost: 25,
+      cooldownSeconds: 6.0,
+      icon: Icons.spa,
+      primaryColor: const Color(0xFF00E676),
+      borderColor: const Color(0xFF69F0AE),
+      actionType: 'vitae_bloom',
+      summary: 'Radiates life-giving ash, restoring 35% Max HP to entire retinue and cleansing all debuffs.',
+      baseMultiplier: 0.0,
+      rankDescriptions: [
+        'Rank 1: Restores 35% Max HP (+140 HP) to all living squad members + cleanses all bleed/burn/poison.',
+        'Rank 2: Restores 45% Max HP (+200 HP) + grants 25 Aegis Shield to entire squad.',
+        'Rank 3: Restores 60% Max HP (+300 HP) + grants 3s Debuff Immunity to all allies.',
+      ],
+    );
+
+    allSkills['vitae_conduit'] = CrucibleSkillNode(
+      id: 'vitae_conduit',
+      name: 'Soul Transfusion',
+      discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.vitae,
+      defaultSlot: 3,
+      cinderCost: 40,
+      cooldownSeconds: 9.0,
+      icon: Icons.favorite,
+      primaryColor: const Color(0xFF00C853),
+      borderColor: const Color(0xFFA7FFEB),
+      actionType: 'vitae_conduit',
+      summary: 'Drains life from target enemy, converting 100% of damage dealt into squad-wide healing + Regeneration.',
+      baseMultiplier: 2.20,
+      rankDescriptions: [
+        'Rank 1: 220% ATK Life Siphon; 100% of damage healed across squad + 4s Regeneration.',
+        'Rank 2: 275% ATK Life Siphon; 125% of damage healed across squad + grants Haste for 3s.',
+        'Rank 3: 340% ATK Life Siphon; full overhealing converted to permanent Max HP boost for encounter.',
+      ],
+    );
+
+    allSkills['vitae_aegis'] = CrucibleSkillNode(
+      id: 'vitae_aegis',
+      name: 'Grace of the Martyr',
+      discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.vitae,
+      defaultSlot: 4,
+      cinderCost: 50,
+      cooldownSeconds: 12.0,
+      icon: Icons.shield_moon,
+      primaryColor: const Color(0xFF1DE9B6),
+      borderColor: const Color(0xFF64FFDA),
+      actionType: 'vitae_aegis',
+      summary: 'Bestows +80 Aegis Barrier & +30% PRR to target ally, or revives a fallen minion at 40% Max HP.',
+      baseMultiplier: 0.0,
+      rankDescriptions: [
+        'Rank 1: Grants +80 Aegis Barrier & -30% damage taken to target ally, or revives fallen minion at 40% HP.',
+        'Rank 2: Grants +120 Aegis Barrier & -40% damage taken, or revives fallen minion at 65% HP + full AP.',
+        'Rank 3: Grants +180 Aegis Barrier to entire squad, or revives all fallen minions at 100% HP.',
+      ],
+    );
+
   }
 
   void configureDefaultsForGeneral(GeneralType general) {
@@ -599,10 +713,14 @@ class CrucibleSkillTreeState {
   int get wrathPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.wrath);
   int get bastionPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.bastion);
   int get resonancePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.resonance);
+  int get vitaePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.vitae);
+  int get calamityPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.calamity);
 
   bool get isMoltenOverdriveActive => wrathPointsSpent >= 3;
   bool get isSlagFortressActive => bastionPointsSpent >= 3;
   bool get isCrucibleSymbiosisActive => resonancePointsSpent >= 3;
+  bool get isFontOfRebirthActive => vitaePointsSpent >= 3;
+  bool get isSeismicCataclysmActive => calamityPointsSpent >= 3;
 
   List<CrucibleSkillNode> getSkillsForBranch(CrucibleSkillBranch branch) {
     return allSkills.values.where((s) => s.branch == branch).toList();

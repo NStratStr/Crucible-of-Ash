@@ -41,6 +41,10 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         return const Color(0xFF00E5FF); // Cyan / Cold Iron / Shield
       case CrucibleSkillBranch.resonance:
         return const Color(0xFFE040FB); // Amethyst / Blood / Hybrid
+      case CrucibleSkillBranch.vitae:
+        return const Color(0xFF00E676); // Emerald / Life Vitae
+      case CrucibleSkillBranch.calamity:
+        return const Color(0xFFFF9100); // Amber / Volcanic Calamity
       case CrucibleSkillBranch.apex:
         return const Color(0xFFFFD54F); // Molten Gold
     }
@@ -54,6 +58,10 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         return 'PATH OF BASTION (DEFENSE)';
       case CrucibleSkillBranch.resonance:
         return 'PATH OF RESONANCE (HYBRID)';
+      case CrucibleSkillBranch.vitae:
+        return 'PATH OF VITAE (HEALING)';
+      case CrucibleSkillBranch.calamity:
+        return 'PATH OF CALAMITY (AOE)';
       case CrucibleSkillBranch.apex:
         return 'APEX FINISHERS (CROWN)';
     }
@@ -67,6 +75,10 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         return Icons.security;
       case CrucibleSkillBranch.resonance:
         return Icons.all_inclusive;
+      case CrucibleSkillBranch.vitae:
+        return Icons.favorite;
+      case CrucibleSkillBranch.calamity:
+        return Icons.waves;
       case CrucibleSkillBranch.apex:
         return Icons.bolt;
     }
@@ -397,6 +409,28 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         isActive: isActive,
         color: const Color(0xFFE040FB),
         icon: Icons.all_inclusive,
+      );
+    } else if (_selectedBranch == CrucibleSkillBranch.vitae) {
+      final bool isActive = state.isFontOfRebirthActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'FONT OF REBIRTH (KEYSTONE)',
+        summary: 'Spending Cinders radiates holy healing to squad (12% Max HP). All overhealing converts directly into Aegis Shield.',
+        pointsRequired: 3,
+        currentPoints: state.vitaePointsSpent,
+        isActive: isActive,
+        color: const Color(0xFF00E676),
+        icon: Icons.favorite,
+      );
+    } else if (_selectedBranch == CrucibleSkillBranch.calamity) {
+      final bool isActive = state.isSeismicCataclysmActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'SEISMIC CATACLYSM (KEYSTONE)',
+        summary: 'All Commander skills hit +1 extra adjacent tile. Striking 3+ enemies on a single cast instantly refunds +20 Cinders & +2,000 AP tempo.',
+        pointsRequired: 3,
+        currentPoints: state.calamityPointsSpent,
+        isActive: isActive,
+        color: const Color(0xFFFF9100),
+        icon: Icons.filter_hdr,
       );
     }
 

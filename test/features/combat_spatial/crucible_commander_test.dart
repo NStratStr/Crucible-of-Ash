@@ -1,3 +1,4 @@
+import 'package:ashen_crucible/shared/data/starter_brigades.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
 import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dart';
@@ -478,6 +479,118 @@ void main() {
       // Footman attacks enemy
       engine.executeUnitAction(footman, explicitTarget: engine.enemyUnits.firstWhere((u) => u.isAlive), actionType: 'auto');
       expect(sculptor.crucibleCinders, equals(cindersBeforeStrike + 3));
+      // 7. Test Path of Vitae (Healing) & Font of Rebirth Keystone
+      tree.upgradeSkill('vitae_mending');
+      tree.upgradeSkill('vitae_mending');
+      tree.upgradeSkill('vitae_bloom');
+      expect(tree.vitaePointsSpent, equals(3));
+      expect(tree.isFontOfRebirthActive, isTrue);
+
+      // Damage footman and test Vitae Bloom heal + debuff cleanse
+      footman.hp = 100;
+      footman.burnDuration = 60;
+      footman.bleedStacks = 3;
+      sculptor.crucibleCinders = 50;
+
+      engine.executeUnitAction(sculptor, actionType: 'vitae_bloom');
+      expect(footman.hp, greaterThan(100));
+      expect(footman.burnDuration, equals(0));
+      expect(footman.bleedStacks, equals(0));
+
+      // Overheal converts into Aegis barrier via Font of Rebirth
+      expect(sculptor.aegisShield, greaterThan(0));
+
+      // 8. Test Path of Calamity (AoE) & Seismic Cataclysm Keystone
+      tree.upgradeSkill('calamity_nova');
+      tree.upgradeSkill('calamity_nova');
+      tree.upgradeSkill('ash_whirlwind');
+      expect(tree.calamityPointsSpent, equals(3));
+      expect(tree.isSeismicCataclysmActive, isTrue);
+
+      for (final enemy in engine.enemyUnits) {
+        enemy.hp = enemy.maxHp;
+        enemy.isPetrifiedPlinth = false;
+      }
+      sculptor.crucibleCinders = 30;
+      sculptor.currentAp = 0;
+      engine.executeUnitAction(sculptor, actionType: 'calamity_nova');
+      // All living enemies damaged & blinded
+      expect(engine.enemyUnits.where((u) => u.isAlive).every((u) => u.vulnerableDuration > 0), isTrue);
+      // Seismic Cataclysm refunds +20 Cinders & +2,000 AP when striking 3+ enemies
+      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(20));
+      expect(sculptor.currentAp, greaterThanOrEqualTo(2000));
+    });
+
+    test('Expanded 8-Minion Buildcraft Roster & Dynamic Retinue Passives', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      // Clear standard units and deploy custom build minions
+      engine.playerUnits.clear();
+
+      final sculptor = CombatUnitState(
+        footprint: UnitFootprint.single1x1,
+        id: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        templateId: 'ash_sculptor',
+        maxArmor: 60,
+        armor: 60,
+        isPlayer: true,
+        isAshSculptor: true,
+        crucibleCinders: 15,
+        occupiedNodes: [const GridNode(column: 1, row: 0)],
+        maxHp: 640,
+        hp: 640,
+        attack: 100,
+        speed: 115,
+      );
+
+      final reaver = CombatUnitState(
+        footprint: UnitFootprint.single1x1,
+        id: 'pyre_reaver',
+        name: 'Pyre Reaver',
+        templateId: 'pyre_reaver',
+        maxArmor: 40,
+        armor: 40,
+        isPlayer: true,
+        occupiedNodes: [const GridNode(column: 0, row: 0)],
+        maxHp: 500,
+        hp: 500,
+        attack: 80,
+        speed: 105,
+      );
+
+      final medicus = CombatUnitState(
+        footprint: UnitFootprint.single1x1,
+        id: 'sanctified_medicus',
+        name: 'Sanctified Medicus',
+        templateId: 'sanctified_medicus',
+        maxArmor: 40,
+        armor: 40,
+        isPlayer: true,
+        occupiedNodes: [const GridNode(column: 1, row: 2)],
+        maxHp: 450,
+        hp: 450,
+        attack: 50,
+        speed: 95,
+      );
+
+      engine.playerUnits.addAll([sculptor, reaver, medicus]);
+
+      expect(engine.isReaverFerocityActive, isTrue);
+      expect(engine.isAuraOfVitalityActive, isTrue);
+      expect(engine.isBulwarkOathActive, isFalse);
+      expect(engine.isStalkerKeenEdgeActive, isFalse);
+
+      // Verify Reserve pool contains all 8 sculpted archetype minions
+      final reserves = StarterBrigades.createReserveInventory();
+      final minionSpecies = reserves.map((u) => u.speciesId).toSet();
+      expect(minionSpecies.contains('pyre_reaver'), isTrue);
+      expect(minionSpecies.contains('stone_sentinel'), isTrue);
+      expect(minionSpecies.contains('blood_scribe'), isTrue);
+      expect(minionSpecies.contains('miasma_chanter'), isTrue);
+      expect(minionSpecies.contains('sanctified_medicus'), isTrue);
+      expect(minionSpecies.contains('cinder_arbalest'), isTrue);
     });
   });
 }

@@ -167,6 +167,40 @@ class SpatialCombatEngine extends ChangeNotifier {
   // ==========================================
   bool get isBulwarkOathActive => playerUnits.any((u) => (u.id == 'iron_footman' || u.templateId == 'iron_footman') && u.isAlive);
   bool get isStalkerKeenEdgeActive => playerUnits.any((u) => (u.id == 'grave_duelist' || u.templateId == 'grave_duelist') && u.isAlive);
+  bool get isReaverFerocityActive => playerUnits.any((u) => (u.id == 'pyre_reaver' || u.templateId == 'pyre_reaver') && u.isAlive);
+  bool get isGraveCarapaceActive => playerUnits.any((u) => (u.id == 'stone_sentinel' || u.templateId == 'stone_sentinel') && u.isAlive);
+  bool get isVitaeBondActive => playerUnits.any((u) => (u.id == 'blood_scribe' || u.templateId == 'blood_scribe') && u.isAlive);
+  bool get isTemporalWeftActive => playerUnits.any((u) => (u.id == 'miasma_chanter' || u.templateId == 'miasma_chanter') && u.isAlive);
+  bool get isAuraOfVitalityActive => playerUnits.any((u) => (u.id == 'sanctified_medicus' || u.templateId == 'sanctified_medicus') && u.isAlive);
+  bool get isSiegeResonatorActive => playerUnits.any((u) => (u.id == 'cinder_arbalest' || u.templateId == 'cinder_arbalest') && u.isAlive);
+
+  void _triggerFontOfRebirth(int cindersSpent) {
+    if (!skillTreeState.isFontOfRebirthActive || cindersSpent <= 0) return;
+    for (final ally in playerUnits.where((u) => u.isAlive)) {
+      final healAmt = max(20, (ally.maxHp * 0.12).round());
+      final missingHp = ally.maxHp - ally.hp;
+      if (healAmt <= missingHp) {
+        ally.hp += healAmt;
+      } else {
+        ally.hp = ally.maxHp;
+        final overheal = healAmt - missingHp;
+        ally.aegisShield += overheal;
+        ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      }
+    }
+    addLog('✨ [FONT OF REBIRTH] Holy ash radiates! Squad healed for 12% Max HP (Overheal -> Aegis Shield)!');
+  }
+
+  void _checkSeismicCataclysm(int enemiesHit) {
+    if (!skillTreeState.isSeismicCataclysmActive || enemiesHit < 3) return;
+    final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+    if (sculptor != null) {
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 20);
+      sculptor.currentAp = min(10000, sculptor.currentAp + 2000);
+      addLog('🌋 [SEISMIC CATACLYSM] $enemiesHit foes blasted! Ash Sculptor refunds +20 Cinders & +2,000 AP tempo!');
+    }
+  }
+
 
   int unboundAshWallet = 600;
   int distilledVitaeWallet = 60;
@@ -2228,12 +2262,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       unit.currentAp = 0;
     } else {
       _executeUnitTurn(unit, explicitTarget: explicitTarget, actionType: actionType);
-      final bool isActiveCinderSkill = actionType == 'forge_cleave' ||
-          actionType == 'sundering_brand' ||
-          actionType == 'obsidian_bastion' ||
-          actionType == 'cataclysmic_pyre' ||
-          actionType == 'cataclysmic_pyre_crit';
-      if (!isActiveCinderSkill) {
+      final bool isCinderCommanderSkill = (unit.isAshSculptor && actionType != 'auto') ||
+          skillTreeState.findSkillForAction(actionType) != null;
+      if (!isCinderCommanderSkill) {
         unit.currentAp = 0;
       }
     }
@@ -2983,7 +3014,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('🗡️ [STALKER KEEN EDGE] The Ash Sculptor crits and channels +4 bonus Cinders -> ${sculptor.crucibleCinders}/100!');
     }
 
-    if (actionType == 'forge_cleave' || actionType == 'cleave' || actionType == 'cold_iron_slam' || actionType == 'siphon_rend' || actionType == 'corrosive_touch') {
+    if (actionType == 'forge_cleave' || actionType == 'cleave' || actionType == 'cold_iron_slam' || actionType == 'siphon_rend' || actionType == 'corrosive_touch' || actionType == 'vitae_mending' || actionType == 'mending_ash' || actionType == 'calamity_sweep') {
       // --- SKILL 1: 0 CINDERS (BUILDER / CINDER GENERATOR - ALWAYS AVAILABLE) ---
       final skillNode = skillTreeState.allSkills.values.firstWhere(
         (s) => s.actionType == actionType,
@@ -3057,6 +3088,31 @@ class SpatialCombatEngine extends ChangeNotifier {
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       } else {
+        if (actionType == 'vitae_mending' || actionType == 'mending_ash') {
+          final rawDmg = (sculptor.effectiveAttack * 1.10).round();
+          final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+          final livingAllies = playerUnits.where((u) => u.isAlive).toList()
+            ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
+          final lowest = livingAllies.firstOrNull;
+          if (lowest != null) {
+            final healAmt = 60 + (sculptor.effectiveAttack * 0.20).round();
+            lowest.hp = min(lowest.maxHp, lowest.hp + healAmt);
+            addLog('VITAE SCULPTOR: Mending Ash strikes ${validTarget.name} for $dmg DMG & mends ${lowest.name} for +$healAmt HP (+$cinderGain Cinders -> ${sculptor.crucibleCinders}/100)!');
+          }
+          dispatchAction(SpatialActionEvent(
+            id: 'mending_${currentTick}_${sculptor.id}',
+            attackerId: sculptor.id,
+            attackerName: sculptor.name,
+            skillName: 'Mending Ash',
+            targetId: validTarget.id,
+            targetName: validTarget.name,
+            damage: dmg,
+            isHeal: true,
+            isPlayerAttacker: true,
+            pattern: TargetPattern.singleTarget,
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ));
+        } else {
         // Forge Cleave (Default Ash): 140% ATK + Bleed stacks, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
@@ -3076,6 +3132,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
+        }
       }
 
     } else if (actionType == 'sundering_brand' || actionType == 'sundering_judgment' || actionType == 'crimson_brand' || actionType == 'miasmic_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
@@ -3258,6 +3315,122 @@ class SpatialCombatEngine extends ChangeNotifier {
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       }
+
+    
+    } else if (actionType == 'vitae_bloom') {
+      if (sculptor.crucibleCinders < 25) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 25);
+      _triggerFontOfRebirth(25);
+      for (final ally in playerUnits.where((u) => u.isAlive)) {
+        final healAmt = max(60, (ally.maxHp * 0.35 + 140).round());
+        ally.hp = min(ally.maxHp, ally.hp + healAmt);
+        ally.bleedStacks = 0;
+        ally.burnDuration = 0;
+        ally.poisonStacks = 0;
+        ally.vulnerableDuration = 0;
+      }
+      addLog('VITAE SCULPTOR: Sanctified Bloom radiates life-giving ash! Squad healed for 35% Max HP & all debuffs cleansed!');
+      dispatchAction(SpatialActionEvent(
+        id: 'bloom_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Sanctified Bloom',
+        targetId: sculptor.id,
+        targetName: 'Squad Restoration',
+        damage: 0,
+        isHeal: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'vitae_conduit') {
+      if (sculptor.crucibleCinders < 40) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 40);
+      _triggerFontOfRebirth(40);
+      final rawDmg = (sculptor.effectiveAttack * 2.20).round();
+      final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+      final livingSquad = playerUnits.where((u) => u.isAlive).toList();
+      final healPerAlly = max(20, (dmg / max(1, livingSquad.length)).round());
+      for (final ally in livingSquad) {
+        ally.hp = min(ally.maxHp, ally.hp + healPerAlly);
+        ally.hasteDuration = max(ally.hasteDuration, 120);
+      }
+      addLog('VITAE SCULPTOR: Soul Transfusion siphons $dmg HP from ${validTarget.name} into retinue (+$healPerAlly HP/ally & 4s Regeneration)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'conduit_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Soul Transfusion',
+        targetId: validTarget.id,
+        targetName: validTarget.name,
+        damage: dmg,
+        isHeal: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'vitae_aegis') {
+      if (sculptor.crucibleCinders < 50) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 50);
+      _triggerFontOfRebirth(50);
+      final deadAlly = playerUnits.where((u) => !u.isAlive).firstOrNull;
+      if (deadAlly != null) {
+        deadAlly.hp = (deadAlly.maxHp * 0.40).round();
+        deadAlly.aegisShield = 40;
+        deadAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        deadAlly.currentAp = 5000;
+        addLog('✨ VITAE SCULPTOR: Grace of the Martyr REVIVES ${deadAlly.name} with 40% HP & 40 Aegis Barrier!');
+      } else {
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.aegisShield += 80;
+          ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        }
+        addLog('VITAE SCULPTOR: Grace of the Martyr bestows +80 Aegis Barrier & -30% PRR to squad!');
+      }
+      dispatchAction(SpatialActionEvent(
+        id: 'grace_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Grace of the Martyr',
+        targetId: sculptor.id,
+        targetName: 'Squad Grace',
+        damage: 0,
+        isHeal: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'calamity_nova') {
+      if (sculptor.crucibleCinders < 30) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
+      _triggerFontOfRebirth(30);
+      final rawDmg = (sculptor.effectiveAttack * 1.75).round();
+      int totalDmg = 0;
+      int enemiesHit = 0;
+      for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
+        final d = enemy.takeDamage(rawDmg, isPhysical: false);
+        enemy.vulnerableDuration = max(enemy.vulnerableDuration, 90);
+        enemy.currentAp = max(0, enemy.currentAp - 1500);
+        totalDmg += d;
+        enemiesHit++;
+      }
+      _checkSeismicCataclysm(enemiesHit);
+      addLog('CALAMITY SCULPTOR: Sunburst Nova engulfs all 9 enemy tiles for $totalDmg DMG (3s Blind, -1,500 AP stagger)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'nova_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Sunburst Nova',
+        targetId: validTarget.id,
+        targetName: 'All 9 Enemy Tiles',
+        damage: totalDmg,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.stAshlarCross,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
 
     } else if (actionType == 'ember_whirlwind' || actionType == 'dawn_retribution' || actionType == 'blood_vortex' || actionType == 'ossuary_catacomb') {
       // --- SKILL 4: 45 CINDERS (HEAVY ASSAULT / DEVASTATION) ---
