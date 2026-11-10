@@ -178,6 +178,13 @@ class _AppShellState extends State<AppShell> {
       if (saved.reserveInventory.isNotEmpty) {
         _inventory = List.from(saved.reserveInventory);
       }
+      final activeSpecies = _tickManager.allies.map((u) => u.speciesId).toSet();
+      final invSpecies = _inventory.map((u) => u.speciesId).toSet();
+      for (final defaultReserve in StarterBrigades.createReserveInventory()) {
+        if (!activeSpecies.contains(defaultReserve.speciesId) && !invSpecies.contains(defaultReserve.speciesId)) {
+          _inventory.add(defaultReserve);
+        }
+      }
     });
   }
 
@@ -291,7 +298,14 @@ class _AppShellState extends State<AppShell> {
           }
 
           if (saved.reserveInventory.isNotEmpty) {
-            _inventory = saved.reserveInventory;
+            _inventory = List.from(saved.reserveInventory);
+          }
+          final activeSpecies2 = _tickManager.allies.map((u) => u.speciesId).toSet();
+          final invSpecies2 = _inventory.map((u) => u.speciesId).toSet();
+          for (final defaultReserve in StarterBrigades.createReserveInventory()) {
+            if (!activeSpecies2.contains(defaultReserve.speciesId) && !invSpecies2.contains(defaultReserve.speciesId)) {
+              _inventory.add(defaultReserve);
+            }
           }
 
           if (saved.relics.isNotEmpty) {

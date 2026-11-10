@@ -6506,9 +6506,41 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 2),
+                                            const SizedBox(height: 2),
                                             Text(
-                                              'HP ${candidate.maxHp} • ATK ${candidate.attack} • DEF ${candidate.defense} • SPD ${candidate.speed}',
-                                              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.0),
+                                              'HP ' + candidate.maxHp.toString() + ' • ATK ' + candidate.attack.toString() + ' • DEF ' + candidate.defense.toString() + ' • SPD ' + candidate.speed.toString(),
+                                              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 8.5),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1E2638),
+                                                borderRadius: BorderRadius.circular(3),
+                                                border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.4), width: 0.6),
+                                              ),
+                                              child: Text(
+                                                candidate.speciesId.contains('footman')
+                                                    ? '🛡️ Bulwark: +25 Armor & -15% Dmg Taken'
+                                                    : (candidate.speciesId.contains('duelist')
+                                                        ? '🗡️ Stalker Edge: +15% Crit & +4 Cinders'
+                                                        : (candidate.speciesId.contains('reaver')
+                                                            ? '🔥 Reaver Ferocity: +20% ATK & +8 Cinders on Kill'
+                                                            : (candidate.speciesId.contains('sentinel')
+                                                                ? '🪨 Grave Carapace: +35% Barrier & Stagger Immune'
+                                                                : (candidate.speciesId.contains('scribe')
+                                                                    ? '🩸 Vitae Bond: +18% Lifesteal & +2 Cinders'
+                                                                    : (candidate.speciesId.contains('chanter')
+                                                                        ? '⏳ Temporal Weft: -20% CDR & +2,000 AP'
+                                                                        : (candidate.speciesId.contains('medicus')
+                                                                            ? '✨ Aura of Vitality: +25% Heals & +3% Regen'
+                                                                            : (candidate.speciesId.contains('arbalest')
+                                                                                ? '🎯 Siege Resonator: +25% AoE & +1 Splash'
+                                                                                : '⚔️ Companion Retinue Synergy'))))))),
+                                                style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 7.5, fontWeight: FontWeight.bold),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -6775,12 +6807,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       ),
                     ),
                   ),
-                  if (_reserveUnits.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () {
                         _playSfx('sfx_card.wav');
-                        // If we have open slots (<5 units in squad), tapping the button opens the deployment sheet to ADD a unit
                         if (_engine.playerUnits.length < 5) {
                           _openRosterSwapSheet(null);
                         } else {
@@ -6791,41 +6821,43 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: _engine.playerUnits.length < 5
-                              ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
-                              : const Color(0xFFE5A93C).withValues(alpha: 0.18),
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(3),
                           border: Border.all(
-                            color: _engine.playerUnits.length < 5
-                                ? const Color(0xFF00E5FF).withValues(alpha: 0.8)
-                                : const Color(0xFFE5A93C).withValues(alpha: 0.7),
-                            width: 0.8,
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.85),
+                            width: 0.9,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _engine.playerUnits.length < 5 ? Icons.person_add_rounded : Icons.swap_horiz_rounded,
+                              Icons.group_add_rounded,
                               size: 11,
-                              color: _engine.playerUnits.length < 5 ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F),
+                              color: Color(0xFF00E5FF),
                             ),
-                            const SizedBox(width: 3),
+                            SizedBox(width: 4),
                             Text(
-                              _engine.playerUnits.length < 5 ? '+ ADD TO SQUAD' : 'ROSTER SWAP',
+                              '👥 CHOOSE SQUAD',
                               style: TextStyle(
-                                fontSize: 8,
-                                color: _engine.playerUnits.length < 5 ? const Color(0xFF00E5FF) : const Color(0xFFFFD54F),
+                                fontSize: 8.5,
+                                color: Color(0xFF00E5FF),
                                 fontWeight: FontWeight.w900,
+                                letterSpacing: 0.4,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  ],
                   const SizedBox(width: 4),
                   InkWell(
                     onTap: () {

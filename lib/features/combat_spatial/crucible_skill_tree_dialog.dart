@@ -192,6 +192,36 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF37474F),
+              foregroundColor: const Color(0xFFFFD54F),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: const BorderSide(color: Color(0xFFFFD54F), width: 0.8),
+              ),
+            ),
+            icon: const Icon(Icons.restart_alt, size: 13, color: Color(0xFFFFD54F)),
+            label: const Text(
+              'RESPEC (RESET)',
+              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+            onPressed: () {
+              setState(() {
+                state.respecAllPoints();
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Crucible points refunded! Rebuild your archetype freely.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
           const SizedBox(width: 12),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white70, size: 20),
@@ -445,16 +475,19 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           final isSelected = skill.id == _selectedSkillId;
           final isEquipped = state.equippedSkillIds.contains(skill.id);
           final slotNumber = state.equippedSkillIds.indexOf(skill.id) + 1;
+          final isPrereqMet = state.isSkillPrerequisiteMet(skill.id);
 
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: isSelected ? skill.primaryColor.withValues(alpha: 0.20) : const Color(0xFF181B26),
+              color: isSelected
+                  ? skill.primaryColor.withValues(alpha: 0.20)
+                  : (isPrereqMet ? const Color(0xFF181B26) : const Color(0xFF11131A)),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: isSelected
                     ? const Color(0xFFFFD54F)
-                    : (isEquipped ? skill.borderColor : Colors.white12),
+                    : (isEquipped ? skill.borderColor : (isPrereqMet ? Colors.white12 : Colors.white10)),
                 width: isSelected ? 1.5 : 1.0,
               ),
             ),
@@ -472,11 +505,18 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: skill.primaryColor,
+                      color: isPrereqMet ? skill.primaryColor : const Color(0xFF263238),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: skill.borderColor, width: 1),
+                      border: Border.all(
+                        color: isPrereqMet ? skill.borderColor : Colors.white24,
+                        width: 1,
+                      ),
                     ),
-                    child: Icon(skill.icon, color: Colors.white, size: 20),
+                    child: Icon(
+                      isPrereqMet ? skill.icon : Icons.lock_outline,
+                      color: isPrereqMet ? Colors.white : Colors.white38,
+                      size: 20,
+                    ),
                   ),
                   if (isEquipped)
                     Positioned(
@@ -500,9 +540,27 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 children: [
                   Text(
                     skill.name,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isPrereqMet ? Colors.white : Colors.white54,
+                    ),
                   ),
                   const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: isPrereqMet
+                          ? (skill.tier == 1 ? const Color(0xFF1B5E20) : const Color(0xFF0D47A1))
+                          : const Color(0xFFB71C1C),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(
+                      isPrereqMet ? 'TIER ${skill.tier}' : '🔒 TIER ${skill.tier}',
+                      style: const TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
@@ -529,8 +587,12 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 ],
               ),
               subtitle: Text(
-                skill.summary,
-                style: const TextStyle(fontSize: 9.5, color: Colors.white60),
+                isPrereqMet ? skill.summary : '🔒 ${state.getPrerequisiteRequirementText(skill.id)}',
+                style: TextStyle(
+                  fontSize: 9.0,
+                  color: isPrereqMet ? Colors.white60 : const Color(0xFFFF8A80),
+                  fontWeight: isPrereqMet ? FontWeight.normal : FontWeight.bold,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -737,6 +799,30 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
 
           const SizedBox(height: 8),
 
+          if (!state.isSkillPrerequisiteMet(skill.id)) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF371717),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFFF5252), width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock, size: 14, color: Color(0xFFFF5252)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      state.getPrerequisiteRequirementText(skill.id),
+                      style: const TextStyle(fontSize: 8.5, color: Color(0xFFFF8A80), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Action Buttons: Upgrade Rank & Equip to Slots 1..5
           Row(
             children: [
@@ -745,13 +831,13 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                   height: 38,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: skill.canUpgrade && state.availableSkillPoints > 0
+                      backgroundColor: state.canUpgradeSkill(skill.id)
                           ? const Color(0xFFFF6D00)
                           : const Color(0xFF263238),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                     ),
-                    onPressed: skill.canUpgrade && state.availableSkillPoints > 0
+                    onPressed: state.canUpgradeSkill(skill.id)
                         ? () {
                             setState(() {
                               state.upgradeSkill(skill.id);
@@ -759,9 +845,11 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                           }
                         : null,
                     child: Text(
-                      skill.canUpgrade
-                          ? 'UPGRADE (1 SP) [Rank ${skill.rank + 1}]'
-                          : 'MAX RANK REACHED',
+                      !state.isSkillPrerequisiteMet(skill.id)
+                          ? '🔒 LOCKED (PREREQUISITES NOT MET)'
+                          : (skill.canUpgrade
+                              ? 'UPGRADE (1 SP) [Rank ${skill.rank + 1}]'
+                              : 'MAX RANK REACHED'),
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ),

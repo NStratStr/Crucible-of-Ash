@@ -22,6 +22,9 @@ class CrucibleSkillNode {
   final String name;
   final CrucibleSkillDiscipline discipline;
   final CrucibleSkillBranch branch;
+  final int tier; // 1 = Starter, 2 = Core Specialization, 3 = Heavy Devastation, 4 = Apex Finisher
+  final int requiredBranchPoints; // Points required in this branch (0 for T1, 1 for T2, 2 for T3, 3 for Apex)
+  final String? prerequisiteSkillId; // Specific preceding skill required to be at least Rank 2
   final int defaultSlot; // 1 to 5
   final int cinderCost;
   final IconData icon;
@@ -34,13 +37,16 @@ class CrucibleSkillNode {
   final int maxRank;
   final double cooldownSeconds;
 
-  int rank; // Current rank (0 = locked, 1..maxRank = unlocked/upgraded)
+  int rank; // Current rank (1..maxRank = unlocked/upgraded)
 
   CrucibleSkillNode({
     required this.id,
     required this.name,
     required this.discipline,
     this.branch = CrucibleSkillBranch.wrath,
+    this.tier = 1,
+    this.requiredBranchPoints = 0,
+    this.prerequisiteSkillId,
     required this.defaultSlot,
     required this.cinderCost,
     required this.icon,
@@ -91,6 +97,8 @@ class CrucibleSkillTreeState {
     // 1. ASH & PYRE DISCIPLINE (Malakor / Forge)
     // ==========================================
     allSkills['ash_cleave'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'ash_cleave',
       branch: CrucibleSkillBranch.wrath,
       name: 'Forge Cleave',
@@ -112,6 +120,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['ash_brand'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'ash_cleave',
       id: 'ash_brand',
       name: 'Sundering Brand',
       discipline: CrucibleSkillDiscipline.ash,
@@ -133,6 +144,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['ash_bastion'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'iron_slam',
       id: 'ash_bastion',
       branch: CrucibleSkillBranch.bastion,
       name: 'Obsidian Bastion',
@@ -154,6 +168,8 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['ash_whirlwind'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'ash_whirlwind',
       name: 'Ember Whirlwind',
       discipline: CrucibleSkillDiscipline.ash,
@@ -175,6 +191,8 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['ash_pyre'] = CrucibleSkillNode(
+      tier: 4,
+      requiredBranchPoints: 3,
       id: 'ash_pyre',
       branch: CrucibleSkillBranch.apex,
       name: 'Cataclysmic Pyre',
@@ -199,6 +217,8 @@ class CrucibleSkillTreeState {
     // 2. IRON & BASTION DISCIPLINE (Valeria / Dawn)
     // ==========================================
     allSkills['iron_slam'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'iron_slam',
       name: 'Cold Iron Slam',
       discipline: CrucibleSkillDiscipline.iron,
@@ -220,6 +240,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['iron_judgment'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'ash_brand',
       id: 'iron_judgment',
       name: 'Sundering Judgment',
       discipline: CrucibleSkillDiscipline.iron,
@@ -241,6 +264,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['iron_bulwark'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'ash_bastion',
       id: 'iron_bulwark',
       name: 'Iron Bulwark',
       discipline: CrucibleSkillDiscipline.iron,
@@ -262,6 +288,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['iron_retribution'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'ash_bastion',
       id: 'iron_retribution',
       name: 'Dawn Retribution',
       discipline: CrucibleSkillDiscipline.iron,
@@ -283,6 +312,8 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['iron_wrath'] = CrucibleSkillNode(
+      tier: 4,
+      requiredBranchPoints: 3,
       id: 'iron_wrath',
       name: 'Wrath of Dawnbound',
       discipline: CrucibleSkillDiscipline.iron,
@@ -307,6 +338,8 @@ class CrucibleSkillTreeState {
     // 3. SANGUINE & FLESH DISCIPLINE (Vladislav)
     // ==========================================
     allSkills['sanguine_rend'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'sanguine_rend',
       branch: CrucibleSkillBranch.resonance,
       name: 'Siphon Rend',
@@ -328,6 +361,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['sanguine_brand'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'sanguine_rend',
       id: 'sanguine_brand',
       name: 'Crimson Brand',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -349,6 +385,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['sanguine_tether'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'sanguine_rend',
       id: 'sanguine_tether',
       name: 'Vein Tether',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -370,6 +409,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['sanguine_vortex'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'ash_whirlwind',
       id: 'sanguine_vortex',
       name: 'Blood Vortex',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -391,6 +433,8 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['sanguine_apex'] = CrucibleSkillNode(
+      tier: 4,
+      requiredBranchPoints: 3,
       id: 'sanguine_apex',
       name: 'Exsanguination Apex',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -415,6 +459,9 @@ class CrucibleSkillTreeState {
     // 4. MIRE & OCCULT DISCIPLINE (Morrigan)
     // ==========================================
     allSkills['mire_touch'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'sanguine_rend',
       id: 'mire_touch',
       name: 'Corrosive Touch',
       discipline: CrucibleSkillDiscipline.mire,
@@ -436,6 +483,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['mire_brand'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'mire_touch',
       id: 'mire_brand',
       name: 'Miasmic Brand',
       discipline: CrucibleSkillDiscipline.mire,
@@ -457,6 +507,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['mire_ward'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'iron_slam',
       id: 'mire_ward',
       name: 'Bone Ward',
       discipline: CrucibleSkillDiscipline.mire,
@@ -478,6 +531,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['mire_catacomb'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'sanguine_vortex',
       id: 'mire_catacomb',
       name: 'Ossuary Catacomb',
       discipline: CrucibleSkillDiscipline.mire,
@@ -499,6 +555,8 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['mire_apex'] = CrucibleSkillNode(
+      tier: 4,
+      requiredBranchPoints: 3,
       id: 'mire_apex',
       name: 'Cataclysmic Spore',
       discipline: CrucibleSkillDiscipline.mire,
@@ -523,6 +581,8 @@ class CrucibleSkillTreeState {
     // 5. PATH OF CALAMITY (AoE / Storms)
     // ==========================================
     allSkills['calamity_nova'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'calamity_nova',
       name: 'Sunburst Nova',
       discipline: CrucibleSkillDiscipline.ash,
@@ -547,6 +607,8 @@ class CrucibleSkillTreeState {
     // 6. PATH OF VITAE (Healing & Restoration)
     // ==========================================
     allSkills['vitae_mending'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'vitae_mending',
       name: 'Mending Ash',
       discipline: CrucibleSkillDiscipline.iron,
@@ -568,6 +630,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['vitae_bloom'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'vitae_mending',
       id: 'vitae_bloom',
       name: 'Sanctified Bloom',
       discipline: CrucibleSkillDiscipline.ash,
@@ -589,6 +654,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['vitae_conduit'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'vitae_bloom',
       id: 'vitae_conduit',
       name: 'Soul Transfusion',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -610,6 +678,9 @@ class CrucibleSkillTreeState {
     );
 
     allSkills['vitae_aegis'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'vitae_bloom',
       id: 'vitae_aegis',
       name: 'Grace of the Martyr',
       discipline: CrucibleSkillDiscipline.mire,
@@ -685,11 +756,88 @@ class CrucibleSkillTreeState {
     return true;
   }
 
+  int get totalPointsSpent {
+    return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + vitaePointsSpent + calamityPointsSpent;
+  }
+
+  bool isSkillPrerequisiteMet(String skillId) {
+    final skill = allSkills[skillId];
+    if (skill == null) return false;
+
+    // Apex Crown Finishers require 3 points spent anywhere or in discipline
+    if (skill.branch == CrucibleSkillBranch.apex) {
+      return totalPointsSpent >= 3;
+    }
+
+    // Branch points requirement
+    if (getPointsSpentInBranch(skill.branch) < skill.requiredBranchPoints) {
+      return false;
+    }
+
+    // Specific predecessor skill must be at least Rank 2 (meaning at least 1 upgrade invested in it)
+    if (skill.prerequisiteSkillId != null) {
+      final prereq = allSkills[skill.prerequisiteSkillId];
+      if (prereq == null || prereq.rank < 2) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  String getPrerequisiteRequirementText(String skillId) {
+    final skill = allSkills[skillId];
+    if (skill == null) return '';
+
+    if (skill.branch == CrucibleSkillBranch.apex) {
+      if (totalPointsSpent < 3) {
+        return 'Requires 3 points invested across any branch ($totalPointsSpent/3).';
+      }
+      return 'Apex Crown Overdrive Unlocked!';
+    }
+
+    final branchName = skill.branch.name.toUpperCase();
+    final ptsSpent = getPointsSpentInBranch(skill.branch);
+    if (ptsSpent < skill.requiredBranchPoints) {
+      return 'Requires ${skill.requiredBranchPoints} pt${skill.requiredBranchPoints > 1 ? "s" : ""} in Path of $branchName ($ptsSpent/${skill.requiredBranchPoints}).';
+    }
+
+    if (skill.prerequisiteSkillId != null) {
+      final prereq = allSkills[skill.prerequisiteSkillId];
+      if (prereq != null && prereq.rank < 2) {
+        return 'Requires Rank 2 in ${prereq.name} (invest 1 SP in ${prereq.name}).';
+      }
+    }
+
+    return 'Prerequisites satisfied';
+  }
+
+  bool canUpgradeSkill(String skillId) {
+    final skill = allSkills[skillId];
+    if (skill == null) return false;
+    if (availableSkillPoints <= 0) return false;
+    if (!skill.canUpgrade) return false;
+    return isSkillPrerequisiteMet(skillId);
+  }
+
+  void respecAllPoints() {
+    int refunded = 0;
+    for (final skill in allSkills.values) {
+      if (skill.rank > 1) {
+        refunded += (skill.rank - 1);
+        skill.rank = 1;
+      }
+    }
+    availableSkillPoints += refunded;
+    remainingCooldowns.clear();
+  }
+
   bool upgradeSkill(String skillId) {
     final skill = allSkills[skillId];
     if (skill == null) return false;
     if (availableSkillPoints <= 0) return false;
     if (!skill.canUpgrade) return false;
+    if (!isSkillPrerequisiteMet(skillId)) return false;
 
     skill.rank++;
     availableSkillPoints--;

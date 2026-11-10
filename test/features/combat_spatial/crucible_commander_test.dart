@@ -592,5 +592,43 @@ void main() {
       expect(minionSpecies.contains('sanctified_medicus'), isTrue);
       expect(minionSpecies.contains('cinder_arbalest'), isTrue);
     });
+
+    test('Skill Tree Prerequisites, Tiered Dependencies, and Respec System', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+      final tree = engine.skillTreeState;
+      tree.respecAllPoints();
+      tree.availableSkillPoints = 10;
+
+      // 1. Initial State: Tier 1 starter is unlocked, Tier 2 is locked
+      expect(tree.isSkillPrerequisiteMet('ash_cleave'), isTrue);
+      expect(tree.isSkillPrerequisiteMet('ash_brand'), isFalse);
+      expect(tree.canUpgradeSkill('ash_brand'), isFalse);
+
+      // Attempting to upgrade a locked Tier 2 skill fails
+      final failUpgrade = tree.upgradeSkill('ash_brand');
+      expect(failUpgrade, isFalse);
+
+      // 2. Upgrade Tier 1 starter (Forge Cleave R1 -> R2)
+      final okUpgrade1 = tree.upgradeSkill('ash_cleave');
+      expect(okUpgrade1, isTrue);
+      expect(tree.wrathPointsSpent, equals(1));
+
+      // 3. Now Tier 2 (Sundering Brand) prerequisites are satisfied!
+      expect(tree.isSkillPrerequisiteMet('ash_brand'), isTrue);
+      expect(tree.canUpgradeSkill('ash_brand'), isTrue);
+
+      final okUpgrade2 = tree.upgradeSkill('ash_brand');
+      expect(okUpgrade2, isTrue);
+      expect(tree.allSkills['ash_brand']!.rank, equals(2));
+      expect(tree.wrathPointsSpent, equals(2));
+
+      // 4. Test Respec Crucible: Refunds all invested points and locks Tier 2 again
+      tree.respecAllPoints();
+      expect(tree.allSkills['ash_cleave']!.rank, equals(1));
+      expect(tree.allSkills['ash_brand']!.rank, equals(1));
+      expect(tree.wrathPointsSpent, equals(0));
+      expect(tree.isSkillPrerequisiteMet('ash_brand'), isFalse);
+    });
   });
 }
