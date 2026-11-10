@@ -5872,17 +5872,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: isAttacking ? 0 : (unit.isDowned ? 2 : 6),
+              bottom: unit.isDowned ? 2 : 6,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
                 opacity: unit.isDowned ? 0.68 : 1.0,
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 180),
-                  scale: unit.isDowned ? 0.94 : (isAttacking ? 1.18 : 1.0),
+                  scale: unit.isDowned ? 0.94 : 1.0,
                   curve: Curves.easeOutBack,
                   child: SizedBox(
-                    width: isAttacking ? (modelWidth * 1.35).clamp(90.0, 220.0) : modelWidth,
-                    height: isAttacking ? (modelHeight * 1.35).clamp(90.0, 220.0) : modelHeight,
+                    width: modelWidth,
+                    height: modelHeight,
                     child: Stack(
                       alignment: Alignment.bottomCenter,
                       clipBehavior: Clip.none,
@@ -5982,7 +5982,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       columns: 3,
                                       rows: 2,
                                       totalFrames: 6,
-                                      duration: Duration(milliseconds: isAttacking ? 550 : 1200),
+                                      duration: Duration(milliseconds: isAttacking ? 1200 : 2600),
                                       loop: true,
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
