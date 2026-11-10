@@ -291,6 +291,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _battlefieldFocusNode = FocusNode();
     SpriteSheetAnimation.precache('assets/animations/ash_sculptor_attack_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
+    SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -5935,6 +5936,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
                                         unit.assetPath,
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
+                                    )
+                              : (unit.isPlayer &&
+                                      !unit.isDowned &&
+                                      (unit.id.contains('footman') ||
+                                          unit.id.contains('tombstone_sentinel') ||
+                                          unit.templateId.contains('footman') ||
+                                          unit.templateId.contains('tombstone_sentinel') ||
+                                          unit.assetPath.toLowerCase().contains('iron_footman')))
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/iron_footman_idle_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: Duration(milliseconds: isAttacking ? 550 : 1200),
+                                      loop: true,
+                                      fit: BoxFit.contain,
+                                      fallback: Image.asset(
+                                        'assets/images/iron_footman_idle.png',
                                         fit: BoxFit.contain,
                                         alignment: Alignment.bottomCenter,
                                       ),

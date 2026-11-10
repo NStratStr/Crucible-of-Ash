@@ -519,7 +519,7 @@ class CombatUnitState {
       return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
     }
     if (key.contains('tombstone_sentinel') || key.contains('sentinel')) {
-      return 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png';
+      return isPlayer ? 'assets/images/iron_footman_idle.png' : 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png';
     }
     if (key.contains('ossuary_juggernaut') || key.contains('juggernaut')) {
       return 'assets/images/Crypt Stalkers/CRY-01-VAN-G3 Ossuary Juggernaut.png';
@@ -579,7 +579,7 @@ class CombatUnitState {
       return 'assets/images/Ash Legion/lady_valeria_g1.png';
     }
     if (key.contains('iron_footman')) {
-      return 'assets/images/crimson_inquisitor.png';
+      return 'assets/images/iron_footman_idle.png';
     }
     if (key.contains('sanguine_blade') || key.contains('flayer')) {
       return 'assets/images/sanguine_flayer_g3.png';
