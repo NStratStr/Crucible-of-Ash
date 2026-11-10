@@ -12,6 +12,8 @@ import '../generals/general_command_service.dart';
 import '../plinths/plinth_service.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
+import 'models/crucible_skill_tree_models.dart';
+import 'crucible_skill_tree_dialog.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
@@ -8175,27 +8177,39 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
-    final disc = SculptorDisciplineVisuals.forGeneral(_engine.activeGeneralType);
-
     if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
-      if (actionType == 'basic' || actionType == 'cinder_strike' || actionType == 'skill1' || actionType == disc.s1Action) {
-        if (unit.crucibleCinders < 15) return;
-        setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s1Action);
-        });
-      } else if (actionType == 'signature' || actionType == 'skill2' || actionType == disc.s2Action) {
-        if (unit.crucibleCinders < 30) return;
-        setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s2Action);
-        });
-      } else if (actionType == 'skill3' || actionType == disc.s3Action) {
-        if (unit.crucibleCinders < 25) return;
-        setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s3Action);
-        });
-      } else if (actionType == 'ultimate' || actionType == 'skill4' || actionType == disc.s4Action) {
-        if (unit.crucibleCinders < 80) return;
-        _startForgeStrikeFinisher(unit, explicitTarget);
+      int? slotIdx;
+      if (actionType == 'slot1') slotIdx = 0;
+      if (actionType == 'slot2') slotIdx = 1;
+      if (actionType == 'slot3') slotIdx = 2;
+      if (actionType == 'slot4') slotIdx = 3;
+      if (actionType == 'slot5') slotIdx = 4;
+
+      if (slotIdx != null) {
+        final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
+        if (skill == null || unit.crucibleCinders < skill.cinderCost) return;
+        if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
+          _startForgeStrikeFinisher(unit, explicitTarget);
+        } else {
+          setState(() {
+            _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: skill.actionType);
+          });
+        }
+        return;
+      }
+
+      final skill = _engine.skillTreeState.allSkills[actionType] ??
+          _engine.skillTreeState.allSkills.values.where((s) => s.actionType == actionType).firstOrNull;
+      if (skill != null) {
+        if (unit.crucibleCinders < skill.cinderCost) return;
+        if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
+          _startForgeStrikeFinisher(unit, explicitTarget);
+        } else {
+          setState(() {
+            _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: skill.actionType);
+          });
+        }
+        return;
       }
       return;
     }
@@ -8216,29 +8230,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   KeyEventResult _handleBattleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    final disc = SculptorDisciplineVisuals.forGeneral(_engine.activeGeneralType);
-
-    // Key '1': Skill 1 (15 Cinders)
+    // Keys '1' to '5': Equipped Skill Slots 1 to 5
     if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
-      _executeHotkeyedAction(disc.s1Action);
+      _executeHotkeyedAction('slot1');
       return KeyEventResult.handled;
     }
-
-    // Key '2': Skill 2 (30 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
-      _executeHotkeyedAction(disc.s2Action);
+      _executeHotkeyedAction('slot2');
       return KeyEventResult.handled;
     }
-
-    // Key '3': Skill 3 (25 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
-      _executeHotkeyedAction(disc.s3Action);
+      _executeHotkeyedAction('slot3');
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
+      _executeHotkeyedAction('slot4');
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.digit5 || event.logicalKey == LogicalKeyboardKey.numpad5) {
+      _executeHotkeyedAction('slot5');
       return KeyEventResult.handled;
     }
 
-    // Key '4': Skill 4 (80 Cinders Apex)
-    if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
-      _executeHotkeyedAction(disc.s4Action);
+    // Key 'K': Open Crucible Skill Tree
+    if (event.logicalKey == LogicalKeyboardKey.keyK) {
+      CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+        setState(() {});
+      });
       return KeyEventResult.handled;
     }
 
@@ -8250,7 +8268,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
     // Spacebar: Confirm / Fire Basic Attack
     if (event.logicalKey == LogicalKeyboardKey.space) {
-      _executeHotkeyedAction('basic');
+      _executeHotkeyedAction('slot1');
       return KeyEventResult.handled;
     }
 
@@ -8522,6 +8540,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     const SizedBox(width: 4),
                     InkWell(
                       onTap: () {
+                        CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                          setState(() {});
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF282A3E),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.8), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.account_tree, size: 9, color: Color(0xFFFFD54F)),
+                            SizedBox(width: 3),
+                            Text(
+                              'TREE',
+                              style: TextStyle(color: Color(0xFFFFD54F), fontSize: 8.0, fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
                         setState(() {
                           _isLogDrawerVisible = !_isLogDrawerVisible;
                         });
@@ -8650,97 +8696,50 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                 ),
 
-              // Action Buttons Row: 4 Active Cinder Disciplined Commander Abilities
+              // Action Buttons Row: 5 Active Cinder Disciplined Commander Abilities
               Row(
-                children: [
-                  // Skill 1 (15 Cinders)
-                  Expanded(
-                    child: buildActionButton(
-                      title: disc.s1Title,
-                      subtitle: disc.s1Sub,
-                      icon: disc.s1Icon,
-                      activeColor: disc.s1Color,
-                      borderColor: disc.s1Border,
-                      isEnabled: unit.crucibleCinders >= 15,
-                      tooltipMessage: disc.s1Tooltip,
-                      onPressed: () {
-                        setState(() {
-                          _engine.executeUnitAction(
-                            unit,
-                            isReposition: false,
-                            explicitTarget: explicitTarget,
-                            actionType: disc.s1Action,
-                          );
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 4),
+                children: List.generate(5, (slotIdx) {
+                  final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
+                  if (skill == null) return const SizedBox.shrink();
 
-                  // Skill 2 (30 Cinders)
-                  Expanded(
-                    child: buildActionButton(
-                      title: disc.s2Title,
-                      subtitle: disc.s2Sub,
-                      icon: disc.s2Icon,
-                      activeColor: disc.s2Color,
-                      borderColor: disc.s2Border,
-                      isEnabled: unit.crucibleCinders >= 30,
-                      tooltipMessage: disc.s2Tooltip,
-                      onPressed: () {
-                        setState(() {
-                          _engine.executeUnitAction(
-                            unit,
-                            isReposition: false,
-                            explicitTarget: explicitTarget,
-                            actionType: disc.s2Action,
-                          );
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 4),
+                  final bool isFinisher = skill.cinderCost >= 80;
+                  final bool isEnabled = unit.crucibleCinders >= skill.cinderCost;
 
-                  // Skill 3 (25 Cinders)
-                  Expanded(
-                    child: buildActionButton(
-                      title: disc.s3Title,
-                      subtitle: disc.s3Sub,
-                      icon: disc.s3Icon,
-                      activeColor: disc.s3Color,
-                      borderColor: disc.s3Border,
-                      isEnabled: unit.crucibleCinders >= 25,
-                      tooltipMessage: disc.s3Tooltip,
-                      onPressed: () {
-                        setState(() {
-                          _engine.executeUnitAction(
-                            unit,
-                            isReposition: false,
-                            explicitTarget: explicitTarget,
-                            actionType: disc.s3Action,
-                          );
-                        });
-                      },
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: slotIdx < 4 ? 3.0 : 0.0),
+                      child: buildActionButton(
+                        title: isNarrow && skill.name.length > 7
+                            ? '${skill.name.substring(0, 6)}.'
+                            : skill.name.toUpperCase(),
+                        subtitle: '${skill.cinderCost}🔥 • R${skill.rank}',
+                        icon: skill.icon,
+                        activeColor: isFinisher
+                            ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
+                            : skill.primaryColor,
+                        borderColor: isFinisher
+                            ? (isEnabled ? skill.borderColor : Colors.white24)
+                            : skill.borderColor,
+                        isEnabled: isEnabled,
+                        tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
+                        onPressed: () {
+                          if (isFinisher) {
+                            _startForgeStrikeFinisher(unit, explicitTarget);
+                          } else {
+                            setState(() {
+                              _engine.executeUnitAction(
+                                unit,
+                                isReposition: false,
+                                explicitTarget: explicitTarget,
+                                actionType: skill.actionType,
+                              );
+                            });
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-
-                  // Skill 4 (80 Cinders Apex)
-                  Expanded(
-                    child: buildActionButton(
-                      title: disc.s4Title,
-                      subtitle: disc.s4Sub,
-                      icon: disc.s4Icon,
-                      activeColor: isApexReady ? disc.s4Color : const Color(0xFF3E2723),
-                      borderColor: isApexReady ? disc.s4Border : Colors.white24,
-                      isEnabled: isApexReady,
-                      tooltipMessage: disc.s4Tooltip,
-                      onPressed: () {
-                        _startForgeStrikeFinisher(unit, explicitTarget);
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                }),
               ),
             ],
           ),

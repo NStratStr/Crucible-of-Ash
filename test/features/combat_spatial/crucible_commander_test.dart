@@ -143,5 +143,47 @@ void main() {
       expect(sculptor.crucibleCinders, equals(cindersBeforeCleave - 15));
       expect(sculptor.currentAp, equals(6400));
     });
+
+    test('Crucible Skill Tree: Equips 5 skills across disciplines, upgrades ranks, and executes Slot 4 heavy assault', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      final tree = engine.skillTreeState;
+
+      // 1. Initial 5 equipped skills for Ash Sculptor
+      expect(tree.equippedSkillIds.length, equals(5));
+      expect(tree.getSkillInSlot(0)?.id, equals('ash_cleave'));
+      expect(tree.getSkillInSlot(1)?.id, equals('ash_brand'));
+      expect(tree.getSkillInSlot(2)?.id, equals('ash_bastion'));
+      expect(tree.getSkillInSlot(3)?.id, equals('ash_whirlwind'));
+      expect(tree.getSkillInSlot(4)?.id, equals('ash_pyre'));
+
+      // 2. Upgrading a skill node with Skill Points
+      final cleave = tree.allSkills['ash_cleave']!;
+      expect(cleave.rank, equals(1));
+      expect(cleave.effectiveMultiplier, equals(1.40));
+      expect(tree.availableSkillPoints, equals(5));
+
+      final upgraded = tree.upgradeSkill('ash_cleave');
+      expect(upgraded, isTrue);
+      expect(cleave.rank, equals(2));
+      expect(cleave.effectiveMultiplier, equals(1.40 * 1.25));
+      expect(tree.availableSkillPoints, equals(4));
+
+      // 3. Cross-Discipline Custom Loadout: Equip Sanguine Siphon into Slot 1 and Dawn Retribution into Slot 4
+      final equipSanguine = tree.equipSkill(0, 'sanguine_rend');
+      expect(equipSanguine, isTrue);
+      expect(tree.getSkillInSlot(0)?.name, equals('Siphon Rend'));
+
+      final equipIron = tree.equipSkill(3, 'iron_retribution');
+      expect(equipIron, isTrue);
+      expect(tree.getSkillInSlot(3)?.name, equals('Dawn Retribution'));
+
+      // 4. Slot 4 Heavy Devastation: Ember Whirlwind consumes 45 Cinders
+      final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
+      sculptor.crucibleCinders = 50;
+      engine.executeUnitAction(sculptor, actionType: 'ember_whirlwind');
+      expect(sculptor.crucibleCinders, equals(5)); // 50 - 45 = 5
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'models/spatial_combat_models.dart';
+import 'models/crucible_skill_tree_models.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/data/starter_brigades.dart';
 import '../../core/combat_math.dart';
@@ -41,6 +42,9 @@ class SpatialCombatEngine extends ChangeNotifier {
   int maxFocus = 7;
   int get teamVitae => focus;
   set teamVitae(int val) => focus = val.clamp(0, maxFocus);
+
+  // Crucible Skill Tree & 5-Slot Loadout State
+  late final CrucibleSkillTreeState skillTreeState = CrucibleSkillTreeState();
 
   /// Rank & Rite Spec Sec 2 & Sec 6: Active Unit awaiting turn execution during pause
   CombatUnitState? activeActingUnit;
@@ -551,6 +555,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     // --- POPULATE PLAYER SQUAD ONTO SPATIAL GRID ---
     if (playerEntities != null && playerEntities.isNotEmpty) {
       final activeGen = commandService?.activeGeneralType;
+      skillTreeState.configureDefaultsForGeneral(activeGen ?? GeneralType.malakor);
       final double morriganSpeedMult = activeGen == GeneralType.morrigan ? 1.10 : 1.0;
       final double valeriaArmorMult = activeGen == GeneralType.valeria ? 1.25 : 1.0;
 
@@ -1003,6 +1008,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     );
 
     enemyUnits.addAll([gorgoroth, cinderWitch, pyreZealot]);
+    skillTreeState.configureDefaultsForGeneral(commandService?.activeGeneralType ?? GeneralType.malakor);
 
     // --- PLAYER SQUAD: ASH & STONE ORDER ---
     // --- PLAYER SQUAD: THE ASH SCULPTOR & SCULPTED RETINUE ---
@@ -3052,8 +3058,123 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       }
 
+    } else if (actionType == 'ember_whirlwind' || actionType == 'dawn_retribution' || actionType == 'blood_vortex' || actionType == 'ossuary_catacomb') {
+      // --- SKILL 4: 45 CINDERS (HEAVY ASSAULT / DEVASTATION) ---
+      if (sculptor.crucibleCinders < 45) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 45);
+
+      if (actionType == 'ember_whirlwind') {
+        // Ember Whirlwind: 210% AoE Cleave across frontline + 2 Burns + shreds 25 Armor
+        final rawDmg = (sculptor.effectiveAttack * 2.10).round();
+        int totalDmg = 0;
+        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList()) {
+          final d = enemy.takeDamage(rawDmg, isPhysical: true);
+          enemy.burnDuration = max(enemy.burnDuration, 90);
+          enemy.armor = max(0, enemy.armor - 25);
+          totalDmg += d;
+        }
+        if (totalDmg == 0) {
+          totalDmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+          validTarget.burnDuration = max(validTarget.burnDuration, 90);
+          validTarget.armor = max(0, validTarget.armor - 25);
+        }
+        addLog('ASH SCULPTOR: Ember Whirlwind tears across front ranks for $totalDmg DMG (+2 Burns, -25 Armor)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'whirlwind_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Ember Whirlwind',
+          targetId: validTarget.id,
+          targetName: 'Frontline Enemies',
+          damage: totalDmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.horizontalRowScythe,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+
+      } else if (actionType == 'dawn_retribution') {
+        // Dawn Retribution: 220% Holy Strike + staggers all targets by -2,500 AP + counter-reflect stance
+        final rawDmg = (sculptor.effectiveAttack * 2.20).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        for (final enemy in opposingSquad.where((u) => u.isAlive)) {
+          enemy.currentAp = max(0, enemy.currentAp - 2500);
+        }
+        sculptor.chiseledTraitIds.add('iron_thorns');
+        addLog('IRON SCULPTOR: Dawn Retribution smites ${validTarget.name} for $dmg DMG & delays all foes (-2,500 AP)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'retribution_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Dawn Retribution',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+
+      } else if (actionType == 'blood_vortex') {
+        // Blood Vortex: 200% Blood Siphon across all bleeding foes + restores 20% Max HP to squad
+        final rawDmg = (sculptor.effectiveAttack * 2.00).round();
+        int totalLeeched = 0;
+        final bleedingFoes = opposingSquad.where((u) => u.isAlive && u.bleedStacks > 0).toList();
+        final targets = bleedingFoes.isNotEmpty ? bleedingFoes : [validTarget];
+        for (final t in targets) {
+          final d = t.takeDamage(rawDmg, isPhysical: true);
+          totalLeeched += d;
+          t.bleedStacks += 2;
+        }
+        final squadHeal = (sculptor.maxHp * 0.20).round();
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.hp = min(ally.maxHp, ally.hp + squadHeal);
+        }
+        addLog('SANGUINE SCULPTOR: Blood Vortex harvests $totalLeeched DMG from bleeding foes & heals squad +$squadHeal HP!');
+        dispatchAction(SpatialActionEvent(
+          id: 'vortex_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Blood Vortex',
+          targetId: validTarget.id,
+          targetName: 'Bleeding Enemies',
+          damage: totalLeeched,
+          isHeal: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.horizontalRowScythe,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+
+      } else if (actionType == 'ossuary_catacomb') {
+        // Ossuary Catacomb: 200% Blight Rupture + stuns target column for 1 turn + +40 Ossuary barrier
+        final rawDmg = (sculptor.effectiveAttack * 2.00).round();
+        final targetCol = validTarget.occupiedNodes.firstOrNull?.column ?? 0;
+        int totalDmg = 0;
+        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol))) {
+          final d = enemy.takeDamage(rawDmg, isPhysical: false);
+          enemy.currentAp = 0; // Stun / reset AP
+          enemy.poisonStacks += 3;
+          totalDmg += d;
+        }
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.aegisShield += 40;
+        }
+        addLog('MIRE SCULPTOR: Ossuary Catacomb impales Column ${targetCol + 1} ($totalDmg DMG, Stunned, +40 Squad Barrier)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'catacomb_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Ossuary Catacomb',
+          targetId: validTarget.id,
+          targetName: 'Column ${targetCol + 1}',
+          damage: totalDmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.piercingColumnSkewer,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+
     } else if (actionType.contains('cataclysmic') || actionType.contains('pyre') || actionType.contains('wrath') || actionType.contains('exsanguination') || actionType.contains('spore') || actionType == 'ultimate') {
-      // --- SKILL 4: 80 CINDERS (APEX FINISHER) ---
+      // --- SKILL 5: 80 CINDERS (APEX FINISHER) ---
       if (sculptor.crucibleCinders < 80) return;
       final bool isForgeCrit = actionType.contains('crit');
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 80);
