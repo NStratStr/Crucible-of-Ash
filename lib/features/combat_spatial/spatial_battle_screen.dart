@@ -8187,7 +8187,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       if (slotIdx != null) {
         final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
-        if (skill == null || unit.crucibleCinders < skill.cinderCost) return;
+        final bool isGenerator = skill != null && skill.cinderCost == 0;
+        if (skill == null || (!isGenerator && unit.crucibleCinders < skill.cinderCost)) return;
         if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
           _startForgeStrikeFinisher(unit, explicitTarget);
         } else {
@@ -8201,7 +8202,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       final skill = _engine.skillTreeState.allSkills[actionType] ??
           _engine.skillTreeState.allSkills.values.where((s) => s.actionType == actionType).firstOrNull;
       if (skill != null) {
-        if (unit.crucibleCinders < skill.cinderCost) return;
+        final bool isGenerator = skill.cinderCost == 0;
+        if (!isGenerator && unit.crucibleCinders < skill.cinderCost) return;
         if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
           _startForgeStrikeFinisher(unit, explicitTarget);
         } else {
@@ -8703,7 +8705,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   if (skill == null) return const SizedBox.shrink();
 
                   final bool isFinisher = skill.cinderCost >= 80;
-                  final bool isEnabled = unit.crucibleCinders >= skill.cinderCost;
+                  final bool isGenerator = skill.cinderCost == 0;
+                  final int cinderYield = skill.rank >= 3 ? 10 : (skill.rank == 2 ? 8 : 6);
+                  final bool isEnabled = isGenerator || (unit.crucibleCinders >= skill.cinderCost);
 
                   return Expanded(
                     child: Padding(
@@ -8712,7 +8716,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         title: isNarrow && skill.name.length > 7
                             ? '${skill.name.substring(0, 6)}.'
                             : skill.name.toUpperCase(),
-                        subtitle: '${skill.cinderCost}🔥 • R${skill.rank}',
+                        subtitle: isGenerator
+                            ? '+$cinderYield🔥 • R${skill.rank}'
+                            : '${skill.cinderCost}🔥 • R${skill.rank}',
                         icon: skill.icon,
                         activeColor: isFinisher
                             ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))

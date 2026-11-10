@@ -189,17 +189,39 @@ class _AppShellState extends State<AppShell> {
     }
     // Slot 0: Always The Ash Sculptor Commander
     result[0] = result[0].copyWith(
+      id: 'ash_sculptor_01',
       name: 'The Ash Sculptor',
       speciesId: 'ash_sculptor',
       customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
     );
     // Slot 1: Always the animated Iron Footman Vanguard companion
     result[1] = result[1].copyWith(
+      id: 'ash_footman_01',
       name: 'Iron Footman',
       speciesId: 'iron_footman',
       archetype: Archetype.juggernaut,
       customAvatarAsset: 'assets/images/iron_footman_idle.png',
+      speed: 90,
     );
+    // Slot 2: Distinct Grave Duelist companion (heal corrupted duplicate sculptors)
+    if (result.length > 2) {
+      final u2 = result[2];
+      if (u2.speciesId.contains('ash_sculptor') ||
+          u2.speciesId.contains('vladislav') ||
+          u2.name.contains('Sculptor') ||
+          u2.id.contains('sculptor') ||
+          u2.id.contains('vladislav') ||
+          u2.id == result[0].id) {
+        result[2] = result[2].copyWith(
+          id: 'ash_duelist_01',
+          name: 'Grave Duelist',
+          speciesId: 'grave_duelist',
+          archetype: Archetype.assassin,
+          customAvatarAsset: 'assets/images/grave_duelist.png',
+          speed: 125,
+        );
+      }
+    }
     return result;
   }
 
@@ -397,13 +419,36 @@ class _AppShellState extends State<AppShell> {
       isReachable: true,
     );
 
-    // Ensure lead commander is The Ash Sculptor with full HP
-    final updatedAllies = _tickManager.allies.map((u) {
-      if (u.id.contains('vladislav') || u.speciesId.contains('vladislav') || u == _tickManager.allies.first) {
+    // Ensure lead commander is The Ash Sculptor with full HP, and companions are distinct
+    final updatedAllies = _tickManager.allies.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final u = entry.value;
+      if (idx == 0) {
         return u.copyWith(
+          id: 'ash_sculptor_01',
           name: 'The Ash Sculptor',
           speciesId: 'ash_sculptor',
           customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
+          currentHp: u.currentHp <= 0 ? u.maxHp : u.currentHp,
+        );
+      } else if (idx == 1 && (u.speciesId.contains('ash_sculptor') || u.name.contains('Sculptor'))) {
+        return u.copyWith(
+          id: 'ash_footman_01',
+          name: 'Iron Footman',
+          speciesId: 'iron_footman',
+          archetype: Archetype.juggernaut,
+          customAvatarAsset: 'assets/images/iron_footman_idle.png',
+          speed: 90,
+          currentHp: u.currentHp <= 0 ? u.maxHp : u.currentHp,
+        );
+      } else if (idx == 2 && (u.speciesId.contains('ash_sculptor') || u.name.contains('Sculptor'))) {
+        return u.copyWith(
+          id: 'ash_duelist_01',
+          name: 'Grave Duelist',
+          speciesId: 'grave_duelist',
+          archetype: Archetype.assassin,
+          customAvatarAsset: 'assets/images/grave_duelist.png',
+          speed: 125,
           currentHp: u.currentHp <= 0 ? u.maxHp : u.currentHp,
         );
       } else if (u.currentHp <= 0) {

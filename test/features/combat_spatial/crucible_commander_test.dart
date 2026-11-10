@@ -57,8 +57,8 @@ void main() {
       expect(engine.playerUnits.length, 3);
       expect(engine.playerUnits[0].name, 'The Ash Sculptor');
       expect(engine.playerUnits[0].isAshSculptor, isTrue);
-      expect(engine.playerUnits[1].name, 'Tombstone Sentinel');
-      expect(engine.playerUnits[2].name, 'Blood Scribe');
+      expect(engine.playerUnits[1].name, 'Iron Footman');
+      expect(engine.playerUnits[2].name, 'Grave Duelist');
 
       for (final ally in engine.playerUnits) {
         expect(ally.occupiedNodes.isNotEmpty, isTrue, reason: '${ally.name} should have occupied grid nodes');
@@ -136,12 +136,120 @@ void main() {
       expect(sculptor.currentAp, lessThan(10000));
       expect(sculptor.crucibleCinders, equals(cindersBefore + 6));
 
-      // Spending 15 Cinders on Forge Cleave executes immediately without resetting interval TM
+      // Slot 1 (Forge Cleave) is an always-available builder consuming 0 Cinders and generating +6 Cinders
       sculptor.currentAp = 6400;
-      final cindersBeforeCleave = sculptor.crucibleCinders;
+      sculptor.crucibleCinders = 0; // Test activation at 0 cinders!
       engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
-      expect(sculptor.crucibleCinders, equals(cindersBeforeCleave - 15));
+      expect(sculptor.crucibleCinders, equals(6));
       expect(sculptor.currentAp, equals(6400));
+    });
+
+    test('Player retinue has distinct companions and staggered initiative so attacks do not sync', () {
+      final engine = SpatialCombatEngine();
+      engine.setupCampaignEncounter(
+        playerEntities: const [
+          UnitEntity(
+            id: 'corrupted_0',
+            speciesId: 'ash_sculptor',
+            name: 'The Ash Sculptor',
+            generation: 1,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.assassin,
+            slot: FormationSlot.front1,
+            level: 4,
+            maxLevel: 10,
+            currentHp: 1665,
+            maxHp: 1665,
+            attack: 283,
+            defense: 110,
+            speed: 115,
+            resist: 65,
+            nativeTraitId: 'vampiric_conduit',
+            lineageAncestors: ['strigoi_lord'],
+          ),
+          UnitEntity(
+            id: 'corrupted_1',
+            speciesId: 'ash_sculptor',
+            name: 'The Ash Sculptor',
+            generation: 1,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.juggernaut,
+            slot: FormationSlot.front2,
+            level: 5,
+            maxLevel: 10,
+            currentHp: 1531,
+            maxHp: 1531,
+            attack: 194,
+            defense: 140,
+            speed: 95,
+            resist: 60,
+            nativeTraitId: 'shield_bash',
+            lineageAncestors: ['ironclad_veteran'],
+          ),
+          UnitEntity(
+            id: 'corrupted_2',
+            speciesId: 'ash_sculptor',
+            name: 'The Ash Sculptor',
+            generation: 1,
+            rarity: UnitRarity.legendary,
+            archetype: Archetype.assassin,
+            slot: FormationSlot.front3,
+            level: 5,
+            maxLevel: 10,
+            currentHp: 1531,
+            maxHp: 1531,
+            attack: 194,
+            defense: 75,
+            speed: 125,
+            resist: 45,
+            nativeTraitId: 'vicious_strike',
+            lineageAncestors: ['ashen_inquisitor'],
+          ),
+        ],
+        enemyEntities: const [
+          UnitEntity(
+            id: 'dummy',
+            speciesId: 'dummy',
+            name: 'Dummy',
+            generation: 1,
+            rarity: UnitRarity.common,
+            archetype: Archetype.juggernaut,
+            slot: FormationSlot.front1,
+            level: 1,
+            maxLevel: 10,
+            currentHp: 1000,
+            maxHp: 1000,
+            attack: 10,
+            defense: 10,
+            speed: 50,
+            resist: 10,
+            nativeTraitId: 'none',
+            lineageAncestors: [],
+          ),
+        ],
+      );
+
+      // Verify that corrupt clone entities are healed into distinct units
+      expect(engine.playerUnits.length, 3);
+      expect(engine.playerUnits[0].name, 'The Ash Sculptor');
+      expect(engine.playerUnits[0].isAshSculptor, isTrue);
+      expect(engine.playerUnits[0].speed, 115);
+      expect(engine.playerUnits[0].currentAp, 0);
+
+      expect(engine.playerUnits[1].name, 'Iron Footman');
+      expect(engine.playerUnits[1].isAshSculptor, isFalse);
+      expect(engine.playerUnits[1].customAssetPath, 'assets/images/iron_footman_idle.png');
+      expect(engine.playerUnits[1].speed, 95);
+      expect(engine.playerUnits[1].currentAp, 2500);
+
+      expect(engine.playerUnits[2].name, 'Grave Duelist');
+      expect(engine.playerUnits[2].isAshSculptor, isFalse);
+      expect(engine.playerUnits[2].customAssetPath, 'assets/images/grave_duelist.png');
+      expect(engine.playerUnits[2].speed, 125);
+      expect(engine.playerUnits[2].currentAp, 5000);
+
+      // Verify that only 1 unit is Ash Sculptor
+      expect(engine.playerUnits.where((u) => u.isAshSculptor).length, 1);
     });
 
     test('Crucible Skill Tree: Equips 5 skills across disciplines, upgrades ranks, and executes Slot 4 heavy assault', () {
