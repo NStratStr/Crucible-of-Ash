@@ -295,6 +295,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _battlefieldFocusNode = FocusNode();
     SpriteSheetAnimation.precache('assets/animations/ash_sculptor_attack_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/ash_sculptor_defend_sheet.png');
+    SpriteSheetAnimation.precache('assets/animations/ash_sculptor_idle_sheet.png');
+    SpriteSheetAnimation.precache('assets/animations/blood_scribe_idle_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
@@ -5966,6 +5968,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
                                         unit.assetPath,
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
+                                    )
+                              : (unit.isPlayer &&
+                                      !unit.isDowned &&
+                                      (unit.isAshSculptor ||
+                                          unit.id == 'ash_sculptor' ||
+                                          unit.templateId == 'ash_sculptor' ||
+                                          unit.assetPath.toLowerCase().contains('ash_sculptor')))
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/ash_sculptor_idle_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: const Duration(milliseconds: 2400),
+                                      loop: true,
+                                      fit: BoxFit.contain,
+                                      fallback: Image.asset(
+                                        'assets/images/ash_sculptor_idle.png',
+                                        fit: BoxFit.contain,
+                                        alignment: Alignment.bottomCenter,
+                                      ),
+                                    )
+                              : (!unit.isDowned &&
+                                      (unit.id.contains('scribe') ||
+                                          unit.templateId.contains('scribe') ||
+                                          unit.assetPath.toLowerCase().contains('scribe')))
+                                  ? SpriteSheetAnimation(
+                                      assetPath: 'assets/animations/blood_scribe_idle_sheet.png',
+                                      columns: 3,
+                                      rows: 2,
+                                      totalFrames: 6,
+                                      duration: Duration(milliseconds: isAttacking ? 1300 : 2500),
+                                      loop: true,
+                                      fit: BoxFit.contain,
+                                      fallback: Image.asset(
+                                        'assets/images/blood_scribe_idle.png',
                                         fit: BoxFit.contain,
                                         alignment: Alignment.bottomCenter,
                                       ),

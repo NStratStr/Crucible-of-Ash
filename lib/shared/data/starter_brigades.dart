@@ -568,7 +568,7 @@ class StarterBrigades {
         lineageAncestors: const [],
         speciesId: 'blood_scribe',
         name: 'Blood Scribe',
-        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png',
+        customAvatarAsset: 'assets/images/blood_scribe_idle.png',
         generation: 1,
         archetype: Archetype.occultist,
         slot: FormationSlot.front3,
@@ -1589,7 +1589,7 @@ class StarterBrigades {
           speed: 92,
           nativeTraitId: 'plague_hex',
           lineageAncestors: [],
-          customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png',
+          customAvatarAsset: 'assets/images/blood_scribe_idle.png',
         ),
         const UnitEntity(
           id: 'enemy_ch2_initiate',
@@ -1979,7 +1979,7 @@ class StarterBrigades {
         speed: 110,
         nativeTraitId: 'pyre_infusion',
         lineageAncestors: [],
-        customAvatarAsset: 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png',
+        customAvatarAsset: 'assets/images/blood_scribe_idle.png',
       ),
       const UnitEntity(
         id: 'pyre_zealot',
