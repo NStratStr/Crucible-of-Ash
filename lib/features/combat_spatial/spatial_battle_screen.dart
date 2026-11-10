@@ -5761,9 +5761,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final bool isDamaged = _damagedUnitId == unit.id || _damagedUnitIds.contains(unit.id);
     final String? floatingPop = _unitFloatingPops[unit.id];
 
-    // Lunge forward across clash line during attack with heroic elevation arc
-    final double lungeY = _is2DGridView ? (isAttacking ? -16.0 : 0.0) : (isAttacking ? (unit.isPlayer ? -20.0 : 20.0) : 0.0);
-    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 64.0 : -48.0) : 0.0;
+    // Subtle forward step during attack so the sprite animation plays cleanly in the open clash space
+    // without crossing over or hiding behind the enemy squad!
+    final double lungeY = _is2DGridView ? (isAttacking ? -4.0 : 0.0) : (isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0);
+    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 22.0 : -22.0) : 0.0;
     // Directional knockback recoil when taking a hit (pushed backward away from enemy strike)
     final double hitRecoilX = isDamaged ? (unit.isPlayer ? -20.0 : 20.0) : 0.0;
     final double hitShakeY = isDamaged ? -6.0 : 0.0;
@@ -5869,17 +5870,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 opacity: unit.isDowned ? 0.68 : 1.0,
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 180),
-                  scale: unit.isDowned ? 0.94 : (isAttacking ? 1.35 : 1.0),
+                  scale: unit.isDowned ? 0.94 : (isAttacking ? 1.18 : 1.0),
                   curve: Curves.easeOutBack,
                   child: SizedBox(
-                    width: isAttacking ? (modelWidth * 1.65).clamp(90.0, 260.0) : modelWidth,
-                    height: isAttacking ? (modelHeight * 1.65).clamp(90.0, 260.0) : modelHeight,
+                    width: isAttacking ? (modelWidth * 1.35).clamp(90.0, 220.0) : modelWidth,
+                    height: isAttacking ? (modelHeight * 1.35).clamp(90.0, 220.0) : modelHeight,
                     child: Stack(
                       alignment: Alignment.bottomCenter,
                       clipBehavior: Clip.none,
                       children: [
                         // Main Character Sprite (with Stone Petrification / Hit-Flash color filter)
-                        ColorFiltered(
+                        Positioned.fill(
+                          child: ColorFiltered(
                           colorFilter: unit.isDowned
                               ? const ColorFilter.matrix(<double>[
                                   0.2126, 0.7152, 0.0722, 0, 10,
@@ -5942,12 +5944,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                   fit: BoxFit.contain,
                                   alignment: Alignment.bottomCenter,
                                   filterQuality: FilterQuality.medium,
-                                  errorBuilder: (context, error, stackTrace) => Icon(
-                                    unit.isPlayer ? Icons.shield : Icons.security,
-                                    color: factionColor,
-                                    size: isBoss ? 48 : 36,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                      unit.isPlayer ? Icons.shield : Icons.security,
+                                      color: factionColor,
+                                      size: isBoss ? 48 : 36,
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
 
                         // Ash Dissolve Floating Embers for Downed / Inert Vessels

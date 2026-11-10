@@ -138,16 +138,18 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
         final int col = currentFrame % widget.columns;
         final int row = currentFrame ~/ widget.columns;
 
-        return CustomPaint(
-          painter: _SpriteSheetPainter(
-            image: _image!,
-            columns: widget.columns,
-            rows: widget.rows,
-            frameCol: col,
-            frameRow: row,
-            fit: widget.fit,
-            blendMode: widget.blendMode,
-            colorFilter: widget.colorFilter,
+        return SizedBox.expand(
+          child: CustomPaint(
+            painter: _SpriteSheetPainter(
+              image: _image!,
+              columns: widget.columns,
+              rows: widget.rows,
+              frameCol: col,
+              frameRow: row,
+              fit: widget.fit,
+              blendMode: widget.blendMode,
+              colorFilter: widget.colorFilter,
+            ),
           ),
         );
       },
@@ -178,6 +180,8 @@ class _SpriteSheetPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
     final double frameWidth = image.width / columns;
     final double frameHeight = image.height / rows;
 
@@ -188,7 +192,11 @@ class _SpriteSheetPainter extends CustomPainter {
       frameHeight,
     );
 
-    final Rect dstRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final FittedSizes fitted = applyBoxFit(fit, Size(frameWidth, frameHeight), size);
+    final Rect dstRect = Alignment.bottomCenter.inscribe(
+      fitted.destination,
+      Rect.fromLTWH(0, 0, size.width, size.height),
+    );
 
     final Paint paint = Paint()..filterQuality = FilterQuality.high;
     if (colorFilter != null) {
