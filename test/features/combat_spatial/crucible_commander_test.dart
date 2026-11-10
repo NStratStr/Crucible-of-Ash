@@ -114,27 +114,27 @@ void main() {
       final minion = engine.playerUnits.firstWhere((u) => !u.isAshSculptor);
 
       sculptor.currentAp = 0;
-      sculptor.crucibleCinders = 45;
+      sculptor.crucibleCinders = 15;
       minion.currentAp = 9950; // Will reach 10,000 TM on next tick
 
       engine.stepTick();
 
       // Minion should NOT pause turn execution for legacy UI tray
       expect(engine.isTurnExecutionPaused, isFalse);
-      // Minion should have acted automatically and channeled +10 Cinders to the Ash Sculptor
+      // Minion should have acted automatically and channeled +3 Cinders to the Ash Sculptor
       expect(minion.currentAp, lessThan(10000));
-      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(55));
+      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(18));
 
       // Clear action pause so next tick can resolve
       engine.activeActionEvent = null;
 
-      // Now bring The Ash Sculptor to 10,000 TM -> attacks automatically at interval for +15 Cinders!
+      // Now bring The Ash Sculptor to 10,000 TM -> attacks automatically at interval for +6 Cinders!
       final cindersBefore = sculptor.crucibleCinders;
       sculptor.currentAp = 9950;
       engine.stepTick();
       expect(engine.isTurnExecutionPaused, isFalse);
       expect(sculptor.currentAp, lessThan(10000));
-      expect(sculptor.crucibleCinders, equals(cindersBefore + 15));
+      expect(sculptor.crucibleCinders, equals(cindersBefore + 6));
 
       // Spending 15 Cinders on Forge Cleave executes immediately without resetting interval TM
       sculptor.currentAp = 6400;

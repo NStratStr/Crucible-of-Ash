@@ -108,6 +108,9 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
+  /// Active General Type accessor
+  GeneralType get activeGeneralType => commandService?.activeGeneralType ?? GeneralType.malakor;
+
   /// GDD Section 4.2: Positional Commander Stance Aura for Lady Valeria
   /// Row 0 = Frontline ("Bastion of Cold Iron": Frontline allies gain +25 Armor)
   /// Row 1 or 2 = Rearguard ("Aegis Rearguard": Mid/Backline allies gain +20% Shield/Ward potency)
@@ -578,10 +581,31 @@ class SpatialCombatEngine extends ChangeNotifier {
         // Identify the Commander Protagonist (lead slot) and Vanguard Footman (slot 1)
         final bool isCommanderLead = (i == 0) ||
             p.speciesId.contains('vladislav') ||
+            p.speciesId.contains('valeria') ||
+            p.speciesId.contains('morrigan') ||
             p.speciesId.contains('ash_sculptor') ||
             p.id.contains('vladislav') ||
+            p.id.contains('valeria') ||
+            p.id.contains('morrigan') ||
             p.id.contains('ash_sculptor');
         final bool isFootmanCompanion = !isCommanderLead && (i == 1);
+
+        String commanderName = 'The Ash Sculptor';
+        String commanderAsset = 'assets/images/ash_sculptor_idle.png';
+        String commanderTemplate = 'ash_sculptor';
+        if (activeGen == GeneralType.valeria) {
+          commanderName = 'The Iron Sculptor';
+          commanderAsset = 'assets/images/Ash Legion/lady_valeria_g1.png';
+          commanderTemplate = 'iron_sculptor';
+        } else if (activeGen == GeneralType.vladislav) {
+          commanderName = 'The Sanguine Sculptor';
+          commanderAsset = 'assets/images/lord_vladislav.png';
+          commanderTemplate = 'sanguine_sculptor';
+        } else if (activeGen == GeneralType.morrigan) {
+          commanderName = 'The Mire Sculptor';
+          commanderAsset = 'assets/images/Mire Coven/[MIR-CMD-G1] Swamp-Witch Morbida (Initiate Commander).png';
+          commanderTemplate = 'mire_sculptor';
+        }
 
         final String unitId = isCommanderLead
             ? 'ash_sculptor'
@@ -592,16 +616,16 @@ class SpatialCombatEngine extends ChangeNotifier {
         playerUnits.add(CombatUnitState(
           id: unitId,
           name: isCommanderLead
-              ? 'The Ash Sculptor'
+              ? commanderName
               : (isFootmanCompanion ? 'Iron Footman' : p.name),
           templateId: isCommanderLead
-              ? 'ash_sculptor'
+              ? commanderTemplate
               : (isFootmanCompanion ? 'iron_footman' : p.speciesId),
           isPlayer: true,
           isAshSculptor: isCommanderLead,
-          crucibleCinders: isCommanderLead ? 45 : 0,
+          crucibleCinders: isCommanderLead ? 15 : 0,
           customAssetPath: isCommanderLead
-              ? 'assets/images/ash_sculptor_idle.png'
+              ? commanderAsset
               : (isFootmanCompanion ? 'assets/images/iron_footman_idle.png' : p.customAvatarAsset),
           footprint: UnitFootprint.single1x1,
           archetype: (isCommanderLead || isFootmanCompanion)
@@ -989,7 +1013,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       templateId: 'ash_sculptor',
       isPlayer: true,
       isAshSculptor: true,
-      crucibleCinders: 45,
+      crucibleCinders: 15,
       archetype: UnitArchetype.vanguardMelee,
       footprint: UnitFootprint.single1x1,
       occupiedNodes: [
@@ -1732,6 +1756,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
     final applied = target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
+    if (target.isPlayer && (target.id.contains('footman') || target.templateId.contains('footman')) && applied > 0) {
+      final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+      if (sculptor != null && sculptor.isAlive) {
+        sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 3);
+        addLog('  🛡️ [TEMPERED ANVIL] ${target.name} weathered attack: +3 Cinders to Sculptor (${sculptor.crucibleCinders}/100)!');
+      }
+    }
     if (target.chiseledTraitIds.contains('iron_thorns') && isPhysical && applied > 0) {
       // Find attacker if viable
       final enemiesOrAllies = target.isPlayer ? enemyUnits : playerUnits;
@@ -2754,106 +2785,319 @@ class SpatialCombatEngine extends ChangeNotifier {
             opposingSquad.where((u) => u.isAlive).firstOrNull;
 
     if (validTarget == null) return;
+    final activeGen = commandService?.activeGeneralType ?? GeneralType.malakor;
 
-    if (actionType == 'forge_cleave') {
-      // 0. Forge Cleave: Spends 15 Cinders for an immediate on-demand 140% ATK heavy strike (+1 Bleed)
+    if (actionType == 'forge_cleave' || actionType == 'cleave' || actionType == 'cold_iron_slam' || actionType == 'siphon_rend' || actionType == 'corrosive_touch') {
+      // --- SKILL 1: 15 CINDERS ---
       if (sculptor.crucibleCinders < 15) return;
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 15);
-      final rawDmg = (sculptor.effectiveAttack * 1.40).round();
-      final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
-      validTarget.bleedStacks += 1;
 
-      addLog('ASH SCULPTOR: Forge Cleave strikes ${validTarget.name} for $dmg DMG (-15 Cinders)!');
-      dispatchAction(SpatialActionEvent(
-        id: 'cleave_${currentTick}_${sculptor.id}',
-        attackerId: sculptor.id,
-        attackerName: sculptor.name,
-        skillName: 'Forge Cleave',
-        targetId: validTarget.id,
-        targetName: validTarget.name,
-        damage: dmg,
-        bleedStacks: 1,
-        isPlayerAttacker: true,
-        pattern: TargetPattern.singleTarget,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      ));
-
-    } else if (actionType == 'sundering_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
-      // 1. Sundering Brand: Spends 30 Cinders, 175% ATK DMG, shatters 50% Armor for 2 turns
-      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
-      final rawDmg = (sculptor.effectiveAttack * 1.75).round();
-      final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
-      validTarget.armor = (validTarget.armor * 0.50).round();
-      validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 60); // 2s vulnerable
-
-      addLog('ASH SCULPTOR: Sundering Brand scorches ${validTarget.name} for $dmg DMG & shatters 50% Armor!');
-      dispatchAction(SpatialActionEvent(
-        id: 'brand_${currentTick}_${sculptor.id}',
-        attackerId: sculptor.id,
-        attackerName: sculptor.name,
-        skillName: 'Sundering Brand',
-        targetId: validTarget.id,
-        targetName: validTarget.name,
-        damage: dmg,
-        isPlayerAttacker: true,
-        pattern: TargetPattern.singleTarget,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      ));
-
-      // Trigger Crypt Stalker Opportunist Synergy:
-      _triggerCryptStalkerAmbush(validTarget);
-
-    } else if (actionType == 'obsidian_bastion') {
-      // 2. Obsidian Bastion: Spends 25 Cinders, grants 25% max HP Aegis Shield to Sculptor and adjacent allies
-      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 25);
-      final shieldAmt = (sculptor.maxHp * 0.25).round();
-      sculptor.aegisShield += shieldAmt;
-
-      for (final ally in playerUnits.where((u) => u.isAlive && u.id != sculptor.id)) {
-        ally.aegisShield += (shieldAmt * 0.65).round();
+      if (activeGen == GeneralType.valeria) {
+        // Cold Iron Slam: 130% ATK, reduces armor by 20, staggers AP -1500
+        final rawDmg = (sculptor.effectiveAttack * 1.30).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        validTarget.armor = max(0, validTarget.armor - 20);
+        validTarget.currentAp = max(0, validTarget.currentAp - 1500);
+        addLog('IRON SCULPTOR: Cold Iron Slam shatters ${validTarget.name} for $dmg DMG (-20 Armor, -1,500 AP)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'slam_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Cold Iron Slam',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.vladislav) {
+        // Siphon Rend: 135% ATK, drains 40% DMG as HP
+        final rawDmg = (sculptor.effectiveAttack * 1.35).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final leechHp = (dmg * 0.40).round();
+        sculptor.hp = min(sculptor.maxHp, sculptor.hp + leechHp);
+        addLog('SANGUINE SCULPTOR: Siphon Rend strikes ${validTarget.name} for $dmg DMG (leeched +$leechHp HP)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'siphon_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Siphon Rend',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isHeal: true,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.morrigan) {
+        // Corrosive Touch: 130% ATK, 2 Poison, -1000 AP
+        final rawDmg = (sculptor.effectiveAttack * 1.30).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        validTarget.poisonStacks += 2;
+        validTarget.currentAp = max(0, validTarget.currentAp - 1000);
+        addLog('MIRE SCULPTOR: Corrosive Touch infects ${validTarget.name} for $dmg DMG (+2 Poison, -1,000 AP)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'corrosive_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Corrosive Touch',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else {
+        // Forge Cleave (Default Ash): 140% ATK + 1 Bleed
+        final rawDmg = (sculptor.effectiveAttack * 1.40).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        validTarget.bleedStacks += 1;
+        addLog('ASH SCULPTOR: Forge Cleave strikes ${validTarget.name} for $dmg DMG (-15 Cinders)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'cleave_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Forge Cleave',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          bleedStacks: 1,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       }
 
-      addLog('ASH SCULPTOR: Obsidian Bastion projects +$shieldAmt Aegis barrier across the commander retinue!');
-      dispatchAction(SpatialActionEvent(
-        id: 'bastion_${currentTick}_${sculptor.id}',
-        attackerId: sculptor.id,
-        attackerName: sculptor.name,
-        skillName: 'Obsidian Bastion',
-        targetId: sculptor.id,
-        targetName: 'Squad Aegis',
-        damage: 0,
-        isPlayerAttacker: true,
-        pattern: TargetPattern.singleTarget,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      ));
+    } else if (actionType == 'sundering_brand' || actionType == 'sundering_judgment' || actionType == 'crimson_brand' || actionType == 'miasmic_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
+      // --- SKILL 2: 30 CINDERS ---
+      if (sculptor.crucibleCinders < 30) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
 
-    } else if (actionType == 'cataclysmic_pyre' || actionType == 'cataclysmic_pyre_crit' || (actionType == 'ultimate' && sculptor.isCataclysmicPyreReady)) {
-      // 3. Cataclysmic Pyre (Apex Finisher): Spends 80 Cinders, AoE 250% (or 350% Perfect Forge Crit) ATK damage to ALL enemies + burns
-      final bool isForgeCrit = actionType == 'cataclysmic_pyre_crit';
+      if (activeGen == GeneralType.valeria) {
+        // Sundering Judgment: 180% Holy DMG, shreds 30% Armor, 3s Vulnerable
+        final rawDmg = (sculptor.effectiveAttack * 1.80).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        validTarget.armor = (validTarget.armor * 0.70).round();
+        validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 90);
+        addLog('IRON SCULPTOR: Sundering Judgment smites ${validTarget.name} for $dmg DMG (-30% Armor, 3s Vulnerable)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'judgment_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Sundering Judgment',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.vladislav) {
+        // Crimson Brand: 165% ATK, 3 Bleeds, detonates active bleeds for 2x
+        final rawDmg = (sculptor.effectiveAttack * 1.65).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final priorBleeds = validTarget.bleedStacks;
+        validTarget.bleedStacks += 3;
+        int bleedDetonationDmg = 0;
+        if (priorBleeds > 0) {
+          bleedDetonationDmg = priorBleeds * 25;
+          validTarget.takeDamage(bleedDetonationDmg, ignoreArmor: true, isPhysical: false);
+        }
+        addLog('SANGUINE SCULPTOR: Crimson Brand carves ${validTarget.name} for $dmg DMG (+3 Bleeds, detonate: +$bleedDetonationDmg)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'crimson_brand_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Crimson Brand',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg + bleedDetonationDmg,
+          bleedStacks: 3,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.morrigan) {
+        // Miasmic Brand: 160% ATK, infects column with 3 Poison and Vulnerable
+        final rawDmg = (sculptor.effectiveAttack * 1.60).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        validTarget.poisonStacks += 3;
+        final targetCol = validTarget.occupiedNodes.firstOrNull?.column ?? 0;
+        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol))) {
+          enemy.poisonStacks += 2;
+          enemy.vulnerableDuration = max(enemy.vulnerableDuration, 60);
+        }
+        addLog('MIRE SCULPTOR: Miasmic Brand plagues Column ${targetCol + 1} (${validTarget.name} took $dmg DMG)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'miasmic_brand_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Miasmic Brand',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.piercingColumnSkewer,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else {
+        // Sundering Brand (Default Ash): 175% ATK, shatters 50% Armor, triggers Crypt Stalker Ambush
+        final rawDmg = (sculptor.effectiveAttack * 1.75).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        validTarget.armor = (validTarget.armor * 0.50).round();
+        validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 60);
+        addLog('ASH SCULPTOR: Sundering Brand scorches ${validTarget.name} for $dmg DMG & shatters 50% Armor!');
+        dispatchAction(SpatialActionEvent(
+          id: 'brand_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Sundering Brand',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+        _triggerCryptStalkerAmbush(validTarget);
+      }
+
+    } else if (actionType == 'obsidian_bastion' || actionType == 'iron_bulwark' || actionType == 'vein_tether' || actionType == 'bone_ward') {
+      // --- SKILL 3: 25 CINDERS ---
+      if (sculptor.crucibleCinders < 25) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 25);
+
+      if (activeGen == GeneralType.valeria) {
+        // Iron Bulwark: +35 Armor & cleanses debuffs across squad
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.armor += 35;
+          ally.burnDuration = 0;
+          ally.poisonStacks = 0;
+          ally.bleedStacks = 0;
+          ally.vulnerableDuration = 0;
+        }
+        addLog('IRON SCULPTOR: Iron Bulwark reinforces retinue with +35 Armor and cleanses debuffs!');
+        dispatchAction(SpatialActionEvent(
+          id: 'bulwark_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Iron Bulwark',
+          targetId: sculptor.id,
+          targetName: 'Squad Bulwark',
+          damage: 0,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.vladislav) {
+        // Vein Tether: 4s Haste & +25 Aegis to all living allies
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.aegisShield += 25;
+          ally.currentAp = min(10000, ally.currentAp + 2500);
+        }
+        addLog('SANGUINE SCULPTOR: Vein Tether hastens retinue (+2,500 AP, +25 Aegis)!');
+        dispatchAction(SpatialActionEvent(
+          id: 'vein_tether_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Vein Tether',
+          targetId: sculptor.id,
+          targetName: 'Squad Tether',
+          damage: 0,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else if (activeGen == GeneralType.morrigan) {
+        // Bone Ward: 30% max HP ossuary shields to all living allies
+        final shieldAmt = (sculptor.maxHp * 0.30).round();
+        for (final ally in playerUnits.where((u) => u.isAlive)) {
+          ally.aegisShield += shieldAmt;
+        }
+        addLog('MIRE SCULPTOR: Bone Ward enchants retinue with +$shieldAmt Ossuary Shields!');
+        dispatchAction(SpatialActionEvent(
+          id: 'bone_ward_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Bone Ward',
+          targetId: sculptor.id,
+          targetName: 'Squad Ossuary',
+          damage: 0,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      } else {
+        // Obsidian Bastion (Default Ash): 25% max HP Aegis to Sculptor, 65% to retinue
+        final shieldAmt = (sculptor.maxHp * 0.25).round();
+        sculptor.aegisShield += shieldAmt;
+        for (final ally in playerUnits.where((u) => u.isAlive && u.id != sculptor.id)) {
+          ally.aegisShield += (shieldAmt * 0.65).round();
+        }
+        addLog('ASH SCULPTOR: Obsidian Bastion projects +$shieldAmt Aegis barrier across the commander retinue!');
+        dispatchAction(SpatialActionEvent(
+          id: 'bastion_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Obsidian Bastion',
+          targetId: sculptor.id,
+          targetName: 'Squad Aegis',
+          damage: 0,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
+      }
+
+    } else if (actionType.contains('cataclysmic') || actionType.contains('pyre') || actionType.contains('wrath') || actionType.contains('exsanguination') || actionType.contains('spore') || actionType == 'ultimate') {
+      // --- SKILL 4: 80 CINDERS (APEX FINISHER) ---
+      if (sculptor.crucibleCinders < 80) return;
+      final bool isForgeCrit = actionType.contains('crit');
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 80);
       final double mult = isForgeCrit ? 3.50 : 2.50;
       final rawDmg = (sculptor.effectiveAttack * mult).round();
-      int totalPyreDmg = 0;
+      int totalApexDmg = 0;
 
       for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
-        final dmg = enemy.takeDamage(rawDmg, isPhysical: false);
-        enemy.burnDuration = max(enemy.burnDuration, 90); // 3s burn
-        totalPyreDmg += dmg;
+        int finalHit = rawDmg;
+        if (activeGen == GeneralType.vladislav && (enemy.hp / max(1, enemy.maxHp)) <= 0.25) {
+          finalHit = (rawDmg * 1.5).round(); // Exsanguination execution threshold
+        } else if (activeGen == GeneralType.morrigan && enemy.poisonStacks > 0) {
+          finalHit = (rawDmg * 1.3).round(); // Spore detonation on poisoned foes
+        }
+        final dmg = enemy.takeDamage(finalHit, isPhysical: activeGen != GeneralType.valeria && activeGen != GeneralType.morrigan);
+        if (activeGen == GeneralType.malakor) {
+          enemy.burnDuration = max(enemy.burnDuration, 90);
+        } else if (activeGen == GeneralType.vladislav) {
+          enemy.bleedStacks += 2;
+        } else if (activeGen == GeneralType.morrigan) {
+          enemy.poisonStacks += 3;
+        }
+        totalApexDmg += dmg;
       }
 
+      final apexName = activeGen == GeneralType.valeria
+          ? 'Wrath of the Dawnbound'
+          : (activeGen == GeneralType.vladislav
+              ? 'Exsanguination Apex'
+              : (activeGen == GeneralType.morrigan ? 'Cataclysmic Spore' : 'Cataclysmic Pyre'));
+
       if (isForgeCrit) {
-        addLog('🔥 CRUCIBLE APEX OVERDRIVE: PERFECT FORGE STRIKE! Cataclysmic Pyre supercharged to 350% ATK ($totalPyreDmg fire DMG)!');
+        addLog('🔥 CRUCIBLE APEX OVERDRIVE: PERFECT FORGE STRIKE! $apexName supercharged to 350% ATK ($totalApexDmg DMG)!');
       } else {
-        addLog('ASH SCULPTOR: CATACLYSMIC PYRE erupts across all enemy ranks for $totalPyreDmg total fire DMG!');
+        addLog('${sculptor.name.toUpperCase()}: $apexName erupts across all enemy ranks for $totalApexDmg total DMG!');
       }
       dispatchAction(SpatialActionEvent(
-        id: 'pyre_${currentTick}_${sculptor.id}',
+        id: 'apex_${currentTick}_${sculptor.id}',
         attackerId: sculptor.id,
         attackerName: sculptor.name,
-        skillName: isForgeCrit ? 'Cataclysmic Pyre (PERFECT FORGE!)' : 'Cataclysmic Pyre',
+        skillName: isForgeCrit ? '$apexName (PERFECT FORGE!)' : apexName,
         targetId: validTarget.id,
         targetName: 'All Enemy Ranks',
-        damage: totalPyreDmg,
+        damage: totalApexDmg,
         isCrit: isForgeCrit,
         isPlayerAttacker: true,
         pattern: TargetPattern.horizontalRowScythe,
@@ -2861,11 +3105,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       ));
 
     } else {
-      // 4. Default / Cinder Strike: Generates +15 Cinders, deals 100% ATK DMG
-      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+      // --- DEFAULT INTERVAL BASIC ATTACK (+6 CINDERS) ---
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 6);
       final dmg = validTarget.takeDamage(sculptor.effectiveAttack, isPhysical: true);
 
-      addLog('ASH SCULPTOR: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+15 Cinders -> ${sculptor.crucibleCinders}/100)!');
+      addLog('${sculptor.name}: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+6 Cinders -> ${sculptor.crucibleCinders}/100)!');
       dispatchAction(SpatialActionEvent(
         id: 'strike_${currentTick}_${sculptor.id}',
         attackerId: sculptor.id,
@@ -2884,12 +3128,39 @@ class SpatialCombatEngine extends ChangeNotifier {
     advanceToNextWaveIfPending();
   }
 
-  /// Retinue Companion Synergy 1: Retinue companions channel +10 Cinders to Ash Sculptor on turn
-  void _channelRetinueCinders(CombatUnitState companion) {
+  /// Retinue Companion Synergy 1: Retinue companions channel +3 Cinders (bonus on Crit/Pierce) to the Sculptor
+  void _channelRetinueCinders(CombatUnitState companion, {bool isCrit = false, bool isPierce = false}) {
     final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
     if (sculptor != null && sculptor.isAlive) {
-      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 10);
-      addLog('  ★ [RETINUE CONDUIT] ${companion.name} channels +10 Cinders to the Ash Sculptor (${sculptor.crucibleCinders}/100)!');
+      int cinders = 3;
+      String perk = '';
+      if (isCrit && (companion.templateId.contains('duelist') || companion.archetype == UnitArchetype.reachMidline)) {
+        cinders = 6;
+        perk = ' (DEADLY SPARK CRIT!)';
+      } else if (isPierce && (companion.templateId.contains('arbalest') || companion.templateId.contains('marksman'))) {
+        cinders = 5;
+        perk = ' (PIERCING SPARK!)';
+      }
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + cinders);
+      addLog('  ★ [RETINUE CONDUIT] ${companion.name} channels +$cinders Cinders$perk to the Sculptor (${sculptor.crucibleCinders}/100)!');
+    }
+  }
+
+  /// Direct Retinue Command: Order a companion to immediately unleash their unique signature skill
+  void executeCompanionSignature(String companionId, {CombatUnitState? explicitTarget}) {
+    final companion = playerUnits.where((u) => u.id == companionId && u.isAlive).firstOrNull;
+    if (companion == null) return;
+    final opposingSquad = enemyUnits;
+    final target = (explicitTarget != null && explicitTarget.isAlive)
+        ? explicitTarget
+        : _resolveColumnTarget(unitCol: companion.occupiedNodes.firstOrNull?.column ?? 0, targetingPlayers: false) ??
+            opposingSquad.where((u) => u.isAlive).firstOrNull;
+    if (target != null) {
+      _executeSignatureSkill(companion, target);
+      companion.signatureCooldown = 3; // Reset signature cooldown
+      addLog('⚡ RETINUE COMMAND: Ordered ${companion.name} to execute ${companion.signatureSkillName} on ${target.name}!');
+      lastBannerMessage = 'RETINUE ORDER: ${companion.name.toUpperCase()} — ${companion.signatureSkillName.toUpperCase()}!';
+      notifyListeners();
     }
   }
 

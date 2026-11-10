@@ -8175,23 +8175,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
+    final disc = SculptorDisciplineVisuals.forGeneral(_engine.activeGeneralType);
+
     if (unit.isAshSculptor || unit.id == 'ash_sculptor') {
-      if (actionType == 'basic' || actionType == 'cinder_strike' || actionType == 'forge_cleave') {
+      if (actionType == 'basic' || actionType == 'cinder_strike' || actionType == 'skill1' || actionType == disc.s1Action) {
         if (unit.crucibleCinders < 15) return;
         setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'forge_cleave');
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s1Action);
         });
-      } else if (actionType == 'signature' || actionType == 'sundering_brand') {
+      } else if (actionType == 'signature' || actionType == 'skill2' || actionType == disc.s2Action) {
         if (unit.crucibleCinders < 30) return;
         setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'sundering_brand');
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s2Action);
         });
-      } else if (actionType == 'obsidian_bastion') {
+      } else if (actionType == 'skill3' || actionType == disc.s3Action) {
         if (unit.crucibleCinders < 25) return;
         setState(() {
-          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: 'obsidian_bastion');
+          _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: disc.s3Action);
         });
-      } else if (actionType == 'ultimate' || actionType == 'cataclysmic_pyre') {
+      } else if (actionType == 'ultimate' || actionType == 'skill4' || actionType == disc.s4Action) {
         if (unit.crucibleCinders < 80) return;
         _startForgeStrikeFinisher(unit, explicitTarget);
       }
@@ -8214,27 +8216,29 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   KeyEventResult _handleBattleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    // Key '1': Strike (+15 Cinders)
+    final disc = SculptorDisciplineVisuals.forGeneral(_engine.activeGeneralType);
+
+    // Key '1': Skill 1 (15 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit1 || event.logicalKey == LogicalKeyboardKey.numpad1) {
-      _executeHotkeyedAction('cinder_strike');
+      _executeHotkeyedAction(disc.s1Action);
       return KeyEventResult.handled;
     }
 
-    // Key '2': Sundering Brand (30 Cinders)
+    // Key '2': Skill 2 (30 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit2 || event.logicalKey == LogicalKeyboardKey.numpad2) {
-      _executeHotkeyedAction('sundering_brand');
+      _executeHotkeyedAction(disc.s2Action);
       return KeyEventResult.handled;
     }
 
-    // Key '3': Obsidian Bastion (25 Cinders)
+    // Key '3': Skill 3 (25 Cinders)
     if (event.logicalKey == LogicalKeyboardKey.digit3 || event.logicalKey == LogicalKeyboardKey.numpad3) {
-      _executeHotkeyedAction('obsidian_bastion');
+      _executeHotkeyedAction(disc.s3Action);
       return KeyEventResult.handled;
     }
 
-    // Key '4': Cataclysmic Pyre Apex (80 Cinders)
+    // Key '4': Skill 4 (80 Cinders Apex)
     if (event.logicalKey == LogicalKeyboardKey.digit4 || event.logicalKey == LogicalKeyboardKey.numpad4) {
-      _executeHotkeyedAction('cataclysmic_pyre');
+      _executeHotkeyedAction(disc.s4Action);
       return KeyEventResult.handled;
     }
 
@@ -8261,37 +8265,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     return KeyEventResult.ignored;
   }
 
-  /// Rank & Rite Spec Sec 2: Turn Action Decision Tray
-  /// Triggered whenever an ally reaches 10,000 TM. Execution pauses so player can:
-  /// 1. Cast 1 Tuning Slip from Sculptor Tray (Vitae pool <= 7).
-  /// 2. Attack / Cast Signature Skill (100% TM cost -> 0 TM).
-  /// 3. Reposition (1-tile shift, 25% TM cost -> 7,500 TM retained).
-    /// Crucible Commander System: The Ash Sculptor Commander Action Tray
+  /// Crucible Commander System: Sculptor Commander Action Tray
   Widget _buildSculptorCommanderTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
     final explicitTarget = _selectedEnemyUnitId != null
         ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
         : _getSmartDefaultTarget();
 
+    final disc = SculptorDisciplineVisuals.forGeneral(_engine.activeGeneralType);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isNarrow = constraints.maxWidth < 650;
-        final bool isPyreReady = unit.crucibleCinders >= 80;
+        final bool isApexReady = unit.crucibleCinders >= 80;
 
         Widget buildCinderMeter() {
           return Container(
             height: isNarrow ? 14 : 16,
-            width: isNarrow ? 100 : 150,
+            width: isNarrow ? 90 : 140,
             decoration: BoxDecoration(
               color: const Color(0xFF1E1210),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00),
-                width: isPyreReady ? 1.4 : 0.8,
+                color: isApexReady ? const Color(0xFFFFD54F) : disc.primaryColor,
+                width: isApexReady ? 1.4 : 0.8,
               ),
-              boxShadow: isPyreReady
+              boxShadow: isApexReady
                   ? [
                       BoxShadow(
-                        color: const Color(0xFFFF6D00).withValues(alpha: 0.6),
+                        color: disc.primaryColor.withValues(alpha: 0.6),
                         blurRadius: 8,
                         spreadRadius: 1,
                       )
@@ -8305,9 +8306,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   FractionallySizedBox(
                     widthFactor: (unit.crucibleCinders / 100.0).clamp(0.0, 1.0),
                     child: Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Color(0xFFD84315), Color(0xFFFF6D00), Color(0xFFFFD54F)],
+                          colors: [disc.primaryColor.withValues(alpha: 0.7), disc.primaryColor, const Color(0xFFFFD54F)],
                         ),
                       ),
                     ),
@@ -8395,20 +8396,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           );
         }
 
+        final companions = _engine.playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive).toList();
+
         return Container(
           padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 12, vertical: isNarrow ? 5 : 8),
           decoration: BoxDecoration(
             color: const Color(0xFF1B1926),
             border: Border(
               top: BorderSide(
-                color: isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00),
-                width: isPyreReady ? 2.0 : 1.5,
+                color: isApexReady ? const Color(0xFFFFD54F) : disc.primaryColor,
+                width: isApexReady ? 2.0 : 1.5,
               ),
               bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
             ),
             boxShadow: [
               BoxShadow(
-                color: (isPyreReady ? const Color(0xFFFFD54F) : const Color(0xFFFF6D00)).withValues(alpha: 0.2),
+                color: (isApexReady ? const Color(0xFFFFD54F) : disc.primaryColor).withValues(alpha: 0.2),
                 blurRadius: 10,
                 offset: const Offset(0, -2),
               ),
@@ -8417,9 +8420,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header Status Row: Avatar + Name + Cinder Gauge + Target
+              // Header Status Row: Avatar + Discipline Name + Cinder Gauge + Target + Controls
               Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 5),
                 child: Row(
                   children: [
                     ClipRRect(
@@ -8436,7 +8439,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF6D00),
+                        color: disc.primaryColor,
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: const Text(
@@ -8446,10 +8449,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      unit.name.toUpperCase(),
+                      disc.title,
                       style: TextStyle(
-                        color: const Color(0xFFFFD54F),
-                        fontSize: isNarrow ? 10.0 : 11.5,
+                        color: disc.primaryColor,
+                        fontSize: isNarrow ? 9.5 : 11.0,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
                       ),
@@ -8465,7 +8468,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 0.8),
                       ),
                       child: Text(
-                        '⚔️ AUTO +15🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
+                        '⚔️ AUTO +6🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
                         style: const TextStyle(
                           fontSize: 7.5,
                           color: Color(0xFF80D8FF),
@@ -8541,26 +8544,132 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
 
-              // Action Buttons Row: 4 Active Cinder Commander Abilities
+              // Retinue Command Sub-Bar: Direct orders for player companions
+              if (companions.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141622),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.white12, width: 0.8),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF263238),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          'RETINUE',
+                          style: TextStyle(fontSize: 7.0, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: companions.map((comp) {
+                              final bool isSigReady = comp.signatureCooldown <= 0;
+                              return Container(
+                                margin: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A1F2C),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isSigReady ? const Color(0xFFFFD54F) : Colors.white10,
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: Image.asset(
+                                        comp.assetPath,
+                                        width: 18,
+                                        height: 18,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14, color: Colors.white70),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          comp.name,
+                                          style: const TextStyle(fontSize: 7.5, color: Colors.white, fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          comp.signatureSkillName,
+                                          style: TextStyle(
+                                            fontSize: 6.5,
+                                            color: isSigReady ? const Color(0xFFFFD54F) : Colors.white38,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 5),
+                                    SizedBox(
+                                      height: 19,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isSigReady ? const Color(0xFFFF6D00) : const Color(0xFF263238),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                                        ),
+                                        onPressed: isSigReady
+                                            ? () {
+                                                setState(() {
+                                                  _engine.executeCompanionSignature(comp.id, explicitTarget: explicitTarget);
+                                                });
+                                              }
+                                            : null,
+                                        child: Text(
+                                          isSigReady ? 'ORDER' : '${comp.signatureCooldown} CD',
+                                          style: const TextStyle(fontSize: 7.0, fontWeight: FontWeight.w900),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Action Buttons Row: 4 Active Cinder Disciplined Commander Abilities
               Row(
                 children: [
-                  // 1. Forge Cleave (15 Cinders)
+                  // Skill 1 (15 Cinders)
                   Expanded(
                     child: buildActionButton(
-                      title: 'CLEAVE',
-                      subtitle: '15 Cinders',
-                      icon: Icons.sports_mma,
-                      activeColor: const Color(0xFFB3261E),
-                      borderColor: const Color(0xFFFF8A80),
+                      title: disc.s1Title,
+                      subtitle: disc.s1Sub,
+                      icon: disc.s1Icon,
+                      activeColor: disc.s1Color,
+                      borderColor: disc.s1Border,
                       isEnabled: unit.crucibleCinders >= 15,
-                      tooltipMessage: 'Forge Cleave: Consumes 15 Cinders for an immediate 140% ATK heavy cleave (+1 Bleed). Or wait for your free Auto-Strike (+15 Cinders)!',
+                      tooltipMessage: disc.s1Tooltip,
                       onPressed: () {
                         setState(() {
                           _engine.executeUnitAction(
                             unit,
                             isReposition: false,
                             explicitTarget: explicitTarget,
-                            actionType: 'forge_cleave',
+                            actionType: disc.s1Action,
                           );
                         });
                       },
@@ -8568,23 +8677,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                   const SizedBox(width: 4),
 
-                  // 2. Sundering Brand
+                  // Skill 2 (30 Cinders)
                   Expanded(
                     child: buildActionButton(
-                      title: 'BRAND',
-                      subtitle: '30 Cinders',
-                      icon: Icons.local_fire_department,
-                      activeColor: const Color(0xFFC2185B),
-                      borderColor: const Color(0xFFFF4081),
+                      title: disc.s2Title,
+                      subtitle: disc.s2Sub,
+                      icon: disc.s2Icon,
+                      activeColor: disc.s2Color,
+                      borderColor: disc.s2Border,
                       isEnabled: unit.crucibleCinders >= 30,
-                      tooltipMessage: 'Sundering Brand: Consumes 30 Cinders. 175% ATK DMG, shatters 50% enemy armor & triggers Crypt Stalker reaction ambush!',
+                      tooltipMessage: disc.s2Tooltip,
                       onPressed: () {
                         setState(() {
                           _engine.executeUnitAction(
                             unit,
                             isReposition: false,
                             explicitTarget: explicitTarget,
-                            actionType: 'sundering_brand',
+                            actionType: disc.s2Action,
                           );
                         });
                       },
@@ -8592,23 +8701,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                   const SizedBox(width: 4),
 
-                  // 3. Obsidian Bastion
+                  // Skill 3 (25 Cinders)
                   Expanded(
                     child: buildActionButton(
-                      title: 'BASTION',
-                      subtitle: '25 Cinders',
-                      icon: Icons.shield,
-                      activeColor: const Color(0xFF00695C),
-                      borderColor: const Color(0xFF00BFA5),
+                      title: disc.s3Title,
+                      subtitle: disc.s3Sub,
+                      icon: disc.s3Icon,
+                      activeColor: disc.s3Color,
+                      borderColor: disc.s3Border,
                       isEnabled: unit.crucibleCinders >= 25,
-                      tooltipMessage: 'Obsidian Bastion: Consumes 25 Cinders. Shields Sculptor and retinue companions with an Aegis barrier.',
+                      tooltipMessage: disc.s3Tooltip,
                       onPressed: () {
                         setState(() {
                           _engine.executeUnitAction(
                             unit,
                             isReposition: false,
                             explicitTarget: explicitTarget,
-                            actionType: 'obsidian_bastion',
+                            actionType: disc.s3Action,
                           );
                         });
                       },
@@ -8616,16 +8725,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   ),
                   const SizedBox(width: 4),
 
-                  // 4. Cataclysmic Pyre
+                  // Skill 4 (80 Cinders Apex)
                   Expanded(
                     child: buildActionButton(
-                      title: 'PYRE APEX',
-                      subtitle: '80 Cinders',
-                      icon: Icons.bolt,
-                      activeColor: isPyreReady ? const Color(0xFFFF6D00) : const Color(0xFF3E2723),
-                      borderColor: isPyreReady ? const Color(0xFFFFD54F) : Colors.white24,
-                      isEnabled: isPyreReady,
-                      tooltipMessage: 'Cataclysmic Pyre: APEX FINISHER! Consumes 80 Cinders. Unleashes screen-shattering 250% ATK fire nova across all enemy ranks!',
+                      title: disc.s4Title,
+                      subtitle: disc.s4Sub,
+                      icon: disc.s4Icon,
+                      activeColor: isApexReady ? disc.s4Color : const Color(0xFF3E2723),
+                      borderColor: isApexReady ? disc.s4Border : Colors.white24,
+                      isEnabled: isApexReady,
+                      tooltipMessage: disc.s4Tooltip,
                       onPressed: () {
                         _startForgeStrikeFinisher(unit, explicitTarget);
                       },
@@ -11047,5 +11156,211 @@ class _AshEmbersDissolvePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _AshEmbersDissolvePainter oldDelegate) {
     return true;
+  }
+}
+
+class SculptorDisciplineVisuals {
+  final String title;
+  final Color primaryColor;
+  final String s1Title;
+  final String s1Sub;
+  final IconData s1Icon;
+  final Color s1Color;
+  final Color s1Border;
+  final String s1Action;
+  final String s1Tooltip;
+
+  final String s2Title;
+  final String s2Sub;
+  final IconData s2Icon;
+  final Color s2Color;
+  final Color s2Border;
+  final String s2Action;
+  final String s2Tooltip;
+
+  final String s3Title;
+  final String s3Sub;
+  final IconData s3Icon;
+  final Color s3Color;
+  final Color s3Border;
+  final String s3Action;
+  final String s3Tooltip;
+
+  final String s4Title;
+  final String s4Sub;
+  final IconData s4Icon;
+  final Color s4Color;
+  final Color s4Border;
+  final String s4Action;
+  final String s4Tooltip;
+
+  const SculptorDisciplineVisuals({
+    required this.title,
+    required this.primaryColor,
+    required this.s1Title,
+    required this.s1Sub,
+    required this.s1Icon,
+    required this.s1Color,
+    required this.s1Border,
+    required this.s1Action,
+    required this.s1Tooltip,
+    required this.s2Title,
+    required this.s2Sub,
+    required this.s2Icon,
+    required this.s2Color,
+    required this.s2Border,
+    required this.s2Action,
+    required this.s2Tooltip,
+    required this.s3Title,
+    required this.s3Sub,
+    required this.s3Icon,
+    required this.s3Color,
+    required this.s3Border,
+    required this.s3Action,
+    required this.s3Tooltip,
+    required this.s4Title,
+    required this.s4Sub,
+    required this.s4Icon,
+    required this.s4Color,
+    required this.s4Border,
+    required this.s4Action,
+    required this.s4Tooltip,
+  });
+
+  factory SculptorDisciplineVisuals.forGeneral(GeneralType general) {
+    switch (general) {
+      case GeneralType.valeria:
+        return const SculptorDisciplineVisuals(
+          title: 'THE IRON SCULPTOR',
+          primaryColor: Color(0xFFFFD54F),
+          s1Title: 'IRON SLAM',
+          s1Sub: '15 Cinders',
+          s1Icon: Icons.shield,
+          s1Color: Color(0xFF5D4037),
+          s1Border: Color(0xFFFFD54F),
+          s1Action: 'cold_iron_slam',
+          s1Tooltip: 'Cold Iron Slam: Consumes 15 Cinders. 130% ATK, shreds 20 Armor, staggers -1,500 AP.',
+          s2Title: 'JUDGMENT',
+          s2Sub: '30 Cinders',
+          s2Icon: Icons.wb_sunny,
+          s2Color: Color(0xFFF57F17),
+          s2Border: Color(0xFFFFD54F),
+          s2Action: 'sundering_judgment',
+          s2Tooltip: 'Sundering Judgment: Consumes 30 Cinders. 180% Holy DMG, shreds 30% Armor & inflicts 3s Vulnerable.',
+          s3Title: 'BULWARK',
+          s3Sub: '25 Cinders',
+          s3Icon: Icons.security,
+          s3Color: Color(0xFF37474F),
+          s3Border: Color(0xFF81D4FA),
+          s3Action: 'iron_bulwark',
+          s3Tooltip: 'Iron Bulwark: Consumes 25 Cinders. +35 Armor & cleanses all debuffs across squad.',
+          s4Title: 'WRATH APEX',
+          s4Sub: '80 Cinders',
+          s4Icon: Icons.flash_on,
+          s4Color: Color(0xFFFFB300),
+          s4Border: Color(0xFFFFF176),
+          s4Action: 'wrath_of_the_dawnbound',
+          s4Tooltip: 'Wrath of the Dawnbound: APEX! 280% (380% Perfect Forge Crit) Radiant Nova across all foes!',
+        );
+      case GeneralType.vladislav:
+        return const SculptorDisciplineVisuals(
+          title: 'THE SANGUINE SCULPTOR',
+          primaryColor: Color(0xFFFF1744),
+          s1Title: 'SIPHON REND',
+          s1Sub: '15 Cinders',
+          s1Icon: Icons.bloodtype,
+          s1Color: Color(0xFF880E4F),
+          s1Border: Color(0xFFFF5252),
+          s1Action: 'siphon_rend',
+          s1Tooltip: 'Siphon Rend: Consumes 15 Cinders. 135% ATK, leeches 40% DMG dealt as HP.',
+          s2Title: 'CRIMSON BRAND',
+          s2Sub: '30 Cinders',
+          s2Icon: Icons.whatshot,
+          s2Color: Color(0xFFC2185B),
+          s2Border: Color(0xFFFF4081),
+          s2Action: 'crimson_brand',
+          s2Tooltip: 'Crimson Brand: Consumes 30 Cinders. 165% ATK + 3 Bleeds, detonates active bleeds for 2x DMG.',
+          s3Title: 'VEIN TETHER',
+          s3Sub: '25 Cinders',
+          s3Icon: Icons.all_inclusive,
+          s3Color: Color(0xFF4A148C),
+          s3Border: Color(0xFFEA80FC),
+          s3Action: 'vein_tether',
+          s3Tooltip: 'Vein Tether: Consumes 25 Cinders. +2,500 AP haste & +25 Aegis to all allies.',
+          s4Title: 'EXSANGUINATION',
+          s4Sub: '80 Cinders',
+          s4Icon: Icons.storm,
+          s4Color: Color(0xFFB71C1C),
+          s4Border: Color(0xFFFF1744),
+          s4Action: 'exsanguination_apex',
+          s4Tooltip: 'Exsanguination Apex: APEX! 260% (360% Forge Crit) Blood Tempest, executes targets below 25% HP!',
+        );
+      case GeneralType.morrigan:
+        return const SculptorDisciplineVisuals(
+          title: 'THE MIRE SCULPTOR',
+          primaryColor: Color(0xFF00E676),
+          s1Title: 'CORROSIVE TOUCH',
+          s1Sub: '15 Cinders',
+          s1Icon: Icons.coronavirus,
+          s1Color: Color(0xFF1B5E20),
+          s1Border: Color(0xFF69F0AE),
+          s1Action: 'corrosive_touch',
+          s1Tooltip: 'Corrosive Touch: Consumes 15 Cinders. 130% ATK, 2 Poison, -1,000 AP stagger.',
+          s2Title: 'MIASMIC BRAND',
+          s2Sub: '30 Cinders',
+          s2Icon: Icons.bubble_chart,
+          s2Color: Color(0xFF2E7D32),
+          s2Border: Color(0xFF00E676),
+          s2Action: 'miasmic_brand',
+          s2Tooltip: 'Miasmic Brand: Consumes 30 Cinders. 160% ATK, plagues target column with 3 Poison & Vulnerable.',
+          s3Title: 'BONE WARD',
+          s3Sub: '25 Cinders',
+          s3Icon: Icons.healing,
+          s3Color: Color(0xFF004D40),
+          s3Border: Color(0xFF64FFDA),
+          s3Action: 'bone_ward',
+          s3Tooltip: 'Bone Ward: Consumes 25 Cinders. 30% max HP ossuary shields to all living allies.',
+          s4Title: 'SPORE APEX',
+          s4Sub: '80 Cinders',
+          s4Icon: Icons.eco,
+          s4Color: Color(0xFF00C853),
+          s4Border: Color(0xFFB9F6CA),
+          s4Action: 'cataclysmic_spore',
+          s4Tooltip: 'Cataclysmic Spore: APEX! 240% (340% Forge Crit) Nature eruption, deals bonus damage to poisoned foes!',
+        );
+      case GeneralType.malakor:
+        return const SculptorDisciplineVisuals(
+          title: 'THE ASH SCULPTOR',
+          primaryColor: Color(0xFFFF6D00),
+          s1Title: 'CLEAVE',
+          s1Sub: '15 Cinders',
+          s1Icon: Icons.sports_mma,
+          s1Color: Color(0xFFB3261E),
+          s1Border: Color(0xFFFF8A80),
+          s1Action: 'forge_cleave',
+          s1Tooltip: 'Forge Cleave: Consumes 15 Cinders. 140% ATK heavy strike (+1 Bleed).',
+          s2Title: 'BRAND',
+          s2Sub: '30 Cinders',
+          s2Icon: Icons.local_fire_department,
+          s2Color: Color(0xFFC2185B),
+          s2Border: Color(0xFFFF4081),
+          s2Action: 'sundering_brand',
+          s2Tooltip: 'Sundering Brand: Consumes 30 Cinders. 175% ATK, shatters 50% Armor & triggers Crypt Stalker ambush!',
+          s3Title: 'BASTION',
+          s3Sub: '25 Cinders',
+          s3Icon: Icons.shield,
+          s3Color: Color(0xFF00695C),
+          s3Border: Color(0xFF00BFA5),
+          s3Action: 'obsidian_bastion',
+          s3Tooltip: 'Obsidian Bastion: Consumes 25 Cinders. Shields Sculptor and retinue with Aegis barriers.',
+          s4Title: 'PYRE APEX',
+          s4Sub: '80 Cinders',
+          s4Icon: Icons.bolt,
+          s4Color: Color(0xFFFF6D00),
+          s4Border: Color(0xFFFFD54F),
+          s4Action: 'cataclysmic_pyre',
+          s4Tooltip: 'Cataclysmic Pyre: APEX! 250% (350% Perfect Forge Crit) Fire Nova across all enemy ranks!',
+        );
+    }
   }
 }

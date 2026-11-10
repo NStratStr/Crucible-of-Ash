@@ -345,7 +345,7 @@ class CombatUnitState {
     this.invulnerabilityTicks = 0,
     this.ultimateGauge = 100,
     this.ultimateCooldown = 0,
-    this.crucibleCinders = 35,
+    this.crucibleCinders = 15,
     this.isAshSculptor = false,
     this.shieldAppliedMs = 0,
     this.isSlagCarapaceActive = false,
