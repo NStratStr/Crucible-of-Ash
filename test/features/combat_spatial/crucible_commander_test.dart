@@ -130,19 +130,19 @@ void main() {
       // Clear action pause so next tick can resolve
       engine.activeActionEvent = null;
 
-      // Now bring The Ash Sculptor to 10,000 TM -> attacks automatically at interval for +6 Cinders!
+      // Now bring The Ash Sculptor to 10,000 TM -> attacks automatically at interval for +4 Cinders!
       final cindersBefore = sculptor.crucibleCinders;
       sculptor.currentAp = 9950;
       engine.stepTick();
       expect(engine.isTurnExecutionPaused, isFalse);
       expect(sculptor.currentAp, lessThan(10000));
-      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(cindersBefore + 6));
+      expect(sculptor.crucibleCinders, greaterThanOrEqualTo(cindersBefore + 4));
 
-      // Slot 1 (Forge Cleave) is an always-available builder consuming 0 Cinders and generating +6 Cinders
+      // Slot 1 (Forge Cleave) is the main cinder generator consuming 0 Cinders and generating +18 Cinders
       sculptor.currentAp = 6400;
       sculptor.crucibleCinders = 0; // Test activation at 0 cinders!
       engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
-      expect(sculptor.crucibleCinders, anyOf(equals(6), equals(10)));
+      expect(sculptor.crucibleCinders, anyOf(equals(18), equals(22)));
       expect(sculptor.currentAp, equals(6400));
     });
 
@@ -302,14 +302,14 @@ void main() {
       final sculptor = engine.playerUnits.firstWhere((u) => u.isAshSculptor);
       sculptor.crucibleCinders = 0;
 
-      // Slot 1: Forge Cleave has 1.5s cooldown
+      // Slot 1: Forge Cleave has 6.0s cooldown as main cinder generator
       final cleave = engine.skillTreeState.getSkillInSlot(0)!;
-      expect(cleave.effectiveCooldownSeconds, equals(1.5));
+      expect(cleave.effectiveCooldownSeconds, equals(6.0));
       expect(engine.skillTreeState.getCooldownRemaining(cleave.id), equals(0.0));
 
       // Execute Forge Cleave
       engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
-      expect(sculptor.crucibleCinders, anyOf(equals(6), equals(10))); // Generated 6 (+4 if companion crit)
+      expect(sculptor.crucibleCinders, anyOf(equals(18), equals(22))); // Generated 6 (+4 if companion crit)
       expect(engine.skillTreeState.getCooldownRemaining(cleave.id), greaterThan(0.0));
 
       // Attempting to execute while on cooldown is blocked

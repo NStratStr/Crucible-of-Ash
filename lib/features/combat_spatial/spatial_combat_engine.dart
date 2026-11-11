@@ -3009,7 +3009,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         (s) => s.actionType == actionType,
         orElse: () => skillTreeState.allSkills['ash_cleave']!,
       );
-      final int cinderGain = skillNode.rank >= 3 ? 10 : (skillNode.rank == 2 ? 8 : 6);
+      final int cinderGain = skillNode.rank >= 3 ? 26 : (skillNode.rank == 2 ? 22 : 18);
       sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + cinderGain);
       final double mult = skillNode.effectiveMultiplier;
 
@@ -3589,11 +3589,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       ));
 
     } else {
-      // --- DEFAULT INTERVAL BASIC ATTACK (+6 CINDERS) ---
-      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 6);
+      // --- DEFAULT INTERVAL BASIC ATTACK (+4 CINDERS) ---
+      sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
       final dmg = validTarget.takeDamage(sculptor.effectiveAttack, isPhysical: true);
 
-      addLog('${sculptor.name}: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+6 Cinders -> ${sculptor.crucibleCinders}/100)!');
+      addLog('${sculptor.name}: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+4 Cinders -> ${sculptor.crucibleCinders}/100)!');
       dispatchAction(SpatialActionEvent(
         id: 'strike_${currentTick}_${sculptor.id}',
         attackerId: sculptor.id,

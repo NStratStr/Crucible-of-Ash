@@ -9651,7 +9651,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 0.8),
                       ),
                       child: Text(
-                        '⚔️ AUTO +6🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
+                        '⚔️ AUTO +4🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
                         style: const TextStyle(
                           fontSize: 7.5,
                           color: Color(0xFF80D8FF),
@@ -9953,7 +9953,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
                   final bool isFinisher = skill.cinderCost >= 80;
                   final bool isGenerator = skill.cinderCost == 0;
-                  final int cinderYield = skill.rank >= 3 ? 10 : (skill.rank == 2 ? 8 : 6);
+                  final int cinderYield = skill.rank >= 3 ? 26 : (skill.rank == 2 ? 22 : 18);
                   final double cdRemaining = _engine.skillTreeState.getCooldownRemaining(skill.id);
                   final bool isOnCooldown = cdRemaining > 0.0;
                   final bool isEnabled = !isOnCooldown && (isGenerator || (unit.crucibleCinders >= skill.cinderCost));
@@ -9964,7 +9964,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   final String subtitleText = isOnCooldown
                       ? '${cdRemaining.toStringAsFixed(1)}s CD'
                       : (isGenerator
-                          ? '+$cinderYield🔥 • STRIKE'
+                          ? '+$cinderYield🔥 • GENERATOR'
                           : (isEnabled
                               ? '${skill.cinderCost}🔥 • READY'
                               : '${unit.crucibleCinders}/${skill.cinderCost}🔥 ${(progress * 100).toInt()}%'));
@@ -12524,12 +12524,12 @@ class SculptorDisciplineVisuals {
           title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFFFFD54F),
           s1Title: 'IRON SLAM',
-          s1Sub: '15 Cinders',
+          s1Sub: '+18 Cinders',
           s1Icon: Icons.shield,
           s1Color: Color(0xFF5D4037),
           s1Border: Color(0xFFFFD54F),
           s1Action: 'cold_iron_slam',
-          s1Tooltip: 'Cold Iron Slam: Consumes 15 Cinders. 130% ATK, shreds 20 Armor, staggers -1,500 AP.',
+          s1Tooltip: 'Cold Iron Slam: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, shreds 20 Armor, staggers -1,500 AP.',
           s2Title: 'JUDGMENT',
           s2Sub: '30 Cinders',
           s2Icon: Icons.wb_sunny,
@@ -12557,12 +12557,12 @@ class SculptorDisciplineVisuals {
           title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFFFF1744),
           s1Title: 'SIPHON REND',
-          s1Sub: '15 Cinders',
+          s1Sub: '+18 Cinders',
           s1Icon: Icons.bloodtype,
           s1Color: Color(0xFF880E4F),
           s1Border: Color(0xFFFF5252),
           s1Action: 'siphon_rend',
-          s1Tooltip: 'Siphon Rend: Consumes 15 Cinders. 135% ATK, leeches 40% DMG dealt as HP.',
+          s1Tooltip: 'Siphon Rend: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 135% ATK, leeches 40% DMG dealt as HP.',
           s2Title: 'CRIMSON BRAND',
           s2Sub: '30 Cinders',
           s2Icon: Icons.whatshot,
@@ -12590,12 +12590,12 @@ class SculptorDisciplineVisuals {
           title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFF00E676),
           s1Title: 'CORROSIVE TOUCH',
-          s1Sub: '15 Cinders',
+          s1Sub: '+18 Cinders',
           s1Icon: Icons.coronavirus,
           s1Color: Color(0xFF1B5E20),
           s1Border: Color(0xFF69F0AE),
           s1Action: 'corrosive_touch',
-          s1Tooltip: 'Corrosive Touch: Consumes 15 Cinders. 130% ATK, 2 Poison, -1,000 AP stagger.',
+          s1Tooltip: 'Corrosive Touch: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 130% ATK, 2 Poison, -1,000 AP stagger.',
           s2Title: 'MIASMIC BRAND',
           s2Sub: '30 Cinders',
           s2Icon: Icons.bubble_chart,
@@ -12623,12 +12623,12 @@ class SculptorDisciplineVisuals {
           title: 'THE ASH SCULPTOR',
           primaryColor: Color(0xFFFF6D00),
           s1Title: 'CLEAVE',
-          s1Sub: '15 Cinders',
+          s1Sub: '+18 Cinders',
           s1Icon: Icons.sports_mma,
           s1Color: Color(0xFFB3261E),
           s1Border: Color(0xFFFF8A80),
           s1Action: 'forge_cleave',
-          s1Tooltip: 'Forge Cleave: Consumes 15 Cinders. 140% ATK heavy strike (+1 Bleed).',
+          s1Tooltip: 'Forge Cleave: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 140% ATK heavy strike (+1 Bleed).',
           s2Title: 'BRAND',
           s2Sub: '30 Cinders',
           s2Icon: Icons.local_fire_department,
