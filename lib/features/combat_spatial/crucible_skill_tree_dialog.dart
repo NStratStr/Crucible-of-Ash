@@ -495,6 +495,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         isActive: isActive,
         color: const Color(0xFFE040FB),
         icon: Icons.all_inclusive,
+        iconAsset: 'assets/images/icons/skills/icon_keystone_resonant_crucible.png',
       );
     } else if (_selectedBranch == CrucibleSkillBranch.vitae) {
       final bool isActive = state.isFontOfRebirthActive;
