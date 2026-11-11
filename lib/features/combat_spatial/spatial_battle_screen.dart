@@ -4723,9 +4723,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       } else if (_selectedEnemyUnitId != null) {
         final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
         if (enemy != null) {
-          message = '👁️ ENEMY SCOUTING: Inspecting ${enemy.name.toUpperCase()} — crimson line shows its initial target column!';
-          themeColor = const Color(0xFFFF5252);
-          icon = Icons.radar;
+          return _buildSelectedEnemyInspectionBanner(enemy);
         }
       } else {
         final unplacedCount = _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).length;
@@ -4820,9 +4818,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     } else if (_selectedEnemyUnitId != null) {
       final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
       if (enemy != null) {
-        message = '👁️ THREAT VECTOR: ${enemy.name.toUpperCase()} (${enemy.hp}/${enemy.maxHp} HP • ${enemy.armor} Armor) — crimson line shows target!';
-        themeColor = const Color(0xFFFF5252);
-        icon = Icons.radar;
+        return _buildSelectedEnemyInspectionBanner(enemy);
       }
     }
 
@@ -5755,6 +5751,820 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     );
   }
 
+
+  // =========================================================================
+  // TACTICAL HEALTH BAR, STATUS BADGES & INSPECTION TOOLTIP HELPERS
+  // =========================================================================
+
+  List<UnitStatusBadgeData> _getUnitStatusBadges(CombatUnitState unit) {
+    final list = <UnitStatusBadgeData>[];
+
+    // 1. Bleed
+    if (unit.bleedStacks > 0) {
+      list.add(UnitStatusBadgeData(
+        id: 'bleed',
+        name: 'Bleed',
+        icon: '🩸',
+        summary: 'x${unit.bleedStacks}',
+        detail: 'Bleed (x${unit.bleedStacks}): Sanguine hemorrhage. Suffers bleed damage on its next action.',
+        color: const Color(0xFFFF5252),
+        bg: const Color(0xFF38080E),
+        isBuff: false,
+      ));
+    }
+
+    // 2. Poison
+    if (unit.poisonStacks > 0) {
+      final penalty = (unit.poisonStacks * 2).clamp(0, 40);
+      list.add(UnitStatusBadgeData(
+        id: 'poison',
+        name: 'Poison',
+        icon: '🧪',
+        summary: 'x${unit.poisonStacks}',
+        detail: 'Poison (x${unit.poisonStacks}): Necrotic rot. -$penalty% ATK & SPD; takes true damage over time.',
+        color: const Color(0xFF69F0AE),
+        bg: const Color(0xFF072412),
+        isBuff: false,
+      ));
+    }
+
+    // 3. Burn
+    if (unit.burnDuration > 0) {
+      final sec = (unit.burnDuration / 30.0).toStringAsFixed(1);
+      list.add(UnitStatusBadgeData(
+        id: 'burn',
+        name: 'Burn',
+        icon: '🔥',
+        summary: '${sec}s',
+        detail: 'Burn (${sec}s): Scorching embers. Searing periodic fire damage.',
+        color: const Color(0xFFFF9100),
+        bg: const Color(0xFF2C1400),
+        isBuff: false,
+      ));
+    }
+
+    // 4. Freeze
+    if (unit.freezeDuration > 0) {
+      final sec = (unit.freezeDuration / 30.0).toStringAsFixed(1);
+      list.add(UnitStatusBadgeData(
+        id: 'freeze',
+        name: 'Freeze',
+        icon: '❄️',
+        summary: '${sec}s',
+        detail: 'Freeze (${sec}s): Solid permafrost. Incapacitated; physical strikes shatter for +15% max HP bonus damage.',
+        color: const Color(0xFF80D8FF),
+        bg: const Color(0xFF0A2230),
+        isBuff: false,
+      ));
+    }
+
+    // 5. Stun
+    if (unit.stunDuration > 0) {
+      final sec = (unit.stunDuration / 30.0).toStringAsFixed(1);
+      list.add(UnitStatusBadgeData(
+        id: 'stun',
+        name: 'Stun',
+        icon: '⚡',
+        summary: '${sec}s',
+        detail: 'Stun (${sec}s): Concussed. Action Points and Turn Meter are completely frozen.',
+        color: const Color(0xFFFFD54F),
+        bg: const Color(0xFF292005),
+        isBuff: false,
+      ));
+    }
+
+    // 6. Vulnerable
+    if (unit.vulnerableDuration > 0) {
+      final sec = (unit.vulnerableDuration / 30.0).toStringAsFixed(1);
+      list.add(UnitStatusBadgeData(
+        id: 'vulnerable',
+        name: 'Vulnerable',
+        icon: '🎯',
+        summary: '+25%',
+        detail: 'Vulnerable (${sec}s): Defenses breached. Takes +25% increased damage from all attacks.',
+        color: const Color(0xFFEA80FC),
+        bg: const Color(0xFF280B2E),
+        isBuff: false,
+      ));
+    }
+
+    // 7. Haste
+    if (unit.hasteDuration > 0) {
+      final sec = (unit.hasteDuration / 30.0).toStringAsFixed(1);
+      list.add(UnitStatusBadgeData(
+        id: 'haste',
+        name: 'Haste',
+        icon: '💨',
+        summary: '+35%',
+        detail: 'Haste (${sec}s): Kinetic velocity. +35% AP accumulation speed.',
+        color: const Color(0xFF00E5FF),
+        bg: const Color(0xFF03222B),
+        isBuff: true,
+      ));
+    }
+
+    // 8. Aegis Shield
+    if (unit.aegisShield > 0) {
+      list.add(UnitStatusBadgeData(
+        id: 'aegis',
+        name: 'Aegis Shield',
+        icon: '🛡️',
+        summary: '${unit.aegisShield}',
+        detail: 'Aegis Barrier: Radiant kinetic ward absorbs the next ${unit.aegisShield} damage before HP is harmed.',
+        color: const Color(0xFF00E5FF),
+        bg: const Color(0xFF00222D),
+        isBuff: true,
+      ));
+    }
+
+    // 9. Armor
+    if (unit.armor > 0) {
+      list.add(UnitStatusBadgeData(
+        id: 'armor',
+        name: 'Armor Plating',
+        icon: '🛡️',
+        summary: '${unit.armor}',
+        detail: 'Armor (${unit.armor}): Physical plating directly mitigating incoming basic attacks and skills.',
+        color: const Color(0xFFB0BEC5),
+        bg: const Color(0xFF1E272C),
+        isBuff: true,
+      ));
+    }
+
+    // 10. Stagger (Boss)
+    if (unit.isStaggered) {
+      list.add(const UnitStatusBadgeData(
+        id: 'stagger',
+        name: 'Staggered',
+        icon: '💥',
+        summary: 'BROKEN',
+        detail: 'Staggered: Break bar shattered! Unit is immobilized and suffers 150% critical damage.',
+        color: Color(0xFFFFD54F),
+        bg: Color(0xFF332600),
+        isBuff: false,
+      ));
+    }
+
+    // 11. Slag Carapace (Boss)
+    if (unit.isSlagCarapaceActive) {
+      list.add(const UnitStatusBadgeData(
+        id: 'carapace',
+        name: 'Slag Carapace',
+        icon: '🌋',
+        summary: 'CARAPACE',
+        detail: 'Slag Carapace: Molten volcanic coating significantly reducing non-critical strikes.',
+        color: Color(0xFFFF7043),
+        bg: Color(0xFF331408),
+        isBuff: true,
+      ));
+    }
+
+    // 12. Kinetic Bastion
+    if (unit.isKineticBastionActive && unit.kineticBastionCharges > 0) {
+      list.add(UnitStatusBadgeData(
+        id: 'kinetic',
+        name: 'Kinetic Bastion',
+        icon: '⚡',
+        summary: '${unit.kineticBastionCharges}',
+        detail: 'Kinetic Bastion (${unit.kineticBastionCharges}/${unit.maxKineticBastionCharges}): Stored kinetic charges for counter-strike.',
+        color: const Color(0xFFFFD54F),
+        bg: const Color(0xFF2C2405),
+        isBuff: true,
+      ));
+    }
+
+    // 13. Petrified Plinth
+    if (unit.isPetrifiedPlinth) {
+      list.add(UnitStatusBadgeData(
+        id: 'plinth',
+        name: 'Petrified Plinth',
+        icon: '🪨',
+        summary: '${unit.plinthDurability}/3',
+        detail: 'Petrified Plinth: Downed unit petrified into solid stone (${unit.plinthDurability}/3 hits remaining to shatter).',
+        color: const Color(0xFF90A4AE),
+        bg: const Color(0xFF1C2429),
+        isBuff: false,
+      ));
+    }
+
+    return list;
+  }
+
+  InlineSpan _buildUnitTooltipSpan(CombatUnitState unit) {
+    final bool isEnemy = !unit.isPlayer;
+    final factionColor = isEnemy ? const Color(0xFFFF5252) : const Color(0xFF69F0AE);
+    final int hpPercent = unit.maxHp > 0 ? ((unit.hp / unit.maxHp) * 100).round() : 0;
+    final int apPercent = ((unit.currentAp / SpatialCombatEngine.tickThreshold) * 100).round().clamp(0, 100);
+    final int killDmg = unit.hp;
+    final int totalEhp = unit.ehp.round();
+
+    final badges = _getUnitStatusBadges(unit);
+
+    return TextSpan(
+      children: [
+        // 1. Header
+        TextSpan(
+          text: '${unit.name.toUpperCase()}\n',
+          style: TextStyle(
+            color: factionColor,
+            fontWeight: FontWeight.w900,
+            fontSize: 12.0,
+            letterSpacing: 0.6,
+          ),
+        ),
+        TextSpan(
+          text: '${isEnemy ? "Enemy" : "Allied"} ${unit.archetype.name} • Lv.${unit.level} • ${unit.currentDepth.name.toUpperCase()} ROW\n',
+          style: const TextStyle(
+            color: Color(0xFFB0BEC5),
+            fontSize: 9.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const TextSpan(text: '────────────────────────────\n', style: TextStyle(color: Colors.white24, fontSize: 8)),
+
+        // 2. Kill Assessment / Health Status
+        if (isEnemy) ...[
+          TextSpan(
+            text: '🎯 DAMAGE NEEDED TO KILL: $killDmg Direct HP\n',
+            style: const TextStyle(
+              color: Color(0xFFFFD54F),
+              fontWeight: FontWeight.w900,
+              fontSize: 10.5,
+            ),
+          ),
+          TextSpan(
+            text: '   • Current HP: ${unit.hp} / ${unit.maxHp} ($hpPercent%)\n'
+                '   • Armor Plating: ${unit.armor} (Total EHP: $totalEhp)\n'
+                '${unit.aegisShield > 0 ? "   • Aegis Barrier: ${unit.aegisShield} damage absorption\n" : ""}',
+            style: const TextStyle(
+              color: Color(0xFFE0E0E0),
+              fontSize: 9.5,
+              height: 1.35,
+            ),
+          ),
+        ] else ...[
+          TextSpan(
+            text: '💚 VITAL STATUS: ${unit.hp} / ${unit.maxHp} HP ($hpPercent%)\n',
+            style: const TextStyle(
+              color: Color(0xFF69F0AE),
+              fontWeight: FontWeight.w900,
+              fontSize: 10.5,
+            ),
+          ),
+          TextSpan(
+            text: '   • Armor: ${unit.armor} / ${unit.maxArmor}\n'
+                '${unit.aegisShield > 0 ? "   • Aegis Shield: ${unit.aegisShield}\n" : ""}',
+            style: const TextStyle(
+              color: Color(0xFFE0E0E0),
+              fontSize: 9.5,
+              height: 1.35,
+            ),
+          ),
+        ],
+
+        // 3. Combat Stats
+        TextSpan(
+          text: '⚔️ Attack: ${unit.effectiveAttack}  •  ⚡ Speed: ${unit.effectiveSpeed}  •  ⏱️ Turn Meter: $apPercent%\n',
+          style: const TextStyle(
+            color: Color(0xFF81D4FA),
+            fontSize: 9.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        // 4. Status Effects
+        const TextSpan(text: '────────────────────────────\n', style: TextStyle(color: Colors.white24, fontSize: 8)),
+        if (badges.isEmpty) ...[
+          const TextSpan(
+            text: '✨ Status: Normal (No active afflictions or buffs)\n',
+            style: TextStyle(color: Colors.white70, fontSize: 9.0, fontStyle: FontStyle.italic),
+          ),
+        ] else ...[
+          const TextSpan(
+            text: 'ACTIVE BUFFS & DEBUFFS:\n',
+            style: TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.bold, fontSize: 9.5),
+          ),
+          for (final b in badges)
+            TextSpan(
+              text: '${b.icon} ${b.detail}\n',
+              style: TextStyle(
+                color: b.color,
+                fontSize: 9.0,
+                height: 1.3,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+
+        // 5. Intent (if enemy)
+        if (!unit.isPlayer && unit.pendingIntent != null) ...[
+          const TextSpan(text: '────────────────────────────\n', style: TextStyle(color: Colors.white24, fontSize: 8)),
+          TextSpan(
+            text: '⚔️ INCOMING SKILL: ${unit.pendingIntent!.skillName.toUpperCase()}\n'
+                '   Striking in ${((unit.pendingIntent!.triggerTick - _engine.currentTick).clamp(0, 9999) / 30.0).toStringAsFixed(1)}s '
+                '(${unit.pendingIntent!.targetSummary ?? "targeted zone"})\n',
+            style: const TextStyle(
+              color: Color(0xFFFF8A80),
+              fontWeight: FontWeight.bold,
+              fontSize: 9.5,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildOverheadStatusBadgesRow(List<UnitStatusBadgeData> badges) {
+    final displayBadges = badges.take(4).toList();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final b in displayBadges)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 1.0),
+            padding: const EdgeInsets.symmetric(horizontal: 3.5, vertical: 1.0),
+            decoration: BoxDecoration(
+              color: b.bg.withValues(alpha: 0.90),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: b.color.withValues(alpha: 0.85), width: 0.8),
+              boxShadow: [
+                BoxShadow(color: b.color.withValues(alpha: 0.35), blurRadius: 3),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(b.icon, style: const TextStyle(fontSize: 7.5)),
+                const SizedBox(width: 1.5),
+                Text(
+                  b.summary,
+                  style: TextStyle(
+                    color: b.color,
+                    fontSize: 7.0,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (badges.length > 4)
+          Container(
+            margin: const EdgeInsets.only(left: 1.0),
+            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 1.0),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: Colors.white30, width: 0.6),
+            ),
+            child: Text(
+              '+${badges.length - 4}',
+              style: const TextStyle(fontSize: 6.5, color: Colors.white70, fontWeight: FontWeight.bold),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildOverheadHealthBar(
+    CombatUnitState unit, {
+    required bool isBoss,
+    required double tileWidth,
+    required bool isSelected,
+  }) {
+    final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
+    final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
+    final double barWidth = isBoss ? 122.0 : (tileWidth * 0.90).clamp(76.0, 96.0);
+    final bool isEnemy = !unit.isPlayer;
+
+    String hpLabel;
+    if (unit.isPetrifiedPlinth) {
+      hpLabel = '🪨 ${unit.plinthDurability}/3';
+    } else if (unit.isDowned) {
+      hpLabel = '💀 DOWNED';
+    } else if (isEnemy) {
+      if (unit.armor > 0) {
+        hpLabel = '${unit.hp} [🛡️${unit.armor}]';
+      } else {
+        hpLabel = '${unit.hp} / ${unit.maxHp}';
+      }
+    } else {
+      if (unit.armor > 0) {
+        hpLabel = '${unit.hp} [🛡️${unit.armor}]';
+      } else {
+        hpLabel = '${unit.hp} / ${unit.maxHp}';
+      }
+    }
+
+    return Container(
+      width: barWidth,
+      padding: const EdgeInsets.all(1.2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0A11).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(3.5),
+        border: Border.all(
+          color: isSelected
+              ? const Color(0xFFFFD54F)
+              : (isEnemy
+                  ? const Color(0xFFFF5252).withValues(alpha: 0.65)
+                  : const Color(0xFF00E676).withValues(alpha: 0.65)),
+          width: isSelected ? 1.4 : 0.9,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isSelected
+                ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
+                : Colors.black.withValues(alpha: 0.7),
+            blurRadius: isSelected ? 6 : 3,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Main HP & Armor Bar
+          Container(
+            height: isBoss ? 11.0 : 9.0,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1012),
+              borderRadius: BorderRadius.circular(2.0),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. Health Bar Fill
+                FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: hpRatio,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isEnemy
+                            ? [const Color(0xFFB71C1C), const Color(0xFFFF1744)]
+                            : [const Color(0xFF00C853), const Color(0xFF69F0AE)],
+                      ),
+                      borderRadius: BorderRadius.circular(1.5),
+                    ),
+                  ),
+                ),
+
+                // 2. Armor Overlay
+                if (unit.armor > 0)
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(1.5),
+                        border: Border.all(color: const Color(0xFF00E5FF), width: 0.6),
+                      ),
+                    ),
+                  ),
+
+                // 3. Aegis Shield Overlay
+                if (unit.aegisShield > 0)
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (unit.aegisShield / max(1, unit.maxHp)).clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(1.5),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0xAA00E5FF), blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // 4. Numerical Text
+                Center(
+                  child: Text(
+                    hpLabel,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isBoss ? 8.5 : 7.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
+                      fontFamily: 'monospace',
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 3),
+                        Shadow(color: Colors.black, blurRadius: 2, offset: Offset(0, 1)),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 1.0),
+
+          // AP Turn Meter (Gold Action Gauge)
+          Container(
+            height: 2.0,
+            decoration: BoxDecoration(
+              color: const Color(0xFF120E15),
+              borderRadius: BorderRadius.circular(1.0),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: apRatio,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD54F),
+                  borderRadius: BorderRadius.circular(1.0),
+                  boxShadow: apRatio >= 0.98
+                      ? const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 3)]
+                      : null,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedEnemyInspectionBanner(CombatUnitState enemy) {
+    final double hpRatio = enemy.maxHp > 0 ? (enemy.hp / enemy.maxHp).clamp(0.0, 1.0) : 0.0;
+    final int apPct = (enemy.currentAp / SpatialCombatEngine.tickThreshold * 100).round().clamp(0, 100);
+    final badges = _getUnitStatusBadges(enemy);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF160B0E).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.85), width: 1.2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x33FF1744), blurRadius: 8),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.radar, color: Color(0xFFFF5252), size: 16),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'TARGET: ${enemy.name.toUpperCase()}',
+                style: const TextStyle(
+                  color: Color(0xFFFF8A80),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11.0,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                '${enemy.archetype.name} • Row ${enemy.currentDepth.name.toUpperCase()} • ${enemy.effectiveSpeed} SPD ($apPct% TM)',
+                style: const TextStyle(
+                  color: Color(0xFFB0BEC5),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF230D12),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.5), width: 0.8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '🎯 ${enemy.hp} HP TO KILL',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10.0,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      Text(
+                        '${enemy.hp} / ${enemy.maxHp} HP  •  🛡️ ${enemy.armor} ARMOR',
+                        style: const TextStyle(
+                          color: Color(0xFFFFCCBC),
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Container(
+                      height: 5,
+                      color: Colors.black45,
+                      child: Stack(
+                        children: [
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: hpRatio,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFFB71C1C), Color(0xFFFF1744)],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (enemy.armor > 0)
+                            FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: (enemy.armor / max(1, enemy.maxHp)).clamp(0.0, 1.0),
+                              child: Container(
+                                color: Colors.white70,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          if (badges.isNotEmpty) ...[
+            _buildOverheadStatusBadgesRow(badges),
+            const SizedBox(width: 8),
+          ],
+
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedEnemyUnitId = null;
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.close, color: Colors.white70, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedPlayerInspectionBanner(CombatUnitState unit) {
+    final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
+    final int apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round().clamp(0, 100);
+    final badges = _getUnitStatusBadges(unit);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C1612).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.85), width: 1.2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x3300E676), blurRadius: 8),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield, color: Color(0xFF00E676), size: 16),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ALLY: ${unit.name.toUpperCase()}',
+                style: const TextStyle(
+                  color: Color(0xFFB9F6CA),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11.0,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                '${unit.postureLabel} • ${unit.effectiveSpeed} SPD ($apPct% TM)',
+                style: const TextStyle(
+                  color: Color(0xFFB0BEC5),
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF092015),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.4), width: 0.8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '💚 ${unit.hp} / ${unit.maxHp} HP',
+                        style: const TextStyle(
+                          color: Color(0xFF69F0AE),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10.0,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      Text(
+                        '🛡️ ${unit.armor} ARMOR${unit.aegisShield > 0 ? " • 🛡️ ${unit.aegisShield} AEGIS" : ""}',
+                        style: const TextStyle(
+                          color: Color(0xFF81D4FA),
+                          fontSize: 9.0,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Container(
+                      height: 5,
+                      color: Colors.black45,
+                      child: Stack(
+                        children: [
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: hpRatio,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Color(0xFF00C853), Color(0xFF69F0AE)],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (unit.armor > 0)
+                            FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
+                              child: Container(
+                                color: Colors.white70,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          if (badges.isNotEmpty) ...[
+            _buildOverheadStatusBadgesRow(badges),
+            const SizedBox(width: 8),
+          ],
+
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedUnitId = null;
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.close, color: Colors.white70, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUnitMiniatureWidget(
     CombatUnitState unit, {
     required double tileWidth,
@@ -6068,46 +6878,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
               ),
             ),
 
-            // 2b. Overhead Enemy Intent Telegraph Badge (Suggestion 2)
-            if (!unit.isPlayer && unit.pendingIntent != null && unit.isAlive)
-              Positioned(
-                top: isBoss ? -34 : -28,
-                child: Builder(
-                  builder: (context) {
-                    final intent = unit.pendingIntent!;
-                    final remTicks = (intent.triggerTick - _engine.currentTick).clamp(0, 9999);
-                    final remSec = (remTicks / 30.0).toStringAsFixed(1);
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xEE380B13),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x66FF1744), blurRadius: 6, spreadRadius: 1),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('⚔️', style: TextStyle(fontSize: 8)),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${intent.skillName.toUpperCase()} (${remSec}s)',
-                            style: const TextStyle(
-                              fontSize: 6.5,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFFF8A80),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-
             // 3. Status Badges & Selected Unit Indicator (Positioned dynamically above the head of any model)
             // Overhead badges removed to keep hero art completely unobstructed
             // 4. Floating Damage / Effect Pop Text (Live execution with graceful smooth ascent & gentle drift)
@@ -6126,7 +6896,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   : (t < 0.15 ? 0.85 + (t / 0.15) * 0.15 : 1.0);
 
               return Positioned(
-                bottom: modelHeight + 14 + riseY,
+                bottom: modelHeight + 36 + riseY,
                 left: driftX != 0 ? driftX : null,
                 child: Opacity(
                   opacity: opacity,
@@ -6172,7 +6942,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             }),
             if (!_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired) && floatingPop != null)
               Positioned(
-                bottom: modelHeight + 14,
+                bottom: modelHeight + 36,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -6205,7 +6975,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // 4b. Tactical Spell Drag Hover: Phantom Damage & Effect Indicator Badge
             if (phantomEffect != null && floatingPop == null)
               Positioned(
-                bottom: modelHeight + 16,
+                bottom: modelHeight + 38,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                   decoration: BoxDecoration(
@@ -6251,86 +7021,115 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                 ),
               ),
 
-            // 5. Sleek Compact Tactical Health & AP Meters
+            // 5. Overhead Tactical Health & Status HUD Cluster (Expanded Health Bar, Status Badges & Tooltip)
             Positioned(
-              bottom: 2,
-              child: SizedBox(
-                width: isBoss ? 56.0 : 36.0,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Sleek 2.5px HP & Armor Bar
-                    Container(
-                      height: 2.5,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(1.5),
-                        border: Border.all(color: Colors.white12, width: 0.3),
+              bottom: modelHeight + 6,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (unit.isPlayer) {
+                    setState(() {
+                      _selectedUnitId = (_selectedUnitId == unit.id) ? null : unit.id;
+                      _selectedEnemyUnitId = null;
+                      _selectedCardId = null;
+                    });
+                  } else {
+                    setState(() {
+                      _selectedEnemyUnitId = (_selectedEnemyUnitId == unit.id) ? null : unit.id;
+                      _selectedUnitId = null;
+                      _selectedCardId = null;
+                    });
+                  }
+                },
+                child: Tooltip(
+                  preferBelow: false,
+                  verticalOffset: 12,
+                  waitDuration: Duration.zero,
+                  showDuration: const Duration(seconds: 6),
+                  triggerMode: TooltipTriggerMode.tap,
+                  richMessage: _buildUnitTooltipSpan(unit),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F0B12).withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF1744))
+                            .withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        spreadRadius: 1,
                       ),
-                      child: Stack(
-                        children: [
-                          // Base HP: Pure emerald green for player squad, pure vivid crimson/garnet for enemies
-                          FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: hpRatio,
-                            child: Container(
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Overhead Intent Badge (Enemy)
+                      if (!unit.isPlayer && unit.pendingIntent != null && unit.isAlive) ...[
+                        Builder(
+                          builder: (context) {
+                            final intent = unit.pendingIntent!;
+                            final remTicks = (intent.triggerTick - _engine.currentTick).clamp(0, 9999);
+                            final remSec = (remTicks / 30.0).toStringAsFixed(1);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: unit.isPlayer ? const Color(0xFF00E676) : const Color(0xFFFF1744),
-                                borderRadius: BorderRadius.circular(1),
+                                color: const Color(0xEE380B13),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
+                                boxShadow: const [
+                                  BoxShadow(color: Color(0x66FF1744), blurRadius: 6, spreadRadius: 1),
+                                ],
                               ),
-                            ),
-                          ),
-                          // Proportional White/Cyan Armor Overlay
-                          if (unit.armor > 0)
-                            FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.95),
-                                  borderRadius: BorderRadius.circular(1),
-                                  border: Border.all(color: const Color(0xFF00E5FF), width: 0.4),
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('⚔️', style: TextStyle(fontSize: 8)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${intent.skillName.toUpperCase()} (${remSec}s)',
+                                    style: const TextStyle(
+                                      fontSize: 7.0,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFFF8A80),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          // Aegis Barrier Overlay (Sleek Cyan Bar)
-                          if (unit.aegisShield > 0)
-                            FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: (unit.aegisShield / max(1, unit.maxHp)).clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.95),
-                                  borderRadius: BorderRadius.circular(1),
-                                  boxShadow: const [
-                                    BoxShadow(color: Color(0x9900E5FF), blurRadius: 3),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    // AP Turn Meter (1.5px)
-                    Container(
-                      height: 1.5,
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(1),
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: apRatio,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD54F).withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(0.5),
-                          ),
+                            );
+                          },
                         ),
+                      ],
+
+                      // Buff & Debuff Badges Strip
+                      Builder(
+                        builder: (context) {
+                          final badges = _getUnitStatusBadges(unit);
+                          if (badges.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 2.5),
+                            child: _buildOverheadStatusBadgesRow(badges),
+                          );
+                        },
                       ),
-                    ),
-                  ],
+
+                      // Prominent Tactical Health & AP Bar
+                      _buildOverheadHealthBar(
+                        unit,
+                        isBoss: isBoss,
+                        tileWidth: tileWidth,
+                        isSelected: isSelected ||
+                            (!unit.isPlayer && _selectedEnemyUnitId == unit.id) ||
+                            (unit.isPlayer && _selectedUnitId == unit.id),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -11625,6 +12424,29 @@ class _AshEmbersDissolvePainter extends CustomPainter {
   bool shouldRepaint(covariant _AshEmbersDissolvePainter oldDelegate) {
     return true;
   }
+}
+
+
+class UnitStatusBadgeData {
+  final String id;
+  final String name;
+  final String icon;
+  final String summary;
+  final String detail;
+  final Color color;
+  final Color bg;
+  final bool isBuff;
+
+  const UnitStatusBadgeData({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.summary,
+    required this.detail,
+    required this.color,
+    required this.bg,
+    required this.isBuff,
+  });
 }
 
 class SculptorDisciplineVisuals {
