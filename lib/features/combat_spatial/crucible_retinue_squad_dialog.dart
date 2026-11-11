@@ -119,12 +119,8 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
         _reserves.add(outgoingEntity);
       }
 
-      // Sync combat engine player units
-      if (outgoingUnitId != null) {
-        widget.engine.swapPlayerUnit(outgoingUnitId, incomingMinion, relicService: widget.relicService);
-      } else {
-        widget.engine.addPlayerUnitFromReserve(incomingMinion, relicService: widget.relicService);
-      }
+      // Sync combat engine player units directly and reliably
+      widget.engine.setRetinueCompanion(_selectedCompanionSlot, incomingMinion, relicService: widget.relicService);
 
       widget.onSquadUpdated(_squad, _reserves);
     });
@@ -596,6 +592,8 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
             ),
             onPressed: () {
+              widget.engine.updateRetinueSquad(_squad, relicService: widget.relicService);
+              widget.onSquadUpdated(_squad, _reserves);
               Navigator.of(context).pop();
             },
           ),

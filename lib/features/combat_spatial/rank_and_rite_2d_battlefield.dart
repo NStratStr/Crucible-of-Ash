@@ -848,7 +848,12 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       if (isPlayer) {
-                        onSelectPlayerUnit(occupant.id);
+                        if (engine.isPreBattlePhase && selectedAlly != null && selectedAlly.id != occupant.id) {
+                          // In pre-battle deployment, tapping another friendly ally swaps grid positions!
+                          onMovePlayerUnit(selectedAlly.id, col, row);
+                        } else {
+                          onSelectPlayerUnit(occupant.id);
+                        }
                       } else {
                         onSelectEnemyUnit(occupant.id);
                       }
@@ -890,31 +895,33 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     },
                   ),
                 )
-              else if (isMoveReachable)
-                Center(
+              else if (isMoveReachable) ...[
+                Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
                       onMovePlayerUnit(selectedAlly.id, col, row);
                     },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E676).withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF00E676), width: 1.0),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0x6600E676), blurRadius: 6),
-                        ],
-                      ),
-                      child: const Text(
-                        'SHIFT',
-                        style: TextStyle(fontSize: 7.5, color: Color(0xFFE8F5E9), fontWeight: FontWeight.w900),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF00E676), width: 1.0),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x6600E676), blurRadius: 6),
+                          ],
+                        ),
+                        child: const Text(
+                          'SHIFT',
+                          style: TextStyle(fontSize: 7.5, color: Color(0xFFE8F5E9), fontWeight: FontWeight.w900),
+                        ),
                       ),
                     ),
                   ),
-                )
-              else
+                ),
+              ] else
                 Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,

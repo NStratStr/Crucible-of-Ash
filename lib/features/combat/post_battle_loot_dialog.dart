@@ -205,7 +205,7 @@ class PostBattleLootDialog extends StatelessWidget {
                       children: [
                         Text(
                           isVictory
-                              ? 'The Crucible claims the defeated mineral vessels. Ambient Ash, Distilled Vitae aquifers, and soul-remnants have condensed into your alchemical gauntlet.'
+                              ? 'The Crucible claims the defeated mineral vessels. Crucible Cinders, Alchemical Vitae aquifers, and soul-remnants have condensed into your alchemical gauntlet.'
                               : 'All frontline and arcanum vessels have collapsed into inert stone husks. Mortal essence retreats to the Ashen Encampment.',
                           style: const TextStyle(
                             color: Colors.white70,
@@ -293,7 +293,7 @@ class PostBattleLootDialog extends StatelessWidget {
                                 child: _buildRewardTile(
                                   icon: Icons.whatshot,
                                   iconColor: const Color(0xFFFF7043),
-                                  label: 'UNBOUND ASH',
+                                  label: 'CRUCIBLE ASH',
                                   value: '+${rewards.rawAsh}',
                                   valueColor: const Color(0xFFFFB74D),
                                 ),
@@ -303,7 +303,7 @@ class PostBattleLootDialog extends StatelessWidget {
                                 child: _buildRewardTile(
                                   icon: Icons.water_drop,
                                   iconColor: const Color(0xFFFF1744),
-                                  label: 'DISTILLED VITAE',
+                                  label: 'ALCHEMICAL VITAE',
                                   value: '+${rewards.distilledVitae}',
                                   valueColor: const Color(0xFFFF5252),
                                 ),
@@ -317,7 +317,7 @@ class PostBattleLootDialog extends StatelessWidget {
                                 child: _buildRewardTile(
                                   icon: Icons.military_tech,
                                   iconColor: primaryGold,
-                                  label: 'BRIGADE XP',
+                                  label: 'SCULPTOR & SQUAD XP',
                                   value: '+${rewards.xpGained} XP',
                                   valueColor: primaryGold,
                                 ),
@@ -327,7 +327,7 @@ class PostBattleLootDialog extends StatelessWidget {
                                 child: _buildRewardTile(
                                   icon: Icons.diamond_outlined,
                                   iconColor: const Color(0xFF00E5FF),
-                                  label: 'EMBER SHARDS',
+                                  label: 'ASHEN SHARDS',
                                   value: '+${rewards.emberShards}',
                                   valueColor: const Color(0xFF80D8FF),
                                 ),
@@ -339,7 +339,7 @@ class PostBattleLootDialog extends StatelessWidget {
                             _buildRewardTile(
                               icon: Icons.vpn_key,
                               iconColor: const Color(0xFFBA68C8),
-                              label: 'CRUCIBLE KEYS / BLOODLINE SIGILS',
+                              label: 'BLOODLINE SIGILS',
                               value: '+${rewards.cryptKeys}',
                               valueColor: const Color(0xFFCE93D8),
                             ),
@@ -349,7 +349,7 @@ class PostBattleLootDialog extends StatelessWidget {
                             _buildRewardTile(
                               icon: Icons.foundation,
                               iconColor: const Color(0xFF00E5FF),
-                              label: 'PETRIFIED PLINTH SHARDS (SCULPTORY)',
+                              label: 'PLINTH SHARDS (SCULPTING RESONANCE)',
                               value: '+${rewards.petrifiedPlinths} SHARDS',
                               valueColor: const Color(0xFF80D8FF),
                             ),

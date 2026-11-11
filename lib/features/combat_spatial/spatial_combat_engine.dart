@@ -165,14 +165,14 @@ class SpatialCombatEngine extends ChangeNotifier {
   // ==========================================
   // RETINUE PASSIVES & CRYPT WALLET SYSTEM
   // ==========================================
-  bool get isBulwarkOathActive => playerUnits.any((u) => (u.id == 'iron_footman' || u.templateId == 'iron_footman') && u.isAlive);
-  bool get isStalkerKeenEdgeActive => playerUnits.any((u) => (u.id == 'grave_duelist' || u.templateId == 'grave_duelist') && u.isAlive);
-  bool get isReaverFerocityActive => playerUnits.any((u) => (u.id == 'pyre_reaver' || u.templateId == 'pyre_reaver') && u.isAlive);
-  bool get isGraveCarapaceActive => playerUnits.any((u) => (u.id == 'stone_sentinel' || u.templateId == 'stone_sentinel') && u.isAlive);
-  bool get isVitaeBondActive => playerUnits.any((u) => (u.id == 'blood_scribe' || u.templateId == 'blood_scribe') && u.isAlive);
-  bool get isTemporalWeftActive => playerUnits.any((u) => (u.id == 'miasma_chanter' || u.templateId == 'miasma_chanter') && u.isAlive);
-  bool get isAuraOfVitalityActive => playerUnits.any((u) => (u.id == 'sanctified_medicus' || u.templateId == 'sanctified_medicus') && u.isAlive);
-  bool get isSiegeResonatorActive => playerUnits.any((u) => (u.id == 'cinder_arbalest' || u.templateId == 'cinder_arbalest') && u.isAlive);
+  bool get isBulwarkOathActive => playerUnits.any((u) => (u.id.contains('footman') || u.templateId.contains('footman') || u.name.toLowerCase().contains('footman')) && u.isAlive);
+  bool get isStalkerKeenEdgeActive => playerUnits.any((u) => (u.id.contains('duelist') || u.templateId.contains('duelist') || u.name.toLowerCase().contains('duelist')) && u.isAlive);
+  bool get isReaverFerocityActive => playerUnits.any((u) => (u.id.contains('reaver') || u.templateId.contains('reaver') || u.name.toLowerCase().contains('reaver')) && u.isAlive);
+  bool get isGraveCarapaceActive => playerUnits.any((u) => (u.id.contains('sentinel') || u.templateId.contains('sentinel') || u.name.toLowerCase().contains('sentinel')) && u.isAlive);
+  bool get isVitaeBondActive => playerUnits.any((u) => (u.id.contains('scribe') || u.templateId.contains('scribe') || u.name.toLowerCase().contains('scribe')) && u.isAlive);
+  bool get isTemporalWeftActive => playerUnits.any((u) => (u.id.contains('chanter') || u.templateId.contains('chanter') || u.name.toLowerCase().contains('chanter')) && u.isAlive);
+  bool get isAuraOfVitalityActive => playerUnits.any((u) => (u.id.contains('medicus') || u.templateId.contains('medicus') || u.name.toLowerCase().contains('medicus')) && u.isAlive);
+  bool get isSiegeResonatorActive => playerUnits.any((u) => (u.id.contains('arbalest') || u.templateId.contains('arbalest') || u.name.toLowerCase().contains('arbalest')) && u.isAlive);
 
   void _triggerFontOfRebirth(int cindersSpent) {
     if (!skillTreeState.isFontOfRebirthActive || cindersSpent <= 0) return;
@@ -689,10 +689,9 @@ class SpatialCombatEngine extends ChangeNotifier {
         final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult * morriganSpeedMult).round();
         final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
 
-        // Strictly enforce: Slot 0 = Commander Sculptor, Slot 1 = Crusader Iron Footman, Slot 2 = Grave Duelist Skirmisher
+        // Enforce: Slot 0 = Commander Sculptor, Slot 1 & 2 = Player's chosen Retinue Minions
         final bool isCommanderLead = (i == 0);
-        final bool isFootmanCompanion = (i == 1);
-        final bool isCorruptedSlot2 = (i == 2) &&
+        final bool isCorruptedCompanion = (i > 0) &&
             (p.speciesId.contains('ash_sculptor') ||
              p.speciesId.contains('vladislav') ||
              p.name.contains('Sculptor') ||
@@ -706,33 +705,33 @@ class SpatialCombatEngine extends ChangeNotifier {
 
         final String unitId = isCommanderLead
             ? 'ash_sculptor'
-            : (isFootmanCompanion
-                ? 'iron_footman'
-                : (isCorruptedSlot2 ? 'grave_duelist' : p.id));
+            : (isCorruptedCompanion ? (i == 1 ? 'iron_footman' : 'grave_duelist') : p.id);
         final autoNode = autoFormationNodes[i];
 
-        // Stagger unit speeds and starting AP so turns and incoming hits occur asynchronously
+        // Stagger unit starting AP so turns and incoming hits occur asynchronously
         final int finalSpeed = isCommanderLead
             ? 115
-            : (isFootmanCompanion ? 95 : (isCorruptedSlot2 ? 125 : effectiveSpd));
+            : (isCorruptedCompanion ? (i == 1 ? 95 : 125) : effectiveSpd);
         final int initialAp = isCommanderLead
             ? 0
-            : (isFootmanCompanion ? 2500 : 5000);
+            : (i == 1 ? 2500 : 5000);
 
         final String unitName = isCommanderLead
             ? commanderName
-            : (isFootmanCompanion ? 'Iron Footman' : (isCorruptedSlot2 ? 'Grave Duelist' : p.name));
+            : (isCorruptedCompanion ? (i == 1 ? 'Iron Footman' : 'Grave Duelist') : p.name);
         final String unitTemplate = isCommanderLead
             ? commanderTemplate
-            : (isFootmanCompanion ? 'iron_footman' : (isCorruptedSlot2 ? 'grave_duelist' : p.speciesId));
+            : (isCorruptedCompanion ? (i == 1 ? 'iron_footman' : 'grave_duelist') : p.speciesId);
         final String? unitAsset = isCommanderLead
             ? commanderAsset
-            : (isFootmanCompanion ? 'assets/images/iron_footman_idle.png' : (isCorruptedSlot2 ? 'assets/images/grave_duelist.png' : p.customAvatarAsset));
+            : (isCorruptedCompanion
+                ? (i == 1 ? 'assets/images/iron_footman_idle.png' : 'assets/images/grave_duelist.png')
+                : p.customAvatarAsset);
         final UnitArchetype unitArchetype = isCommanderLead
             ? UnitArchetype.vanguardMelee
-            : (isFootmanCompanion
-                ? UnitArchetype.vanguardMelee
-                : (isCorruptedSlot2 ? UnitArchetype.reachMidline : mapArchetypeToSpatial(p.archetype)));
+            : (isCorruptedCompanion
+                ? (i == 1 ? UnitArchetype.vanguardMelee : UnitArchetype.reachMidline)
+                : mapArchetypeToSpatial(p.archetype));
 
         playerUnits.add(CombatUnitState(
           id: unitId,
@@ -4264,6 +4263,146 @@ class SpatialCombatEngine extends ChangeNotifier {
     addLog('Added ${incomingEntity.name} to active squad.');
     notifyListeners();
     return true;
+  }
+
+  /// Dynamically updates retinue companions (Slots 1 & 2) during pre-battle deployment
+  void updateRetinueSquad(List<UnitEntity> updatedSquad, {RelicService? relicService}) {
+    if (!isPreBattlePhase || updatedSquad.isEmpty) return;
+    if (playerUnits.isEmpty) return;
+
+    final autoFormationNodes = [
+      const GridNode(column: 1, row: 0), // Slot 0: Ash Sculptor (Frontline Mid)
+      const GridNode(column: 0, row: 0), // Slot 1: Companion A (Frontline Top)
+      const GridNode(column: 1, row: 2), // Slot 2: Companion B (Backline Mid)
+    ];
+
+    // Ensure Ash Sculptor stays locked at slot 0
+    final sculptor = playerUnits.firstWhere(
+      (u) => u.isAshSculptor || u.id == 'ash_sculptor',
+      orElse: () => playerUnits[0],
+    );
+
+    final List<CombatUnitState> newPlayerUnits = [sculptor];
+
+    for (int i = 1; i < updatedSquad.length && i < 3; i++) {
+      final p = updatedSquad[i];
+      List<GridNode> nodes = [];
+      if (playerUnits.length > i && playerUnits[i].occupiedNodes.isNotEmpty) {
+        nodes = playerUnits[i].occupiedNodes.map((n) => GridNode(
+          column: n.column,
+          row: n.row,
+          occupantUnitId: p.id,
+        )).toList();
+      } else {
+        nodes = [autoFormationNodes[i]];
+      }
+
+      final relicBonuses = relicService?.calculateBonuses(p.id) ?? const UnitRelicBonuses();
+      final double plinthAllMult = p.plinthMaterial == PlinthMaterial.gold ? 1.10 : 1.0;
+      final double plinthAtkMult = p.plinthMaterial == PlinthMaterial.obsidian ? 1.10 : plinthAllMult;
+      final double plinthDefMult = p.plinthMaterial == PlinthMaterial.iron ? 1.15 : plinthAllMult;
+
+      final effectiveAtk = ((p.attack + relicBonuses.bonusAttack) * plinthAtkMult).round();
+      final effectiveDef = ((p.defense + relicBonuses.bonusDefense) * plinthDefMult).round();
+      final effectiveMaxHp = ((p.maxHp + relicBonuses.bonusHp) * plinthAllMult).round();
+      final effectiveHp = ((p.currentHp + relicBonuses.bonusHp) * plinthAllMult).round();
+      final effectiveSpd = ((p.speed + relicBonuses.bonusSpeed) * plinthAllMult).round();
+      final effectiveGraftId = p.graftedTraitId ?? (p.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
+
+      newPlayerUnits.add(CombatUnitState(
+        id: p.id,
+        name: p.name,
+        templateId: p.speciesId,
+        isPlayer: true,
+        footprint: UnitFootprint.single1x1,
+        archetype: mapArchetypeToSpatial(p.archetype),
+        occupiedNodes: nodes,
+        level: p.level,
+        maxHp: effectiveMaxHp,
+        hp: effectiveHp,
+        maxArmor: effectiveDef,
+        armor: effectiveDef,
+        attack: effectiveAtk,
+        speed: effectiveSpd,
+        currentAp: i == 1 ? 2500 : 5000,
+        customAssetPath: p.customAvatarAsset,
+        nativeTraitId: p.nativeTraitId,
+        graftedTraitId: effectiveGraftId,
+        ultimateGauge: 100,
+        ultimateCooldown: 0,
+      ));
+    }
+
+    playerUnits.clear();
+    playerUnits.addAll(newPlayerUnits);
+    lastBannerMessage = '👥 RETINUE SQUAD SYNCED: ${playerUnits.map((u) => u.name).join(' • ')}';
+    addLog('Retinue squad updated: ${playerUnits.map((u) => u.name).join(', ')}');
+    notifyListeners();
+  }
+
+  /// Sets or updates a single retinue companion at slot 1 or 2 during pre-battle
+  void setRetinueCompanion(int slotIndex, UnitEntity minion, {RelicService? relicService}) {
+    if (slotIndex < 1 || slotIndex > 2) return;
+    final autoFormationNodes = [
+      const GridNode(column: 1, row: 0),
+      const GridNode(column: 0, row: 0),
+      const GridNode(column: 1, row: 2),
+    ];
+
+    List<GridNode> nodes = [];
+    if (playerUnits.length > slotIndex && playerUnits[slotIndex].occupiedNodes.isNotEmpty) {
+      nodes = playerUnits[slotIndex].occupiedNodes.map((n) => GridNode(
+        column: n.column,
+        row: n.row,
+        occupantUnitId: minion.id,
+      )).toList();
+    } else {
+      nodes = [autoFormationNodes[slotIndex]];
+    }
+
+    final relicBonuses = relicService?.calculateBonuses(minion.id) ?? const UnitRelicBonuses();
+    final double plinthAllMult = minion.plinthMaterial == PlinthMaterial.gold ? 1.10 : 1.0;
+    final double plinthAtkMult = minion.plinthMaterial == PlinthMaterial.obsidian ? 1.10 : plinthAllMult;
+    final double plinthDefMult = minion.plinthMaterial == PlinthMaterial.iron ? 1.15 : plinthAllMult;
+
+    final effectiveAtk = ((minion.attack + relicBonuses.bonusAttack) * plinthAtkMult).round();
+    final effectiveDef = ((minion.defense + relicBonuses.bonusDefense) * plinthDefMult).round();
+    final effectiveMaxHp = ((minion.maxHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveHp = ((minion.currentHp + relicBonuses.bonusHp) * plinthAllMult).round();
+    final effectiveSpd = ((minion.speed + relicBonuses.bonusSpeed) * plinthAllMult).round();
+    final effectiveGraftId = minion.graftedTraitId ?? (minion.plinthMaterial == PlinthMaterial.bone ? 'plinth_vampiric_bone' : null);
+
+    final newUnit = CombatUnitState(
+      id: minion.id,
+      name: minion.name,
+      templateId: minion.speciesId,
+      isPlayer: true,
+      footprint: UnitFootprint.single1x1,
+      archetype: mapArchetypeToSpatial(minion.archetype),
+      occupiedNodes: nodes,
+      level: minion.level,
+      maxHp: effectiveMaxHp,
+      hp: effectiveHp,
+      maxArmor: effectiveDef,
+      armor: effectiveDef,
+      attack: effectiveAtk,
+      speed: effectiveSpd,
+      currentAp: slotIndex == 1 ? 2500 : 5000,
+      customAssetPath: minion.customAvatarAsset,
+      nativeTraitId: minion.nativeTraitId,
+      graftedTraitId: effectiveGraftId,
+      ultimateGauge: 100,
+      ultimateCooldown: 0,
+    );
+
+    if (playerUnits.length > slotIndex) {
+      playerUnits[slotIndex] = newUnit;
+    } else {
+      playerUnits.add(newUnit);
+    }
+    lastBannerMessage = '⚔️ RETINUE COMPANION: ${minion.name} assigned to Slot ${slotIndex + 1}';
+    addLog('Assigned ${minion.name} to Retinue Slot ${slotIndex + 1}.');
+    notifyListeners();
   }
 
   /// Tactical Plinth Triage: Player shifts or swaps unit across nodes

@@ -339,14 +339,17 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
   Widget _buildBranchTabs(CrucibleSkillTreeState state) {
     return Container(
       color: const Color(0xFF141720),
-      child: Row(
-        children: CrucibleSkillBranch.values.map((branch) {
-          final isSelected = branch == _selectedBranch;
-          final color = _getBranchColor(branch);
-          final pointsSpent = state.getPointsSpentInBranch(branch);
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: CrucibleSkillBranch.values.map((branch) {
+            final isSelected = branch == _selectedBranch;
+            final color = _getBranchColor(branch);
+            final pointsSpent = state.getPointsSpentInBranch(branch);
 
-          return Expanded(
-            child: InkWell(
+            return InkWell(
               onTap: () {
                 setState(() {
                   _selectedBranch = branch;
@@ -355,7 +358,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
                   border: Border(
@@ -366,7 +369,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                   ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(_getBranchIcon(branch), size: 14, color: isSelected ? color : Colors.white54),
                     const SizedBox(width: 6),
@@ -397,9 +400,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                   ],
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

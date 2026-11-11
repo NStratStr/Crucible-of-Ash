@@ -358,12 +358,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
       final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
       player.setVolume(vol).then((_) {
-        player.play(AssetSource('audio/$resolved'));
-      }).catchError((e) {
-        debugPrint('Error playing SFX $resolved: $e');
+        return player.play(AssetSource('audio/$resolved')).catchError((_) {});
+      }).catchError((_) {
+        // Silently ignore audio playback errors on web (404s/codecs)
       });
-    } catch (e) {
-      debugPrint('Error playing SFX $sfxName: $e');
+    } catch (_) {
+      // Silently ignore
     }
   }
 
@@ -1814,7 +1814,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                               const Icon(Icons.blur_on, color: Color(0xFFB0BEC5), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardUnboundAsh} Ash',
+                                                '+${_engine.rewardUnboundAsh} Crucible Ash',
                                                 style: const TextStyle(color: Color(0xFFECEFF1), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -1826,7 +1826,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                               const Icon(Icons.opacity, color: Color(0xFFE53935), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardDistilledVitae} Vitae',
+                                                '+${_engine.rewardDistilledVitae} Alchemical Vitae',
                                                 style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -1838,7 +1838,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                               const Icon(Icons.foundation, color: Color(0xFF00E5FF), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardPetrifiedPlinths} Plinths',
+                                                '+${_engine.rewardPetrifiedPlinths} Plinth Shards',
                                                 style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -7221,6 +7221,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       reserveUnits: _reserveUnits,
       relicService: widget.relicService,
       onSquadUpdated: (updatedSquad, updatedReserves) {
+        _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
         setState(() {
           _currentSquadUnits = updatedSquad;
           _reserveUnits = updatedReserves;
@@ -7724,6 +7725,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           reserveUnits: _reserveUnits,
                           relicService: widget.relicService,
                           onSquadUpdated: (updatedSquad, updatedReserves) {
+                            _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
                             setState(() {
                               _currentSquadUnits = updatedSquad;
                               _reserveUnits = updatedReserves;

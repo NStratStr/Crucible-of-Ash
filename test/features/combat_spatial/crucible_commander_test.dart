@@ -317,8 +317,8 @@ void main() {
       engine.executeUnitAction(sculptor, actionType: 'forge_cleave');
       expect(sculptor.crucibleCinders, equals(cindersBefore), reason: 'Should not generate cinders while on cooldown');
 
-      // Ticking simulation decrements cooldown
-      engine.skillTreeState.updateCooldowns(1.6);
+      // Ticking simulation decrements cooldown (cleave cooldown is 6.0s)
+      engine.skillTreeState.updateCooldowns(6.1);
       expect(engine.skillTreeState.getCooldownRemaining(cleave.id), equals(0.0));
 
       // Off cooldown: can execute again!
@@ -629,6 +629,107 @@ void main() {
       expect(tree.allSkills['ash_brand']!.rank, equals(1));
       expect(tree.wrathPointsSpent, equals(0));
       expect(tree.isSkillPrerequisiteMet('ash_brand'), isFalse);
+    });
+
+    test('Retinue Squad Builder updates playerUnits dynamically and persists through deployment', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+
+      // Initially slots 1 & 2 are Iron Footman and Grave Duelist
+      expect(engine.playerUnits[0].isAshSculptor, isTrue);
+      expect(engine.playerUnits[1].templateId, contains('footman'));
+      expect(engine.playerUnits[2].templateId, contains('duelist'));
+
+      // Now user changes squad to Stone Sentinel & Pyre Reaver
+      const sculptorEntity = UnitEntity(
+        id: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        speciesId: 'ash_sculptor',
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        generation: 1,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 1000,
+        maxHp: 1000,
+        attack: 120,
+        defense: 120,
+        speed: 100,
+        nativeTraitId: 'iron_fortitude',
+        lineageAncestors: [],
+      );
+      const sentinelEntity = UnitEntity(
+        id: 'stone_sentinel_01',
+        name: 'Stone Sentinel',
+        speciesId: 'stone_sentinel',
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front2,
+        generation: 1,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 1100,
+        maxHp: 1100,
+        attack: 90,
+        defense: 160,
+        speed: 85,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      );
+      const reaverEntity = UnitEntity(
+        id: 'pyre_reaver_01',
+        name: 'Pyre Reaver',
+        speciesId: 'pyre_reaver',
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front3,
+        generation: 1,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 860,
+        maxHp: 860,
+        attack: 165,
+        defense: 95,
+        speed: 110,
+        nativeTraitId: 'rend_flesh',
+        lineageAncestors: [],
+      );
+
+      engine.updateRetinueSquad([sculptorEntity, sentinelEntity, reaverEntity]);
+
+      expect(engine.playerUnits[0].isAshSculptor, isTrue);
+      expect(engine.playerUnits[1].id, equals('stone_sentinel_01'));
+      expect(engine.playerUnits[1].name, equals('Stone Sentinel'));
+      expect(engine.playerUnits[2].id, equals('pyre_reaver_01'));
+      expect(engine.playerUnits[2].name, equals('Pyre Reaver'));
+
+      // Check retinue passives reflect the new squad:
+      expect(engine.isGraveCarapaceActive, isTrue); // Stone Sentinel
+      expect(engine.isReaverFerocityActive, isTrue); // Pyre Reaver
+      expect(engine.isBulwarkOathActive, isFalse); // Iron Footman benched
+    });
+
+    test('Pre-Battle Deployment grid tap-to-swap exchanges unit formation positions', () {
+      final engine = SpatialCombatEngine();
+      engine.setupSunderAtAshenGate();
+      expect(engine.isPreBattlePhase, isTrue);
+
+      final unit0 = engine.playerUnits[0]; // (Col 1, Row 0)
+      final unit1 = engine.playerUnits[1]; // (Col 0, Row 0)
+      final pos0 = unit0.occupiedNodes.first;
+      final pos1 = unit1.occupiedNodes.first;
+
+      expect(pos0.column, equals(1));
+      expect(pos0.row, equals(0));
+      expect(pos1.column, equals(0));
+      expect(pos1.row, equals(0));
+
+      // Move unit0 into unit1's tile -> Tactical Formation Swap!
+      final swapped = engine.movePlayerUnit(unit0.id, pos1.column, pos1.row);
+      expect(swapped, isTrue);
+
+      expect(unit0.occupiedNodes.first.column, equals(0));
+      expect(unit0.occupiedNodes.first.row, equals(0));
+      expect(unit1.occupiedNodes.first.column, equals(1));
+      expect(unit1.occupiedNodes.first.row, equals(0));
     });
   });
 }

@@ -191,6 +191,8 @@ class SpatialTelegraphIntent {
     required this.totalWindupTicks,
     required this.rawDamage,
   });
+
+  String get targetSummary => '${pattern.name} (${targetNodes.length} tiles)';
 }
 
 /// Tactical Unit Archetype determining posture adaptation
