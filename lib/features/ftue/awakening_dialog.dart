@@ -1,19 +1,115 @@
 import 'package:flutter/material.dart';
-import '../generals/general_command_service.dart';
+import '../combat_spatial/models/crucible_skill_tree_models.dart';
+
+class SculptorDisciplineData {
+  final CrucibleSkillBranch branch;
+  final String title;
+  final String branchName;
+  final String tagline;
+  final String playstyle;
+  final Color themeColor;
+  final IconData icon;
+  final String starterGenerator;
+  final String starterCoreSkill;
+  final String traitBonus;
+  final String flavor;
+
+  const SculptorDisciplineData({
+    required this.branch,
+    required this.title,
+    required this.branchName,
+    required this.tagline,
+    required this.playstyle,
+    required this.themeColor,
+    required this.icon,
+    required this.starterGenerator,
+    required this.starterCoreSkill,
+    required this.traitBonus,
+    required this.flavor,
+  });
+
+  static const List<SculptorDisciplineData> allDisciplines = [
+    SculptorDisciplineData(
+      branch: CrucibleSkillBranch.wrath,
+      title: 'FORGE BERSERKER',
+      branchName: 'PATH OF WRATH',
+      tagline: 'Pyre-Forged Carnage & Armor Cleave',
+      playstyle: 'Aggressive frontline burst & raw physical momentum',
+      themeColor: Color(0xFFFF5252),
+      icon: Icons.local_fire_department,
+      starterGenerator: 'Forge Cleave (Free Strike • +6 Cinders)',
+      starterCoreSkill: 'Sundering Brand (30 Cinders • Armor Shred)',
+      traitBonus: '+15% Direct Strike Damage & +2 Cinders on Crits',
+      flavor: 'Hammer hot ore into the flesh of the fallen. Shatter enemy defenses with devastating cleaving blows.',
+    ),
+    SculptorDisciplineData(
+      branch: CrucibleSkillBranch.bastion,
+      title: 'IRONCLAD WARDEN',
+      branchName: 'PATH OF BASTION',
+      tagline: 'Granite Bulwarks & Squad Mitigation',
+      playstyle: 'Immovable tanking, damage redirection & Aegis shielding',
+      themeColor: Color(0xFF42A5F5),
+      icon: Icons.shield,
+      starterGenerator: 'Iron Bastion (Defensive Strike • +6 Cinders)',
+      starterCoreSkill: 'Cinder Bulwark (25 Cinders • Squad Aegis Shield)',
+      traitBonus: '+20% Aegis Shield Power & -15% Squad Damage Taken',
+      flavor: 'Weave mineral strata into living ramparts. Turn incoming enemy volleys into harmless showers of flint sparks.',
+    ),
+    SculptorDisciplineData(
+      branch: CrucibleSkillBranch.resonance,
+      title: 'BLOOD ALCHEMIST',
+      branchName: 'PATH OF RESONANCE',
+      tagline: 'Sanguine Tethering & Life Leech',
+      playstyle: 'Hybrid lifesteal, continuous bleed ticks & sustain',
+      themeColor: Color(0xFFAB47BC),
+      icon: Icons.bloodtype,
+      starterGenerator: 'Siphon Rend (Vampiric Slash • +6 Cinders & Leech)',
+      starterCoreSkill: 'Crimson Brand (30 Cinders • Bleed Affliction)',
+      traitBonus: '+15% Sanguine Lifesteal & +3 Cinders on Bleed Ticks',
+      flavor: 'Quicken cold veins with molten vitriol. Siphon the vital essence of foes across battlefield vectors.',
+    ),
+    SculptorDisciplineData(
+      branch: CrucibleSkillBranch.vitae,
+      title: 'SANCTIFIED RESTORER',
+      branchName: 'PATH OF VITAE',
+      tagline: 'Living Mineral Renewal & Squad Mending',
+      playstyle: 'Dynamic squad healing, overshield conversion & cleanse',
+      themeColor: Color(0xFF66BB6A),
+      icon: Icons.healing,
+      starterGenerator: 'Mending Ash (Restorative Strike • +6 Cinders & Mends Ally)',
+      starterCoreSkill: 'Sanctified Bloom (25 Cinders • Frontline Renewal)',
+      traitBonus: '+20% Healing Power & +5% Max HP Regen Per Turn',
+      flavor: 'Purify calcified organs with soothing white fire. Keep your companion retinue fighting through impossible odds.',
+    ),
+    SculptorDisciplineData(
+      branch: CrucibleSkillBranch.calamity,
+      title: 'PYRE ARCANIST',
+      branchName: 'PATH OF CALAMITY',
+      tagline: 'Battlefield Devastation & Ash Whirlwinds',
+      playstyle: 'Wide-area annihilation, vortex displacement & AoE pyres',
+      themeColor: Color(0xFFFF7043),
+      icon: Icons.whatshot,
+      starterGenerator: 'Ash Whirlwind (Spinning Strike • +6 Cinders & Cleave)',
+      starterCoreSkill: 'Sanguine Vortex (40 Cinders • Gravitational Pull & Pyre)',
+      traitBonus: '+25% AoE Damage & +1 AoE Splash Radius',
+      flavor: 'Unleash the suffocating heat of the caldera. Drag enemies into burning gravitational vortexes.',
+    ),
+  ];
+}
 
 class AwakeningDialog extends StatefulWidget {
-  final GeneralType initialSelected;
+  final CrucibleSkillBranch initialSelected;
 
   const AwakeningDialog({
     super.key,
-    this.initialSelected = GeneralType.vladislav,
+    this.initialSelected = CrucibleSkillBranch.wrath,
   });
 
-  static Future<GeneralType?> show(
+  static Future<CrucibleSkillBranch?> show(
     BuildContext context, {
-    GeneralType initialSelected = GeneralType.vladislav,
+    CrucibleSkillBranch initialSelected = CrucibleSkillBranch.wrath,
   }) {
-    return showDialog<GeneralType>(
+    return showDialog<CrucibleSkillBranch>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AwakeningDialog(initialSelected: initialSelected),
@@ -25,8 +121,8 @@ class AwakeningDialog extends StatefulWidget {
 }
 
 class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProviderStateMixin {
-  late GeneralType _selected;
-  int _currentStep = 0; // 0 = Prologue Lore Slides, 1 = Commander Faction Selection
+  late CrucibleSkillBranch _selected;
+  int _currentStep = 0; // 0 = Prologue Lore Slides, 1 = Sculptor Discipline Selection
   int _prologuePage = 0;
   final PageController _pageController = PageController();
 
@@ -68,7 +164,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
       'icon': Icons.fort,
       'color': const Color(0xFFFFD54F),
       'body':
-          'Dying legionnaires, deserting knights, and infected witches followed your workbench trail across the wasteland. Together, you claimed a geothermal volcanic basin where subterranean Vitae springs hold back the ash: The Citadel Sanctuary. Now, bind covenant with your first Progenitor Champion to lead your vanguard.',
+          'Dying legionnaires, deserting knights, and infected witches followed your workbench trail across the wasteland. Together, you claimed a geothermal volcanic basin where subterranean Vitae springs hold back the ash: The Citadel Sanctuary. Now, as the Ash Sculptor, choose your initial martial discipline to forge your first Grimoire rites.',
       'quote': '"They called it an extinction. We called it a harvest. Welcome to the Crucible."',
     },
   ];
@@ -112,13 +208,13 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               // Subtle background vignette
               Positioned.fill(
                 child: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: RadialGradient(
                       center: Alignment.center,
                       radius: 1.1,
                       colors: [
-                        const Color(0xFF161624),
-                        const Color(0xFF08080E),
+                        Color(0xFF161624),
+                        Color(0xFF08080E),
                       ],
                     ),
                   ),
@@ -134,11 +230,11 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
                     _buildHeader(isCompact),
                     const SizedBox(height: 12),
 
-                    // Main Content (Prologue or 4-Faction Selection)
+                    // Main Content (Prologue or Sculptor Discipline Selection)
                     Expanded(
                       child: _currentStep == 0
                           ? _buildPrologueView(isCompact)
-                          : _buildFactionSelectionView(isCompact),
+                          : _buildDisciplineSelectionView(isCompact),
                     ),
 
                     const SizedBox(height: 14),
@@ -176,7 +272,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               Text(
                 _currentStep == 0
                     ? 'PROLOGUE • THE CALCIFIED CONTINENT'
-                    : 'FIRST TIME AWAKENING • CHOOSE YOUR PROGENITOR',
+                    : 'SCULPTOR INITIATION • CHOOSE YOUR STARTING DISCIPLINE',
                 style: const TextStyle(
                   color: Color(0xFFFFD54F),
                   fontSize: 10.5,
@@ -187,7 +283,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               Text(
                 _currentStep == 0
                     ? 'The Genesis of the Itinerant Alchemist'
-                    : 'Rescue 1 of 4 Faction Champions to Lead Your Sanctuary',
+                    : 'Select Your Initial Combat Pathway to Forge Your First Grimoire Rites',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -298,20 +394,21 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
                           slide['title'] as String,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontFamily: 'serif',
-                            color: accent,
+                            color: Colors.white,
+                            fontSize: isCompact ? 18 : 22,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 1.4,
-                            fontSize: isCompact ? 16 : 19,
+                            letterSpacing: 1.0,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           slide['subtitle'] as String,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            letterSpacing: 0.8,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: isCompact ? 12 : 13.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -319,26 +416,27 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
                           slide['body'] as String,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: isCompact ? 12 : 13.5,
-                            height: 1.5,
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: isCompact ? 12 : 14,
+                            height: 1.55,
                           ),
                         ),
                         const SizedBox(height: 18),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.black45,
+                            color: Colors.black.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white12),
+                            border: Border.all(color: accent.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             slide['quote'] as String,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFFFFD54F),
+                            style: TextStyle(
+                              color: accent.withValues(alpha: 0.95),
+                              fontSize: isCompact ? 11 : 12.5,
                               fontStyle: FontStyle.italic,
-                              fontSize: 11.5,
+                              height: 1.35,
                             ),
                           ),
                         ),
@@ -375,8 +473,8 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
     );
   }
 
-  Widget _buildFactionSelectionView(bool isCompact) {
-    final generals = GeneralProfile.allGenerals;
+  Widget _buildDisciplineSelectionView(bool isCompact) {
+    final disciplines = SculptorDisciplineData.allDisciplines;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,7 +492,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Four half-calcified champions lie stranded at the perimeter. You have enough raw catalyst to stabilize ONE immediate Progenitor General to lead your starter brigade:',
+                  'As the Ash Sculptor, you command the battlefield with your Grimoire rites. Choose your starting discipline: you begin with core fundamentals (Slot 1 primary generator + Slot 2 tactical core) and 5 Skill Points to build up your rites in the Crucible Skill Tree.',
                   style: TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.3),
                 ),
               ),
@@ -403,22 +501,22 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
         ),
         const SizedBox(height: 12),
 
-        // 4-Faction Grid
+        // 5-Discipline List / Grid
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final crossAxisCount = constraints.maxWidth < 680 ? 1 : 2;
+              final crossAxisCount = constraints.maxWidth < 720 ? 1 : (constraints.maxWidth < 900 ? 2 : 3);
 
               return GridView.builder(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: crossAxisCount == 1 ? 2.6 : 1.75,
+                  childAspectRatio: crossAxisCount == 1 ? 2.5 : 1.5,
                 ),
-                itemCount: generals.length,
+                itemCount: disciplines.length,
                 itemBuilder: (context, index) {
-                  return _buildFactionCard(generals[index]);
+                  return _buildDisciplineCard(disciplines[index]);
                 },
               );
             },
@@ -428,37 +526,28 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
     );
   }
 
-  Widget _buildFactionCard(GeneralProfile profile) {
-    final bool isSelected = _selected == profile.type;
-
-    // Faction metadata labels
-    final factionMap = {
-      GeneralType.vladislav: {'faction': 'SANGUINE COURT', 'playstyle': 'Lifesteal & Execution'},
-      GeneralType.valeria: {'faction': 'ASH LEGION', 'playstyle': 'Heavy Armor & Counter-Strikes'},
-      GeneralType.malakor: {'faction': 'MIRE COVEN', 'playstyle': 'Blight Stacks & Necrotic Rebirth'},
-      GeneralType.morrigan: {'faction': 'CALX ORDER', 'playstyle': 'Haste, Turn Meter & Criticals'},
-    };
-    final meta = factionMap[profile.type] ?? {'faction': 'INDEPENDENT', 'playstyle': 'Tactical'};
+  Widget _buildDisciplineCard(SculptorDisciplineData discipline) {
+    final bool isSelected = _selected == discipline.branch;
 
     return InkWell(
-      onTap: () => setState(() => _selected = profile.type),
+      onTap: () => setState(() => _selected = discipline.branch),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
-              ? profile.themeColor.withValues(alpha: 0.18)
+              ? discipline.themeColor.withValues(alpha: 0.18)
               : const Color(0xFF13131F),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? profile.themeColor : Colors.white12,
+            color: isSelected ? discipline.themeColor : Colors.white12,
             width: isSelected ? 2.0 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: profile.themeColor.withValues(alpha: 0.35),
+                    color: discipline.themeColor.withValues(alpha: 0.35),
                     blurRadius: 10,
                   ),
                 ]
@@ -468,21 +557,21 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Top Row: Icon, Name, Faction & Radio
+            // Top Row: Icon, Name, Branch Badge & Radio
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: profile.themeColor.withValues(alpha: 0.22),
-                    border: Border.all(color: profile.themeColor, width: 1.5),
+                    color: discipline.themeColor.withValues(alpha: 0.22),
+                    border: Border.all(color: discipline.themeColor, width: 1.5),
                   ),
-                  child: Icon(profile.icon, color: profile.themeColor, size: 22),
+                  child: Icon(discipline.icon, color: discipline.themeColor, size: 20),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,51 +581,48 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
-                              color: profile.themeColor.withValues(alpha: 0.25),
+                              color: discipline.themeColor.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: profile.themeColor, width: 0.8),
+                              border: Border.all(color: discipline.themeColor, width: 0.8),
                             ),
                             child: Text(
-                              meta['faction']!,
+                              discipline.branchName,
                               style: TextStyle(
-                                color: profile.themeColor,
+                                color: discipline.themeColor,
                                 fontSize: 7.5,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.8,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            meta['playstyle']!,
-                            style: const TextStyle(color: Colors.white54, fontSize: 8.5),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        profile.name,
+                        discipline.title,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        profile.title,
+                        discipline.tagline,
                         style: TextStyle(
-                          color: profile.themeColor,
-                          fontSize: 10,
+                          color: discipline.themeColor,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                Radio<GeneralType>(
-                  value: profile.type,
+                Radio<CrucibleSkillBranch>(
+                  value: discipline.branch,
                   groupValue: _selected,
-                  activeColor: profile.themeColor,
+                  activeColor: discipline.themeColor,
                   onChanged: (val) {
                     if (val != null) setState(() => _selected = val);
                   },
@@ -544,48 +630,62 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               ],
             ),
 
-            // Aura Description
+            // Starter Skills Box
             Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: profile.themeColor.withValues(alpha: 0.3)),
+                border: Border.all(color: discipline.themeColor.withValues(alpha: 0.3)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.bolt, size: 12, color: profile.themeColor),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      'AURA: ${profile.auraName} — ${profile.auraDescription}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: profile.themeColor,
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Icon(Icons.flash_on, size: 11, color: discipline.themeColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        'STARTER SKILLS (SLOTS 1 & 2):',
+                        style: TextStyle(
+                          color: discipline.themeColor,
+                          fontSize: 8.0,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '• ${discipline.starterGenerator}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 8.0),
+                  ),
+                  Text(
+                    '• ${discipline.starterCoreSkill}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 8.0),
                   ),
                 ],
               ),
             ),
 
-            // Orders list
+            // Trait bonus
             Row(
               children: [
                 const Text(
-                  'FOCUS ORDERS: ',
+                  'TRAIT: ',
                   style: TextStyle(color: Colors.white38, fontSize: 8.0, fontWeight: FontWeight.bold),
                 ),
                 Expanded(
                   child: Text(
-                    profile.orders.take(3).map((o) => '${o.name} (${o.focusCost}F)').join(' • '),
+                    discipline.traitBonus,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70, fontSize: 8.5),
+                    style: TextStyle(color: discipline.themeColor, fontSize: 8.5, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -620,7 +720,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
               size: 16,
             ),
             label: Text(
-              isLastSlide ? 'CHOOSE PROGENITOR GENERAL' : 'NEXT CHAPTER',
+              isLastSlide ? 'CHOOSE SCULPTOR DISCIPLINE' : 'NEXT CHAPTER',
               style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
             ),
             style: ElevatedButton.styleFrom(
@@ -644,7 +744,7 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
       );
     }
 
-    final chosenProfile = GeneralProfile.getByType(_selected);
+    final chosen = SculptorDisciplineData.allDisciplines.firstWhere((d) => d.branch == _selected);
 
     return Row(
       children: [
@@ -660,17 +760,17 @@ class _AwakeningDialogState extends State<AwakeningDialog> with SingleTickerProv
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton.icon(
-            icon: const Icon(Icons.shield, size: 18),
+            icon: const Icon(Icons.auto_awesome, size: 18),
             label: Text(
-              'SEAL COVENANT WITH ${chosenProfile.name.toUpperCase()}',
+              'INITIATE AS ${chosen.title}',
               style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1, fontSize: 12),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: chosenProfile.themeColor,
+              backgroundColor: chosen.themeColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              shadowColor: chosenProfile.themeColor.withValues(alpha: 0.6),
+              shadowColor: chosen.themeColor.withValues(alpha: 0.6),
               elevation: 4,
             ),
             onPressed: () => Navigator.pop(context, _selected),

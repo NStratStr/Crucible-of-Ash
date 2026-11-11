@@ -1361,6 +1361,11 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     currentTick++;
 
+    if (isDebugInfiniteCinders) {
+      final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+      if (sculptor != null) sculptor.crucibleCinders = 100;
+    }
+
     // Apply Active Minion Retinue Passives & Keystone: Slag Fortress
     final bool hasLivingMinion = playerUnits.any((u) => !u.isAshSculptor && u.isAlive);
     final bool isSlagFortress = skillTreeState.isSlagFortressActive && hasLivingMinion;
@@ -1880,6 +1885,10 @@ class SpatialCombatEngine extends ChangeNotifier {
     bool ignoreArmor = false,
     bool isPhysical = true,
   }) {
+    if (target.isPlayer && isDebugGodModeEnabled) {
+      addLog('🛡️ [DEV GOD MODE] ${target.name} absorbed all incoming damage.');
+      return 0;
+    }
     double finalDmg = rawDamage.toDouble();
     if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: attackerRow)) {
       finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
@@ -4402,6 +4411,118 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
     lastBannerMessage = '⚔️ RETINUE COMPANION: ${minion.name} assigned to Slot ${slotIndex + 1}';
     addLog('Assigned ${minion.name} to Retinue Slot ${slotIndex + 1}.');
+    notifyListeners();
+  }
+
+  // ==========================================
+  // DEV TOOLS & DEBUG SANDBOX SYSTEM
+  // ==========================================
+  bool isDebugGodModeEnabled = false;
+  bool isDebugInfiniteCinders = false;
+
+  void debugToggleGodMode() {
+    isDebugGodModeEnabled = !isDebugGodModeEnabled;
+    lastBannerMessage = isDebugGodModeEnabled
+        ? '🛡️ DEV GOD MODE: ON (SQUAD INVULNERABLE)'
+        : '🛡️ DEV GOD MODE: OFF';
+    notifyListeners();
+  }
+
+  void debugToggleInfiniteCinders() {
+    isDebugInfiniteCinders = !isDebugInfiniteCinders;
+    if (isDebugInfiniteCinders) {
+      final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+      if (sculptor != null) sculptor.crucibleCinders = 100;
+    }
+    lastBannerMessage = isDebugInfiniteCinders
+        ? '🔥 DEV INFINITE CINDERS: ON (LOCKED AT 100)'
+        : '🔥 DEV INFINITE CINDERS: OFF';
+    notifyListeners();
+  }
+
+  void debugAddSkillPoints(int points) {
+    skillTreeState.availableSkillPoints += points;
+    lastBannerMessage = '⚡ DEV GRANTED: +$points SKILL POINTS (TOTAL: ${skillTreeState.availableSkillPoints})';
+    notifyListeners();
+  }
+
+  void debugFillCinders() {
+    final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+    if (sculptor != null) sculptor.crucibleCinders = 100;
+    lastBannerMessage = '🔥 DEV CINDERS MAXED (100/100)';
+    notifyListeners();
+  }
+
+  void debugResetCooldowns() {
+    skillTreeState.resetAllCooldowns();
+    for (final p in playerUnits) {
+      p.ultimateCooldown = 0;
+    }
+    lastBannerMessage = '⏱️ DEV COOLDOWNS RESET (0.0s)';
+    notifyListeners();
+  }
+
+  void debugUnlockAllSkills() {
+    skillTreeState.availableSkillPoints += 50;
+    for (final skill in skillTreeState.allSkills.values) {
+      skill.rank = skill.maxRank;
+    }
+    lastBannerMessage = '👑 DEV: ALL GRIMOIRE SKILLS UNLOCKED AT MAX RANK!';
+    notifyListeners();
+  }
+
+  void debugFillAlliesAp() {
+    for (final p in playerUnits.where((u) => u.isAlive)) {
+      p.currentAp = SpatialCombatEngine.tickThreshold; // 10,000 AP
+    }
+    lastBannerMessage = '⚡ DEV: ALL ALLIES AP FILLED (INSTANT TURNS READY)';
+    notifyListeners();
+  }
+
+  void debugKillAllEnemies() {
+    for (final e in enemyUnits.where((u) => u.isAlive)) {
+      e.hp = 0;
+    }
+    advanceToNextWaveIfPending();
+    lastBannerMessage = '💥 DEV: ALL CURRENT ENEMIES CLEANSED';
+    notifyListeners();
+  }
+
+  void debugSpawnTrainingDummy() {
+    const int targetCol = 1;
+    const int targetRow = 1;
+    enemyUnits.removeWhere((u) => u.occupies(targetCol, targetRow) && !u.isAlive);
+    final dummy = CombatUnitState(
+      id: 'debug_training_dummy_${DateTime.now().millisecondsSinceEpoch}',
+      name: 'Ash Training Colossus',
+      templateId: 'gorgoroth_boss',
+      isPlayer: false,
+      footprint: UnitFootprint.single1x1,
+      archetype: UnitArchetype.vanguardMelee,
+      occupiedNodes: [const GridNode(column: targetCol, row: targetRow, occupantUnitId: 'dummy')],
+      level: 10,
+      maxHp: 25000,
+      hp: 25000,
+      maxArmor: 150,
+      armor: 150,
+      attack: 10,
+      speed: 30,
+      currentAp: 0,
+      customAssetPath: 'assets/images/magma_golem.png',
+      maxStagger: 1000,
+      stagger: 1000,
+      ultimateGauge: 0,
+      ultimateCooldown: 999,
+    );
+    enemyUnits.add(dummy);
+    lastBannerMessage = '🎯 DEV: SPAWNED 25,000 HP TRAINING DUMMY AT (COL 2, ROW 1)';
+    addLog('Spawned training dummy for skill testing.');
+    notifyListeners();
+  }
+
+  void debugEquipArchetypeLoadout(CrucibleSkillBranch branch) {
+    skillTreeState.configureStartingDiscipline(branch, startWithBasics: false);
+    lastBannerMessage = '⚔️ DEV LOADOUT: EQUIPPED PURE ${branch.name.toUpperCase()} PRESET';
     notifyListeners();
   }
 

@@ -89,7 +89,7 @@ class CrucibleSkillTreeState {
 
   CrucibleSkillTreeState() {
     _initializeAllSkills();
-    configureDefaultsForGeneral(GeneralType.malakor);
+    configureStartingDiscipline(CrucibleSkillBranch.wrath, startWithBasics: true);
   }
 
   void _initializeAllSkills() {
@@ -701,6 +701,102 @@ class CrucibleSkillTreeState {
       ],
     );
 
+  }
+
+  void configureStartingDiscipline(CrucibleSkillBranch branch, {bool startWithBasics = true}) {
+    if (startWithBasics) {
+      // Start with the basics (Slot 1 generator + Slot 2 core skill) and build up!
+      // Slots 3, 4, 5 start empty and are unlocked as the player levels up and invests Skill Points.
+      equippedSkillIds[2] = '';
+      equippedSkillIds[3] = '';
+      equippedSkillIds[4] = '';
+      availableSkillPoints = 5;
+
+      switch (branch) {
+        case CrucibleSkillBranch.wrath:
+          equippedSkillIds[0] = 'ash_cleave';
+          equippedSkillIds[1] = 'ash_brand';
+          allSkills['ash_cleave']?.rank = 1;
+          allSkills['ash_brand']?.rank = 1;
+          break;
+        case CrucibleSkillBranch.bastion:
+          equippedSkillIds[0] = 'iron_slam';
+          equippedSkillIds[1] = 'ash_bastion';
+          allSkills['iron_slam']?.rank = 1;
+          allSkills['ash_bastion']?.rank = 1;
+          break;
+        case CrucibleSkillBranch.resonance:
+          equippedSkillIds[0] = 'sanguine_rend';
+          equippedSkillIds[1] = 'sanguine_tether';
+          allSkills['sanguine_rend']?.rank = 1;
+          allSkills['sanguine_tether']?.rank = 1;
+          break;
+        case CrucibleSkillBranch.vitae:
+          equippedSkillIds[0] = 'mending_ash';
+          equippedSkillIds[1] = 'sanctified_bloom';
+          allSkills['mending_ash']?.rank = 1;
+          allSkills['sanctified_bloom']?.rank = 1;
+          break;
+        case CrucibleSkillBranch.calamity:
+          equippedSkillIds[0] = 'ash_whirlwind';
+          equippedSkillIds[1] = 'sanguine_vortex';
+          allSkills['ash_whirlwind']?.rank = 1;
+          allSkills['sanguine_vortex']?.rank = 1;
+          break;
+        case CrucibleSkillBranch.apex:
+          equippedSkillIds[0] = 'ash_cleave';
+          equippedSkillIds[1] = 'ash_brand';
+          allSkills['ash_cleave']?.rank = 1;
+          allSkills['ash_brand']?.rank = 1;
+          break;
+      }
+    } else {
+      // Full 5-Slot Presets for Sandbox / Dev Testing
+      switch (branch) {
+        case CrucibleSkillBranch.wrath:
+          equippedSkillIds[0] = 'ash_cleave';
+          equippedSkillIds[1] = 'ash_brand';
+          equippedSkillIds[2] = 'iron_judgment';
+          equippedSkillIds[3] = 'ash_whirlwind';
+          equippedSkillIds[4] = 'ash_pyre';
+          break;
+        case CrucibleSkillBranch.bastion:
+          equippedSkillIds[0] = 'iron_slam';
+          equippedSkillIds[1] = 'ash_bastion';
+          equippedSkillIds[2] = 'iron_bulwark';
+          equippedSkillIds[3] = 'iron_retribution';
+          equippedSkillIds[4] = 'iron_wrath';
+          break;
+        case CrucibleSkillBranch.resonance:
+          equippedSkillIds[0] = 'sanguine_rend';
+          equippedSkillIds[1] = 'sanguine_tether';
+          equippedSkillIds[2] = 'mire_curse';
+          equippedSkillIds[3] = 'sanguine_vortex';
+          equippedSkillIds[4] = 'sanguine_apex';
+          break;
+        case CrucibleSkillBranch.vitae:
+          equippedSkillIds[0] = 'mending_ash';
+          equippedSkillIds[1] = 'sanctified_bloom';
+          equippedSkillIds[2] = 'soul_transfusion';
+          equippedSkillIds[3] = 'grace_martyr';
+          equippedSkillIds[4] = 'ash_pyre';
+          break;
+        case CrucibleSkillBranch.calamity:
+          equippedSkillIds[0] = 'ash_whirlwind';
+          equippedSkillIds[1] = 'sanguine_vortex';
+          equippedSkillIds[2] = 'mire_nova';
+          equippedSkillIds[3] = 'ash_cleave';
+          equippedSkillIds[4] = 'mire_calamity';
+          break;
+        case CrucibleSkillBranch.apex:
+          equippedSkillIds[0] = 'ash_cleave';
+          equippedSkillIds[1] = 'ash_brand';
+          equippedSkillIds[2] = 'ash_bastion';
+          equippedSkillIds[3] = 'ash_whirlwind';
+          equippedSkillIds[4] = 'ash_pyre';
+          break;
+      }
+    }
   }
 
   void configureDefaultsForGeneral(GeneralType general) {

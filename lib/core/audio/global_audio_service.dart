@@ -58,6 +58,9 @@ class GlobalAudioService {
     _isInitialized = true;
 
     try {
+      if (kIsWeb) {
+        AudioCache.instance.prefix = '';
+      }
       _bgmPlayer = AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
 

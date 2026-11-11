@@ -4,6 +4,73 @@ import '../../features/generals/general_command_service.dart';
 import '../models/unit_entity.dart';
 
 class StarterBrigades {
+  /// Returns the canonical starter brigade for the protagonist Ash Sculptor + initial retinue minions
+  static List<UnitEntity> createSculptorStarterSquad() {
+    return const [
+      UnitEntity(
+        id: 'ash_sculptor',
+        speciesId: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
+        generation: 1,
+        rarity: UnitRarity.legendary,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 1045,
+        maxHp: 1045,
+        attack: 145,
+        defense: 125,
+        speed: 115,
+        resist: 70,
+        critRate: 0.20,
+        critDamage: 1.50,
+        nativeTraitId: 'crucible_cinder_core',
+        lineageAncestors: ['itinerant_physician'],
+        plinthMaterial: PlinthMaterial.gold,
+      ),
+      UnitEntity(
+        id: 'iron_footman_starter',
+        speciesId: 'iron_footman',
+        name: 'Iron Footman',
+        customAvatarAsset: 'assets/images/iron_footman_idle.png',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front2,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 900,
+        maxHp: 900,
+        attack: 115,
+        defense: 150,
+        speed: 95,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      ),
+      UnitEntity(
+        id: 'grave_duelist_starter',
+        speciesId: 'grave_duelist',
+        name: 'Grave Duelist',
+        customAvatarAsset: 'assets/images/grave_duelist.png',
+        generation: 1,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front3,
+        level: 1,
+        maxLevel: 10,
+        currentHp: 720,
+        maxHp: 720,
+        attack: 155,
+        defense: 85,
+        speed: 125,
+        critRate: 0.30,
+        critDamage: 1.75,
+        nativeTraitId: 'stalker_edge',
+        lineageAncestors: [],
+      ),
+    ];
+  }
+
   /// Returns a solo starter squad consisting only of the player's chosen Progenitor Commander
   static List<UnitEntity> createSoloStarterSquad(GeneralType generalType) {
     switch (generalType) {

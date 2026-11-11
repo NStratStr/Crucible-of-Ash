@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models/crucible_skill_tree_models.dart';
 import 'spatial_combat_engine.dart';
+import 'dialogs/crucible_debug_sandbox_dialog.dart';
 import '../generals/general_command_service.dart';
 
 class CrucibleSkillTreeDialog extends StatefulWidget {
@@ -53,17 +54,17 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
   String _getBranchTitle(CrucibleSkillBranch b) {
     switch (b) {
       case CrucibleSkillBranch.wrath:
-        return 'PATH OF WRATH (ATTACK)';
+        return 'WRATH (ATK)';
       case CrucibleSkillBranch.bastion:
-        return 'PATH OF BASTION (DEFENSE)';
+        return 'BASTION (DEF)';
       case CrucibleSkillBranch.resonance:
-        return 'PATH OF RESONANCE (HYBRID)';
+        return 'RESONANCE (HYB)';
       case CrucibleSkillBranch.vitae:
-        return 'PATH OF VITAE (HEALING)';
+        return 'VITAE (HEAL)';
       case CrucibleSkillBranch.calamity:
-        return 'PATH OF CALAMITY (AOE)';
+        return 'CALAMITY (AOE)';
       case CrucibleSkillBranch.apex:
-        return 'APEX FINISHERS (CROWN)';
+        return 'APEX (ULT)';
     }
   }
 
@@ -219,6 +220,32 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                   content: Text('Crucible points refunded! Rebuild your archetype freely.'),
                   duration: Duration(seconds: 2),
                 ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF261D12),
+              foregroundColor: const Color(0xFFFFD54F),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: const BorderSide(color: Color(0xFFFFD54F), width: 0.8),
+              ),
+            ),
+            icon: const Icon(Icons.build_circle, size: 13, color: Color(0xFFFFD54F)),
+            label: const Text(
+              'DEV TOOLS',
+              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            ),
+            onPressed: () {
+              CrucibleDebugSandboxDialog.show(
+                context,
+                engine: widget.engine,
+                onStateChanged: () => setState(() {}),
               );
             },
           ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../core/combat_math.dart';
@@ -16,6 +17,7 @@ import 'models/crucible_skill_tree_models.dart';
 import 'crucible_skill_tree_dialog.dart';
 import 'crucible_sanctuary_upgrade_dialog.dart';
 import 'crucible_retinue_squad_dialog.dart';
+import 'dialogs/crucible_debug_sandbox_dialog.dart';
 import 'rank_and_rite_2d_battlefield.dart';
 import '../../shared/widgets/sprite_sheet_animation.dart';
 import '../../shared/widgets/pedigree_inspector_dialog.dart';
@@ -325,6 +327,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
   Future<void> _initAudio() async {
     try {
+      if (kIsWeb) {
+        AudioCache.instance.prefix = '';
+      }
       final settings = SettingsService();
       _isMuted = !settings.bgmEnabled;
       _bgmPlayer = AudioPlayer();
@@ -2771,6 +2776,40 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             fontWeight: FontWeight.bold,
                             fontSize: 8.5,
                             letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Crucible Dev Sandbox Button
+                GestureDetector(
+                  onTap: () {
+                    CrucibleDebugSandboxDialog.show(
+                      context,
+                      engine: _engine,
+                      onStateChanged: () => setState(() {}),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFD54F).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.9),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.build_circle, color: Color(0xFFFFD54F), size: 13),
+                        SizedBox(width: 4),
+                        Text(
+                          'DEV TOOLS',
+                          style: TextStyle(
+                            color: Color(0xFFFFD54F),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 8.5,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
@@ -7834,9 +7873,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           width: 0.8,
                         ),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(Icons.auto_fix_high, size: 11, color: Color(0xFFFFAB40)),
                           SizedBox(width: 3),
                           Text(
@@ -7844,6 +7883,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             style: TextStyle(
                               fontSize: 8,
                               color: Color(0xFFFFAB40),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () {
+                      _playSfx('sfx_card.wav');
+                      CrucibleDebugSandboxDialog.show(
+                        context,
+                        engine: _engine,
+                        onStateChanged: () => setState(() {}),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF261D12),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.build_circle, size: 11, color: Color(0xFFFFD54F)),
+                          SizedBox(width: 3),
+                          Text(
+                            'DEV SANDBOX',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Color(0xFFFFD54F),
                               fontWeight: FontWeight.w900,
                             ),
                           ),

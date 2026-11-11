@@ -16,6 +16,7 @@ import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/combat/post_battle_loot_dialog.dart';
 import '../../features/combat_spatial/spatial_battle_screen.dart';
+import '../../features/combat_spatial/models/crucible_skill_tree_models.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
 import '../../features/generals/general_selection_dialog.dart';
@@ -606,16 +607,14 @@ class _AppShellState extends State<AppShell> {
   Future<void> _showAwakeningDialog() async {
     final chosen = await AwakeningDialog.show(
       context,
-      initialSelected: _activeGeneralType,
+      initialSelected: CrucibleSkillBranch.wrath,
     );
     if (!mounted || chosen == null) return;
 
-    final soloStarter = StarterBrigades.createSoloStarterSquad(chosen);
+    final sculptorStarter = StarterBrigades.createSculptorStarterSquad();
     setState(() {
-      _activeGeneralType = chosen;
-      _commandService.setActiveGeneral(chosen);
-      _tickManager.updateSquads(allies: soloStarter);
-      _inventory = []; // Solo start: reserve thralls are unlocked via rescues/conquests
+      _tickManager.updateSquads(allies: sculptorStarter);
+      _inventory = StarterBrigades.createReserveInventory();
       _hasCompletedAwakening = true;
       if (_ftueService.currentStage == FtueStage.awakening) {
         _ftueService.advanceStage();
@@ -623,11 +622,11 @@ class _AppShellState extends State<AppShell> {
     });
     _saveCurrentState();
 
-    final profile = _commandService.currentProfile;
+    final discipline = SculptorDisciplineData.allDisciplines.firstWhere((d) => d.branch == chosen);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Covenant sealed with ${profile.name}! Deploying solo Commander into Stage 1-1.'),
-        backgroundColor: profile.themeColor,
+        content: Text('Ash Sculptor initiated into ${discipline.title}! Deploying retinue into battle.'),
+        backgroundColor: discipline.themeColor,
       ),
     );
   }
