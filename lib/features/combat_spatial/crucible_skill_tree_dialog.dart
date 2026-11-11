@@ -324,7 +324,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                           ),
                           const SizedBox(width: 5),
                           if (skill != null) ...[
-                            Icon(skill.icon, size: 13, color: skill.borderColor),
+                            _buildSkillVisualIcon(skill, size: 22),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Column(
@@ -434,6 +434,30 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
     );
   }
 
+  Widget _buildSkillVisualIcon(CrucibleSkillNode skill, {double size = 24, bool isLocked = false}) {
+    if (skill.iconAsset != null) {
+      return Opacity(
+        opacity: isLocked ? 0.35 : 1.0,
+        child: Image.asset(
+          skill.iconAsset!,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => Icon(
+            isLocked ? Icons.lock_outline : skill.icon,
+            color: isLocked ? Colors.white38 : Colors.white,
+            size: size * 0.65,
+          ),
+        ),
+      );
+    }
+    return Icon(
+      isLocked ? Icons.lock_outline : skill.icon,
+      color: isLocked ? Colors.white38 : Colors.white,
+      size: size * 0.65,
+    );
+  }
+
   Widget _buildBranchSkillPathway(List<CrucibleSkillNode> skills, CrucibleSkillTreeState state) {
     Widget? keystoneWidget;
 
@@ -447,6 +471,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         isActive: isActive,
         color: const Color(0xFFFF5252),
         icon: Icons.local_fire_department,
+        iconAsset: 'assets/images/icons/skills/icon_keystone_anvil_sunder.png',
       );
     } else if (_selectedBranch == CrucibleSkillBranch.bastion) {
       final bool isActive = state.isSlagFortressActive;
@@ -532,21 +557,22 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: isPrereqMet ? skill.primaryColor : const Color(0xFF263238),
+                      color: skill.iconAsset != null
+                          ? Colors.transparent
+                          : (isPrereqMet ? skill.primaryColor : const Color(0xFF263238)),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isPrereqMet ? skill.borderColor : Colors.white24,
-                        width: 1,
-                      ),
+                      border: skill.iconAsset != null
+                          ? null
+                          : Border.all(
+                              color: isPrereqMet ? skill.borderColor : Colors.white24,
+                              width: 1,
+                            ),
                     ),
-                    child: Icon(
-                      isPrereqMet ? skill.icon : Icons.lock_outline,
-                      color: isPrereqMet ? Colors.white : Colors.white38,
-                      size: 20,
-                    ),
+                    alignment: Alignment.center,
+                    child: _buildSkillVisualIcon(skill, size: 38, isLocked: !isPrereqMet),
                   ),
                   if (isEquipped)
                     Positioned(
@@ -641,6 +667,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
     required bool isActive,
     required Color color,
     required IconData icon,
+    String? iconAsset,
   }) {
     return Container(
       padding: const EdgeInsets.all(10),
@@ -664,7 +691,13 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: isActive ? color : Colors.white38, size: 22),
+          if (iconAsset != null)
+            Opacity(
+              opacity: isActive ? 1.0 : 0.45,
+              child: Image.asset(iconAsset, width: 34, height: 34, fit: BoxFit.contain),
+            )
+          else
+            Icon(icon, color: isActive ? color : Colors.white38, size: 22),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -738,14 +771,15 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: skill.primaryColor,
+                  color: skill.iconAsset != null ? Colors.transparent : skill.primaryColor,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: skill.borderColor, width: 1.2),
+                  border: skill.iconAsset != null ? null : Border.all(color: skill.borderColor, width: 1.2),
                 ),
-                child: Icon(skill.icon, color: Colors.white, size: 24),
+                alignment: Alignment.center,
+                child: _buildSkillVisualIcon(skill, size: 46),
               ),
               const SizedBox(width: 10),
               Expanded(

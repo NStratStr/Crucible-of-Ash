@@ -64,6 +64,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/icons/skills/
     - assets/images/Ash Legion/
     - assets/images/Crypt Stalkers/
     - assets/images/Spells/

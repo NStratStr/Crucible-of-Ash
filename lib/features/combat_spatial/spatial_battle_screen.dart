@@ -9461,6 +9461,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required String title,
           required String subtitle,
           required IconData icon,
+          String? iconAsset,
           required Color activeColor,
           required Color borderColor,
           required bool isEnabled,
@@ -9550,54 +9551,111 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       // 3. Button Content: Icon + Title + Subtitle
                       Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 4, vertical: 2),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    icon,
-                                    size: isNarrow ? 11 : 13,
-                                    color: isEnabled
-                                        ? Colors.white
-                                        : (progress > 0.4 ? Colors.white70 : Colors.white38),
-                                  ),
-                                  const SizedBox(width: 2.5),
-                                  Flexible(
-                                    child: Text(
-                                      title,
-                                      style: TextStyle(
-                                        fontSize: isNarrow ? 7.8 : 9.0,
-                                        fontWeight: FontWeight.w900,
-                                        color: isEnabled
-                                            ? Colors.white
-                                            : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
-                                        letterSpacing: 0.3,
+                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 3 : 6, vertical: 2),
+                          child: iconAsset != null
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Opacity(
+                                      opacity: isEnabled ? 1.0 : (progress > 0.4 ? 0.72 : 0.42),
+                                      child: Image.asset(
+                                        iconAsset,
+                                        width: isNarrow ? 26 : 34,
+                                        height: isNarrow ? 26 : 34,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, _, _) => Icon(
+                                          icon,
+                                          size: isNarrow ? 14 : 16,
+                                          color: isEnabled ? Colors.white : Colors.white38,
+                                        ),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                style: TextStyle(
-                                  fontSize: isNarrow ? 6.2 : 7.2,
-                                  color: isEnabled
-                                      ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
-                                      : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.2,
+                                    SizedBox(width: isNarrow ? 3 : 6),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            title,
+                                            style: TextStyle(
+                                              fontSize: isNarrow ? 7.8 : 9.2,
+                                              fontWeight: FontWeight.w900,
+                                              color: isEnabled
+                                                  ? Colors.white
+                                                  : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
+                                              letterSpacing: 0.3,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                          const SizedBox(height: 1.5),
+                                          Text(
+                                            subtitle,
+                                            style: TextStyle(
+                                              fontSize: isNarrow ? 6.2 : 7.2,
+                                              color: isEnabled
+                                                  ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
+                                                  : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.2,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          icon,
+                                          size: isNarrow ? 11 : 13,
+                                          color: isEnabled
+                                              ? Colors.white
+                                              : (progress > 0.4 ? Colors.white70 : Colors.white38),
+                                        ),
+                                        const SizedBox(width: 2.5),
+                                        Flexible(
+                                          child: Text(
+                                            title,
+                                            style: TextStyle(
+                                              fontSize: isNarrow ? 7.8 : 9.0,
+                                              fontWeight: FontWeight.w900,
+                                              color: isEnabled
+                                                  ? Colors.white
+                                                  : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
+                                              letterSpacing: 0.3,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      subtitle,
+                                      style: TextStyle(
+                                        fontSize: isNarrow ? 6.2 : 7.2,
+                                        color: isEnabled
+                                            ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
+                                            : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
 
@@ -10057,6 +10115,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                             : skill.name.toUpperCase(),
                         subtitle: subtitleText,
                         icon: skill.icon,
+                        iconAsset: skill.iconAsset,
                         activeColor: isFinisher
                             ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
                             : skill.primaryColor,

@@ -28,6 +28,7 @@ class CrucibleSkillNode {
   final int defaultSlot; // 1 to 5
   final int cinderCost;
   final IconData icon;
+  final String? iconAsset;
   final Color primaryColor;
   final Color borderColor;
   final String actionType;
@@ -50,6 +51,7 @@ class CrucibleSkillNode {
     required this.defaultSlot,
     required this.cinderCost,
     required this.icon,
+    this.iconAsset,
     required this.primaryColor,
     required this.borderColor,
     required this.actionType,
@@ -107,6 +109,7 @@ class CrucibleSkillTreeState {
       cinderCost: 0,
       cooldownSeconds: 6.0,
       icon: Icons.sports_mma,
+      iconAsset: 'assets/images/icons/skills/icon_skill_forge_cleave.png',
       primaryColor: const Color(0xFFB3261E),
       borderColor: const Color(0xFFFF8A80),
       actionType: 'forge_cleave',
@@ -131,6 +134,7 @@ class CrucibleSkillTreeState {
       cinderCost: 30,
       cooldownSeconds: 6.0,
       icon: Icons.local_fire_department,
+      iconAsset: 'assets/images/icons/skills/icon_skill_sundering_brand.png',
       primaryColor: const Color(0xFFC2185B),
       borderColor: const Color(0xFFFF4081),
       actionType: 'sundering_brand',
@@ -201,6 +205,7 @@ class CrucibleSkillTreeState {
       cinderCost: 80,
       cooldownSeconds: 20.0,
       icon: Icons.bolt,
+      iconAsset: 'assets/images/icons/skills/icon_skill_ash_pyre.png',
       primaryColor: const Color(0xFFFF6D00),
       borderColor: const Color(0xFFFFD54F),
       actionType: 'cataclysmic_pyre',
@@ -251,6 +256,7 @@ class CrucibleSkillTreeState {
       cinderCost: 30,
       cooldownSeconds: 6.0,
       icon: Icons.wb_sunny,
+      iconAsset: 'assets/images/icons/skills/icon_skill_iron_judgment.png',
       primaryColor: const Color(0xFFF57F17),
       borderColor: const Color(0xFFFFD54F),
       actionType: 'sundering_judgment',
