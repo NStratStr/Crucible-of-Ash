@@ -483,6 +483,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         isActive: isActive,
         color: const Color(0xFF00E5FF),
         icon: Icons.shield,
+        iconAsset: 'assets/images/icons/skills/icon_keystone_unyielding_strata.png',
       );
     } else if (_selectedBranch == CrucibleSkillBranch.resonance) {
       final bool isActive = state.isCrucibleSymbiosisActive;
