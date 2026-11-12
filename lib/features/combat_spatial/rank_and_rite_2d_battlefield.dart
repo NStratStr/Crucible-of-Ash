@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
@@ -69,19 +70,41 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Colors.transparent,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
-          // Left: Player Squad (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
-          _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Left: Player Squad (Backline Row 2 -> Midline Row 1 -> Frontline Row 0)
+              _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
-          // Center: Intimate clash spacing (armies face off in close tactical confrontation)
-          SizedBox(width: (tileWidth * 0.38).clamp(32.0, 68.0)),
+              // Center: Intimate clash spacing (armies face off in close tactical confrontation)
+              SizedBox(width: (tileWidth * 0.38).clamp(32.0, 68.0)),
 
-          // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
-          _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
+              // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
+              _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
+            ],
+          ),
+
+          // Tactical Intent Vectors Overlay (Visualizes enemy intent targets & inspected battle lines)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _2DTacticalIntentVectorPainter(
+                  engine: engine,
+                  tileWidth: tileWidth,
+                  tileHeight: tileHeight,
+                  clashWidth: (tileWidth * 0.38).clamp(32.0, 68.0),
+                  selectedEnemyUnitId: selectedEnemyUnitId,
+                  selectedUnitId: selectedUnitId,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -961,4 +984,176 @@ class RankAndRite2DBattlefield extends StatelessWidget {
       },
     );
   }
+}
+
+/// 2D Tactical Intent Vector Painter
+/// Draws glowing gothic curved energy arcs connecting attacking enemies to their telegraphed target allies
+class _2DTacticalIntentVectorPainter extends CustomPainter {
+  final SpatialCombatEngine engine;
+  final double tileWidth;
+  final double tileHeight;
+  final double clashWidth;
+  final String? selectedEnemyUnitId;
+  final String? selectedUnitId;
+
+  const _2DTacticalIntentVectorPainter({
+    required this.engine,
+    required this.tileWidth,
+    required this.tileHeight,
+    required this.clashWidth,
+    this.selectedEnemyUnitId,
+    this.selectedUnitId,
+  });
+
+  Offset _getGridNodeCenter(int col, int row, bool isPlayer) {
+    // col = 0, 1, 2 (vertical lane)
+    // row = 0, 1, 2 (depth rank)
+    final double y = col * tileHeight + (tileHeight * 0.5);
+    if (isPlayer) {
+      // Player ranks: [2, 1, 0] -> rankIdx: row 2 = 0, row 1 = 1, row 0 = 2
+      final int rankIdx = (2 - row).clamp(0, 2);
+      final double x = rankIdx * tileWidth + (tileWidth * 0.5);
+      return Offset(x, y);
+    } else {
+      // Enemy ranks: [0, 1, 2] -> rankIdx = row
+      final double playerTotalWidth = 3 * tileWidth;
+      final double x = playerTotalWidth + clashWidth + (row.clamp(0, 2) * tileWidth) + (tileWidth * 0.5);
+      return Offset(x, y);
+    }
+  }
+
+  void _drawVector(
+    Canvas canvas, {
+    required Offset from,
+    required Offset to,
+    required Color color,
+    String? label,
+  }) {
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 4.5
+      ..style = PaintingStyle.stroke;
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 1.8
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    path.moveTo(from.dx, from.dy);
+    // Subtle graceful curve
+    final double midX = (from.dx + to.dx) * 0.5;
+    final double midY = min(from.dy, to.dy) - 18.0;
+    path.quadraticBezierTo(midX, midY, to.dx, to.dy);
+
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, linePaint);
+
+    // Arrowhead towards target
+    final angle = atan2(to.dy - midY, to.dx - midX);
+    const arrowSize = 6.0;
+    final arrowPath = Path()
+      ..moveTo(to.dx, to.dy)
+      ..lineTo(to.dx - arrowSize * cos(angle - 0.5), to.dy - arrowSize * sin(angle - 0.5))
+      ..lineTo(to.dx - arrowSize * cos(angle + 0.5), to.dy - arrowSize * sin(angle + 0.5))
+      ..close();
+
+    final arrowPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(arrowPath, arrowPaint);
+
+    // Reticle diamond on target node
+    final diamondPaint = Paint()
+      ..color = color.withValues(alpha: 0.8)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    const r = 5.0;
+    final diamondPath = Path()
+      ..moveTo(to.dx, to.dy - r)
+      ..lineTo(to.dx + r, to.dy)
+      ..lineTo(to.dx, to.dy + r)
+      ..lineTo(to.dx - r, to.dy)
+      ..close();
+    canvas.drawPath(diamondPath, diamondPaint);
+
+    // Optional Intent Label above curve
+    if (label != null && label.isNotEmpty) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: color,
+            fontSize: 7.2,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.4,
+            backgroundColor: const Color(0xDD0C0A10),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(canvas, Offset(midX - (textPainter.width * 0.5), midY - 6));
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Live Enemy Telegraph Windup Intent Vectors (Boss & Elite telegraphs)
+    for (final enemy in engine.enemyUnits.where((e) => e.isAlive && e.pendingIntent != null)) {
+      if (enemy.occupiedNodes.isEmpty) continue;
+      final intent = enemy.pendingIntent!;
+      final from = _getGridNodeCenter(enemy.occupiedNodes.first.column, enemy.occupiedNodes.first.row, false);
+      for (final tNode in intent.targetNodes) {
+        final to = _getGridNodeCenter(tNode.column, tNode.row, true);
+        _drawVector(
+          canvas,
+          from: from,
+          to: to,
+          color: const Color(0xFFFF1744),
+          label: intent.skillName.toUpperCase(),
+        );
+      }
+    }
+
+    // 2. Inspected Enemy Unit Intent Vector (When player taps an enemy)
+    if (selectedEnemyUnitId != null) {
+      final enemy = engine.enemyUnits.where((e) => e.id == selectedEnemyUnitId && e.isAlive && e.pendingIntent == null).firstOrNull;
+      if (enemy != null && enemy.occupiedNodes.isNotEmpty) {
+        final targetAlly = engine.resolveProjectedTarget(enemy);
+        if (targetAlly != null && targetAlly.occupiedNodes.isNotEmpty) {
+          final from = _getGridNodeCenter(enemy.occupiedNodes.first.column, enemy.occupiedNodes.first.row, false);
+          final to = _getGridNodeCenter(targetAlly.occupiedNodes.first.column, targetAlly.occupiedNodes.first.row, true);
+          _drawVector(
+            canvas,
+            from: from,
+            to: to,
+            color: const Color(0xFFFF5252),
+            label: 'AIMING AT ${targetAlly.name.toUpperCase()}',
+          );
+        }
+      }
+    }
+
+    // 3. Inspected Player Companion Intent Vector (When player taps an ally)
+    if (selectedUnitId != null) {
+      final ally = engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull;
+      if (ally != null && ally.occupiedNodes.isNotEmpty) {
+        final targetEnemy = engine.resolveProjectedTarget(ally);
+        if (targetEnemy != null && targetEnemy.occupiedNodes.isNotEmpty) {
+          final from = _getGridNodeCenter(ally.occupiedNodes.first.column, ally.occupiedNodes.first.row, true);
+          final to = _getGridNodeCenter(targetEnemy.occupiedNodes.first.column, targetEnemy.occupiedNodes.first.row, false);
+          _drawVector(
+            canvas,
+            from: from,
+            to: to,
+            color: const Color(0xFF00E5FF),
+            label: 'ENGAGING ${targetEnemy.name.toUpperCase()}',
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _2DTacticalIntentVectorPainter oldDelegate) => true;
 }

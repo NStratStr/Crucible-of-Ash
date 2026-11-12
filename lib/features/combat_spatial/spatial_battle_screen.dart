@@ -9761,6 +9761,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required IconData icon,
           String? iconAsset,
           String? hotkeyLabel,
+          CrucibleSkillNode? skill,
           required Color activeColor,
           required Color borderColor,
           required bool isEnabled,
@@ -9772,10 +9773,72 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required String tooltipMessage,
         }) {
           final double buttonHeight = isNarrow ? 44.0 : 50.0;
+          final int cinderYield = (skill?.rank ?? 1) >= 3 ? 26 : ((skill?.rank ?? 1) == 2 ? 22 : 18);
+
+          final richTooltipSpan = skill != null
+              ? TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${skill.name.toUpperCase()}\n',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD54F),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'TIER ${skill.tier} • RANK ${skill.rank}/${skill.maxRank} • ${isGenerator ? "CINDER GENERATOR" : (isFinisher ? "APEX FINISHER" : "DISCIPLINE SKILL")}\n',
+                      style: TextStyle(
+                        color: borderColor,
+                        fontSize: 7.8,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Cost: ${isGenerator ? "0 (Yields +$cinderYield🔥)" : "${skill.cinderCost}🔥"} • CD: ${skill.cooldownSeconds.toStringAsFixed(1)}s${hotkeyLabel != null ? " • Key [$hotkeyLabel]" : ""}\n\n',
+                      style: const TextStyle(
+                        color: Color(0xFFFFCC80),
+                        fontSize: 8.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextSpan(
+                      text: skill.currentRankDescription,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8.8,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                )
+              : null;
 
           return Tooltip(
             preferBelow: false,
-            message: tooltipMessage,
+            waitDuration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B1824), Color(0xFF100E17)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: borderColor.withValues(alpha: 0.9), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: borderColor.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+                const BoxShadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 3)),
+              ],
+            ),
+            richMessage: richTooltipSpan,
+            message: richTooltipSpan == null ? tooltipMessage : null,
             child: InkWell(
               onTap: isEnabled ? onPressed : null,
               borderRadius: BorderRadius.circular(6),
@@ -10487,6 +10550,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     child: Padding(
                       padding: EdgeInsets.only(right: slotIdx < 4 ? 3.0 : 0.0),
                       child: buildActionButton(
+                        skill: skill,
                         title: isNarrow && skill.name.length > 7
                             ? '${skill.name.substring(0, 6)}.'
                             : skill.name.toUpperCase(),
