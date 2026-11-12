@@ -1206,42 +1206,53 @@ class _AppShellState extends State<AppShell> {
 
       _saveCurrentState();
 
-      PostBattleLootDialog.show(
-        context: context,
-        rewards: rewardsData,
-        onContinue: () {
-          if (!mounted) return;
-          if (_activeDelveRoom != null) {
-            _delveService.completeRoom(
-              _activeDelveRoom!.id,
-              extraIchor: scaledAsh,
-              extraOre: scaledOre,
-              extraSigils: earnedSigils,
-              extraPlinths: petrifiedPlinths,
-            );
-            _delveService.updateSquadHpAfterBattle(_tickManager.allies);
-            setState(() {
-              _activeDelveRoom = null;
-              _currentIndex = 0;
-            });
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _openCatacombDelveSheet();
-            });
-            return;
-          }
-          if (isBossClear) {
-            _showChapterAscensionDialog(nextCh);
-          } else {
-            setState(() {
-              _currentIndex = 0;
-              _activeNode = null;
-            });
-          }
-        },
-        onOpenSculptory: () {
-          _openPlinthSculptorySheet();
-        },
-      );
+      if (mounted) {
+        final String spoilsText = '⚔️ VICTORY: +$scaledAsh Ash • +$distilledVitae Vitae • +$petrifiedPlinths Plinths'
+            '${relicDrop != null ? " • Relic: $relicDrop" : ""}'
+            '${captured != null ? " • Captured: ${captured.name}" : ""}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              spoilsText,
+              style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            backgroundColor: const Color(0xFF14121B),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
+            ),
+          ),
+        );
+      }
+
+      if (_activeDelveRoom != null) {
+        _delveService.completeRoom(
+          _activeDelveRoom!.id,
+          extraIchor: scaledAsh,
+          extraOre: scaledOre,
+          extraSigils: earnedSigils,
+          extraPlinths: petrifiedPlinths,
+        );
+        _delveService.updateSquadHpAfterBattle(_tickManager.allies);
+        setState(() {
+          _activeDelveRoom = null;
+          _currentIndex = 0;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openCatacombDelveSheet();
+        });
+        return;
+      }
+      if (isBossClear) {
+        _showChapterAscensionDialog(nextCh);
+      } else {
+        setState(() {
+          _currentIndex = 0;
+          _activeNode = null;
+        });
+      }
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
@@ -1371,29 +1382,30 @@ class _AppShellState extends State<AppShell> {
       _activeDelveRoom = null;
     }
 
-    PostBattleLootDialog.show(
-      context: context,
-      rewards: CombatRewardsData(
-        isVictory: false,
-        rawAsh: consolationAsh,
-        emberShards: consolationOre,
-        cryptKeys: 0,
-        xpGained: consolationXp,
-        encounterTitle: _activeNode?.name != null
-            ? '${_activeNode!.name} (50% Loot Salvaged)'
-            : 'Defeat in the Shadows (50% Loot Salvaged)',
+    if (!mounted) return;
+    setState(() {
+      final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
+      _tickManager.updateSquads(allies: revivedAllies);
+      _activeExpeditionBoons.clear();
+      _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
+      _activeNode = null;
+      _currentIndex = 0; // Return to campaign map
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '💀 DEFEAT: Squad revived at camp. Salvaged +$consolationAsh Ash & +$consolationOre Ore.',
+          style: const TextStyle(color: Color(0xFFFF8A80), fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+        backgroundColor: const Color(0xFF1B0F12),
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
+        ),
       ),
-      onContinue: () {
-        if (!mounted) return;
-        setState(() {
-          final revivedAllies = _tickManager.allies.map((u) => u.copyWith(currentHp: u.maxHp)).toList();
-          _tickManager.updateSquads(allies: revivedAllies);
-          _activeExpeditionBoons.clear();
-          _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
-          _activeNode = null;
-          _currentIndex = 0; // Return to campaign map
-        });
-      },
     );
   }
 
