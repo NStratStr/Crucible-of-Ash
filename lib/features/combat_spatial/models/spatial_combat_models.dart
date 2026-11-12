@@ -522,6 +522,9 @@ class CombatUnitState {
     if (key.contains('ash_sculptor') || key.contains('grave_warden')) {
       return 'assets/images/ash_sculptor_idle.png';
     }
+    if (key.contains('duelist') || key.contains('grave_duelist')) {
+      return 'assets/images/grave_duelist.png';
+    }
     if (key.contains('vladislav')) {
       return 'assets/images/Crypt Stalkers/lord_vladislav_g1.png';
     }

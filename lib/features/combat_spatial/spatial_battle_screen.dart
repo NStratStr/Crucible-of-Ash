@@ -6848,83 +6848,86 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           clipBehavior: Clip.none,
           children: [
             // 1. Tabletop Miniature Carved Runic Plinth
-            Positioned(
-              bottom: 2,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Outer Beveled Plinth Ring & Deep Contact Shadow
-                  Container(
-                    width: baseWidth,
-                    height: baseHeight + (_is2DGridView ? 4 : 0),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, (baseHeight + (_is2DGridView ? 4 : 0)) / 2)),
-                      gradient: RadialGradient(
-                        center: const Alignment(0, -0.15),
-                        radius: 0.9,
-                        colors: unit.isDowned
-                            ? [
-                                const Color(0xFF546E7A).withValues(alpha: 0.50),
-                                const Color(0xFF263238),
-                                Colors.transparent,
-                              ]
-                            : [
-                                (unit.isAshSculptor || unit.id == 'ash_sculptor')
-                                    ? const Color(0xFF4A3414).withValues(alpha: 0.85)
-                                    : (unit.isPlayer ? const Color(0xFF142938).withValues(alpha: 0.85) : const Color(0xFF381418).withValues(alpha: 0.85)),
-                                const Color(0xFF0C0A10).withValues(alpha: 0.95),
-                                Colors.transparent,
-                              ],
-                      ),
-                      border: Border.all(
-                        color: unit.isDowned
-                            ? const Color(0xFF90A4AE).withValues(alpha: 0.6)
-                            : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
-                                ? const Color(0xFFFFD54F)
-                                : factionColor.withValues(alpha: isSelected || isAttacking ? 0.95 : 0.75)),
-                        width: isSelected || isAttacking ? 2.0 : 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.75),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+            // In 2D Grid view, rank_and_rite_2d_battlefield owns and renders the grounded stone base,
+            // so we suppress this duplicate plinth when _is2DGridView is true to avoid double stacked circles.
+            if (!_is2DGridView)
+              Positioned(
+                bottom: 2,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Outer Beveled Plinth Ring & Deep Contact Shadow
+                    Container(
+                      width: baseWidth,
+                      height: baseHeight + (_is2DGridView ? 4 : 0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, (baseHeight + (_is2DGridView ? 4 : 0)) / 2)),
+                        gradient: RadialGradient(
+                          center: const Alignment(0, -0.15),
+                          radius: 0.9,
+                          colors: unit.isDowned
+                              ? [
+                                  const Color(0xFF546E7A).withValues(alpha: 0.50),
+                                  const Color(0xFF263238),
+                                  Colors.transparent,
+                                ]
+                              : [
+                                  (unit.isAshSculptor || unit.id == 'ash_sculptor')
+                                      ? const Color(0xFF4A3414).withValues(alpha: 0.85)
+                                      : (unit.isPlayer ? const Color(0xFF142938).withValues(alpha: 0.85) : const Color(0xFF381418).withValues(alpha: 0.85)),
+                                  const Color(0xFF0C0A10).withValues(alpha: 0.95),
+                                  Colors.transparent,
+                                ],
                         ),
-                        BoxShadow(
+                        border: Border.all(
                           color: unit.isDowned
-                              ? const Color(0xFF37474F).withValues(alpha: 0.4)
+                              ? const Color(0xFF90A4AE).withValues(alpha: 0.6)
                               : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
-                                  ? const Color(0xFFFFD54F).withValues(alpha: isSelected || isAttacking ? 0.65 : 0.35)
-                                  : factionColor.withValues(alpha: isSelected || isAttacking ? 0.65 : 0.25)),
-                          blurRadius: isSelected || isAttacking ? 12 : 6,
-                          spreadRadius: isSelected || isAttacking ? 2 : 0,
+                                  ? const Color(0xFFFFD54F)
+                                  : factionColor.withValues(alpha: isSelected || isAttacking ? 0.95 : 0.75)),
+                          width: isSelected || isAttacking ? 2.0 : 1.2,
                         ),
-                        if (unit.aegisShield > 0)
-                          const BoxShadow(
-                            color: Color(0xCC00E5FF),
-                            blurRadius: 10,
-                            spreadRadius: 1.5,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
                           ),
-                      ],
-                    ),
-                  ),
-                  // Inner Concentric Carved Stone Lip
-                  Container(
-                    width: baseWidth * 0.78,
-                    height: (baseHeight + (_is2DGridView ? 4 : 0)) * 0.65,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.all(Radius.elliptical(baseWidth * 0.39, (baseHeight + (_is2DGridView ? 4 : 0)) * 0.325)),
-                      border: Border.all(
-                        color: (unit.isAshSculptor || unit.id == 'ash_sculptor')
-                            ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
-                            : factionColor.withValues(alpha: 0.35),
-                        width: 0.8,
+                          BoxShadow(
+                            color: unit.isDowned
+                                ? const Color(0xFF37474F).withValues(alpha: 0.4)
+                                : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
+                                    ? const Color(0xFFFFD54F).withValues(alpha: isSelected || isAttacking ? 0.65 : 0.35)
+                                    : factionColor.withValues(alpha: isSelected || isAttacking ? 0.65 : 0.25)),
+                            blurRadius: isSelected || isAttacking ? 12 : 6,
+                            spreadRadius: isSelected || isAttacking ? 2 : 0,
+                          ),
+                          if (unit.aegisShield > 0)
+                            const BoxShadow(
+                              color: Color(0xCC00E5FF),
+                              blurRadius: 10,
+                              spreadRadius: 1.5,
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    // Inner Concentric Carved Stone Lip
+                    Container(
+                      width: baseWidth * 0.78,
+                      height: (baseHeight + (_is2DGridView ? 4 : 0)) * 0.65,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.elliptical(baseWidth * 0.39, (baseHeight + (_is2DGridView ? 4 : 0)) * 0.325)),
+                        border: Border.all(
+                          color: (unit.isAshSculptor || unit.id == 'ash_sculptor')
+                              ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
+                              : factionColor.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // 1b. Ground plinth in rank_and_rite_2d_battlefield cleanly handles active unit rim/glow.
             // Redundant second yellow circle removed per user request for visual clarity.

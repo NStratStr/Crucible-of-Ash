@@ -524,42 +524,44 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           plinthGlowColor = Colors.transparent;
         } else if (isTelegraphed) {
           plinthRimColor = const Color(0xFFFF1744);
-          plinthGlowColor = const Color(0xFFFF1744).withValues(alpha: 0.75);
+          plinthGlowColor = const Color(0xFFFF1744).withValues(alpha: 0.60);
         } else if (isNecroticMire) {
           plinthRimColor = const Color(0xFF00E676);
-          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.75);
+          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.60);
         } else if (isTurnActiveUnit) {
+          // Current acting unit: elegant, crisp golden tactical focus ring
           plinthRimColor = const Color(0xFFFFD54F);
-          plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.85);
+          plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.50);
         } else if (!isPlayer && isSelected) {
-          // Explicit targeted enemy lock: fierce crimson/gold reticle rim!
+          // Explicit targeted enemy lock: fierce crimson reticle rim!
           plinthRimColor = const Color(0xFFFF1744);
-          plinthGlowColor = const Color(0xFFFF5252).withValues(alpha: 0.85);
+          plinthGlowColor = const Color(0xFFFF5252).withValues(alpha: 0.55);
         } else if (isSecondaryCleave) {
-          // Secondary cleave/splash target: warm amber rim & pulse!
+          // Secondary cleave/splash target: warm amber rim
           plinthRimColor = const Color(0xFFFF9100);
-          plinthGlowColor = const Color(0xFFFF9100).withValues(alpha: 0.75);
-        } else if (isSelected || isDropCandidate || isHovered) {
-          plinthRimColor = const Color(0xFF00E5FF);
-          plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.6);
+          plinthGlowColor = const Color(0xFFFF9100).withValues(alpha: 0.40);
+        } else if (isDropCandidate || isHovered) {
+          // Interactive drag/hover target
+          plinthRimColor = const Color(0xFFFFD54F).withValues(alpha: 0.80);
+          plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.25);
+        } else if (isPlayer && isSelected) {
+          // Selected player ally: subtle golden highlight
+          plinthRimColor = const Color(0xFFFFD54F);
+          plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.35);
         } else if (isMoveReachable) {
-          plinthRimColor = const Color(0xFF00E676).withValues(alpha: 0.35);
+          plinthRimColor = const Color(0xFF81D4FA).withValues(alpha: 0.35);
           plinthGlowColor = Colors.transparent;
         } else if (occupant != null) {
-          if (hasVanguardCover) {
-            plinthRimColor = const Color(0xFF00E5FF);
-            plinthGlowColor = const Color(0xFF00E5FF).withValues(alpha: 0.45);
-          } else {
-            plinthRimColor = isPlayer
-                ? const Color(0xFF64B5F6).withValues(alpha: 0.70)
-                : const Color(0xFFE57373).withValues(alpha: 0.65);
-            plinthGlowColor = (isPlayer ? const Color(0xFF2196F3) : const Color(0xFFF44336)).withValues(alpha: 0.25);
-          }
-        } else {
-          // Empty ground coordinate
+          // Natural grounded weathered stone plinth for all active units — ZERO neon halos!
           plinthRimColor = isPlayer
-              ? const Color(0xFF37474F).withValues(alpha: 0.35)
-              : const Color(0xFF4E342E).withValues(alpha: 0.30);
+              ? const Color(0xFF334050).withValues(alpha: 0.70)
+              : const Color(0xFF42282C).withValues(alpha: 0.70);
+          plinthGlowColor = Colors.transparent;
+        } else {
+          // Empty ground coordinate: completely unlit during live combat
+          plinthRimColor = (engine.isPreBattlePhase && isPlayer)
+              ? const Color(0xFF2C3240).withValues(alpha: 0.30)
+              : Colors.transparent;
           plinthGlowColor = Colors.transparent;
         }
 
@@ -572,81 +574,59 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // 1. Natural Ground Plinth (Carved Runic Miniature Base)
-              if (!isMultiNodeBoss && (occupant != null || isDropCandidate || isHovered || engine.isPreBattlePhase))
+              // 1. Natural Ground Plinth (Carved Weathered Slate Miniature Base)
+              // Only render when a unit occupies this tile, or during pre-battle / active drag
+              if (!isMultiNodeBoss && (occupant != null || isDropCandidate || (engine.isPreBattlePhase && isPlayer)))
                 Positioned(
                   bottom: 8,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: plinthW,
-                        height: plinthH,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
-                          gradient: RadialGradient(
-                            center: const Alignment(0, -0.15),
-                            radius: 0.85,
-                            colors: isPlayer
-                                ? [
-                                    (occupant?.isAshSculptor == true || occupant?.id == 'ash_sculptor')
-                                        ? const Color(0xFF382810).withValues(alpha: 0.95)
-                                        : const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.40),
-                                    const Color(0xFF0B1420).withValues(alpha: 0.80),
-                                    Colors.transparent,
-                                  ]
-                                : [
-                                    const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.40),
-                                    const Color(0xFF1B0709).withValues(alpha: 0.80),
-                                    Colors.transparent,
-                                  ],
-                          ),
-                          border: Border.all(
-                            color: (occupant?.isAshSculptor == true || occupant?.id == 'ash_sculptor') && !isSelected && !isTurnActiveUnit
-                                ? const Color(0xFFFFD54F).withValues(alpha: 0.85)
-                                : plinthRimColor,
-                            width: isTurnActiveUnit ? 2.4 : ((isSelected || isDropCandidate || isHovered) ? 1.8 : 1.2),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.70),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                            if (plinthGlowColor != Colors.transparent || (occupant?.isAshSculptor == true && !isSelected))
-                              BoxShadow(
-                                color: (occupant?.isAshSculptor == true && plinthGlowColor == Colors.transparent)
-                                    ? const Color(0xFFFFD54F).withValues(alpha: 0.3)
-                                    : plinthGlowColor,
-                                blurRadius: isTurnActiveUnit ? 18 : (isSelected ? 12 : 6),
-                                spreadRadius: isTurnActiveUnit ? 3 : (isSelected ? 2 : 0),
-                              ),
-                          ],
-                        ),
+                  child: Container(
+                    width: plinthW,
+                    height: plinthH,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
+                      gradient: RadialGradient(
+                        center: const Alignment(0, -0.15),
+                        radius: 0.85,
+                        colors: isPlayer
+                            ? [
+                                const Color(0xFF1E232D).withValues(alpha: occupant != null ? 0.90 : 0.30),
+                                const Color(0xFF0F131A).withValues(alpha: 0.85),
+                                Colors.transparent,
+                              ]
+                            : [
+                                const Color(0xFF2B181B).withValues(alpha: occupant != null ? 0.90 : 0.30),
+                                const Color(0xFF140A0D).withValues(alpha: 0.85),
+                                Colors.transparent,
+                              ],
                       ),
-                      // Inner concentric carved rune lip
-                      Container(
-                        width: plinthW * 0.76,
-                        height: plinthH * 0.65,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.elliptical(plinthW * 0.38, plinthH * 0.325)),
-                          border: Border.all(
-                            color: plinthRimColor.withValues(alpha: 0.35),
-                            width: 0.8,
-                          ),
-                        ),
+                      border: Border.all(
+                        color: plinthRimColor,
+                        width: (isSelected || isTurnActiveUnit) ? 1.6 : 0.9,
                       ),
-                    ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.80),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                        if (plinthGlowColor != Colors.transparent)
+                          BoxShadow(
+                            color: plinthGlowColor,
+                            blurRadius: isTurnActiveUnit ? 10 : (isSelected ? 8 : 4),
+                            spreadRadius: isTurnActiveUnit ? 1 : 0,
+                          ),
+                      ],
+                    ),
                   ),
                 ),
 
-              // 1b. Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate)
-              if ((selectedCardId != null && !isPlayer) || isHovered)
+              // 1b. Glowing Arcane Spell Magic Circle Projection (ONLY when actively dragging a spell card over an enemy)
+              if (selectedCardId != null && !isPlayer && (isHovered || isDropCandidate))
                 Positioned(
                   bottom: 2,
                   child: IgnorePointer(
                     child: Opacity(
-                      opacity: (isHovered || isDropCandidate) ? 0.85 : (selectedCardId != null ? 0.40 : 0.0),
+                      opacity: (isHovered || isDropCandidate) ? 0.80 : 0.0,
                       child: Image.asset(
                         (selectedCardId == 'phalanx_intercept' || selectedCardId == 'stoke_the_embers')
                             ? 'assets/images/Spells/Support_spell_magic_circle.png'
