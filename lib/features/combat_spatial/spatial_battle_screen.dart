@@ -74,7 +74,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   Set<String> _computeProjectedSecondaryTargetEnemyIds() {
     final Set<String> secondaryIds = {};
     final actingAlly = _engine.activeActingUnit ??
-        (_selectedUnitId != null ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull : null);
+        (_selectedUnitId != null ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull : null) ??
+        _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
     if (actingAlly == null) return secondaryIds;
 
     final targetEnemy = _selectedEnemyUnitId != null
@@ -85,7 +86,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     final primaryCol = targetEnemy.occupiedNodes.first.column;
     final primaryRow = targetEnemy.occupiedNodes.first.row;
 
-    final bool hasRowCleave = actingAlly.activeStance == StanceType.holdTheLine ||
+    final bool isSculptor = actingAlly.isAshSculptor || actingAlly.id == 'ash_sculptor';
+    final bool hasRowCleave = isSculptor ||
+        actingAlly.activeStance == StanceType.holdTheLine ||
         actingAlly.id.contains('vladislav') ||
         actingAlly.signatureSkillName.toLowerCase().contains('cleave') ||
         actingAlly.signatureSkillName.toLowerCase().contains('slash') ||
@@ -7317,6 +7320,91 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Overhead Target Reticle (for primary focused enemy & cleave targets)
+                      if (!unit.isPlayer && unit.isAlive) ...[
+                        Builder(
+                          builder: (context) {
+                            final bool isExplicitTarget = _selectedEnemyUnitId == unit.id;
+                            final bool isDefaultTarget = _selectedEnemyUnitId == null && _getSmartDefaultTarget()?.id == unit.id;
+                            final bool isCleaveSecondary = _computeProjectedSecondaryTargetEnemyIds().contains(unit.id);
+
+                            if (isExplicitTarget || isDefaultTarget) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 2.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isExplicitTarget
+                                        ? [const Color(0xFF4A0E17), const Color(0xFF28070D)]
+                                        : [const Color(0xFF2A1519), const Color(0xFF1B0B0E)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(3.5),
+                                  border: Border.all(
+                                    color: isExplicitTarget ? const Color(0xFFFF1744) : const Color(0xFFFF5252).withValues(alpha: 0.7),
+                                    width: isExplicitTarget ? 1.2 : 0.8,
+                                  ),
+                                  boxShadow: isExplicitTarget
+                                      ? [
+                                          const BoxShadow(color: Color(0x88FF1744), blurRadius: 7, spreadRadius: 1),
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.gps_fixed,
+                                      size: 9.5,
+                                      color: isExplicitTarget ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      isExplicitTarget ? 'FOCUS TARGET' : 'TARGET',
+                                      style: TextStyle(
+                                        fontSize: 7.0,
+                                        fontWeight: FontWeight.w900,
+                                        color: isExplicitTarget ? const Color(0xFFFFCDD2) : Colors.white70,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            } else if (isCleaveSecondary) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 2.5),
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF381B08),
+                                  borderRadius: BorderRadius.circular(3.5),
+                                  border: Border.all(color: const Color(0xFFFF9100), width: 0.9),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x66FF9100), blurRadius: 5),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.call_split, size: 9, color: Color(0xFFFFB74D)),
+                                    SizedBox(width: 2.5),
+                                    Text(
+                                      'CLEAVE SPLASH',
+                                      style: TextStyle(
+                                        fontSize: 6.8,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFFFFE0B2),
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+
                       // Overhead Intent Badge (Enemy)
                       if (!unit.isPlayer && unit.pendingIntent != null && unit.isAlive) ...[
                         Builder(
@@ -10298,6 +10386,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                                           ? () {
                                               setState(() {
                                                 _engine.executeCompanionSignature(comp.id, explicitTarget: explicitTarget);
+                                                _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
+                                                final bannerText = '⚡ ${comp.name.toUpperCase()}: ${comp.signatureSkillName.toUpperCase()} PRIMED!';
+                                                _unitFloatingPops[comp.id] = bannerText;
+                                                _floatingPops.add(_FloatingCombatText(
+                                                  id: 'pop_order_${comp.id}_${DateTime.now().millisecondsSinceEpoch}',
+                                                  unitId: comp.id,
+                                                  text: bannerText,
+                                                  color: const Color(0xFFFFD54F),
+                                                  borderColor: const Color(0xFFFF9100),
+                                                  fontSize: 10.5,
+                                                  isCrit: true,
+                                                  createdMs: DateTime.now().millisecondsSinceEpoch,
+                                                  durationMs: 1600,
+                                                  horizontalDrift: 0.0,
+                                                ));
                                               });
                                             }
                                           : null,
