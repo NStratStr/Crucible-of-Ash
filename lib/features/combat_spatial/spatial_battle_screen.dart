@@ -234,6 +234,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<_ActiveCombatSpriteVfx> _activeSpriteVfx = [];
   Offset _screenShakeOffset = Offset.zero;
   double _shakeIntensity = 0.0;
+  bool _enableScreenShake = true; // Accessible motion comfort toggle
   double _battlefieldCameraZoom = 1.0;
   bool _isSlowMoFinisher = false;
 
@@ -402,12 +403,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         _activeSynergyBannerColor = const Color(0xFFFFD54F);
       } else if (currentPhase == EncounterPhase.ashenReckoning) {
         _playSfx('sfx_spell.wav');
-        _triggerScreenShake(intensity: 8.0);
+        _triggerScreenShake(intensity: 3.5);
         _activeSynergyBannerText = '🔥 THE ASHEN RECKONING HAS BEGUN! (2.0x Dmg / -50% Heals)';
         _activeSynergyBannerColor = const Color(0xFFFF5252);
       } else if (currentPhase == EncounterPhase.terminalCollapse) {
         _playSfx('sfx_slash.wav');
-        _triggerScreenShake(intensity: 14.0);
+        _triggerScreenShake(intensity: 4.5);
         _activeSynergyBannerText = '💀 TERMINAL COLLAPSE! (True Dmg / Revives Disabled)';
         _activeSynergyBannerColor = const Color(0xFFE040FB);
       }
@@ -418,7 +419,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     if (boss != null && !_hasBossEnraged && boss.hp <= (boss.maxHp * 0.50)) {
       _hasBossEnraged = true;
       _playSfx('Dinosaur Growl 3_Mono.wav');
-      _triggerScreenShake(intensity: 12.0);
+      _triggerScreenShake(intensity: 4.0);
       _activeSynergyBannerText = '🔥 ' + boss.name.toUpperCase() + ' ENTERS ASHEN ENRAGE!';
       _activeSynergyBannerColor = const Color(0xFFFF3D00);
       Timer(const Duration(milliseconds: 2200), () {
@@ -436,7 +437,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         _wasBossStaggered = true;
         _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
         _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
-        _triggerScreenShake(intensity: 10.0);
+        _triggerScreenShake(intensity: 4.0);
       } else if (!boss.isStaggered && _wasBossStaggered) {
         _wasBossStaggered = false;
         _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
@@ -505,10 +506,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _animTimers.add(t);
   }
 
-  void _triggerScreenShake({double intensity = 6.0}) {
-    _shakeIntensity = intensity;
-    const int stepCount = 6;
-    const int stepMs = 35;
+  void _triggerScreenShake({double intensity = 4.0}) {
+    if (!_enableScreenShake) return;
+    _shakeIntensity = intensity.clamp(0.0, 5.0);
+    const int stepCount = 3;
+    const int stepMs = 28;
 
     for (int i = 0; i <= stepCount; i++) {
       final t = Timer(Duration(milliseconds: i * stepMs), () {
@@ -520,8 +522,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           } else {
             final double decay = 1.0 - (i / stepCount);
             final double sign = (i % 2 == 0) ? 1.0 : -1.0;
-            final double offsetX = sign * _shakeIntensity * decay * (i % 3 == 0 ? 0.7 : 1.0);
-            final double offsetY = -sign * _shakeIntensity * decay * 0.65;
+            final double offsetX = sign * _shakeIntensity * decay * 0.7;
+            final double offsetY = -sign * _shakeIntensity * decay * 0.5;
             _screenShakeOffset = Offset(offsetX, offsetY);
           }
         });
@@ -790,23 +792,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
       final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
 
-      final double shakeIntensity = isApexStrike
-          ? (event.isCrit ? 26.0 : 20.0)
-          : (event.isCrit
-              ? 14.0
-              : (isBossStrike
-                  ? 9.5
-                  : (isSculptorStrike
-                      ? 7.5
-                      : (isHeavyImpact ? 5.0 : 2.5))));
-      _triggerScreenShake(intensity: shakeIntensity);
+      // Motion Comfort: Normal attacks and minion swings NEVER shake or zoom the camera.
+      // Only monumental Apex Pyre / Forge Strike finishers trigger a controlled micro-bump.
+      if (isApexStrike && _enableScreenShake) {
+        _triggerScreenShake(intensity: event.isCrit ? 4.5 : 3.0);
+      }
 
       if (isHeavyImpact) {
-        _triggerHitStop(durationMs: isApexStrike ? 140 : (isUltimate ? 120 : (isSculptorStrike ? 85 : 70)));
-        _triggerCameraImpactZoom(
-          zoomScale: isApexStrike ? 1.18 : (isUltimate ? 1.14 : (isSculptorStrike ? 1.08 : 1.04)),
-          durationMs: isApexStrike ? 650 : (isUltimate ? 600 : 280),
-        );
+        _triggerHitStop(durationMs: isApexStrike ? 110 : (isUltimate ? 80 : 35));
+        if (isApexStrike) {
+          _triggerCameraImpactZoom(
+            zoomScale: 1.05,
+            durationMs: 300,
+          );
+        }
         _groundRipples.add(_GroundShockwaveRipple(
           id: 'ripple_${event.id}_$impactNowMs',
           origin: targetOffset,
@@ -1228,6 +1227,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             constraints: const BoxConstraints(),
             tooltip: _isMuted ? 'Unmute' : 'Mute',
             onPressed: _toggleMute,
+          ),
+          const SizedBox(width: 2),
+          // Motion Comfort: Screen Shake Toggle
+          IconButton(
+            icon: Icon(
+              _enableScreenShake ? Icons.vibration : Icons.motion_photos_off,
+              color: _enableScreenShake ? const Color(0xFFFFD54F) : Colors.white38,
+              size: 19,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            tooltip: _enableScreenShake
+                ? 'Screen Shake: ON (Tap for Motion Comfort)'
+                : 'Screen Shake: OFF (Camera Locked)',
+            onPressed: () {
+              setState(() {
+                _enableScreenShake = !_enableScreenShake;
+              });
+            },
           ),
           const SizedBox(width: 4),
           // Play / Pause Simulation
@@ -11470,9 +11488,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     });
 
     if (isPerfect) {
-      _triggerScreenShake(intensity: 24.0);
+      _triggerScreenShake(intensity: 4.5);
     } else {
-      _triggerScreenShake(intensity: 12.0);
+      _triggerScreenShake(intensity: 3.0);
     }
 
     Timer(const Duration(milliseconds: 320), () {
