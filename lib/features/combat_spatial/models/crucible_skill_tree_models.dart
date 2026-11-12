@@ -631,6 +631,7 @@ class CrucibleSkillTreeState {
       cinderCost: 0,
       cooldownSeconds: 6.0,
       icon: Icons.healing,
+      iconAsset: 'assets/images/icons/skills/icon_skill_mending_ash.png',
       primaryColor: const Color(0xFF00E676),
       borderColor: const Color(0xFFB9F6CA),
       actionType: 'vitae_mending',
@@ -655,6 +656,7 @@ class CrucibleSkillTreeState {
       cinderCost: 25,
       cooldownSeconds: 6.0,
       icon: Icons.spa,
+      iconAsset: 'assets/images/icons/skills/icon_skill_sanctified_bloom.png',
       primaryColor: const Color(0xFF00E676),
       borderColor: const Color(0xFF69F0AE),
       actionType: 'vitae_bloom',
@@ -679,6 +681,7 @@ class CrucibleSkillTreeState {
       cinderCost: 40,
       cooldownSeconds: 9.0,
       icon: Icons.favorite,
+      iconAsset: 'assets/images/icons/skills/icon_skill_soul_transfusion.png',
       primaryColor: const Color(0xFF00C853),
       borderColor: const Color(0xFFA7FFEB),
       actionType: 'vitae_conduit',
@@ -703,6 +706,7 @@ class CrucibleSkillTreeState {
       cinderCost: 50,
       cooldownSeconds: 12.0,
       icon: Icons.shield_moon,
+      iconAsset: 'assets/images/icons/skills/icon_skill_grace_martyr.png',
       primaryColor: const Color(0xFF1DE9B6),
       borderColor: const Color(0xFF64FFDA),
       actionType: 'vitae_aegis',
@@ -746,10 +750,10 @@ class CrucibleSkillTreeState {
           allSkills['sanguine_tether']?.rank = 1;
           break;
         case CrucibleSkillBranch.vitae:
-          equippedSkillIds[0] = 'mending_ash';
-          equippedSkillIds[1] = 'sanctified_bloom';
-          allSkills['mending_ash']?.rank = 1;
-          allSkills['sanctified_bloom']?.rank = 1;
+          equippedSkillIds[0] = 'vitae_mending';
+          equippedSkillIds[1] = 'vitae_bloom';
+          allSkills['vitae_mending']?.rank = 1;
+          allSkills['vitae_bloom']?.rank = 1;
           break;
         case CrucibleSkillBranch.calamity:
           equippedSkillIds[0] = 'ash_whirlwind';
@@ -784,23 +788,23 @@ class CrucibleSkillTreeState {
         case CrucibleSkillBranch.resonance:
           equippedSkillIds[0] = 'sanguine_rend';
           equippedSkillIds[1] = 'sanguine_tether';
-          equippedSkillIds[2] = 'mire_curse';
+          equippedSkillIds[2] = 'mire_touch';
           equippedSkillIds[3] = 'sanguine_vortex';
           equippedSkillIds[4] = 'sanguine_apex';
           break;
         case CrucibleSkillBranch.vitae:
-          equippedSkillIds[0] = 'mending_ash';
-          equippedSkillIds[1] = 'sanctified_bloom';
-          equippedSkillIds[2] = 'soul_transfusion';
-          equippedSkillIds[3] = 'grace_martyr';
+          equippedSkillIds[0] = 'vitae_mending';
+          equippedSkillIds[1] = 'vitae_bloom';
+          equippedSkillIds[2] = 'vitae_conduit';
+          equippedSkillIds[3] = 'vitae_aegis';
           equippedSkillIds[4] = 'ash_pyre';
           break;
         case CrucibleSkillBranch.calamity:
           equippedSkillIds[0] = 'ash_whirlwind';
           equippedSkillIds[1] = 'sanguine_vortex';
-          equippedSkillIds[2] = 'mire_nova';
-          equippedSkillIds[3] = 'ash_cleave';
-          equippedSkillIds[4] = 'mire_calamity';
+          equippedSkillIds[2] = 'calamity_nova';
+          equippedSkillIds[3] = 'mire_catacomb';
+          equippedSkillIds[4] = 'mire_apex';
           break;
         case CrucibleSkillBranch.apex:
           equippedSkillIds[0] = 'ash_cleave';

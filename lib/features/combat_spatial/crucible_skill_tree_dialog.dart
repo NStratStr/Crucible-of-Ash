@@ -507,6 +507,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         isActive: isActive,
         color: const Color(0xFF00E676),
         icon: Icons.favorite,
+        iconAsset: 'assets/images/icons/skills/icon_keystone_font_rebirth.png',
       );
     } else if (_selectedBranch == CrucibleSkillBranch.calamity) {
       final bool isActive = state.isSeismicCataclysmActive;
