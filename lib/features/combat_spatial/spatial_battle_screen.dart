@@ -791,12 +791,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
 
       final double shakeIntensity = isApexStrike
-          ? (event.isCrit ? 24.0 : 18.0)
+          ? (event.isCrit ? 26.0 : 20.0)
           : (event.isCrit
-              ? 16.0
-              : (isSculptorStrike
-                  ? 12.0
-                  : (isBossStrike ? 10.0 : 6.0)));
+              ? 14.0
+              : (isBossStrike
+                  ? 9.5
+                  : (isSculptorStrike
+                      ? 7.5
+                      : (isHeavyImpact ? 5.0 : 2.5))));
       _triggerScreenShake(intensity: shakeIntensity);
 
       if (isHeavyImpact) {
@@ -834,7 +836,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         String popText;
         Color popColor;
         Color popBorder;
-        double popSize = 11.0;
+        double popSize = 11.5;
         bool isCrit = event.isCrit || (target?.isStaggered == true);
 
         if (event.isHeal) {
@@ -847,7 +849,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             popColor = const Color(0xFFFFD54F);
             popBorder = const Color(0xFFFFC107);
           } else {
-            popText = '+HEAL';
+            popText = '+${event.damage > 0 ? event.damage : "HEAL"} 💚';
             popColor = const Color(0xFF69F0AE);
             popBorder = const Color(0xFF00E676);
           }
@@ -856,21 +858,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             popText = '🩸 -${event.damage} BLOODNOVA!';
             popColor = const Color(0xFFFF1744);
             popBorder = const Color(0xFF880E4F);
-            popSize = 13.0;
+            popSize = 13.5;
           } else if (event.skillName.contains('Sanguine Siphon')) {
-            popText = '🩸 -${event.damage} (DRAIN +3🩸)';
+            popText = '🩸 -${event.damage} DRAIN';
             popColor = const Color(0xFFFF5252);
             popBorder = const Color(0xFFB71C1C);
-            popSize = 12.0;
+            popSize = 12.5;
           } else if (isCrit) {
-            popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '★ -${event.damage} CRIT!';
+            popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '💥 -${event.damage} CRIT!';
             popColor = const Color(0xFFFFD54F);
             popBorder = const Color(0xFFFF9100);
-            popSize = 14.5;
+            popSize = 15.5;
           } else if (event.bleedStacks > 0) {
-            popText = '🩸 -${event.damage} (+${event.bleedStacks} Bleed)';
+            popText = '🩸 -${event.damage} BLEED';
             popColor = const Color(0xFFFF3D00);
             popBorder = const Color(0xFFDD2C00);
+            popSize = 12.0;
           } else {
             popText = '-${event.damage}';
             popColor = const Color(0xFFFF8A80);
@@ -951,13 +954,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
       _animTimers.add(tVfx);
 
+      // Fast visceral hit-flash reset (160ms normal, 220ms crit) so character art doesn't remain tinted
+      final tFlash = Timer(Duration(milliseconds: event.isCrit ? 220 : 160), () {
+        if (mounted) {
+          setState(() {
+            _damagedUnitId = null;
+            _damagedUnitIds.clear();
+          });
+        }
+      });
+      _animTimers.add(tFlash);
+
       // Reset visual lunge & floating pops after 1400ms
       final t1 = Timer(const Duration(milliseconds: 1400), () {
         if (mounted) {
           setState(() {
             _attackingUnitId = null;
-            _damagedUnitId = null;
-            _damagedUnitIds.clear();
             _unitFloatingPops.remove(event.targetId);
             if (event.secondaryTargetHits.isNotEmpty) {
               for (final sId in event.secondaryTargetHits.keys) {
@@ -2367,33 +2379,53 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             ],
           ),
           const SizedBox(height: 3),
-          // Boss HP Bar
+          // Boss HP Bar with Segmented Quarter Ticks
           Stack(
             children: [
               Container(
-                height: 5,
+                height: 7,
                 decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(2.5),
-                  border: Border.all(color: Colors.white24, width: 0.5),
+                  color: const Color(0xFF0C0A0E),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: Colors.white24, width: 0.6),
                 ),
               ),
               FractionallySizedBox(
                 alignment: Alignment.centerLeft,
                 widthFactor: hpRatio,
                 child: Container(
-                  height: 5,
+                  height: 7,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFD32F2F), Color(0xFFFF5252)],
+                      colors: [Color(0xFFB71C1C), Color(0xFFE53935), Color(0xFFFF5252)],
                     ),
-                    borderRadius: BorderRadius.circular(2.5),
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF1744).withValues(alpha: 0.35),
+                        blurRadius: 4,
+                      ),
+                    ],
                   ),
                 ),
               ),
+              // Boss HP 25%, 50%, 75% notches
+              ...[0.25, 0.50, 0.75].map((notch) => Positioned(
+                left: null,
+                top: 0,
+                bottom: 0,
+                child: Align(
+                  alignment: Alignment(notch * 2 - 1, 0),
+                  child: Container(
+                    width: 1.2,
+                    height: 7,
+                    color: Colors.black.withValues(alpha: 0.75),
+                  ),
+                ),
+              )),
             ],
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           // Boss Break / Stagger Bar (Gorgoroth)
           if (boss.hasBreakBar) ...[
             Row(
@@ -2403,8 +2435,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   style: TextStyle(
                     color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
                     fontWeight: FontWeight.w900,
-                    fontSize: 7.5,
-                    letterSpacing: 0.6,
+                    fontSize: 7.8,
+                    letterSpacing: 0.7,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -2412,13 +2444,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   child: Stack(
                     children: [
                       Container(
-                        height: 4,
+                        height: 5.5,
                         decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(2),
+                          color: const Color(0xFF080D14),
+                          borderRadius: BorderRadius.circular(2.5),
                           border: Border.all(
-                            color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF).withValues(alpha: 0.4),
-                            width: 0.5,
+                            color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                            width: isStaggered ? 0.9 : 0.6,
                           ),
                         ),
                       ),
@@ -2426,17 +2458,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         alignment: Alignment.centerLeft,
                         widthFactor: isStaggered ? 1.0 : staggerRatio,
                         child: Container(
-                          height: 4,
+                          height: 5.5,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: isStaggered
-                                  ? [const Color(0xFFFFD600), const Color(0xFFFF9100)]
-                                  : [const Color(0xFF00E5FF), const Color(0xFF40C4FF)],
+                                  ? [const Color(0xFFFFEA00), const Color(0xFFFF9100)]
+                                  : [const Color(0xFF00B0FF), const Color(0xFF00E5FF)],
                             ),
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isStaggered ? const Color(0xFFFFD600) : const Color(0xFF00E5FF)).withValues(alpha: 0.5),
+                                blurRadius: isStaggered ? 6 : 3,
+                              ),
+                            ],
                           ),
                         ),
                       ),
+                      // Stagger 25%, 50%, 75% tick notches
+                      ...[0.25, 0.50, 0.75].map((notch) => Align(
+                        alignment: Alignment(notch * 2 - 1, 0),
+                        child: Container(
+                          width: 1.0,
+                          height: 5.5,
+                          color: Colors.black.withValues(alpha: 0.7),
+                        ),
+                      )),
                     ],
                   ),
                 ),
@@ -2445,9 +2492,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   isStaggered ? 'SHATTERED' : '${boss.stagger}/${boss.maxStagger}',
                   style: TextStyle(
                     color: isStaggered ? const Color(0xFFFFD600) : const Color(0xFF80D8FF),
-                    fontSize: 7.5,
+                    fontSize: 7.8,
                     fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
@@ -2884,37 +2931,56 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // 4. Live Initiative Action Timeline (ATB Sequence Preview)
           if (!isLandscapeMobile)
           Container(
-            height: 30,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            height: 34,
+            margin: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F0F16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF14121A), Color(0xFF0C0A10)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
               borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: Colors.white12),
+              border: Border.all(color: const Color(0xFF2C2836), width: 0.9),
+              boxShadow: const [
+                BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2)),
+              ],
             ),
             child: Row(
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.hourglass_top_rounded, size: 13, color: Color(0xFFFFD54F)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'INITIATIVE',
-                      style: TextStyle(
-                        fontSize: isLandscapeMobile ? 7.5 : 8.5,
-                        color: const Color(0xFFFFD54F),
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1826),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 0.8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 4),
+                      Text(
+                        'TIMELINE',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          color: Color(0xFFFFD54F),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: allLivingUnits.take(7).length,
-                    separatorBuilder: (context, _) => const Icon(Icons.arrow_forward_ios_rounded, size: 9, color: Colors.white24),
+                    separatorBuilder: (context, _) => const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2.0),
+                      child: Icon(Icons.chevron_right_rounded, size: 13, color: Color(0xFF4A4458)),
+                    ),
                     itemBuilder: (context, idx) {
                       final u = allLivingUnits[idx];
                       final isAlly = u.isPlayer;
@@ -2923,136 +2989,159 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       final apRatio = (u.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
                       final apPercent = (apRatio * 100).toInt();
 
-                      return GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          setState(() {
-                            if (isAlly) {
-                              _selectedUnitId = u.id;
-                              _selectedEnemyUnitId = null;
-                            } else {
-                              _selectedEnemyUnitId = u.id;
-                              _selectedUnitId = null;
-                            }
-                          });
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? (isAlly ? const Color(0xFF1E3A24) : const Color(0xFF4A1A1E))
-                                : (isAlly ? const Color(0xFF121E16) : const Color(0xFF221114)),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFFFFD54F)
-                                  : (isActingNext
-                                      ? (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80))
-                                      : (isAlly ? const Color(0xFF2E7D32) : const Color(0xFFC62828))),
-                              width: isSelected || isActingNext ? 1.4 : 0.8,
+                      return Tooltip(
+                        message: '${u.name} • ${isAlly ? "Ally" : "Enemy"}\nHP: ${u.hp}/${u.maxHp} • AP: $apPercent% • SPD: ${u.speed}',
+                        waitDuration: const Duration(milliseconds: 300),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            setState(() {
+                              if (isAlly) {
+                                _selectedUnitId = u.id;
+                                _selectedEnemyUnitId = null;
+                              } else {
+                                _selectedEnemyUnitId = u.id;
+                                _selectedUnitId = null;
+                              }
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: isSelected
+                                    ? (isAlly
+                                        ? [const Color(0xFF1E3A24), const Color(0xFF142618)]
+                                        : [const Color(0xFF4A1A1E), const Color(0xFF2C1014)])
+                                    : (isAlly
+                                        ? [const Color(0xFF141F18), const Color(0xFF0E1611)]
+                                        : [const Color(0xFF241416), const Color(0xFF170D0E)]),
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isSelected
+                                    ? const Color(0xFFFFD54F)
+                                    : (isActingNext
+                                        ? (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80))
+                                        : (isAlly ? const Color(0xFF2E7D32) : const Color(0xFF7F1D1D))),
+                                width: isSelected ? 1.5 : (isActingNext ? 1.3 : 0.8),
+                              ),
+                              boxShadow: isActingNext
+                                  ? [
+                                      BoxShadow(
+                                        color: (isAlly ? const Color(0xFF4CAF50) : const Color(0xFFFF5252)).withValues(alpha: 0.45),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
                             ),
-                            boxShadow: isActingNext
-                                ? [
-                                    BoxShadow(
-                                      color: (isAlly ? const Color(0xFF4CAF50) : const Color(0xFFFF5252)).withValues(alpha: 0.4),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Chamfered Miniature Portrait
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(3.5),
+                                    color: Colors.black54,
+                                    border: Border.all(
+                                      color: isActingNext
+                                          ? const Color(0xFFFFD54F)
+                                          : (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80)),
+                                      width: isActingNext ? 1.1 : 0.7,
                                     ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Circular Unit Avatar
-                              Container(
-                                width: isLandscapeMobile ? 16 : 20,
-                                height: isLandscapeMobile ? 16 : 20,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.black45,
-                                  border: Border.all(
-                                    color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
-                                    width: 0.8,
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Image.asset(
+                                    u.assetPath,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.topCenter,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      isAlly ? Icons.shield : Icons.security,
+                                      size: 11,
+                                      color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
+                                    ),
                                   ),
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Image.asset(
-                                  u.assetPath,
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment.topCenter,
-                                  errorBuilder: (_, __, ___) => Icon(
-                                    isAlly ? Icons.shield : Icons.security,
-                                    size: 11,
-                                    color: isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 5),
+                                const SizedBox(width: 5),
 
-                              // Name and AP Badge
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isActingNext)
-                                        const Padding(
-                                          padding: EdgeInsets.only(right: 2.0),
-                                          child: Icon(Icons.flash_on, size: 9, color: Color(0xFFFFD54F)),
+                                // Name and AP Gauge
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isActingNext)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 2.5),
+                                            child: Icon(Icons.flash_on, size: 9, color: Color(0xFFFFD54F)),
+                                          ),
+                                        Text(
+                                          u.name.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 7.8,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.3,
+                                            color: isSelected
+                                                ? const Color(0xFFFFD54F)
+                                                : (isAlly ? const Color(0xFFA5D6A7) : const Color(0xFFFFCDD2)),
+                                          ),
                                         ),
-                                      Text(
-                                        u.name.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: isLandscapeMobile ? 7.0 : 8.0,
-                                          fontWeight: FontWeight.w900,
-                                          color: isSelected
-                                              ? const Color(0xFFFFD54F)
-                                              : (isAlly ? const Color(0xFFA5D6A7) : const Color(0xFFFFCDD2)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 1.5),
+                                    // Mini AP progress bar
+                                    Container(
+                                      width: 34,
+                                      height: 2.5,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius: BorderRadius.circular(1),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: apRatio,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: isActingNext
+                                                ? const Color(0xFFFFD54F)
+                                                : (isAlly ? const Color(0xFF66BB6A) : const Color(0xFFEF5350)),
+                                            borderRadius: BorderRadius.circular(1),
+                                            boxShadow: isActingNext
+                                                ? [
+                                                    const BoxShadow(
+                                                      color: Color(0xFFFFD54F),
+                                                      blurRadius: 3,
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  // Mini AP progress bar
-                                  Container(
-                                    width: 32,
-                                    height: 2,
-                                    margin: const EdgeInsets.only(top: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(1),
                                     ),
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: apRatio,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: isActingNext
-                                              ? const Color(0xFFFFD54F)
-                                              : (isAlly ? const Color(0xFF66BB6A) : const Color(0xFFEF5350)),
-                                          borderRadius: BorderRadius.circular(1),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$apPercent%',
-                                style: TextStyle(
-                                  fontSize: 7.0,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                  color: isActingNext
-                                      ? const Color(0xFFFFD54F)
-                                      : (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80)),
+                                  ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$apPercent%',
+                                  style: TextStyle(
+                                    fontSize: 7.2,
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w900,
+                                    color: isActingNext
+                                        ? const Color(0xFFFFD54F)
+                                        : (isAlly ? const Color(0xFF81C784) : const Color(0xFFFF8A80)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -7018,20 +7107,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             // 4. Floating Damage / Effect Pop Text (Live execution with graceful smooth ascent & gentle drift)
             ..._floatingPops.where((p) => p.unitId == unit.id && !p.isExpired).map((pop) {
               final t = pop.progress;
-              // Smooth decelerating cubic ascent: rises up to 48 pixels slowly
+              // Smooth decelerating cubic ascent: rises up to 56 pixels
               final double smoothT = sin(t * 3.14159 / 2);
-              final double riseY = smoothT * 48.0;
+              final double riseY = smoothT * 56.0;
               // Gentle horizontal drift
               final double driftX = pop.horizontalDrift * smoothT;
-              // Opacity curve: visible for first 60%, gentle fade out to 0
-              final double opacity = t < 0.60 ? 1.0 : (1.0 - ((t - 0.60) / 0.40)).clamp(0.0, 1.0);
-              // Scale bounce on entry
+              // Opacity curve: crisp 100% for first 65%, then clean fade
+              final double opacity = t < 0.65 ? 1.0 : (1.0 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
+              // Explosive scale punch on entry
               final double scale = pop.isCrit
-                  ? (t < 0.15 ? 1.0 + (t / 0.15) * 0.28 : 1.28 - ((t - 0.15) * 0.20)).clamp(1.0, 1.28)
-                  : (t < 0.15 ? 0.85 + (t / 0.15) * 0.15 : 1.0);
+                  ? (t < 0.12 ? 1.0 + (t / 0.12) * 0.45 : 1.45 - ((t - 0.12) * 0.35)).clamp(1.10, 1.45)
+                  : (t < 0.12 ? 0.90 + (t / 0.12) * 0.25 : 1.15 - ((t - 0.12) * 0.15)).clamp(1.0, 1.15);
 
               return Positioned(
-                bottom: modelHeight + 36 + riseY,
+                bottom: modelHeight + 38 + riseY,
                 left: driftX != 0 ? driftX : null,
                 child: Opacity(
                   opacity: opacity,
@@ -7039,21 +7128,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     scale: scale,
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: pop.isCrit ? 8 : 6,
-                        vertical: pop.isCrit ? 3 : 2,
+                        horizontal: pop.isCrit ? 9 : 6.5,
+                        vertical: pop.isCrit ? 3.5 : 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0C0C14).withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(4),
+                        color: const Color(0xFF0A0A10).withValues(alpha: 0.96),
+                        borderRadius: BorderRadius.circular(pop.isCrit ? 5 : 3.5),
                         border: Border.all(
                           color: pop.borderColor,
-                          width: pop.isCrit ? 1.8 : 1.2,
+                          width: pop.isCrit ? 2.0 : 1.2,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.65 : 0.40),
-                            blurRadius: pop.isCrit ? 10 : 5,
-                            spreadRadius: pop.isCrit ? 1.5 : 0.5,
+                            color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.75 : 0.45),
+                            blurRadius: pop.isCrit ? 12 : 6,
+                            spreadRadius: pop.isCrit ? 2.0 : 0.5,
+                          ),
+                          const BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
@@ -7063,10 +7157,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           color: pop.color,
                           fontWeight: FontWeight.w900,
                           fontSize: pop.fontSize,
-                          letterSpacing: pop.isCrit ? 0.8 : 0.4,
+                          letterSpacing: pop.isCrit ? 0.9 : 0.4,
                           fontFamily: 'monospace',
-                          shadows: const [
-                            Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
+                          shadows: [
+                            const Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
+                            if (pop.isCrit)
+                              Shadow(color: pop.borderColor, blurRadius: 8, offset: Offset.zero),
                           ],
                         ),
                       ),
@@ -9558,6 +9654,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           required String subtitle,
           required IconData icon,
           String? iconAsset,
+          String? hotkeyLabel,
           required Color activeColor,
           required Color borderColor,
           required bool isEnabled,
@@ -9601,6 +9698,39 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                   borderRadius: BorderRadius.circular(5),
                   child: Stack(
                     children: [
+                      // 0. Hotkey Badge in Top-Left Corner
+                      if (hotkeyLabel != null)
+                        Positioned(
+                          top: 2,
+                          left: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
+                            decoration: BoxDecoration(
+                              color: isEnabled
+                                  ? const Color(0xFF231E2C)
+                                  : const Color(0xFF14121A),
+                              borderRadius: BorderRadius.circular(2.5),
+                              border: Border.all(
+                                color: isEnabled
+                                    ? (isFinisher ? const Color(0xFFFFD54F) : borderColor.withValues(alpha: 0.8))
+                                    : Colors.white24,
+                                width: 0.7,
+                              ),
+                            ),
+                            child: Text(
+                              hotkeyLabel,
+                              style: TextStyle(
+                                fontSize: isNarrow ? 6.5 : 7.5,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'monospace',
+                                color: isEnabled
+                                    ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
+                                    : Colors.white38,
+                              ),
+                            ),
+                          ),
+                        ),
+
                       // 1. Vertical Molten "Building-Up" Fuel Fill
                       if (progress > 0)
                         Align(
@@ -10242,6 +10372,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         subtitle: subtitleText,
                         icon: skill.icon,
                         iconAsset: skill.iconAsset,
+                        hotkeyLabel: '${slotIdx + 1}',
                         activeColor: isFinisher
                             ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
                             : skill.primaryColor,
