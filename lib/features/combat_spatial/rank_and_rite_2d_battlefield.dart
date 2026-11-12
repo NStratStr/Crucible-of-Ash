@@ -549,50 +549,73 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // 1. Natural Ground Plinth (Only rendered under units or when dragging/hovering; never litters empty desert terrain!)
+              // 1. Natural Ground Plinth (Carved Runic Miniature Base)
               if (!isMultiNodeBoss && (occupant != null || isDropCandidate || isHovered || engine.isPreBattlePhase))
                 Positioned(
                   bottom: 8,
-                  child: Container(
-                  width: plinthW,
-                  height: plinthH,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
-                    gradient: RadialGradient(
-                      center: const Alignment(0, -0.15),
-                      radius: 0.85,
-                      colors: isPlayer
-                          ? [
-                              const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.40),
-                              const Color(0xFF0B1420).withValues(alpha: 0.80),
-                              Colors.transparent,
-                            ]
-                          : [
-                              const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.40),
-                              const Color(0xFF1B0709).withValues(alpha: 0.80),
-                              Colors.transparent,
-                            ],
-                    ),
-                    border: Border.all(
-                      color: plinthRimColor,
-                      width: isTurnActiveUnit ? 2.4 : ((isSelected || isDropCandidate || isHovered) ? 1.8 : 1.0),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.65),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                      if (plinthGlowColor != Colors.transparent)
-                        BoxShadow(
-                          color: plinthGlowColor,
-                          blurRadius: isTurnActiveUnit ? 18 : (isSelected ? 12 : 6),
-                          spreadRadius: isTurnActiveUnit ? 3 : (isSelected ? 2 : 0),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: plinthW,
+                        height: plinthH,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.elliptical(plinthW / 2, plinthH / 2)),
+                          gradient: RadialGradient(
+                            center: const Alignment(0, -0.15),
+                            radius: 0.85,
+                            colors: isPlayer
+                                ? [
+                                    (occupant?.isAshSculptor == true || occupant?.id == 'ash_sculptor')
+                                        ? const Color(0xFF382810).withValues(alpha: 0.95)
+                                        : const Color(0xFF1A2B42).withValues(alpha: occupant != null ? 0.95 : 0.40),
+                                    const Color(0xFF0B1420).withValues(alpha: 0.80),
+                                    Colors.transparent,
+                                  ]
+                                : [
+                                    const Color(0xFF38151A).withValues(alpha: occupant != null ? 0.95 : 0.40),
+                                    const Color(0xFF1B0709).withValues(alpha: 0.80),
+                                    Colors.transparent,
+                                  ],
+                          ),
+                          border: Border.all(
+                            color: (occupant?.isAshSculptor == true || occupant?.id == 'ash_sculptor') && !isSelected && !isTurnActiveUnit
+                                ? const Color(0xFFFFD54F).withValues(alpha: 0.85)
+                                : plinthRimColor,
+                            width: isTurnActiveUnit ? 2.4 : ((isSelected || isDropCandidate || isHovered) ? 1.8 : 1.2),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.70),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                            if (plinthGlowColor != Colors.transparent || (occupant?.isAshSculptor == true && !isSelected))
+                              BoxShadow(
+                                color: (occupant?.isAshSculptor == true && plinthGlowColor == Colors.transparent)
+                                    ? const Color(0xFFFFD54F).withValues(alpha: 0.3)
+                                    : plinthGlowColor,
+                                blurRadius: isTurnActiveUnit ? 18 : (isSelected ? 12 : 6),
+                                spreadRadius: isTurnActiveUnit ? 3 : (isSelected ? 2 : 0),
+                              ),
+                          ],
                         ),
+                      ),
+                      // Inner concentric carved rune lip
+                      Container(
+                        width: plinthW * 0.76,
+                        height: plinthH * 0.65,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.elliptical(plinthW * 0.38, plinthH * 0.325)),
+                          border: Border.all(
+                            color: plinthRimColor.withValues(alpha: 0.35),
+                            width: 0.8,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
 
               // 1b. Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate)
               if ((selectedCardId != null && !isPlayer) || isHovered)

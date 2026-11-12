@@ -1440,19 +1440,83 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                     ),
                   ),
 
-                  // Subtle Atmospheric Vignette Overlay
+                  // Dynamic Cinematic Vignette, Threat Pulse & Atmospheric Embers Layer
                   Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 1.1,
-                          colors: [
-                            Colors.transparent,
-                            const Color(0xFF06070B).withValues(alpha: 0.35),
-                            const Color(0xFF030406).withValues(alpha: 0.70),
-                          ],
-                        ),
+                    child: IgnorePointer(
+                      child: Builder(
+                        builder: (context) {
+                          final bool isCriticalThreat = _engine.isAshenReckoning;
+                          final sculptor = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+                          final bool isCommanderLowHp = sculptor != null && sculptor.maxHp > 0 && (sculptor.hp / sculptor.maxHp) < 0.25;
+
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // 1. Base Radial Shadow Vignette
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: RadialGradient(
+                                    center: Alignment.center,
+                                    radius: 1.15,
+                                    colors: [
+                                      Colors.transparent,
+                                      const Color(0xFF06070B).withValues(alpha: 0.35),
+                                      const Color(0xFF030406).withValues(alpha: 0.78),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // 2. Scorched Earth Bottom Molten Warmth Reflection
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                height: 180,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        (isCriticalThreat
+                                            ? const Color(0xFF4A0E17)
+                                            : const Color(0xFF2E150B)).withValues(alpha: 0.40),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // 3. Dynamic Threat Heartbeat Glow on Critical HP / Ashen Reckoning
+                              if (isCriticalThreat || isCommanderLowHp)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: const Color(0xFFFF1744).withValues(
+                                        alpha: 0.25 + 0.15 * sin(DateTime.now().millisecondsSinceEpoch / 280.0).abs(),
+                                      ),
+                                      width: 4.0,
+                                    ),
+                                    gradient: RadialGradient(
+                                      center: Alignment.center,
+                                      radius: 0.95,
+                                      colors: [
+                                        Colors.transparent,
+                                        const Color(0xFFFF1744).withValues(alpha: 0.12),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              // 4. Drifting Battlefield Ash Flecks & Glowing Embers
+                              CustomPaint(
+                                painter: _AtmosphericBattlefieldEmbersPainter(
+                                  timestampMs: DateTime.now().millisecondsSinceEpoch,
+                                  isEnraged: isCriticalThreat,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -6673,45 +6737,82 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: [
-            // 1. Tabletop 2.5D Contact Drop Shadow & Soft Ground Glow
+            // 1. Tabletop Miniature Carved Runic Plinth
             Positioned(
               bottom: 2,
-              child: Container(
-                width: baseWidth,
-                height: baseHeight + (_is2DGridView ? 4 : 0),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, baseHeight / 2)),
-                  gradient: RadialGradient(
-                    colors: unit.isDowned
-                        ? [
-                            const Color(0xFF78909C).withValues(alpha: 0.50), // Cold stone inert plinth
-                            const Color(0xFF263238),
-                            Colors.transparent,
-                          ]
-                        : [
-                            factionColor.withValues(alpha: isSelected || isAttacking ? 0.75 : 0.35),
-                            Colors.black87,
-                            Colors.transparent,
-                          ],
-                  ),
-                  border: unit.isDowned
-                      ? Border.all(color: const Color(0xFF90A4AE).withValues(alpha: 0.6), width: 1.0)
-                      : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: unit.isDowned
-                          ? const Color(0xFF37474F).withValues(alpha: 0.5)
-                          : factionColor.withValues(alpha: isSelected || isAttacking ? 0.6 : 0.2),
-                      blurRadius: isSelected || isAttacking ? 8 : 4,
-                    ),
-                    if (unit.aegisShield > 0)
-                      BoxShadow(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.70),
-                        blurRadius: 10,
-                        spreadRadius: 1.5,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer Beveled Plinth Ring & Deep Contact Shadow
+                  Container(
+                    width: baseWidth,
+                    height: baseHeight + (_is2DGridView ? 4 : 0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.elliptical(baseWidth / 2, (baseHeight + (_is2DGridView ? 4 : 0)) / 2)),
+                      gradient: RadialGradient(
+                        center: const Alignment(0, -0.15),
+                        radius: 0.9,
+                        colors: unit.isDowned
+                            ? [
+                                const Color(0xFF546E7A).withValues(alpha: 0.50),
+                                const Color(0xFF263238),
+                                Colors.transparent,
+                              ]
+                            : [
+                                (unit.isAshSculptor || unit.id == 'ash_sculptor')
+                                    ? const Color(0xFF4A3414).withValues(alpha: 0.85)
+                                    : (unit.isPlayer ? const Color(0xFF142938).withValues(alpha: 0.85) : const Color(0xFF381418).withValues(alpha: 0.85)),
+                                const Color(0xFF0C0A10).withValues(alpha: 0.95),
+                                Colors.transparent,
+                              ],
                       ),
-                  ],
-                ),
+                      border: Border.all(
+                        color: unit.isDowned
+                            ? const Color(0xFF90A4AE).withValues(alpha: 0.6)
+                            : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
+                                ? const Color(0xFFFFD54F)
+                                : factionColor.withValues(alpha: isSelected || isAttacking ? 0.95 : 0.75)),
+                        width: isSelected || isAttacking ? 2.0 : 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                        BoxShadow(
+                          color: unit.isDowned
+                              ? const Color(0xFF37474F).withValues(alpha: 0.4)
+                              : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
+                                  ? const Color(0xFFFFD54F).withValues(alpha: isSelected || isAttacking ? 0.65 : 0.35)
+                                  : factionColor.withValues(alpha: isSelected || isAttacking ? 0.65 : 0.25)),
+                          blurRadius: isSelected || isAttacking ? 12 : 6,
+                          spreadRadius: isSelected || isAttacking ? 2 : 0,
+                        ),
+                        if (unit.aegisShield > 0)
+                          const BoxShadow(
+                            color: Color(0xCC00E5FF),
+                            blurRadius: 10,
+                            spreadRadius: 1.5,
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Inner Concentric Carved Stone Lip
+                  Container(
+                    width: baseWidth * 0.78,
+                    height: (baseHeight + (_is2DGridView ? 4 : 0)) * 0.65,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.elliptical(baseWidth * 0.39, (baseHeight + (_is2DGridView ? 4 : 0)) * 0.325)),
+                      border: Border.all(
+                        color: (unit.isAshSculptor || unit.id == 'ash_sculptor')
+                            ? const Color(0xFFFFD54F).withValues(alpha: 0.45)
+                            : factionColor.withValues(alpha: 0.35),
+                        width: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -12585,6 +12686,70 @@ class _AshEmbersDissolvePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AshEmbersDissolvePainter oldDelegate) {
+    return true;
+  }
+}
+
+/// Global arena ambient ash flakes and glowing ember particle painter
+class _AtmosphericBattlefieldEmbersPainter extends CustomPainter {
+  final int timestampMs;
+  final bool isEnraged;
+
+  const _AtmosphericBattlefieldEmbersPainter({
+    required this.timestampMs,
+    this.isEnraged = false,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    if (w <= 0 || h <= 0) return;
+
+    final int count = isEnraged ? 44 : 28;
+    for (int i = 0; i < count; i++) {
+      final double seedX = ((i * 137.508) % 1.0);
+      final double seedSpeed = 0.65 + (i % 5) * 0.20;
+      final int cycleDuration = (5500 / seedSpeed).round();
+
+      final double phase = ((timestampMs + (i * 260)) % cycleDuration) / cycleDuration.toDouble();
+
+      final double x = (w * seedX) + (sin(phase * 3.14159 * 2 + i) * 32.0) + (phase * w * 0.12);
+      final double y = h * (1.05 - phase * 1.1);
+
+      final double opacity = phase < 0.15
+          ? (phase / 0.15)
+          : (phase > 0.82 ? (1.0 - (phase - 0.82) / 0.18) : 1.0);
+
+      final double radius = 0.9 + (i % 4) * 0.65;
+
+      Color color;
+      if (isEnraged) {
+        color = (i % 3 == 0)
+            ? const Color(0xFFFF1744)
+            : ((i % 3 == 1) ? const Color(0xFFFF5252) : const Color(0xFFFF9100));
+      } else {
+        color = (i % 3 == 0)
+            ? const Color(0xFFFF9100)
+            : ((i % 3 == 1) ? const Color(0xFFFFD54F) : const Color(0xFFFF5722));
+      }
+
+      final paint = Paint()
+        ..color = color.withValues(alpha: opacity * (isEnraged ? 0.75 : 0.50))
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(x % (w + 40) - 20, y), radius, paint);
+
+      if (radius > 1.8) {
+        final glowPaint = Paint()
+          ..color = const Color(0xFFFFF9C4).withValues(alpha: opacity * 0.35)
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(Offset(x % (w + 40) - 20, y), radius * 0.45, glowPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AtmosphericBattlefieldEmbersPainter oldDelegate) {
     return true;
   }
 }
