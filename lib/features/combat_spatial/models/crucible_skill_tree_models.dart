@@ -87,7 +87,7 @@ class CrucibleSkillNode {
 class CrucibleSkillTreeState {
   final Map<String, CrucibleSkillNode> allSkills = {};
   final List<String> equippedSkillIds = List.filled(5, '');
-  int availableSkillPoints = 5;
+  int availableSkillPoints = 0;
 
   CrucibleSkillTreeState() {
     _initializeAllSkills();
@@ -723,49 +723,38 @@ class CrucibleSkillTreeState {
 
   void configureStartingDiscipline(CrucibleSkillBranch branch, {bool startWithBasics = true}) {
     if (startWithBasics) {
-      // Start with the basics (Slot 1 generator + Slot 2 core skill) and build up!
-      // Slots 3, 4, 5 start empty and are unlocked as the player levels up and invests Skill Points.
+      // Start with only Slot 1 (0-Cinder generator) at Rank 1.
+      // Slots 2, 3, 4, 5 start empty and are unlocked through combat victories & Skill Points.
+      equippedSkillIds[1] = '';
       equippedSkillIds[2] = '';
       equippedSkillIds[3] = '';
       equippedSkillIds[4] = '';
-      availableSkillPoints = 5;
+      availableSkillPoints = 0;
 
       switch (branch) {
         case CrucibleSkillBranch.wrath:
           equippedSkillIds[0] = 'ash_cleave';
-          equippedSkillIds[1] = 'ash_brand';
           allSkills['ash_cleave']?.rank = 1;
-          allSkills['ash_brand']?.rank = 1;
           break;
         case CrucibleSkillBranch.bastion:
           equippedSkillIds[0] = 'iron_slam';
-          equippedSkillIds[1] = 'ash_bastion';
           allSkills['iron_slam']?.rank = 1;
-          allSkills['ash_bastion']?.rank = 1;
           break;
         case CrucibleSkillBranch.resonance:
           equippedSkillIds[0] = 'sanguine_rend';
-          equippedSkillIds[1] = 'sanguine_tether';
           allSkills['sanguine_rend']?.rank = 1;
-          allSkills['sanguine_tether']?.rank = 1;
           break;
         case CrucibleSkillBranch.vitae:
           equippedSkillIds[0] = 'vitae_mending';
-          equippedSkillIds[1] = 'vitae_bloom';
           allSkills['vitae_mending']?.rank = 1;
-          allSkills['vitae_bloom']?.rank = 1;
           break;
         case CrucibleSkillBranch.calamity:
           equippedSkillIds[0] = 'ash_whirlwind';
-          equippedSkillIds[1] = 'sanguine_vortex';
           allSkills['ash_whirlwind']?.rank = 1;
-          allSkills['sanguine_vortex']?.rank = 1;
           break;
         case CrucibleSkillBranch.apex:
           equippedSkillIds[0] = 'ash_cleave';
-          equippedSkillIds[1] = 'ash_brand';
           allSkills['ash_cleave']?.rank = 1;
-          allSkills['ash_brand']?.rank = 1;
           break;
       }
     } else {

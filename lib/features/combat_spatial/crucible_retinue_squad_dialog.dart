@@ -56,15 +56,6 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
     super.initState();
     _squad = List.from(widget.currentSquadUnits);
     _reserves = List.from(widget.reserveUnits);
-
-    // Ensure all 8 archetype sculpted minions exist in reserves or squad
-    final activeSpecies = _squad.map((u) => u.speciesId).toSet();
-    final reserveSpecies = _reserves.map((u) => u.speciesId).toSet();
-    for (final defMinion in StarterBrigades.createReserveInventory()) {
-      if (!activeSpecies.contains(defMinion.speciesId) && !reserveSpecies.contains(defMinion.speciesId)) {
-        _reserves.add(defMinion);
-      }
-    }
   }
 
   String _getMinionPassiveTitle(String speciesId) {

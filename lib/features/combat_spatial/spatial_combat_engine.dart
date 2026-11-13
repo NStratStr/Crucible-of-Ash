@@ -212,8 +212,9 @@ class SpatialCombatEngine extends ChangeNotifier {
     unboundAshWallet += rewardUnboundAsh;
     distilledVitaeWallet += rewardDistilledVitae;
     petrifiedPlinthsWallet += rewardPetrifiedPlinths;
+    skillTreeState.availableSkillPoints += 1;
     hasClaimedEncounterVictoryLoot = true;
-    addLog('💎 VICTORY SPOILS CLAIMED: +$rewardUnboundAsh Ash, +$rewardDistilledVitae Vitae, +$rewardPetrifiedPlinths Plinths!');
+    addLog('💎 VICTORY SPOILS CLAIMED: +$rewardUnboundAsh Ash, +$rewardDistilledVitae Vitae, +$rewardPetrifiedPlinths Plinths, +1★ Skill Point!');
     notifyListeners();
   }
 

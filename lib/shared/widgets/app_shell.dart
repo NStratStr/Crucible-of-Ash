@@ -118,7 +118,7 @@ class _AppShellState extends State<AppShell> {
     _traitChiselingService = TraitChiselingService();
     _ftueService = FtueService();
     _resetEncounter(null, BattleModifier.none, false);
-    _inventory = StarterBrigades.createReserveInventory();
+    _inventory = [];
     _campaignNodes = CampaignMapGenerator.generateCampaignForChapter(_currentChapter);
 
     _ftueService.addListener(() {
@@ -179,21 +179,13 @@ class _AppShellState extends State<AppShell> {
       if (saved.reserveInventory.isNotEmpty) {
         _inventory = List.from(saved.reserveInventory);
       }
-      final activeSpecies = _tickManager.allies.map((u) => u.speciesId).toSet();
-      final invSpecies = _inventory.map((u) => u.speciesId).toSet();
-      for (final defaultReserve in StarterBrigades.createReserveInventory()) {
-        if (!activeSpecies.contains(defaultReserve.speciesId) && !invSpecies.contains(defaultReserve.speciesId)) {
-          _inventory.add(defaultReserve);
-        }
-      }
     });
   }
 
   List<UnitEntity> _migrateToSculptorAndFootmanRetinue(List<UnitEntity> rawAllies) {
-    final defaultSquad = StarterBrigades.createAshLegionPlayerSquad();
     final List<UnitEntity> result = List.from(rawAllies);
-    while (result.length < 3) {
-      result.add(defaultSquad[result.length]);
+    if (result.isEmpty) {
+      result.add(StarterBrigades.createSculptorStarterSquad().first);
     }
     // Slot 0: Always The Ash Sculptor Commander
     result[0] = result[0].copyWith(
@@ -202,15 +194,17 @@ class _AppShellState extends State<AppShell> {
       speciesId: 'ash_sculptor',
       customAvatarAsset: 'assets/images/ash_sculptor_idle.png',
     );
-    // Slot 1: Always the animated Iron Footman Vanguard companion
-    result[1] = result[1].copyWith(
-      id: 'ash_footman_01',
-      name: 'Iron Footman',
-      speciesId: 'iron_footman',
-      archetype: Archetype.juggernaut,
-      customAvatarAsset: 'assets/images/iron_footman_idle.png',
-      speed: 90,
-    );
+    // Slot 1 (if unlocked/present): Iron Footman Vanguard companion
+    if (result.length > 1 && result[1].speciesId == 'iron_footman') {
+      result[1] = result[1].copyWith(
+        id: 'ash_footman_01',
+        name: 'Iron Footman',
+        speciesId: 'iron_footman',
+        archetype: Archetype.juggernaut,
+        customAvatarAsset: 'assets/images/iron_footman_idle.png',
+        speed: 90,
+      );
+    }
     // Slot 2: Distinct Grave Duelist companion (heal corrupted duplicate sculptors)
     if (result.length > 2) {
       final u2 = result[2];
@@ -266,7 +260,7 @@ class _AppShellState extends State<AppShell> {
           List<UnitEntity> alliesToRestore = saved.allies;
           // Ensure the player's saved active commander is present in the squad if allies were empty
           if (alliesToRestore.isEmpty) {
-            alliesToRestore = StarterBrigades.createAshLegionPlayerSquad().take(3).toList();
+            alliesToRestore = [StarterBrigades.createSculptorStarterSquad().first];
           } else {
             alliesToRestore = _migrateToSculptorAndFootmanRetinue(alliesToRestore);
           }
@@ -300,13 +294,6 @@ class _AppShellState extends State<AppShell> {
 
           if (saved.reserveInventory.isNotEmpty) {
             _inventory = List.from(saved.reserveInventory);
-          }
-          final activeSpecies2 = _tickManager.allies.map((u) => u.speciesId).toSet();
-          final invSpecies2 = _inventory.map((u) => u.speciesId).toSet();
-          for (final defaultReserve in StarterBrigades.createReserveInventory()) {
-            if (!activeSpecies2.contains(defaultReserve.speciesId) && !invSpecies2.contains(defaultReserve.speciesId)) {
-              _inventory.add(defaultReserve);
-            }
           }
 
           if (saved.relics.isNotEmpty) {
@@ -376,7 +363,7 @@ class _AppShellState extends State<AppShell> {
       )).toList();
       allies = _migrateToSculptorAndFootmanRetinue(allies);
     } else {
-      allies = StarterBrigades.createAshLegionPlayerSquad();
+      allies = [StarterBrigades.createSculptorStarterSquad().first];
     }
     final previousTickManager = _isInitialized ? _tickManager : null;
     final previousCommandService = _isInitialized ? _commandService : null;
@@ -611,10 +598,10 @@ class _AppShellState extends State<AppShell> {
     );
     if (!mounted || chosen == null) return;
 
-    final sculptorStarter = StarterBrigades.createSculptorStarterSquad();
+    final sculptorStarter = [StarterBrigades.createSculptorStarterSquad().first];
     setState(() {
       _tickManager.updateSquads(allies: sculptorStarter);
-      _inventory = StarterBrigades.createReserveInventory();
+      _inventory = [];
       _hasCompletedAwakening = true;
       if (_ftueService.currentStage == FtueStage.awakening) {
         _ftueService.advanceStage();

@@ -3,8 +3,10 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/data/starter_brigades.dart';
 import '../../core/combat_math.dart';
 import '../../shared/utils/platform_fullscreen.dart';
 import '../settings/settings_service.dart';
@@ -70,7 +72,7 @@ class SpatialBattleScreen extends StatefulWidget {
   State<SpatialBattleScreen> createState() => _SpatialBattleScreenState();
 }
 
-class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
+class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerProviderStateMixin {
   Set<String> _computeProjectedSecondaryTargetEnemyIds() {
     final Set<String> secondaryIds = {};
     final actingAlly = _engine.activeActingUnit ??
@@ -195,7 +197,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   late final SpatialCombatEngine _engine;
   List<UnitEntity> _currentSquadUnits = [];
   List<UnitEntity> _reserveUnits = [];
-  Timer? _loopTimer;
+  Ticker? _frameTicker;
+  Duration _lastFrameElapsed = Duration.zero;
+  final ValueNotifier<int> _visualFrameTick = ValueNotifier<int>(0);
   String? _selectedUnitId;
   String? _selectedEnemyUnitId;
   String? _draggedUnitId;
@@ -237,8 +241,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   final List<_ActiveCombatSpriteVfx> _activeSpriteVfx = [];
   Offset _screenShakeOffset = Offset.zero;
   double _shakeIntensity = 0.0;
+  double _shakeRemainingSec = 0.0;
+  double _shakeDurationSec = 0.14;
+  double _shakePhase = 0.0;
   bool _enableScreenShake = true; // Accessible motion comfort toggle
   double _battlefieldCameraZoom = 1.0;
+  double _cameraZoomPeak = 1.0;
+  double _cameraZoomRemainingSec = 0.0;
+  double _cameraZoomDurationSec = 0.25;
   bool _isSlowMoFinisher = false;
 
   // Option 3: Interactive Forge Strike Tactile Finisher
@@ -254,7 +264,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   AudioPlayer? _bgmPlayer;
   final List<AudioPlayer> _sfxPlayers = [];
   int _sfxIndex = 0;
-  static const int _maxSfxPlayers = 4;
+  static const int _maxSfxPlayers = 8;
   bool _isMuted = false;
   bool _isDockCollapsed = false;
   bool _isLogDrawerVisible = false;
@@ -339,7 +349,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _bgmPlayer = AudioPlayer();
       _sfxPlayers.clear();
       for (int i = 0; i < _maxSfxPlayers; i++) {
-        _sfxPlayers.add(AudioPlayer());
+        final player = AudioPlayer();
+        if (!kIsWeb) {
+          await player.setPlayerMode(PlayerMode.lowLatency);
+        }
+        _sfxPlayers.add(player);
       }
       
       // Stop loop event spam on Windows native backend
@@ -366,9 +380,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       _sfxIndex = (_sfxIndex + 1) % _sfxPlayers.length;
 
       final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
-      player.setVolume(vol).then((_) {
-        return player.play(AssetSource('audio/$resolved')).catchError((_) {});
-      }).catchError((_) {
+      player.setVolume(vol).catchError((_) {});
+      player.play(AssetSource('audio/$resolved')).catchError((_) {
         // Silently ignore audio playback errors on web (404s/codecs)
       });
     } catch (_) {
@@ -494,45 +507,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _hitStopRemainingMs = max(_hitStopRemainingMs, durationMs);
   }
 
-  void _triggerCameraImpactZoom({double zoomScale = 1.05, int durationMs = 280}) {
-    if (!mounted) return;
-    setState(() {
-      _battlefieldCameraZoom = zoomScale;
-    });
-    final t = Timer(Duration(milliseconds: durationMs), () {
-      if (mounted) {
-        setState(() {
-          _battlefieldCameraZoom = 1.0;
-        });
-      }
-    });
-    _animTimers.add(t);
+  int _scaledMs(int ms) {
+    final speed = _engine.combatPacingSpeed.clamp(1.0, 2.0);
+    return (ms / speed).round();
   }
 
-  void _triggerScreenShake({double intensity = 4.0}) {
-    if (!_enableScreenShake) return;
-    _shakeIntensity = intensity.clamp(0.0, 5.0);
-    const int stepCount = 3;
-    const int stepMs = 28;
+  void _triggerCameraImpactZoom({double zoomScale = 1.05, int durationMs = 260}) {
+    if (!mounted) return;
+    _cameraZoomPeak = zoomScale;
+    _cameraZoomDurationSec = max(0.08, _scaledMs(durationMs) / 1000.0);
+    _cameraZoomRemainingSec = _cameraZoomDurationSec;
+  }
 
-    for (int i = 0; i <= stepCount; i++) {
-      final t = Timer(Duration(milliseconds: i * stepMs), () {
-        if (!mounted) return;
-        setState(() {
-          if (i == stepCount) {
-            _screenShakeOffset = Offset.zero;
-            _shakeIntensity = 0.0;
-          } else {
-            final double decay = 1.0 - (i / stepCount);
-            final double sign = (i % 2 == 0) ? 1.0 : -1.0;
-            final double offsetX = sign * _shakeIntensity * decay * 0.7;
-            final double offsetY = -sign * _shakeIntensity * decay * 0.5;
-            _screenShakeOffset = Offset(offsetX, offsetY);
-          }
-        });
-      });
-      _animTimers.add(t);
-    }
+  void _triggerScreenShake({double intensity = 4.0, int durationMs = 150}) {
+    if (!_enableScreenShake) return;
+    _shakeIntensity = max(_shakeIntensity, intensity.clamp(0.0, 6.0));
+    _shakeDurationSec = max(0.08, durationMs / 1000.0);
+    _shakeRemainingSec = _shakeDurationSec;
   }
 
   void _enqueueCombatEvent(SpatialActionEvent event) {
@@ -567,14 +558,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         !event.skillName.toLowerCase().contains('attack');
 
     // Stage 1 Announcement Banner Duration:
-    // Display skill/ultimate herald first, then completely dissolve before playing attack animations & damage numbers!
+    // Brief, punchy skill/ultimate herald that scales with combat speed.
     int bannerDurationMs = 0;
     if (isUltimate && caster != null && caster.isPlayer) {
-      bannerDurationMs = 950;
+      bannerDurationMs = _scaledMs(480);
     } else if (isSignature && caster != null) {
-      bannerDurationMs = 750;
+      bannerDurationMs = _scaledMs(380);
     } else if (hasNamedSkill) {
-      bannerDurationMs = 650;
+      bannerDurationMs = _scaledMs(300);
     }
 
     void executePhysicalImpact() {
@@ -802,7 +793,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       }
 
       if (isHeavyImpact) {
-        _triggerHitStop(durationMs: isApexStrike ? 110 : (isUltimate ? 80 : 35));
+        _triggerHitStop(durationMs: isApexStrike ? 85 : (isUltimate ? 60 : 30));
         if (isApexStrike) {
           _triggerCameraImpactZoom(
             zoomScale: 1.05,
@@ -956,8 +947,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
       _animTimers.add(tVfx);
 
-      // Fast visceral hit-flash reset (160ms normal, 220ms crit) so character art doesn't remain tinted
-      final tFlash = Timer(Duration(milliseconds: event.isCrit ? 220 : 160), () {
+      // Fast visceral hit-flash reset (100ms normal, 150ms crit) so character art stays crisp
+      final tFlash = Timer(Duration(milliseconds: event.isCrit ? 150 : 100), () {
         if (mounted) {
           setState(() {
             _damagedUnitId = null;
@@ -967,8 +958,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
       _animTimers.add(tFlash);
 
-      // Reset visual lunge & floating pops after 1400ms
-      final t1 = Timer(const Duration(milliseconds: 1400), () {
+      // Reset visual lunge & unit banner pop quickly so the next turn feels responsive
+      final t1 = Timer(Duration(milliseconds: _scaledMs(650)), () {
         if (mounted) {
           setState(() {
             _attackingUnitId = null;
@@ -983,14 +974,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       });
       _animTimers.add(t1);
 
-      // Conclude action sequence and advance to next event
-      final int animRestMs = (isUltimate || isSignature) ? 1500 : (event.isAssistStrike || event.isKnockback ? 950 : 1200);
+      // Conclude action sequence and advance to next event (floating numbers continue fading asynchronously)
+      final int animRestMs = _scaledMs(
+        (isUltimate || isSignature) ? 650 : (event.isAssistStrike || event.isKnockback ? 420 : 480),
+      );
       final t2 = Timer(Duration(milliseconds: animRestMs), () {
         if (mounted) {
           _isActionSequenceRunning = false;
           if (_actionEventQueue.isNotEmpty) {
-            // 100ms staging gap between consecutive actions so attacks don't abruptly cut each other off
-            final tNext = Timer(const Duration(milliseconds: 100), () {
+            final tNext = Timer(Duration(milliseconds: _scaledMs(40)), () {
               if (mounted) _drainNextCombatEvent();
             });
             _animTimers.add(tNext);
@@ -1043,50 +1035,106 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
   }
 
   void _startLoop() {
-    _loopTimer?.cancel();
-    // Paced loop: ~50ms per tick (~20 ticks/sec default), scaled genuinely by simulationSpeed (0.3x in bullet-time)
-    const baseIntervalMs = 75;
-    _loopTimer = Timer.periodic(const Duration(milliseconds: baseIntervalMs), (timer) {
-      if (!mounted) return;
-      final hasVisibleTrajectory = _selectedUnitId != null ||
-          _draggedUnitId != null ||
-          _selectedEnemyUnitId != null ||
-          _showAllTrajectories ||
-          _engine.enemyUnits.any((e) => e.isAlive && e.pendingIntent != null);
-      if (hasVisibleTrajectory) {
-        _dashPhase = (_dashPhase + 0.06) % 1.0;
+    _frameTicker?.dispose();
+    _lastFrameElapsed = Duration.zero;
+    _frameTicker = createTicker(_onFrameTick)..start();
+  }
+
+  void _onFrameTick(Duration elapsed) {
+    if (!mounted) return;
+    final double rawDt = _lastFrameElapsed == Duration.zero
+        ? (1.0 / 60.0)
+        : (elapsed - _lastFrameElapsed).inMicroseconds / 1000000.0;
+    _lastFrameElapsed = elapsed;
+    final double dt = rawDt.clamp(0.0, 0.05);
+
+    bool needsVisualRepaint = false;
+
+    final hasVisibleTrajectory = _selectedUnitId != null ||
+        _draggedUnitId != null ||
+        _selectedEnemyUnitId != null ||
+        _showAllTrajectories ||
+        _engine.enemyUnits.any((e) => e.isAlive && e.pendingIntent != null);
+    if (hasVisibleTrajectory) {
+      _dashPhase = (_dashPhase + dt * 0.85) % 1.0;
+      needsVisualRepaint = true;
+    }
+
+    // Smooth continuous damped screen shake
+    if (_shakeRemainingSec > 0.0) {
+      _shakeRemainingSec = max(0.0, _shakeRemainingSec - dt);
+      if (_shakeRemainingSec == 0.0) {
+        _screenShakeOffset = Offset.zero;
+        _shakeIntensity = 0.0;
+      } else {
+        _shakePhase += dt * 75.0;
+        final double decay = (_shakeRemainingSec / _shakeDurationSec).clamp(0.0, 1.0);
+        final double amp = _shakeIntensity * decay * decay;
+        _screenShakeOffset = Offset(sin(_shakePhase) * amp, cos(_shakePhase * 1.3) * amp * 0.65);
       }
-      if (_engine.isRunning) {
-        if (_hitStopRemainingMs > 0) {
-          _hitStopRemainingMs = max(0, _hitStopRemainingMs - baseIntervalMs);
-          _tickAccumulator = 0.0;
-        } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
-          // Cooldown timers continue counting down smoothly during skill execution!
-          _engine.skillTreeState.updateCooldowns((baseIntervalMs / 1000.0) * _engine.combatPacingSpeed);
-          // Other units pause attacking until it is their turn order
-          _tickAccumulator = 0.0;
-        } else {
-          _tickAccumulator += _engine.simulationSpeed;
-          while (_tickAccumulator >= 1.0) {
-            _tickAccumulator -= 1.0;
-            _engine.stepTick();
-            if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
-              _tickAccumulator = 0.0;
-              break;
-            }
+      needsVisualRepaint = true;
+    }
+
+    // Smooth continuous camera impact zoom curve
+    if (_cameraZoomRemainingSec > 0.0) {
+      _cameraZoomRemainingSec = max(0.0, _cameraZoomRemainingSec - dt);
+      if (_cameraZoomRemainingSec == 0.0) {
+        _battlefieldCameraZoom = 1.0;
+      } else {
+        final double t = 1.0 - (_cameraZoomRemainingSec / _cameraZoomDurationSec).clamp(0.0, 1.0);
+        // Quick punch in (first 20%), smooth ease-out return
+        final double envelope = t < 0.2 ? (t / 0.2) : (1.0 - ((t - 0.2) / 0.8));
+        _battlefieldCameraZoom = 1.0 + (_cameraZoomPeak - 1.0) * Curves.easeOut.transform(envelope.clamp(0.0, 1.0));
+      }
+      needsVisualRepaint = true;
+    }
+
+    // Keep active floating pops, ripples, and VFX animating smoothly at 60fps
+    if (_floatingPops.isNotEmpty) {
+      _floatingPops.removeWhere((p) => p.isExpired);
+      needsVisualRepaint = true;
+    }
+    if (_groundRipples.isNotEmpty) {
+      _groundRipples.removeWhere((r) => r.isExpired);
+      needsVisualRepaint = true;
+    }
+    if (_activeVfx.isNotEmpty) {
+      needsVisualRepaint = true;
+    }
+
+    bool engineNotifiedThisFrame = false;
+    if (_engine.isRunning) {
+      if (_hitStopRemainingMs > 0) {
+        _hitStopRemainingMs = max(0, _hitStopRemainingMs - (dt * 1000.0).round());
+        _tickAccumulator = 0.0;
+      } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+        _engine.skillTreeState.updateCooldowns(dt * _engine.combatPacingSpeed);
+        _tickAccumulator = 0.0;
+      } else {
+        _tickAccumulator += dt * SpatialCombatEngine.ticksPerSecond * _engine.simulationSpeed;
+        while (_tickAccumulator >= 1.0) {
+          _tickAccumulator -= 1.0;
+          _engine.stepTick();
+          engineNotifiedThisFrame = true;
+          if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+            _tickAccumulator = 0.0;
+            break;
           }
         }
-      } else if (hasVisibleTrajectory) {
-        setState(() {});
       }
-    });
+    }
+
+    if (needsVisualRepaint && !engineNotifiedThisFrame) {
+      _visualFrameTick.value++;
+    }
   }
 
   @override
   void dispose() {
     _forgeStrikeTimer?.cancel();
     _battlefieldFocusNode.dispose();
-    _loopTimer?.cancel();
+    _frameTicker?.dispose();
+    _visualFrameTick.dispose();
     for (final t in _animTimers) {
       t.cancel();
     }
@@ -1115,6 +1163,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
     _floatingPops.clear();
     _unitFloatingPops.clear();
     _damagedUnitIds.clear();
+    _isActionSequenceRunning = false;
+    _shakeRemainingSec = 0.0;
+    _shakeIntensity = 0.0;
+    _screenShakeOffset = Offset.zero;
+    _cameraZoomRemainingSec = 0.0;
+    _battlefieldCameraZoom = 1.0;
     _attackingUnitId = null;
     _damagedUnitId = null;
     _activeSkillName = null;
@@ -1428,21 +1482,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         child: Column(
           children: [
             // Top HUD: Status Banner, Focus Bar & Boss Telemetry (hidden in Zen mode)
-            if (!_isZenMode) _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
+            if (!_isZenMode)
+              RepaintBoundary(
+                child: _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
+              ),
 
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
             Expanded(
               flex: 5,
-              child: Transform.scale(
-                scale: _battlefieldCameraZoom,
-                child: Transform.translate(
-                  offset: _screenShakeOffset,
+              child: ValueListenableBuilder<int>(
+                valueListenable: _visualFrameTick,
+                builder: (context, _, child) => Transform.scale(
+                  scale: _battlefieldCameraZoom,
+                  child: Transform.translate(
+                    offset: _screenShakeOffset,
+                    child: child,
+                  ),
+                ),
+                child: RepaintBoundary(
                   child: Stack(
                   fit: StackFit.expand,
                   children: [
                   // Atmospheric Multi-Layer Parallax Battlefield Arena Backdrop
                   Positioned.fill(
-                    child: Stack(
+                    child: RepaintBoundary(
+                      child: Stack(
                       fit: StackFit.expand,
                       children: [
                         // Layer 1: Distant Sky & Atmosphere
@@ -1470,6 +1534,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                           errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                         ),
                       ],
+                    ),
                     ),
                   ),
 
@@ -2854,6 +2919,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                       context,
                       engine: _engine,
                       onStateChanged: () => setState(() {}),
+                      onUnlockAllUnits: _debugUnlockAllRetinueUnits,
                     );
                   },
                   child: Container(
@@ -3734,11 +3800,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // Attack & Threat Trajectory Overlay Layer (Translucent lines for inspected units & enemy telegraphs)
           if (trajectories.isNotEmpty)
             Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _AttackTrajectoryOverlayPainter(
-                    trajectories: trajectories,
-                    dashPhase: _dashPhase,
+              child: RepaintBoundary(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _visualFrameTick,
+                    builder: (context, _, __) => CustomPaint(
+                      painter: _AttackTrajectoryOverlayPainter(
+                        trajectories: trajectories,
+                        dashPhase: _dashPhase,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -3747,11 +3818,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // Ground Shockwave Ripple Painter Layer (Expanding concentric isometric shockwaves)
           if (_groundRipples.isNotEmpty)
             Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _GroundShockwaveRipplePainter(
-                    ripples: _groundRipples,
-                    currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
+              child: RepaintBoundary(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _visualFrameTick,
+                    builder: (context, _, __) => CustomPaint(
+                      painter: _GroundShockwaveRipplePainter(
+                        ripples: _groundRipples,
+                        currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -3760,11 +3836,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           // Dynamic Kinetic Combat VFX Overlay Layer (Slashes, Beams, Shockwaves)
           if (_activeVfx.isNotEmpty)
             Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _CombatVfxOverlayPainter(
-                    effects: _activeVfx,
-                    currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
+              child: RepaintBoundary(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _visualFrameTick,
+                    builder: (context, _, __) => CustomPaint(
+                      painter: _CombatVfxOverlayPainter(
+                        effects: _activeVfx,
+                        currentTimestampMs: DateTime.now().millisecondsSinceEpoch,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -6367,6 +6448,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Ghost Damage Trail (eases down smoothly from previous HP% so big hits read crisply)
+                AnimatedFractionallySizedBox(
+                  duration: const Duration(milliseconds: 340),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.centerLeft,
+                  widthFactor: hpRatio,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFECB3).withValues(alpha: 0.82),
+                      borderRadius: BorderRadius.circular(2.0),
+                    ),
+                  ),
+                ),
+
                 // Health Bar Gradient Fill
                 FractionallySizedBox(
                   alignment: Alignment.centerLeft,
@@ -6836,14 +6931,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
         ? (tileHeight * 2.9).clamp(160.0, 320.0)
         : (tileHeight * 1.62 * unitScaleMultiplier).clamp(58.0, 175.0));
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack,
-      transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
-      child: SizedBox(
-        width: isBoss ? bossSpanWidth : tileWidth,
-        height: isBoss ? modelHeight : tileHeight,
-        child: Stack(
+    return SizedBox(
+      width: isBoss ? bossSpanWidth : tileWidth,
+      height: isBoss ? modelHeight : tileHeight,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: Duration(milliseconds: (isAttacking && !isDamaged) ? 95 : 175),
+            curve: (isAttacking && !isDamaged) ? Curves.easeOutCubic : Curves.easeOut,
+            transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
+            child: SizedBox(
+              width: isBoss ? bossSpanWidth : tileWidth,
+              height: isBoss ? modelHeight : tileHeight,
+              child: Stack(
           alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
           children: [
@@ -7128,104 +7230,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
 
             // 3. Status Badges & Selected Unit Indicator (Positioned dynamically above the head of any model)
             // Overhead badges removed to keep hero art completely unobstructed
-            // 4. Floating Damage / Effect Pop Text (Live execution with graceful smooth ascent & gentle drift)
-            ..._floatingPops.where((p) => p.unitId == unit.id && !p.isExpired).map((pop) {
-              final t = pop.progress;
-              // Smooth decelerating cubic ascent: rises up to 56 pixels
-              final double smoothT = sin(t * 3.14159 / 2);
-              final double riseY = smoothT * 56.0;
-              // Gentle horizontal drift
-              final double driftX = pop.horizontalDrift * smoothT;
-              // Opacity curve: crisp 100% for first 65%, then clean fade
-              final double opacity = t < 0.65 ? 1.0 : (1.0 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
-              // Explosive scale punch on entry
-              final double scale = pop.isCrit
-                  ? (t < 0.12 ? 1.0 + (t / 0.12) * 0.45 : 1.45 - ((t - 0.12) * 0.35)).clamp(1.10, 1.45)
-                  : (t < 0.12 ? 0.90 + (t / 0.12) * 0.25 : 1.15 - ((t - 0.12) * 0.15)).clamp(1.0, 1.15);
-
-              return Positioned(
-                bottom: modelHeight + 38 + riseY,
-                left: driftX != 0 ? driftX : null,
-                child: Opacity(
-                  opacity: opacity,
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: pop.isCrit ? 9 : 6.5,
-                        vertical: pop.isCrit ? 3.5 : 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A0A10).withValues(alpha: 0.96),
-                        borderRadius: BorderRadius.circular(pop.isCrit ? 5 : 3.5),
-                        border: Border.all(
-                          color: pop.borderColor,
-                          width: pop.isCrit ? 2.0 : 1.2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.75 : 0.45),
-                            blurRadius: pop.isCrit ? 12 : 6,
-                            spreadRadius: pop.isCrit ? 2.0 : 0.5,
-                          ),
-                          const BoxShadow(
-                            color: Colors.black87,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        pop.text,
-                        style: TextStyle(
-                          color: pop.color,
-                          fontWeight: FontWeight.w900,
-                          fontSize: pop.fontSize,
-                          letterSpacing: pop.isCrit ? 0.9 : 0.4,
-                          fontFamily: 'monospace',
-                          shadows: [
-                            const Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
-                            if (pop.isCrit)
-                              Shadow(color: pop.borderColor, blurRadius: 8, offset: Offset.zero),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            if (!_floatingPops.any((p) => p.unitId == unit.id && !p.isExpired) && floatingPop != null)
-              Positioned(
-                bottom: modelHeight + 36,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.90),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: floatingPop.contains('ARMOR')
-                          ? const Color(0xFF00E5FF)
-                          : (floatingPop.contains('FOCUS') ? const Color(0xFFFFD54F) : const Color(0xFFFF5252)),
-                      width: 1.2,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black, blurRadius: 6),
-                    ],
-                  ),
-                  child: Text(
-                    floatingPop,
-                    style: TextStyle(
-                      color: floatingPop.contains('ARMOR')
-                          ? const Color(0xFF00E5FF)
-                          : (floatingPop.contains('FOCUS') ? const Color(0xFFFFD54F) : const Color(0xFFFF5252)),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
+            // (Floating damage/effect pops are rendered in the non-recoiling overlay sibling below.)
 
             // 4b. Tactical Spell Drag Hover: Phantom Damage & Effect Indicator Badge
             if (phantomEffect != null && floatingPop == null)
@@ -7530,6 +7535,124 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
           ],
         ),
       ),
+    ),
+          // 4. Non-recoiling Floating Damage / Effect Pop Text (60fps via _visualFrameTick)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _visualFrameTick,
+                  builder: (context, _, __) {
+                    final activePops = _floatingPops.where((p) => p.unitId == unit.id && !p.isExpired).toList();
+                    if (activePops.isEmpty && floatingPop == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Stack(
+                      alignment: Alignment.bottomCenter,
+                      clipBehavior: Clip.none,
+                      children: [
+                        ...activePops.map((pop) {
+                          final t = pop.progress;
+                          final double smoothT = sin(t * 3.14159 / 2);
+                          final double riseY = smoothT * 56.0;
+                          final double driftX = pop.horizontalDrift * smoothT;
+                          final double opacity = t < 0.65 ? 1.0 : (1.0 - ((t - 0.65) / 0.35)).clamp(0.0, 1.0);
+                          final double scale = pop.isCrit
+                              ? (t < 0.12 ? 1.0 + (t / 0.12) * 0.45 : 1.45 - ((t - 0.12) * 0.35)).clamp(1.10, 1.45)
+                              : (t < 0.12 ? 0.90 + (t / 0.12) * 0.25 : 1.15 - ((t - 0.12) * 0.15)).clamp(1.0, 1.15);
+
+                          return Positioned(
+                            bottom: modelHeight + 38 + riseY,
+                            left: driftX != 0 ? driftX : null,
+                            child: Opacity(
+                              opacity: opacity,
+                              child: Transform.scale(
+                                scale: scale,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: pop.isCrit ? 9 : 6.5,
+                                    vertical: pop.isCrit ? 3.5 : 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0A0A10).withValues(alpha: 0.96),
+                                    borderRadius: BorderRadius.circular(pop.isCrit ? 5 : 3.5),
+                                    border: Border.all(
+                                      color: pop.borderColor,
+                                      width: pop.isCrit ? 2.0 : 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: pop.borderColor.withValues(alpha: pop.isCrit ? 0.75 : 0.45),
+                                        blurRadius: pop.isCrit ? 12 : 6,
+                                        spreadRadius: pop.isCrit ? 2.0 : 0.5,
+                                      ),
+                                      const BoxShadow(
+                                        color: Colors.black87,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    pop.text,
+                                    style: TextStyle(
+                                      color: pop.color,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: pop.fontSize,
+                                      letterSpacing: pop.isCrit ? 0.9 : 0.4,
+                                      fontFamily: 'monospace',
+                                      shadows: [
+                                        const Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1)),
+                                        if (pop.isCrit)
+                                          Shadow(color: pop.borderColor, blurRadius: 8, offset: Offset.zero),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        if (activePops.isEmpty && floatingPop != null)
+                          Positioned(
+                            bottom: modelHeight + 36,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.90),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: floatingPop.contains('ARMOR')
+                                      ? const Color(0xFF00E5FF)
+                                      : (floatingPop.contains('FOCUS') ? const Color(0xFFFFD54F) : const Color(0xFFFF5252)),
+                                  width: 1.2,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black, blurRadius: 6),
+                                ],
+                              ),
+                              child: Text(
+                                floatingPop,
+                                style: TextStyle(
+                                  color: floatingPop.contains('ARMOR')
+                                      ? const Color(0xFF00E5FF)
+                                      : (floatingPop.contains('FOCUS') ? const Color(0xFFFFD54F) : const Color(0xFFFF5252)),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 10,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -7551,6 +7674,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
       case Archetype.occultist:
         return const Color(0xFF4527A0);
     }
+  }
+
+  void _debugUnlockAllRetinueUnits() {
+    final activeSpecies = _currentSquadUnits.map((u) => u.speciesId).toSet();
+    final reserveSpecies = _reserveUnits.map((u) => u.speciesId).toSet();
+    final List<UnitEntity> updatedSquad = List.from(_currentSquadUnits);
+    final List<UnitEntity> updatedReserves = List.from(_reserveUnits);
+    for (final unit in StarterBrigades.createReserveInventory()) {
+      if (!activeSpecies.contains(unit.speciesId) && !reserveSpecies.contains(unit.speciesId)) {
+        if (updatedSquad.length < 3) {
+          updatedSquad.add(unit);
+          activeSpecies.add(unit.speciesId);
+        } else {
+          updatedReserves.add(unit);
+          reserveSpecies.add(unit.speciesId);
+        }
+      }
+    }
+    _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
+    _engine.lastBannerMessage = '👥 DEV: ALL RETINUE UNITS UNLOCKED!';
+    setState(() {
+      _currentSquadUnits = updatedSquad;
+      _reserveUnits = updatedReserves;
+    });
+    widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
   }
 
   void _openRosterSwapSheet(CombatUnitState? targetUnit) {
@@ -8199,6 +8347,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> {
                         context,
                         engine: _engine,
                         onStateChanged: () => setState(() {}),
+                        onUnlockAllUnits: _debugUnlockAllRetinueUnits,
                       );
                     },
                     borderRadius: BorderRadius.circular(4),

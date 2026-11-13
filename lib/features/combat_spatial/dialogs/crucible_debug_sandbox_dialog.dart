@@ -5,17 +5,20 @@ import '../spatial_combat_engine.dart';
 class CrucibleDebugSandboxDialog extends StatefulWidget {
   final SpatialCombatEngine engine;
   final VoidCallback onStateChanged;
+  final VoidCallback? onUnlockAllUnits;
 
   const CrucibleDebugSandboxDialog({
     super.key,
     required this.engine,
     required this.onStateChanged,
+    this.onUnlockAllUnits,
   });
 
   static Future<void> show(
     BuildContext context, {
     required SpatialCombatEngine engine,
     required VoidCallback onStateChanged,
+    VoidCallback? onUnlockAllUnits,
   }) {
     return showDialog(
       context: context,
@@ -23,6 +26,7 @@ class CrucibleDebugSandboxDialog extends StatefulWidget {
       builder: (ctx) => CrucibleDebugSandboxDialog(
         engine: engine,
         onStateChanged: onStateChanged,
+        onUnlockAllUnits: onUnlockAllUnits,
       ),
     );
   }
@@ -199,6 +203,17 @@ class _CrucibleDebugSandboxDialogState extends State<CrucibleDebugSandboxDialog>
                           widget.onStateChanged();
                         },
                       ),
+                      if (widget.onUnlockAllUnits != null)
+                        _buildActionBtn(
+                          label: '👥 UNLOCK ALL RETINUE UNITS',
+                          color: const Color(0xFF40C4FF),
+                          icon: Icons.groups,
+                          onTap: () {
+                            widget.onUnlockAllUnits?.call();
+                            setState(() {});
+                            widget.onStateChanged();
+                          },
+                        ),
                     ],
                   ),
                   const SizedBox(height: 14),

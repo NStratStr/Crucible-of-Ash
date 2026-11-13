@@ -1095,9 +1095,7 @@ class StarterBrigades {
     if (chapter == 1) {
       switch (stageNumber) {
         // Stage 1-1: Ashen Outpost (Ashen Trail Desolation)
-        // FTUE 1v1 encounter for the solo Commander: Rotting Husk (Vanguard)
-        // A resilient frontline vessel whose life-spark you stabilize through battle,
-        // rescuing them to become the player's core tank/protector companion for any chosen Commander.
+        // Solo Commander opening skirmish: Captive Rotting Husk + Outpost Ash-Hound
         case 1:
           return [
             const UnitEntity(
@@ -1109,35 +1107,53 @@ class StarterBrigades {
               slot: FormationSlot.front1,
               level: 1,
               maxLevel: 10,
-              currentHp: 320,
-              maxHp: 320,
-              attack: 38,
-              defense: 32,
-              speed: 75,
+              currentHp: 780,
+              maxHp: 780,
+              attack: 85,
+              defense: 65,
+              speed: 95,
               nativeTraitId: 'iron_bastion',
               lineageAncestors: [],
               customAvatarAsset: 'assets/images/rotting_husk_g1.png',
             ),
+            const UnitEntity(
+              id: 's1_hound_01',
+              speciesId: 'feral_warhound',
+              name: 'Outpost Ash-Hound',
+              generation: 1,
+              archetype: Archetype.skirmisher,
+              slot: FormationSlot.front2,
+              level: 1,
+              maxLevel: 10,
+              currentHp: 420,
+              maxHp: 420,
+              attack: 75,
+              defense: 35,
+              speed: 110,
+              nativeTraitId: 'claw_slash',
+              lineageAncestors: [],
+              customAvatarAsset: 'assets/images/feral_warhound.png',
+            ),
           ];
 
         // Stage 1-2: Sunken Trench (Feral Pyrehound Pack)
-        // 2v2 or 1v2 intro encounter: 2x Young Ash Hounds
+        // 2v3 pack encounter for Sculptor + rescued Vanguard Husk
         case 2:
           return [
             const UnitEntity(
               id: 's2_hound_01',
               speciesId: 'feral_warhound',
-              name: 'Young Ash-Hound',
+              name: 'Alpha Trench Hound',
               generation: 1,
               archetype: Archetype.skirmisher,
               slot: FormationSlot.front1,
-              level: 1,
+              level: 2,
               maxLevel: 10,
-              currentHp: 240,
-              maxHp: 240,
-              attack: 45,
-              defense: 20,
-              speed: 95,
+              currentHp: 640,
+              maxHp: 640,
+              attack: 95,
+              defense: 45,
+              speed: 110,
               nativeTraitId: 'claw_slash',
               lineageAncestors: [],
               customAvatarAsset: 'assets/images/feral_warhound.png',
@@ -1151,11 +1167,29 @@ class StarterBrigades {
               slot: FormationSlot.front2,
               level: 1,
               maxLevel: 10,
-              currentHp: 220,
-              maxHp: 220,
-              attack: 40,
-              defense: 20,
-              speed: 90,
+              currentHp: 520,
+              maxHp: 520,
+              attack: 82,
+              defense: 35,
+              speed: 105,
+              nativeTraitId: 'claw_slash',
+              lineageAncestors: [],
+              customAvatarAsset: 'assets/images/feral_warhound.png',
+            ),
+            const UnitEntity(
+              id: 's2_hound_03',
+              speciesId: 'feral_warhound',
+              name: 'Rabid Ash-Prowler',
+              generation: 1,
+              archetype: Archetype.assassin,
+              slot: FormationSlot.back1,
+              level: 1,
+              maxLevel: 10,
+              currentHp: 440,
+              maxHp: 440,
+              attack: 90,
+              defense: 30,
+              speed: 118,
               nativeTraitId: 'claw_slash',
               lineageAncestors: [],
               customAvatarAsset: 'assets/images/feral_warhound.png',
