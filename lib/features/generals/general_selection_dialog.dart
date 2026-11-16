@@ -396,6 +396,76 @@ class _GeneralSelectionDialogState extends State<GeneralSelectionDialog> {
 
             const SizedBox(height: 10),
 
+            // Starting Discipline & Playstyle Preview
+            Builder(
+              builder: (context) {
+                final String disciplineLabel;
+                final String starterSkill;
+                final String playstyle;
+                switch (gen.type) {
+                  case GeneralType.vladislav:
+                    disciplineLabel = 'RESONANCE • BLOOD & LIFESTEAL';
+                    starterSkill = 'Starter [1]: Siphon Rend (0🔥 • +18 Cinders, Bleed & Heal)';
+                    playstyle = 'Aggressive sustain: drains enemy HP, stacks Bleed, and detonates Blood Marks.';
+                    break;
+                  case GeneralType.valeria:
+                    disciplineLabel = 'BASTION • IRON & SHIELD';
+                    starterSkill = 'Starter [1]: Cold Iron Slam (0🔥 • +18 Cinders, Stagger & Aegis)';
+                    playstyle = 'Unbreakable frontline: stacks Armor & Aegis Shields, stuns, and counters.';
+                    break;
+                  case GeneralType.malakor:
+                    disciplineLabel = 'VITAE • BLIGHT & SUSTAIN';
+                    starterSkill = 'Starter [1]: Mending Ash (0🔥 • +18 Cinders & Squad Heal)';
+                    playstyle = 'Alchemical support: heals the squad, turns overhealing into Shields, and spreads Blight.';
+                    break;
+                  case GeneralType.morrigan:
+                    disciplineLabel = 'WRATH • ASH & TEMPO';
+                    starterSkill = 'Starter [1]: Forge Cleave (0🔥 • +18 Cinders & Bleed Cleave)';
+                    playstyle = 'High-tempo striker: fast turn-meter cycling, heavy cleave, and crit acceleration.';
+                    break;
+                }
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: gen.themeColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: gen.themeColor.withValues(alpha: 0.45)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PLAYSTYLE: $disciplineLabel',
+                        style: TextStyle(
+                          color: gen.themeColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        playstyle,
+                        style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.3),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        starterSkill,
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 10),
+
             // Orders list
             const Text(
               'BATTLEFIELD ORDERS & PHYLACTERY MASTERY:',

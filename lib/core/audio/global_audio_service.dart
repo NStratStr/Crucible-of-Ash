@@ -85,13 +85,19 @@ class GlobalAudioService {
     if (_bgmPlayer == null) return;
 
     if (!settings.bgmEnabled) {
-      _bgmPlayer!.setVolume(0.0);
-      _bgmPlayer!.pause();
+      _bgmPlayer!.setVolume(0.0).catchError((_) {});
+      _bgmPlayer!.pause().catchError((_) {});
     } else {
       final targetVol = settings.bgmVolume * 0.45;
-      _bgmPlayer!.setVolume(targetVol);
+      _bgmPlayer!.setVolume(targetVol).catchError((_) {});
       if (_currentBgmAsset != null && _bgmPlayer!.state != PlayerState.playing) {
-        _bgmPlayer!.resume();
+        _bgmPlayer!.resume().catchError((_) {});
+      }
+    }
+    if (!settings.sfxEnabled) {
+      for (final p in _sfxPlayers) {
+        p.setVolume(0.0).catchError((_) {});
+        p.stop().catchError((_) {});
       }
     }
   }

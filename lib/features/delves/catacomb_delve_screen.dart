@@ -226,7 +226,7 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildSpoilPreviewItem('ICHOR', '+${room.rewardIchor}', const Color(0xFFE91E63)),
+                    _buildSpoilPreviewItem('GOLD', '+${room.rewardIchor}', const Color(0xFFE91E63)),
                     _buildSpoilPreviewItem('ORE', '+${room.rewardOre}', const Color(0xFFFF9800)),
                     _buildSpoilPreviewItem('SIGILS', '+${room.rewardSigils}', const Color(0xFFFFD54F)),
                     _buildSpoilPreviewItem(
@@ -580,7 +580,7 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildSpoilPreviewItem('ICHOR', '${_service.accumulatedIchor}', const Color(0xFFE91E63)),
+                        _buildSpoilPreviewItem('GOLD', '${_service.accumulatedIchor}', const Color(0xFFE91E63)),
                         _buildSpoilPreviewItem('ORE', '${_service.accumulatedOre}', const Color(0xFFFF9800)),
                         _buildSpoilPreviewItem('SIGILS', '${_service.accumulatedSigils}', const Color(0xFFFFD54F)),
                         _buildSpoilPreviewItem(
@@ -683,7 +683,7 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildExtractSummaryRow('Raw Ash & Ichor', '+${spoils['ichor']}', const Color(0xFFE91E63)),
+                    _buildExtractSummaryRow('Raw Ash & Gold', '+${spoils['ichor']}', const Color(0xFFE91E63)),
                     _buildExtractSummaryRow('Cursed Ore', '+${spoils['ore']}', const Color(0xFFFF9800)),
                     _buildExtractSummaryRow('Bloodline Sigils', '+${spoils['sigils']}', const Color(0xFFFFD54F)),
                     _buildExtractSummaryRow('Petrified Plinth Shards', '+${spoils['plinths']}', const Color(0xFF00E5FF)),

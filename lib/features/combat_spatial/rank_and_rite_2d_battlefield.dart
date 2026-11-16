@@ -101,6 +101,10 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   clashWidth: (tileWidth * 0.38).clamp(32.0, 68.0),
                   selectedEnemyUnitId: selectedEnemyUnitId,
                   selectedUnitId: selectedUnitId,
+                  draggedUnitId: draggedUnitId,
+                  hoveredTileCol: hoveredTileCol,
+                  hoveredTileRow: hoveredTileRow,
+                  isHoveredPlayerSide: isHoveredPlayerSide,
                 ),
               ),
             ),
@@ -975,6 +979,10 @@ class _2DTacticalIntentVectorPainter extends CustomPainter {
   final double clashWidth;
   final String? selectedEnemyUnitId;
   final String? selectedUnitId;
+  final String? draggedUnitId;
+  final int? hoveredTileCol;
+  final int? hoveredTileRow;
+  final bool? isHoveredPlayerSide;
 
   const _2DTacticalIntentVectorPainter({
     required this.engine,
@@ -983,6 +991,10 @@ class _2DTacticalIntentVectorPainter extends CustomPainter {
     required this.clashWidth,
     this.selectedEnemyUnitId,
     this.selectedUnitId,
+    this.draggedUnitId,
+    this.hoveredTileCol,
+    this.hoveredTileRow,
+    this.isHoveredPlayerSide,
   });
 
   Offset _getGridNodeCenter(int col, int row, bool isPlayer) {
@@ -1114,21 +1126,26 @@ class _2DTacticalIntentVectorPainter extends CustomPainter {
       }
     }
 
-    // 3. Inspected Player Companion Intent Vector (When player taps an ally)
-    if (selectedUnitId != null) {
-      final ally = engine.playerUnits.where((u) => u.id == selectedUnitId && u.isAlive).firstOrNull;
-      if (ally != null && ally.occupiedNodes.isNotEmpty) {
-        final targetEnemy = engine.resolveProjectedTarget(ally);
-        if (targetEnemy != null && targetEnemy.occupiedNodes.isNotEmpty) {
-          final from = _getGridNodeCenter(ally.occupiedNodes.first.column, ally.occupiedNodes.first.row, true);
-          final to = _getGridNodeCenter(targetEnemy.occupiedNodes.first.column, targetEnemy.occupiedNodes.first.row, false);
-          _drawVector(
-            canvas,
-            from: from,
-            to: to,
-            color: const Color(0xFF00E5FF),
-            label: 'ENGAGING ${targetEnemy.name.toUpperCase()}',
-          );
+    // 3. Active Drag/Move Companion Intent Vector (Only shown while actively dragging/moving a unit)
+    if (draggedUnitId != null) {
+      final ally = engine.playerUnits.where((u) => u.id == draggedUnitId && u.isAlive).firstOrNull;
+      if (ally != null) {
+        final bool hasHoverDest = (isHoveredPlayerSide ?? false) && hoveredTileCol != null && hoveredTileRow != null;
+        if (hasHoverDest || ally.occupiedNodes.isNotEmpty) {
+          final int srcCol = hasHoverDest ? hoveredTileCol! : ally.occupiedNodes.first.column;
+          final int srcRow = hasHoverDest ? hoveredTileRow! : ally.occupiedNodes.first.row;
+          final targetEnemy = engine.resolveProjectedTarget(ally, simulatedCol: srcCol);
+          if (targetEnemy != null && targetEnemy.occupiedNodes.isNotEmpty) {
+            final from = _getGridNodeCenter(srcCol, srcRow, true);
+            final to = _getGridNodeCenter(targetEnemy.occupiedNodes.first.column, targetEnemy.occupiedNodes.first.row, false);
+            _drawVector(
+              canvas,
+              from: from,
+              to: to,
+              color: const Color(0xFF00E5FF),
+              label: 'ENGAGING ${targetEnemy.name.toUpperCase()}',
+            );
+          }
         }
       }
     }

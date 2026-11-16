@@ -31,7 +31,28 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedSkillId = 'ash_cleave';
+    final state = widget.engine.skillTreeState;
+    final unlocked = state.allSkills.values.where((s) => s.isUnlocked).toList();
+    final visibleBranches = state.visibleBranchesForActiveClass;
+    if (state.availableSkillPoints > 0 && unlocked.length <= 1 && unlocked.isNotEmpty) {
+      _selectedBranch = visibleBranches.contains(unlocked.first.branch)
+          ? unlocked.first.branch
+          : visibleBranches.first;
+      final branchSkills = state.getSkillsForBranch(_selectedBranch);
+      final nextUnlockable = branchSkills.where((s) => !s.isUnlocked && state.canUpgradeSkill(s.id)).firstOrNull;
+      _selectedSkillId = nextUnlockable?.id ?? unlocked.first.id;
+    } else {
+      if (!visibleBranches.contains(_selectedBranch) && visibleBranches.isNotEmpty) {
+        _selectedBranch = visibleBranches.first;
+      }
+      final branchSkills = state.getSkillsForBranch(_selectedBranch);
+      _selectedSkillId = unlocked.isNotEmpty ? unlocked.first.id : (branchSkills.firstOrNull?.id ?? 'ash_cleave');
+    }
+  }
+
+  bool _isFirstSkillTutorial(CrucibleSkillTreeState state) {
+    return state.availableSkillPoints > 0 &&
+        state.allSkills.values.where((s) => s.isUnlocked).length <= 1;
   }
 
   Color _getBranchColor(CrucibleSkillBranch b) {
@@ -118,6 +139,34 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
             // 5 Equipped Slots Bar
             _buildEquippedSlotsRow(state),
 
+            if (_isFirstSkillTutorial(state))
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10241C),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF69F0AE), width: 1.2),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.auto_fix_high, color: Color(0xFF69F0AE), size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'TUTORIAL: Select a glowing skill below and click [UPGRADE (1 SP)] on the right to unlock & equip your 2nd Skill Slot!',
+                        style: TextStyle(
+                          color: Color(0xFF69F0AE),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // 3-Branch Archetype Tabs + Crown Apex
             _buildBranchTabs(state),
 
@@ -158,20 +207,40 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.account_tree, color: _getBranchColor(_selectedBranch), size: 20),
+          Icon(Icons.account_tree, color: _getBranchColor(_selectedBranch), size: 18),
           const SizedBox(width: 8),
-          const Text(
-            'CRUCIBLE ARCHETYPE SKILL GRIMOIRE',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFFFD54F),
-              letterSpacing: 1.2,
+          const Flexible(
+            child: Text(
+              'CRUCIBLE ARCHETYPE SKILL GRIMOIRE',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFFD54F),
+                letterSpacing: 1.0,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A222D),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.45), width: 1),
+            ),
+            child: Text(
+              'LV.${state.sculptorLevel} (${state.sculptorXp}/${state.xpToNextLevel} XP) • CASTLE T${state.castleCrucibleTier}',
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.cyanAccent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: const Color(0xFF263238),
               borderRadius: BorderRadius.circular(4),
@@ -180,12 +249,12 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.stars, color: Color(0xFFFFD54F), size: 14),
-                const SizedBox(width: 5),
+                const Icon(Icons.stars, color: Color(0xFFFFD54F), size: 13),
+                const SizedBox(width: 4),
                 Text(
-                  'SKILL POINTS: ${state.availableSkillPoints}',
+                  'SP: ${state.availableSkillPoints}',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFFFFD54F),
                   ),
@@ -193,12 +262,12 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF37474F),
               foregroundColor: const Color(0xFFFFD54F),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
@@ -208,7 +277,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
             ),
             icon: const Icon(Icons.restart_alt, size: 13, color: Color(0xFFFFD54F)),
             label: const Text(
-              'RESPEC (RESET)',
+              'RESPEC',
               style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
             ),
             onPressed: () {
@@ -371,7 +440,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         physics: const BouncingScrollPhysics(),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: CrucibleSkillBranch.values.map((branch) {
+          children: state.visibleBranchesForActiveClass.map((branch) {
             final isSelected = branch == _selectedBranch;
             final color = _getBranchColor(branch);
             final pointsSpent = state.getPointsSpentInBranch(branch);
@@ -534,22 +603,29 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           final isEquipped = state.equippedSkillIds.contains(skill.id);
           final slotNumber = state.equippedSkillIds.indexOf(skill.id) + 1;
           final isPrereqMet = state.isSkillPrerequisiteMet(skill.id);
+          final isTutorialTarget = _isFirstSkillTutorial(state) && !skill.isUnlocked && state.canUpgradeSkill(skill.id);
 
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: isSelected
                   ? skill.primaryColor.withValues(alpha: 0.20)
-                  : (isPrereqMet ? const Color(0xFF181B26) : const Color(0xFF11131A)),
+                  : (isTutorialTarget
+                      ? const Color(0xFF13261E)
+                      : (isPrereqMet ? const Color(0xFF181B26) : const Color(0xFF11131A))),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: isSelected
                     ? const Color(0xFFFFD54F)
-                    : (isEquipped ? skill.borderColor : (isPrereqMet ? Colors.white12 : Colors.white10)),
-                width: isSelected ? 1.5 : 1.0,
+                    : (isTutorialTarget
+                        ? const Color(0xFF69F0AE)
+                        : (isEquipped ? skill.borderColor : (isPrereqMet ? Colors.white12 : Colors.white10))),
+                width: (isSelected || isTutorialTarget) ? 1.6 : 1.0,
               ),
             ),
-            child: ListTile(
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               onTap: () {
                 setState(() {
@@ -627,8 +703,14 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                       borderRadius: BorderRadius.circular(3),
                     ),
                     child: Text(
-                      '${skill.cinderCost}🔥 • ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s CD',
-                      style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
+                      skill.isPassive
+                          ? 'PASSIVE • ALWAYS ACTIVE'
+                          : '${skill.cinderCost}🔥 • ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s CD',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        color: skill.isPassive ? const Color(0xFFCE93D8) : const Color(0xFFFFD54F),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -654,6 +736,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+              ),
               ),
             ),
           );
@@ -794,7 +877,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
                     ),
                     Text(
-                      'Cost: ${skill.cinderCost}🔥 • CD: ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s • Branch: ${_getBranchTitle(skill.branch)}',
+                      skill.isPassive
+                          ? 'PASSIVE UPGRADE • Max Rank ${skill.maxRank} • Branch: ${_getBranchTitle(skill.branch)}'
+                          : 'Cost: ${skill.cinderCost}🔥 • CD: ${skill.effectiveCooldownSeconds.toStringAsFixed(1)}s • Branch: ${_getBranchTitle(skill.branch)}',
                       style: TextStyle(fontSize: 9.0, color: skill.borderColor, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -914,9 +999,11 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                     child: Text(
                       !state.isSkillPrerequisiteMet(skill.id)
                           ? '🔒 LOCKED (PREREQUISITES NOT MET)'
-                          : (skill.canUpgrade
-                              ? 'UPGRADE (1 SP) [Rank ${skill.rank + 1}]'
-                              : 'MAX RANK REACHED'),
+                          : (!skill.isUnlocked
+                              ? 'UNLOCK SKILL (1 SP)'
+                              : (skill.canUpgrade
+                                  ? 'UPGRADE (1 SP) [Rank ${skill.rank + 1}]'
+                                  : 'MAX RANK REACHED')),
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ),
@@ -928,53 +1015,113 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           const SizedBox(height: 8),
 
           // Equip to Slots 1..5
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF181B26),
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  isEquipped ? 'EQUIPPED IN SLOT $currentSlot' : 'EQUIP TO SLOT:',
-                  style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Colors.white70),
+          Builder(
+            builder: (context) {
+              final nextEmptySlot = state.equippedSkillIds.indexWhere((id) => id.isEmpty);
+              final bool promptEquip = skill.isUnlocked && !isEquipped && nextEmptySlot != -1;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: promptEquip ? const Color(0xFF10241C) : const Color(0xFF181B26),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: promptEquip ? const Color(0xFF69F0AE) : Colors.white12,
+                    width: promptEquip ? 1.4 : 1.0,
+                  ),
                 ),
-                const Spacer(),
-                Wrap(
-                  spacing: 4,
-                  children: List.generate(5, (slotIdx) {
-                    final isThisSlot = isEquipped && (currentSlot - 1) == slotIdx;
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          state.equipSkill(slotIdx, skill.id);
-                        });
-                      },
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: isThisSlot ? const Color(0xFFFFD54F) : const Color(0xFF263238),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: isThisSlot ? Colors.black : Colors.white24),
-                        ),
-                        alignment: Alignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (promptEquip)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
                         child: Text(
-                          '${slotIdx + 1}',
-                          style: TextStyle(
-                            fontSize: 10,
+                          'STEP 2: Tap Slot [${nextEmptySlot + 1}] to load ${skill.name} onto your Active Tray!',
+                          style: const TextStyle(
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w900,
-                            color: isThisSlot ? Colors.black : Colors.white,
+                            color: Color(0xFF69F0AE),
                           ),
                         ),
                       ),
-                    );
-                  }),
+                    if (skill.isPassive)
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome, color: Color(0xFFCE93D8), size: 13),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'PASSIVE UPGRADE • ALWAYS ACTIVE (NO BAR SLOT NEEDED)',
+                              style: TextStyle(
+                                fontSize: 9.0,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFCE93D8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          Text(
+                            !skill.isUnlocked
+                                ? 'UNLOCK SKILL FIRST'
+                                : (isEquipped ? 'EQUIPPED IN SLOT $currentSlot' : 'LOAD INTO BAR SLOT:'),
+                            style: TextStyle(
+                              fontSize: 9.0,
+                              fontWeight: FontWeight.bold,
+                              color: promptEquip ? const Color(0xFF69F0AE) : Colors.white70,
+                            ),
+                          ),
+                          const Spacer(),
+                          Wrap(
+                            spacing: 4,
+                            children: List.generate(5, (slotIdx) {
+                              final isThisSlot = isEquipped && (currentSlot - 1) == slotIdx;
+                              final isSuggestedSlot = promptEquip && slotIdx == nextEmptySlot;
+                              return InkWell(
+                                onTap: skill.isUnlocked
+                                    ? () {
+                                        setState(() {
+                                          state.equipSkill(slotIdx, skill.id);
+                                        });
+                                      }
+                                    : null,
+                                child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: isThisSlot
+                                      ? const Color(0xFFFFD54F)
+                                      : (isSuggestedSlot ? const Color(0xFF00E676) : const Color(0xFF263238)),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: (isThisSlot || isSuggestedSlot) ? Colors.black : Colors.white24,
+                                    width: isSuggestedSlot ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${slotIdx + 1}',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: (isThisSlot || isSuggestedSlot)
+                                        ? Colors.black
+                                        : (skill.isUnlocked ? Colors.white : Colors.white30),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),

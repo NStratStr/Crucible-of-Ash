@@ -47,7 +47,10 @@ class SpatialBattleScreen extends StatefulWidget {
   final RelicService? relicService;
   final GeneralCommandService? commandService;
   final PlinthService? plinthService;
+  final CrucibleSkillTreeState? skillTreeState;
   final VoidCallback? onOpenPlinthSculptory;
+  final int maxDeployableUnits;
+  final int spindleTier;
 
   const SpatialBattleScreen({
     super.key,
@@ -65,7 +68,10 @@ class SpatialBattleScreen extends StatefulWidget {
     this.relicService,
     this.commandService,
     this.plinthService,
+    this.skillTreeState,
     this.onOpenPlinthSculptory,
+    this.maxDeployableUnits = 2,
+    this.spindleTier = 1,
   });
 
   @override
@@ -75,6 +81,33 @@ class SpatialBattleScreen extends StatefulWidget {
 class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerProviderStateMixin {
   Set<String> _computeProjectedSecondaryTargetEnemyIds() {
     final Set<String> secondaryIds = {};
+    final hovered = _hoveredSkillNode;
+    if (hovered != null) {
+      if (hovered.branch == CrucibleSkillBranch.bastion ||
+          hovered.branch == CrucibleSkillBranch.vitae) {
+        return secondaryIds;
+      }
+      final act = hovered.actionType.toLowerCase();
+      final bool isFullAoeSkill = hovered.branch == CrucibleSkillBranch.calamity ||
+          act.contains('barrage') ||
+          act.contains('whirlwind') ||
+          act.contains('pyre') ||
+          act.contains('nova') ||
+          act.contains('vortex') ||
+          act.contains('wrath') ||
+          act.contains('cataclysm') ||
+          act.contains('exsanguination') ||
+          act.contains('spore');
+      if (isFullAoeSkill) {
+        for (final enemy in _engine.enemyUnits.where((e) => e.isAlive)) {
+          if (enemy.id != _selectedEnemyUnitId) {
+            secondaryIds.add(enemy.id);
+          }
+        }
+        return secondaryIds;
+      }
+    }
+
     final actingAlly = _engine.activeActingUnit ??
         (_selectedUnitId != null ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull : null) ??
         _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
@@ -202,6 +235,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   final ValueNotifier<int> _visualFrameTick = ValueNotifier<int>(0);
   String? _selectedUnitId;
   String? _selectedEnemyUnitId;
+  String? _hoveredEnemyUnitId;
   String? _draggedUnitId;
   String? _selectedCardId;
   String? _hoveredCardId;
@@ -223,6 +257,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   final List<SpatialActionEvent> _actionEventQueue = [];
   bool _isActionSequenceRunning = false;
   String? _attackingUnitId;
+  int? _activeFireBarrageMs;
+  CrucibleSkillNode? _hoveredSkillNode;
   String? _activeSynergyBannerText;
   Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
   String? _damagedUnitId;
@@ -315,6 +351,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     SpriteSheetAnimation.precache('assets/animations/blood_scribe_idle_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
+    SpriteSheetAnimation.precache('assets/images/Spells/meteor storm.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -332,6 +369,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       relicService: widget.relicService,
       commandService: widget.commandService,
       plinthService: widget.plinthService,
+      skillTreeState: widget.skillTreeState,
+      maxDeployableUnits: widget.maxDeployableUnits,
+      spindleTier: widget.spindleTier,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -345,7 +385,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         AudioCache.instance.prefix = '';
       }
       final settings = SettingsService();
-      _isMuted = !settings.bgmEnabled;
+      _isMuted = !settings.bgmEnabled && !settings.sfxEnabled;
       _bgmPlayer = AudioPlayer();
       _sfxPlayers.clear();
       for (int i = 0; i < _maxSfxPlayers; i++) {
@@ -398,11 +438,22 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     settings.setBgmEnabled(!newMuted);
     settings.setSfxEnabled(!newMuted);
     if (newMuted) {
-      _bgmPlayer?.pause();
-      _bgmPlayer?.setVolume(0.0);
+      _bgmPlayer?.setVolume(0.0).catchError((_) {});
+      _bgmPlayer?.pause().catchError((_) {});
+      for (final p in _sfxPlayers) {
+        p.setVolume(0.0).catchError((_) {});
+        p.stop().catchError((_) {});
+      }
     } else {
-      _bgmPlayer?.setVolume(settings.bgmVolume * 0.45);
-      _bgmPlayer?.resume();
+      _bgmPlayer?.setVolume(settings.bgmVolume * 0.45).catchError((_) {});
+      if (_bgmPlayer?.state == PlayerState.paused) {
+        _bgmPlayer?.resume().catchError((_) {});
+      } else if (_bgmPlayer?.state != PlayerState.playing) {
+        _bgmPlayer?.play(AssetSource('audio/combat_bgm_ambient.mp3')).catchError((_) {});
+      }
+      for (final p in _sfxPlayers) {
+        p.setVolume(settings.sfxVolume * 0.70).catchError((_) {});
+      }
     }
   }
 
@@ -586,85 +637,118 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       String vfxType = 'slash';
       Color primaryColor = const Color(0xFFFF5252);
       Color secondaryColor = const Color(0xFFFF8A80);
-      int durationMs = 1100;
+      int durationMs = 560;
 
       if (event.isAssistStrike) {
         vfxType = 'slash';
         primaryColor = const Color(0xFFFFD54F);
         secondaryColor = const Color(0xFF00E5FF);
-        durationMs = 1450;
+        durationMs = 620;
         _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
       } else if (event.isWallSplat) {
-        vfxType = 'shatter';
+        vfxType = 'heavy_slam';
         primaryColor = const Color(0xFFFF9100);
         secondaryColor = const Color(0xFFFF1744);
-        durationMs = 1200;
+        durationMs = 680;
         _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
       } else if (event.isUnitCollision) {
-        vfxType = 'shockwave';
+        vfxType = 'heavy_slam';
         primaryColor = const Color(0xFFFF5252);
         secondaryColor = const Color(0xFFFFD54F);
-        durationMs = 1100;
+        durationMs = 620;
         _playSfx('Heavy Body Crunch 02.wav');
+      } else if (event.skillName.contains('Cold Iron Slam') || event.skillName.contains('Sundering') || event.skillName.contains('Bulwark') || event.skillName.contains('Bastion')) {
+        vfxType = 'heavy_slam';
+        primaryColor = event.skillName.contains('Sundering Brand') ? const Color(0xFFFF6D00) : const Color(0xFF00E5FF);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 650;
+        _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
+      } else if (event.skillName.contains('Fire Barrage')) {
+        vfxType = 'heavy_slam';
+        primaryColor = const Color(0xFFFF6D00);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 700;
+        _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
+        _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
+        _activeFireBarrageMs = impactNowMs;
+        Timer(const Duration(milliseconds: 1550), () {
+          if (mounted && _activeFireBarrageMs == impactNowMs) {
+            setState(() {
+              _activeFireBarrageMs = null;
+            });
+          }
+        });
+      } else if (event.skillName.contains('Forge Cleave') || event.skillName.contains('Whirlwind') || event.skillName.contains('Pyre')) {
+        vfxType = 'slash';
+        primaryColor = const Color(0xFFFF5722);
+        secondaryColor = const Color(0xFFFFD54F);
+        durationMs = 580;
+        _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
       } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
         vfxType = 'bloodnova';
         primaryColor = const Color(0xFFFF1744);
         secondaryColor = const Color(0xFFD50000);
-        durationMs = 1450;
+        durationMs = 700;
         _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
       } else if (event.skillName.contains('Sovereign Cleave') || event.skillName.contains('Vanguard Cleave')) {
         vfxType = 'slash';
         primaryColor = const Color(0xFFFFD54F);
         secondaryColor = const Color(0xFFFF1744);
-        durationMs = 1300;
+        durationMs = 600;
         _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
       } else if (event.skillName.contains('Deadeye Execution') || event.skillName.contains('Siege-Breaker') || event.skillName.contains('Phantom Riposte')) {
         vfxType = 'slash';
         primaryColor = const Color(0xFF00E5FF);
         secondaryColor = const Color(0xFFFF1744);
-        durationMs = 1200;
+        durationMs = 560;
         _playSfx('SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav');
       } else if (event.skillName.contains('Celestial Surge')) {
         vfxType = 'shockwave';
         primaryColor = const Color(0xFF00E5FF);
         secondaryColor = const Color(0xFFFFD54F);
-        durationMs = 1350;
+        durationMs = 680;
         _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
-      } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
+      } else if (event.skillName.contains('Siphon Rend') || event.skillName.contains('Crimson Brand') || event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Flensing') || event.bleedStacks > 0) {
         vfxType = 'bloodsiphon';
-        primaryColor = const Color(0xFFFF5252);
+        primaryColor = const Color(0xFFFF1744);
         secondaryColor = const Color(0xFF880E4F);
-        durationMs = 1200;
+        durationMs = 640;
         _playSfx('GORESplt_Gore Splatter 01_JSE_GMP.wav');
+      } else if (event.skillName.contains('Corrosive') || event.skillName.contains('Miasmic')) {
+        vfxType = 'shockwave';
+        primaryColor = const Color(0xFF69F0AE);
+        secondaryColor = const Color(0xFFAB47BC);
+        durationMs = 620;
+        _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
       } else if (event.skillName.contains('Smite') || event.skillName.contains('SHATTERS')) {
-        vfxType = 'shatter';
+        vfxType = 'heavy_slam';
         primaryColor = const Color(0xFFFFD54F);
         secondaryColor = const Color(0xFF00E5FF);
-        durationMs = 1350;
+        durationMs = 650;
         _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
       } else if (event.skillName.contains('Arrow') || event.skillName.contains('Shot') || event.skillName.contains('Archer') || event.skillName.contains('Arbalest') || (caster != null && caster.name.contains('Arbalest'))) {
         vfxType = 'arrow';
         primaryColor = const Color(0xFFFFD54F);
         secondaryColor = const Color(0xFFFF8A80);
-        durationMs = 950;
+        durationMs = 480;
         _playSfx('Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav');
       } else if (event.skillName.contains('Sun') || event.skillName.contains('Orb') || event.skillName.contains('Cinder') || event.skillName.contains('Bolt') || (caster != null && caster.archetype == UnitArchetype.backlineCaster)) {
         vfxType = 'firebolt';
         primaryColor = event.isPlayerAttacker ? const Color(0xFFFF9100) : const Color(0xFFFF3D00);
         secondaryColor = const Color(0xFFFFD54F);
-        durationMs = 1100;
+        durationMs = 540;
         _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
       } else if (event.isHeal || event.skillName.contains('Phalanx')) {
-        vfxType = 'shockwave';
-        primaryColor = const Color(0xFF00E5FF);
-        secondaryColor = const Color(0xFF80D8FF);
-        durationMs = 1200;
+        vfxType = 'heal_pulse';
+        primaryColor = const Color(0xFF69F0AE);
+        secondaryColor = const Color(0xFF00E5FF);
+        durationMs = 650;
         _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
       } else if (event.isCrit) {
         vfxType = 'slash';
         primaryColor = const Color(0xFFFF1744);
         secondaryColor = const Color(0xFFFFD54F);
-        durationMs = 1300;
+        durationMs = 620;
         _playSfx('GOREBone_Bone Breaks Celery 01_JSE_GMP.wav');
       } else {
         _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
@@ -784,7 +868,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final bool isBossStrike = event.attackerId == 'gorgoroth_boss';
       final bool isSculptorStrike = event.attackerId == 'ash_sculptor' || event.skillName.contains('Cinder') || event.skillName.contains('Sundering') || event.skillName.contains('Bastion') || event.skillName.contains('Pyre') || event.skillName.contains('Cataclysmic');
       final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
-      final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
+      final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || hasNamedSkill || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
 
       // Motion Comfort: Normal attacks and minion swings NEVER shake or zoom the camera.
       // Only monumental Apex Pyre / Forge Strike finishers trigger a controlled micro-bump.
@@ -832,17 +916,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         double popSize = 11.5;
         bool isCrit = event.isCrit || (target?.isStaggered == true);
 
-        if (event.isHeal) {
+        final bool isEnemyTargetWithLifesteal = event.isHeal &&
+            event.healAmount == 0 &&
+            event.damage > 0 &&
+            target != null &&
+            caster != null &&
+            target.isPlayer != caster.isPlayer;
+
+        if (event.isHeal && !isEnemyTargetWithLifesteal) {
           if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
             popText = '+60 🛡️ AEGIS';
             popColor = const Color(0xFF80D8FF);
             popBorder = const Color(0xFF00E5FF);
           } else if (event.skillName == 'Stoke the Embers') {
-            popText = '+2 ⚡ FOCUS';
+            popText = '+15 🔥 CINDERS';
             popColor = const Color(0xFFFFD54F);
             popBorder = const Color(0xFFFFC107);
           } else {
-            popText = '+${event.damage > 0 ? event.damage : "HEAL"} 💚';
+            final int shownHeal = event.healAmount > 0 ? event.healAmount : event.damage;
+            popText = '+${shownHeal > 0 ? shownHeal : "HEAL"} 💚';
             popColor = const Color(0xFF69F0AE);
             popBorder = const Color(0xFF00E676);
           }
@@ -852,8 +944,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             popColor = const Color(0xFFFF1744);
             popBorder = const Color(0xFF880E4F);
             popSize = 13.5;
-          } else if (event.skillName.contains('Sanguine Siphon')) {
-            popText = '🩸 -${event.damage} DRAIN';
+          } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Siphon Rend')) {
+            popText = '🩸 -${event.damage}';
             popColor = const Color(0xFFFF5252);
             popBorder = const Color(0xFFB71C1C);
             popSize = 12.5;
@@ -893,6 +985,39 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           horizontalDrift: drift,
         ));
 
+        // Spawn a separate green heal pop & rising pulse over the actual healed unit!
+        final int effectiveHeal = event.healAmount > 0
+            ? event.healAmount
+            : (isEnemyTargetWithLifesteal ? (event.damage * 0.4).round() : 0);
+        if (effectiveHeal > 0) {
+          final String healedUnitId = event.healTargetId ?? event.attackerId;
+          final healedUnit = allUnits.where((u) => u.id == healedUnitId).firstOrNull;
+          if (healedUnit != null) {
+            _activeVfx.add(_CombatVfx(
+              id: 'heal_${event.id}_$impactNowMs',
+              startOffset: _getUnitCenterIsometricOffset(healedUnit),
+              targetOffset: _getUnitCenterIsometricOffset(healedUnit),
+              primaryColor: const Color(0xFF69F0AE),
+              secondaryColor: const Color(0xFFFFD54F),
+              type: 'heal_pulse',
+              durationMs: 650,
+              createdMs: impactNowMs,
+            ));
+          }
+          _floatingPops.add(_FloatingCombatText(
+            id: 'pop_heal_${event.id}_$impactNowMs',
+            unitId: healedUnitId,
+            text: '+$effectiveHeal 💚',
+            color: const Color(0xFF69F0AE),
+            borderColor: const Color(0xFF00E676),
+            fontSize: 12.0,
+            isCrit: false,
+            createdMs: impactNowMs,
+            durationMs: 1750,
+            horizontalDrift: -10.0,
+          ));
+        }
+
         // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
         if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
           final graftText = '🧬 ${event.graftedTraitProc ?? ''}';
@@ -913,12 +1038,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
         // Push floating popups for all secondary targets hit by multi-target / AOE spells
         if (event.secondaryTargetHits.isNotEmpty) {
-          int secIndex = 0;
           event.secondaryTargetHits.forEach((secId, secDmg) {
             final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
-            final secText = isSecBlood ? '🩸 - SPLASH' : '- CLEAVE';
+            final secText = secDmg > 0
+                ? (isSecBlood ? '🩸 -$secDmg' : '-$secDmg')
+                : (isSecBlood ? '🩸 - SPLASH' : '- CLEAVE');
             _unitFloatingPops[secId] = secText;
-            secIndex++;
+            final int existingSecCount = _floatingPops.where((p) => p.unitId == secId && !p.isExpired).length;
+            final double secDrift = (existingSecCount % 2 == 1 ? -1.0 : 1.0) * (10.0 + existingSecCount * 9.0);
             _floatingPops.add(_FloatingCombatText(
               id: 'pop_${event.id}_${secId}_$impactNowMs',
               unitId: secId,
@@ -929,7 +1056,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               isCrit: false,
               createdMs: impactNowMs,
               durationMs: 1800,
-              horizontalDrift: (secIndex % 2 == 0 ? 10.0 : -10.0),
+              horizontalDrift: secDrift,
             ));
           });
         }
@@ -1042,90 +1169,94 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
   void _onFrameTick(Duration elapsed) {
     if (!mounted) return;
-    final double rawDt = _lastFrameElapsed == Duration.zero
-        ? (1.0 / 60.0)
-        : (elapsed - _lastFrameElapsed).inMicroseconds / 1000000.0;
-    _lastFrameElapsed = elapsed;
-    final double dt = rawDt.clamp(0.0, 0.05);
+    try {
+      final double rawDt = _lastFrameElapsed == Duration.zero
+          ? (1.0 / 60.0)
+          : (elapsed - _lastFrameElapsed).inMicroseconds / 1000000.0;
+      _lastFrameElapsed = elapsed;
+      final double dt = rawDt.clamp(0.0, 0.05);
 
-    bool needsVisualRepaint = false;
+      bool needsVisualRepaint = false;
 
-    final hasVisibleTrajectory = _selectedUnitId != null ||
-        _draggedUnitId != null ||
-        _selectedEnemyUnitId != null ||
-        _showAllTrajectories ||
-        _engine.enemyUnits.any((e) => e.isAlive && e.pendingIntent != null);
-    if (hasVisibleTrajectory) {
-      _dashPhase = (_dashPhase + dt * 0.85) % 1.0;
-      needsVisualRepaint = true;
-    }
-
-    // Smooth continuous damped screen shake
-    if (_shakeRemainingSec > 0.0) {
-      _shakeRemainingSec = max(0.0, _shakeRemainingSec - dt);
-      if (_shakeRemainingSec == 0.0) {
-        _screenShakeOffset = Offset.zero;
-        _shakeIntensity = 0.0;
-      } else {
-        _shakePhase += dt * 75.0;
-        final double decay = (_shakeRemainingSec / _shakeDurationSec).clamp(0.0, 1.0);
-        final double amp = _shakeIntensity * decay * decay;
-        _screenShakeOffset = Offset(sin(_shakePhase) * amp, cos(_shakePhase * 1.3) * amp * 0.65);
+      final hasVisibleTrajectory = _selectedUnitId != null ||
+          _draggedUnitId != null ||
+          _selectedEnemyUnitId != null ||
+          _showAllTrajectories ||
+          _engine.enemyUnits.any((e) => e.isAlive && e.pendingIntent != null);
+      if (hasVisibleTrajectory) {
+        _dashPhase = (_dashPhase + dt * 0.85) % 1.0;
+        needsVisualRepaint = true;
       }
-      needsVisualRepaint = true;
-    }
 
-    // Smooth continuous camera impact zoom curve
-    if (_cameraZoomRemainingSec > 0.0) {
-      _cameraZoomRemainingSec = max(0.0, _cameraZoomRemainingSec - dt);
-      if (_cameraZoomRemainingSec == 0.0) {
-        _battlefieldCameraZoom = 1.0;
-      } else {
-        final double t = 1.0 - (_cameraZoomRemainingSec / _cameraZoomDurationSec).clamp(0.0, 1.0);
-        // Quick punch in (first 20%), smooth ease-out return
-        final double envelope = t < 0.2 ? (t / 0.2) : (1.0 - ((t - 0.2) / 0.8));
-        _battlefieldCameraZoom = 1.0 + (_cameraZoomPeak - 1.0) * Curves.easeOut.transform(envelope.clamp(0.0, 1.0));
+      // Smooth continuous damped screen shake
+      if (_shakeRemainingSec > 0.0) {
+        _shakeRemainingSec = max(0.0, _shakeRemainingSec - dt);
+        if (_shakeRemainingSec == 0.0) {
+          _screenShakeOffset = Offset.zero;
+          _shakeIntensity = 0.0;
+        } else {
+          _shakePhase += dt * 75.0;
+          final double decay = (_shakeRemainingSec / _shakeDurationSec).clamp(0.0, 1.0);
+          final double amp = _shakeIntensity * decay * decay;
+          _screenShakeOffset = Offset(sin(_shakePhase) * amp, cos(_shakePhase * 1.3) * amp * 0.65);
+        }
+        needsVisualRepaint = true;
       }
-      needsVisualRepaint = true;
-    }
 
-    // Keep active floating pops, ripples, and VFX animating smoothly at 60fps
-    if (_floatingPops.isNotEmpty) {
-      _floatingPops.removeWhere((p) => p.isExpired);
-      needsVisualRepaint = true;
-    }
-    if (_groundRipples.isNotEmpty) {
-      _groundRipples.removeWhere((r) => r.isExpired);
-      needsVisualRepaint = true;
-    }
-    if (_activeVfx.isNotEmpty) {
-      needsVisualRepaint = true;
-    }
+      // Smooth continuous camera impact zoom curve
+      if (_cameraZoomRemainingSec > 0.0) {
+        _cameraZoomRemainingSec = max(0.0, _cameraZoomRemainingSec - dt);
+        if (_cameraZoomRemainingSec == 0.0) {
+          _battlefieldCameraZoom = 1.0;
+        } else {
+          final double t = 1.0 - (_cameraZoomRemainingSec / _cameraZoomDurationSec).clamp(0.0, 1.0);
+          // Quick punch in (first 20%), smooth ease-out return
+          final double envelope = t < 0.2 ? (t / 0.2) : (1.0 - ((t - 0.2) / 0.8));
+          _battlefieldCameraZoom = 1.0 + (_cameraZoomPeak - 1.0) * Curves.easeOut.transform(envelope.clamp(0.0, 1.0));
+        }
+        needsVisualRepaint = true;
+      }
 
-    bool engineNotifiedThisFrame = false;
-    if (_engine.isRunning) {
-      if (_hitStopRemainingMs > 0) {
-        _hitStopRemainingMs = max(0, _hitStopRemainingMs - (dt * 1000.0).round());
-        _tickAccumulator = 0.0;
-      } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
-        _engine.skillTreeState.updateCooldowns(dt * _engine.combatPacingSpeed);
-        _tickAccumulator = 0.0;
-      } else {
-        _tickAccumulator += dt * SpatialCombatEngine.ticksPerSecond * _engine.simulationSpeed;
-        while (_tickAccumulator >= 1.0) {
-          _tickAccumulator -= 1.0;
-          _engine.stepTick();
-          engineNotifiedThisFrame = true;
-          if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
-            _tickAccumulator = 0.0;
-            break;
+      // Keep active floating pops, ripples, and VFX animating smoothly at 60fps
+      if (_floatingPops.isNotEmpty) {
+        _floatingPops.removeWhere((p) => p.isExpired);
+        needsVisualRepaint = true;
+      }
+      if (_groundRipples.isNotEmpty) {
+        _groundRipples.removeWhere((r) => r.isExpired);
+        needsVisualRepaint = true;
+      }
+      if (_activeVfx.isNotEmpty) {
+        needsVisualRepaint = true;
+      }
+
+      bool engineNotifiedThisFrame = false;
+      if (_engine.isRunning) {
+        if (_hitStopRemainingMs > 0) {
+          _hitStopRemainingMs = max(0, _hitStopRemainingMs - (dt * 1000.0).round());
+          _tickAccumulator = 0.0;
+        } else if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+          _engine.skillTreeState.updateCooldowns(dt * _engine.combatPacingSpeed);
+          _tickAccumulator = 0.0;
+        } else {
+          _tickAccumulator += dt * SpatialCombatEngine.ticksPerSecond * _engine.simulationSpeed;
+          while (_tickAccumulator >= 1.0) {
+            _tickAccumulator -= 1.0;
+            _engine.stepTick();
+            engineNotifiedThisFrame = true;
+            if (_engine.isActionPauseEnabled && _engine.activeActionEvent != null) {
+              _tickAccumulator = 0.0;
+              break;
+            }
           }
         }
       }
-    }
 
-    if (needsVisualRepaint && !engineNotifiedThisFrame) {
-      _visualFrameTick.value++;
+      if (needsVisualRepaint && !engineNotifiedThisFrame) {
+        _visualFrameTick.value++;
+      }
+    } catch (e, st) {
+      debugPrint('Combat frame tick error: $e\n$st');
     }
   }
 
@@ -1188,6 +1319,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       relicService: widget.relicService,
       commandService: widget.commandService,
       plinthService: widget.plinthService,
+      skillTreeState: widget.skillTreeState,
+      maxDeployableUnits: widget.maxDeployableUnits,
+      spindleTier: widget.spindleTier,
     );
     _engine.isActionPauseEnabled = true;
     _engine.addListener(_onEngineUpdate);
@@ -1465,9 +1599,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 height: 32,
                 child: Row(
                   children: [
-                    Icon(Icons.foundation, size: 16, color: Color(0xFF00E5FF)),
+                    Icon(Icons.auto_awesome, size: 16, color: Color(0xFF00E5FF)),
                     SizedBox(width: 8),
-                    Text('Plinth Sculptory', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
+                    Text('Titan Core Altar', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
                   ],
                 ),
               ),
@@ -1680,7 +1814,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     onMovePlayerUnit: (id, col, row) {
                                       _engine.movePlayerUnit(id, col, row);
                                       setState(() {
-                                        _selectedUnitId = id;
+                                        _selectedUnitId = null;
+                                        _draggedUnitId = null;
                                         _hoveredTileCol = null;
                                         _hovered2DRow = null;
                                         _isHovered2DPlayerSide = null;
@@ -1742,6 +1877,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       );
                     },
                   ),
+
+                  // AoE Fire Barrage: 3 staggered, compact 3x4 Meteor Sprite-Sheet bursts over enemy formation
+                  if (_activeFireBarrageMs != null)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: _StaggeredMeteorBarrage(
+                          key: ValueKey('fire_barrage_$_activeFireBarrageMs'),
+                        ),
+                      ),
+                    ),
 
 // Layer 3 moved to backdrop so it never obscures bottom row tiles
 
@@ -1998,14 +2143,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                               ),
                                             ],
                                           ),
-                                          // Petrified Plinths
+                                          // Titan Shards
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(Icons.foundation, color: Color(0xFF00E5FF), size: 14),
+                                              const Icon(Icons.auto_awesome, color: Color(0xFF00E5FF), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardPetrifiedPlinths} Plinth Shards',
+                                                '+${_engine.rewardPetrifiedPlinths} Titan Shards',
                                                 style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
@@ -2193,10 +2338,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         textColor: const Color(0xFFFFE082),
                                         glowColor: const Color(0x33FFD54F),
                                       ),
-                                      if (_engine.isVictory)
+                                      if (_engine.isVictory) ...[
+                                        _buildGothicActionButton(
+                                          icon: Icons.account_tree_rounded,
+                                          label: _engine.skillTreeState.availableSkillPoints > 0
+                                              ? 'SKILL TREE (${_engine.skillTreeState.availableSkillPoints}★)'
+                                              : 'SKILL TREE',
+                                          onPressed: () {
+                                            CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                                              setState(() {});
+                                            });
+                                          },
+                                          gradientColors: const [Color(0xFF00695C), Color(0xFF004D40)],
+                                          borderColor: const Color(0xFF69F0AE),
+                                          textColor: const Color(0xFFE0F2F1),
+                                          glowColor: const Color(0x5500E676),
+                                        ),
                                         _buildGothicActionButton(
                                           icon: Icons.auto_fix_high,
-                                          label: 'UPGRADE SQUAD & SCULPTOR',
+                                          label: 'SQUAD & STAT UPGRADES',
                                           onPressed: () {
                                             CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
                                               setState(() {});
@@ -2207,6 +2367,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                           textColor: Colors.white,
                                           glowColor: const Color(0x66FF6D00),
                                         ),
+                                      ],
                                       if (_engine.isVictory && widget.onVictory != null)
                                         _buildGothicActionButton(
                                           icon: Icons.arrow_forward,
@@ -3466,9 +3627,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       }
     }
 
-    // Inspected Enemy Unit Trajectory (when player clicks an enemy to see who it targets)
-    if (_selectedEnemyUnitId != null) {
-      final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
+    // Hovered Enemy Unit Trajectory (shows who an enemy aims at only while hovering it)
+    if (_hoveredEnemyUnitId != null) {
+      final enemy = _engine.enemyUnits.where((u) => u.id == _hoveredEnemyUnitId && u.isAlive).firstOrNull;
       if (enemy != null && enemy.occupiedNodes.isNotEmpty && enemy.pendingIntent == null) {
         final Offset enemyCenter = _getUnitCenterIsometricOffset(enemy, tileWidth: tileWidth, tileHeight: tileHeight);
         final double srcX = enemyCenter.dx;
@@ -3702,6 +3863,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     final isSupportUlt = unitId == 'iron_footman' ||
                         (ultUnit != null && (ultUnit.templateId.contains('medicus') || ultUnit.templateId.contains('priestess') || ultUnit.templateId.contains('alchemist')));
                     return isSupportUlt ? multiUnit.isPlayer : !multiUnit.isPlayer;
+                  } else if (data.startsWith('unit:')) {
+                    final unitId = data.replaceFirst('unit:', '');
+                    final draggedUnit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
+                    return multiUnit.isPlayer &&
+                        draggedUnit != null &&
+                        draggedUnit.id != multiUnit.id &&
+                        !multiUnit.isDisplacementImmune &&
+                        targetAnchor.column >= 0 &&
+                        targetAnchor.column <= 2 &&
+                        targetAnchor.row >= 0 &&
+                        targetAnchor.row <= 2;
                   }
                   return false;
                 },
@@ -3721,6 +3893,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     setState(() {
                       _draggedUltimateUnitId = null;
                       _selectedUltimateUnitId = null;
+                      _hoveredTileGRow = null;
+                      _hoveredTileCol = null;
+                    });
+                  } else if (data.startsWith('unit:')) {
+                    final unitId = data.replaceFirst('unit:', '');
+                    _engine.movePlayerUnit(unitId, targetAnchor.column, targetAnchor.row);
+                    setState(() {
+                      _selectedUnitId = unitId;
+                      _draggedUnitId = null;
                       _hoveredTileGRow = null;
                       _hoveredTileCol = null;
                     });
@@ -3782,13 +3963,75 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         }
                       },
                       child: Center(
-                        child: _buildUnitMiniatureWidget(
-                          multiUnit,
-                          tileWidth: tileWidth,
-                          tileHeight: tileHeight,
-                          colGap: 0.0,
-                          isSelected: isSelected || isDropCandidate,
-                        ),
+                        child: multiUnit.isPlayer
+                            ? Draggable<String>(
+                                data: 'unit:${multiUnit.id}',
+                                maxSimultaneousDrags: 1,
+                                onDragStarted: () {
+                                  setState(() {
+                                    _draggedUnitId = multiUnit.id;
+                                    _selectedUnitId = multiUnit.id;
+                                    _selectedEnemyUnitId = null;
+                                    _selectedCardId = null;
+                                  });
+                                  if (!_engine.isPreBattlePhase) {
+                                    _engine.setBulletTime(true);
+                                  }
+                                },
+                                onDragEnd: (_) {
+                                  setState(() {
+                                    _draggedUnitId = null;
+                                  });
+                                  if (!_engine.isPreBattlePhase) {
+                                    _engine.setBulletTime(false);
+                                  }
+                                },
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: _buildUnitMiniatureWidget(
+                                    multiUnit,
+                                    tileWidth: tileWidth,
+                                    tileHeight: tileHeight,
+                                    colGap: 0.0,
+                                    isDragging: true,
+                                  ),
+                                ),
+                                childWhenDragging: Opacity(
+                                  opacity: 0.3,
+                                  child: _buildUnitMiniatureWidget(
+                                    multiUnit,
+                                    tileWidth: tileWidth,
+                                    tileHeight: tileHeight,
+                                    colGap: 0.0,
+                                  ),
+                                ),
+                                child: _buildUnitMiniatureWidget(
+                                  multiUnit,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: 0.0,
+                                  isSelected: isSelected || isDropCandidate,
+                                ),
+                              )
+                            : MouseRegion(
+                                onEnter: (_) {
+                                  if (_hoveredEnemyUnitId != multiUnit.id) {
+                                    setState(() => _hoveredEnemyUnitId = multiUnit.id);
+                                  }
+                                },
+                                onExit: (_) {
+                                  if (_hoveredEnemyUnitId == multiUnit.id) {
+                                    setState(() => _hoveredEnemyUnitId = null);
+                                  }
+                                },
+                                child: _buildUnitMiniatureWidget(
+                                  multiUnit,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: 0.0,
+                                  isSelected: isSelected || isDropCandidate,
+                                ),
+                              ),
                       ),
                     ),
                   );
@@ -4171,16 +4414,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     final selectedUnit = _selectedUnitId != null
         ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
         : null;
+    final int deployedCount = _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty).length;
+    final bool canSelectedRelocate = selectedUnit != null &&
+        !selectedUnit.isDisplacementImmune &&
+        col >= 0 &&
+        col <= 2 &&
+        row >= 0 &&
+        row <= 2 &&
+        !selectedUnit.occupies(col, row);
     final bool isReachable = isPlayerSquad &&
-        selectedUnit != null &&
+        canSelectedRelocate &&
         occupant == null &&
-        selectedUnit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
+        (selectedUnit.occupiedNodes.isNotEmpty || deployedCount < _engine.maxDeployableUnits);
     final bool isSwappable = isPlayerSquad &&
-        selectedUnit != null &&
+        canSelectedRelocate &&
         occupant != null &&
         occupant.id != selectedUnit.id &&
-        !occupant.isDisplacementImmune &&
-        selectedUnit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
+        !occupant.isDisplacementImmune;
 
     final bool isSelected = (isPlayerSquad && _selectedUnitId != null && occupant?.id == _selectedUnitId) ||
         (!isPlayerSquad && _selectedEnemyUnitId != null && occupant?.id == _selectedEnemyUnitId);
@@ -4287,7 +4537,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           final unit = _engine.playerUnits.where((u) => u.id == unitId && u.isAlive).firstOrNull;
           if (unit == null) return false;
           final bool canEnterOrSwap = occupant == null || (occupant.id != unit.id && !occupant.isDisplacementImmune);
-          return isPlayerSquad && canEnterOrSwap && unit.canMoveTo(col, row, ignoreApCost: _engine.isPreBattlePhase);
+          final int deployedCount = _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty).length;
+          final bool withinCap = unit.occupiedNodes.isNotEmpty || occupant != null || deployedCount < _engine.maxDeployableUnits;
+          return isPlayerSquad && canEnterOrSwap && withinCap && col >= 0 && col <= 2 && row >= 0 && row <= 2 && !unit.occupies(col, row);
         }
       },
       onLeave: (_) {
@@ -4800,13 +5052,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       phantomEffect: phantomEffect,
                                     ),
                                   )
-                                : _buildUnitMiniatureWidget(
-                                    occupant,
-                                    tileWidth: tileWidth,
-                                    tileHeight: tileHeight,
-                                    colGap: colGap,
-                                    isSelected: isSelected,
-                                    phantomEffect: phantomEffect,
+                                : MouseRegion(
+                                    onEnter: (_) {
+                                      if (_hoveredEnemyUnitId != occupant.id) {
+                                        setState(() => _hoveredEnemyUnitId = occupant.id);
+                                      }
+                                    },
+                                    onExit: (_) {
+                                      if (_hoveredEnemyUnitId == occupant.id) {
+                                        setState(() => _hoveredEnemyUnitId = null);
+                                      }
+                                    },
+                                    child: _buildUnitMiniatureWidget(
+                                      occupant,
+                                      tileWidth: tileWidth,
+                                      tileHeight: tileHeight,
+                                      colGap: colGap,
+                                      isSelected: isSelected,
+                                      phantomEffect: phantomEffect,
+                                    ),
                                   ),
                           ),
                         ),
@@ -4955,13 +5219,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         }
       } else {
         final unplacedCount = _engine.playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).length;
+        final bool isFirstFight = _engine.skillTreeState.allSkills.values.where((s) => s.isUnlocked).length <= 1 && _engine.skillTreeState.availableSkillPoints == 0;
         if (unplacedCount > 0) {
           message = '🛡️ PRE-BATTLE: Drag units from the Reserve Dock into place on the grid, then tap [ENGAGE BATTLE]!';
+        } else if (_engine.skillTreeState.availableSkillPoints > 0) {
+          message = '✨ SKILL POINT READY (+${_engine.skillTreeState.availableSkillPoints}★): Open [SKILL TREE] below (or [SKILLS] above) to unlock a new Skill Slot before engaging!';
+        } else if (isFirstFight) {
+          message = '📘 FIRST BATTLE GUIDE: Hover Skill Slot [1] below to read Siphon Rend, drag your hero to position, then tap [ENGAGE BATTLE]!';
         } else {
-          message = '🛡️ SQUAD READY: Drag units to rearrange formation, or tap [ENGAGE BATTLE] in the Reserve Dock to begin!';
+          message = '🛡️ SQUAD READY: Drag units across lanes to position, hover Skill Slots below for tooltips, or tap [ENGAGE BATTLE]!';
         }
-        themeColor = const Color(0xFFFFD54F);
-        icon = Icons.touch_app;
+        themeColor = _engine.skillTreeState.availableSkillPoints > 0 ? const Color(0xFF69F0AE) : const Color(0xFFFFD54F);
+        icon = _engine.skillTreeState.availableSkillPoints > 0 ? Icons.auto_fix_high : Icons.touch_app;
       }
     } else if (_draggedUltimateUnitId != null || _selectedUltimateUnitId != null) {
       final ultUnitId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
@@ -5048,6 +5317,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       if (enemy != null) {
         return _buildSelectedEnemyInspectionBanner(enemy);
       }
+    } else if (message.isEmpty && _engine.isRunning) {
+      final sculptor = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+      final bool isFirstFight = _engine.skillTreeState.allSkills.values.where((s) => s.isUnlocked).length <= 1;
+      final bool hasReadySkill = sculptor != null &&
+          _engine.skillTreeState.equippedSkillIds.any((id) {
+            if (id.isEmpty) return false;
+            final node = _engine.skillTreeState.allSkills[id];
+            return node != null && sculptor.crucibleCinders >= node.cinderCost && _engine.skillTreeState.getCooldownRemaining(id) <= 0.01;
+          });
+      if (_engine.skillTreeState.availableSkillPoints > 0) {
+        message = '💡 +${_engine.skillTreeState.availableSkillPoints}★ SKILL POINT READY: Open [SKILLS] above (or [TREE] below) to unlock new Skill Slots & Ranks!';
+        themeColor = const Color(0xFF69F0AE);
+        icon = Icons.auto_fix_high;
+      } else if (hasReadySkill && _engine.currentTick < 480) {
+        message = isFirstFight
+            ? '📘 STEP 2 — CAST YOUR SKILL: Click glowing [SIPHON REND] below (or press 1) to deal damage, heal, and generate Cinders (🔥)!'
+            : '💡 SKILL READY: Tap a glowing Skill Slot below (or press 1–5) to cast — hover any slot for details!';
+        themeColor = const Color(0xFFFFD54F);
+        icon = Icons.flash_on;
+      } else if (_engine.currentTick < 300) {
+        message = isFirstFight
+            ? '📘 STEP 1 — AUTO-STRIKES & CINDERS: Your hero attacks automatically to build Cinders (🔥). Drag your hero to dodge or click an enemy to inspect!'
+            : '💡 COMBAT TIP: Basic strikes build Cinders (0–100) for Skills. Click any enemy to inspect its target, or drag allies to reposition.';
+        themeColor = const Color(0xFF00E5FF);
+        icon = Icons.lightbulb_outline;
+      }
     }
 
     if (message.isEmpty) return const SizedBox.shrink();
@@ -5055,7 +5350,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
         color: const Color(0xFF101018).withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(6),
@@ -5070,15 +5365,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: themeColor, size: 14),
-          const SizedBox(width: 6),
+          Icon(icon, color: themeColor, size: 16),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
                 color: themeColor,
                 fontWeight: FontWeight.bold,
-                fontSize: 10.5,
+                fontSize: 12.0,
                 letterSpacing: 0.4,
               ),
               overflow: TextOverflow.ellipsis,
@@ -6303,81 +6598,92 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   }
 
   Widget _buildOverheadStatusBadgesRow(List<UnitStatusBadgeData> badges) {
-    final displayBadges = badges.take(4).toList();
-    final overflowBadges = badges.skip(4).toList();
+    final displayBadges = badges.take(5).toList();
+    final overflowBadges = badges.skip(5).toList();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final b in displayBadges)
-          Tooltip(
-            message: '${b.name.toUpperCase()}: ${b.detail}',
-            triggerMode: TooltipTriggerMode.tap,
-            preferBelow: false,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F0B14).withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: b.color, width: 1.0),
-              boxShadow: [
-                BoxShadow(color: b.color.withValues(alpha: 0.35), blurRadius: 6),
-              ],
-            ),
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 3.0, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0810).withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(4.5),
+        border: Border.all(color: Colors.white12, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final b in displayBadges)
+            Tooltip(
+              message: '[${b.isBuff ? "BUFF" : "DEBUFF"}] ${b.name.toUpperCase()}: ${b.detail}',
+              preferBelow: false,
+              waitDuration: const Duration(milliseconds: 120),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                color: b.bg.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(3.5),
-                border: Border.all(color: b.color.withValues(alpha: 0.9), width: 0.9),
+                color: const Color(0xFF0F0B14).withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: b.color, width: 1.0),
                 boxShadow: [
-                  BoxShadow(color: b.color.withValues(alpha: 0.4), blurRadius: 3),
+                  BoxShadow(color: b.color.withValues(alpha: 0.35), blurRadius: 6),
                 ],
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(b.icon, style: const TextStyle(fontSize: 8.5)),
-                  const SizedBox(width: 2.0),
-                  Text(
-                    b.summary,
-                    style: TextStyle(
-                      color: b.color,
-                      fontSize: 7.5,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'monospace',
-                    ),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: b.bg.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(3.5),
+                  border: Border.all(
+                    color: b.isBuff ? const Color(0xFF00E676).withValues(alpha: 0.85) : const Color(0xFFFF5252).withValues(alpha: 0.9),
+                    width: 0.9,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(color: b.color.withValues(alpha: 0.35), blurRadius: 3),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(b.icon, style: const TextStyle(fontSize: 8.5)),
+                    const SizedBox(width: 2.0),
+                    Text(
+                      b.summary,
+                      style: TextStyle(
+                        color: b.color,
+                        fontSize: 7.5,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        if (overflowBadges.isNotEmpty)
-          Tooltip(
-            message: overflowBadges.map((b) => '• ${b.name}: ${b.detail}').join('\n'),
-            triggerMode: TooltipTriggerMode.tap,
-            preferBelow: false,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F0B14).withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
-            ),
-            child: Container(
-              margin: const EdgeInsets.only(left: 1.5),
-              padding: const EdgeInsets.symmetric(horizontal: 3.5, vertical: 1.5),
+          if (overflowBadges.isNotEmpty)
+            Tooltip(
+              message: overflowBadges.map((b) => '• [${b.isBuff ? "BUFF" : "DEBUFF"}] ${b.name}: ${b.detail}').join('\n'),
+              preferBelow: false,
+              waitDuration: const Duration(milliseconds: 120),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1728),
-                borderRadius: BorderRadius.circular(3.5),
-                border: Border.all(color: Colors.white38, width: 0.8),
+                color: const Color(0xFF0F0B14).withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
               ),
-              child: Text(
-                '+${overflowBadges.length}',
-                style: const TextStyle(fontSize: 7.0, color: Colors.white, fontWeight: FontWeight.bold),
+              child: Container(
+                margin: const EdgeInsets.only(left: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 3.5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1728),
+                  borderRadius: BorderRadius.circular(3.5),
+                  border: Border.all(color: Colors.white38, width: 0.8),
+                ),
+                child: Text(
+                  '+${overflowBadges.length}',
+                  style: const TextStyle(fontSize: 7.0, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -6399,16 +6705,18 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     } else if (unit.isDowned) {
       hpLabel = '💀 DOWNED';
     } else if (isEnemy) {
+      final String shieldTag = unit.aegisShield > 0 ? ' +${unit.aegisShield}🛡️' : '';
       if (unit.armor > 0) {
-        hpLabel = '🎯 ${unit.hp} [🛡️${unit.armor}]';
+        hpLabel = '🎯 ${unit.hp}$shieldTag [🛡️${unit.armor}]';
       } else {
-        hpLabel = '🎯 ${unit.hp}/${unit.maxHp}';
+        hpLabel = '🎯 ${unit.hp}/${unit.maxHp}$shieldTag';
       }
     } else {
+      final String shieldTag = unit.aegisShield > 0 ? ' +${unit.aegisShield}🛡️' : '';
       if (unit.armor > 0) {
-        hpLabel = '💚 ${unit.hp} [🛡️${unit.armor}]';
+        hpLabel = '💚 ${unit.hp}$shieldTag [🛡️${unit.armor}]';
       } else {
-        hpLabel = '💚 ${unit.hp}/${unit.maxHp}';
+        hpLabel = '💚 ${unit.hp}/${unit.maxHp}$shieldTag';
       }
     }
 
@@ -6478,36 +6786,25 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ),
                 ),
 
-                // Armor Overlay (Brushed Steel Plate with cyan-silver rim)
-                if (unit.armor > 0)
-                  FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF607D8B), Color(0xFFB0BEC5), Color(0xFF78909C)],
-                        ),
-                        borderRadius: BorderRadius.circular(2.0),
-                        border: Border.all(color: const Color(0xFF80DEEA), width: 0.8),
-                      ),
-                    ),
-                  ),
-
-                // Aegis Shield Overlay (Luminous Cyan Crystal)
+                // Aegis Shield Overlay Bar (Distinct luminous cyan-blue bar across top edge of HP bar)
                 if (unit.aegisShield > 0)
-                  FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: (unit.aegisShield / max(1, unit.maxHp)).clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF00B0FF), Color(0xFF80D8FF)],
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: (unit.aegisShield / max(1, unit.maxHp)).clamp(0.08, 1.0),
+                      child: Container(
+                        height: isBoss ? 5.5 : 4.5,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF00E5FF), Color(0xFF80D8FF), Color(0xFFE1F5FE)],
+                          ),
+                          borderRadius: BorderRadius.circular(2.0),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 0.6),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0xCC00E5FF), blurRadius: 5),
+                          ],
                         ),
-                        borderRadius: BorderRadius.circular(2.0),
-                        boxShadow: const [
-                          BoxShadow(color: Color(0xCC00E5FF), blurRadius: 6),
-                        ],
                       ),
                     ),
                   ),
@@ -6938,11 +7235,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         alignment: Alignment.bottomCenter,
         clipBehavior: Clip.none,
         children: [
-          AnimatedContainer(
-            duration: Duration(milliseconds: (isAttacking && !isDamaged) ? 95 : 175),
-            curve: (isAttacking && !isDamaged) ? Curves.easeOutCubic : Curves.easeOut,
-            transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
-            child: SizedBox(
+          AnimatedScale(
+            scale: isAttacking ? 1.09 : (isDamaged ? 0.93 : 1.0),
+            duration: const Duration(milliseconds: 95),
+            curve: Curves.easeOutBack,
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: (isAttacking && !isDamaged) ? 95 : 175),
+              curve: (isAttacking && !isDamaged) ? Curves.easeOutCubic : Curves.easeOut,
+              transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
+              child: SizedBox(
               width: isBoss ? bossSpanWidth : tileWidth,
               height: isBoss ? modelHeight : tileHeight,
               child: Stack(
@@ -7536,6 +7837,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         ),
       ),
     ),
+          ),
           // 4. Non-recoiling Floating Damage / Effect Pop Text (60fps via _visualFrameTick)
           Positioned.fill(
             child: IgnorePointer(
@@ -8137,7 +8439,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         const SizedBox(width: 5),
                         Flexible(
                           child: Text(
-                            'RESERVE SQUAD ($deployedCount/$totalCount DEPLOYED)',
+                            'RESERVE SQUAD ($deployedCount/${_engine.maxDeployableUnits} MAX • $totalCount OWNED)',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 9.0,
@@ -9693,7 +9995,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       if (slotIdx != null) {
         final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
         final bool isGenerator = skill != null && skill.cinderCost == 0;
-        if (skill == null || (!isGenerator && unit.crucibleCinders < skill.cinderCost)) return;
+        if (skill == null) return;
+        if (!isGenerator && unit.crucibleCinders < skill.cinderCost) {
+          setState(() {
+            _engine.lastBannerMessage = '🔥 Need ${skill.cinderCost} Cinders for ${skill.name} (have ${unit.crucibleCinders}) — use Slot [1] to build Cinders!';
+          });
+          return;
+        }
         if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
           _startForgeStrikeFinisher(unit, explicitTarget);
         } else {
@@ -9924,7 +10232,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           required VoidCallback? onPressed,
           required String tooltipMessage,
         }) {
-          final double buttonHeight = isNarrow ? 44.0 : 50.0;
+          final double slotSize = isNarrow ? 50.0 : 58.0;
           final int cinderYield = (skill?.rank ?? 1) >= 3 ? 26 : ((skill?.rank ?? 1) == 2 ? 22 : 18);
 
           final richTooltipSpan = skill != null
@@ -9934,7 +10242,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       text: '${skill.name.toUpperCase()}\n',
                       style: const TextStyle(
                         color: Color(0xFFFFD54F),
-                        fontSize: 10.5,
+                        fontSize: 14.0,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.8,
                       ),
@@ -9943,7 +10251,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       text: 'TIER ${skill.tier} • RANK ${skill.rank}/${skill.maxRank} • ${isGenerator ? "CINDER GENERATOR" : (isFinisher ? "APEX FINISHER" : "DISCIPLINE SKILL")}\n',
                       style: TextStyle(
                         color: borderColor,
-                        fontSize: 7.8,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
                       ),
@@ -9952,7 +10260,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       text: 'Cost: ${isGenerator ? "0 (Yields +$cinderYield🔥)" : "${skill.cinderCost}🔥"} • CD: ${skill.cooldownSeconds.toStringAsFixed(1)}s${hotkeyLabel != null ? " • Key [$hotkeyLabel]" : ""}\n\n',
                       style: const TextStyle(
                         color: Color(0xFFFFCC80),
-                        fontSize: 8.2,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -9960,18 +10268,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       text: skill.currentRankDescription,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 8.8,
-                        height: 1.35,
+                        fontSize: 12.2,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 )
               : null;
 
-          return Tooltip(
+          return MouseRegion(
+            onEnter: skill == null
+                ? null
+                : (_) {
+                    if (_hoveredSkillNode?.id != skill.id) {
+                      setState(() => _hoveredSkillNode = skill);
+                    }
+                  },
+            onExit: skill == null
+                ? null
+                : (_) {
+                    if (_hoveredSkillNode?.id == skill.id) {
+                      setState(() => _hoveredSkillNode = null);
+                    }
+                  },
+            child: Tooltip(
             preferBelow: false,
-            waitDuration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            verticalOffset: 14,
+            waitDuration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF1B1824), Color(0xFF100E17)],
@@ -9993,65 +10317,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             message: richTooltipSpan == null ? tooltipMessage : null,
             child: InkWell(
               onTap: isEnabled ? onPressed : null,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               child: Container(
-                height: buttonHeight,
+                width: slotSize,
+                height: slotSize,
                 decoration: BoxDecoration(
                   color: const Color(0xFF131118),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isEnabled
                         ? (isFinisher ? const Color(0xFFFFD54F) : borderColor)
                         : (progress > 0 ? borderColor.withValues(alpha: 0.45) : Colors.white12),
-                    width: isEnabled ? (isFinisher ? 1.8 : 1.3) : 0.8,
+                    width: isEnabled ? (isFinisher ? 2.0 : 1.6) : 1.0,
                   ),
                   boxShadow: isEnabled
                       ? [
                           BoxShadow(
-                            color: (isFinisher ? const Color(0xFFFFD54F) : activeColor).withValues(alpha: 0.45),
-                            blurRadius: isFinisher ? 10 : 6,
-                            spreadRadius: isFinisher ? 1 : 0,
+                            color: (isFinisher ? const Color(0xFFFFD54F) : activeColor).withValues(alpha: 0.55),
+                            blurRadius: isFinisher ? 12 : 8,
+                            spreadRadius: isFinisher ? 1.5 : 0.5,
                           ),
                         ]
                       : null,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
+                  borderRadius: BorderRadius.circular(7),
                   child: Stack(
                     children: [
-                      // 0. Hotkey Badge in Top-Left Corner
-                      if (hotkeyLabel != null)
-                        Positioned(
-                          top: 2,
-                          left: 2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
-                            decoration: BoxDecoration(
-                              color: isEnabled
-                                  ? const Color(0xFF231E2C)
-                                  : const Color(0xFF14121A),
-                              borderRadius: BorderRadius.circular(2.5),
-                              border: Border.all(
-                                color: isEnabled
-                                    ? (isFinisher ? const Color(0xFFFFD54F) : borderColor.withValues(alpha: 0.8))
-                                    : Colors.white24,
-                                width: 0.7,
-                              ),
-                            ),
-                            child: Text(
-                              hotkeyLabel,
-                              style: TextStyle(
-                                fontSize: isNarrow ? 6.5 : 7.5,
-                                fontWeight: FontWeight.w900,
-                                fontFamily: 'monospace',
-                                color: isEnabled
-                                    ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
-                                    : Colors.white38,
-                              ),
-                            ),
-                          ),
-                        ),
-
                       // 1. Vertical Molten "Building-Up" Fuel Fill
                       if (progress > 0)
                         Align(
@@ -10065,8 +10357,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                   begin: Alignment.bottomCenter,
                                   end: Alignment.topCenter,
                                   colors: [
-                                    activeColor.withValues(alpha: isEnabled ? 0.90 : 0.45),
-                                    activeColor.withValues(alpha: isEnabled ? 0.70 : 0.20),
+                                    activeColor.withValues(alpha: isEnabled ? 0.50 : 0.25),
+                                    activeColor.withValues(alpha: isEnabled ? 0.22 : 0.08),
                                   ],
                                 ),
                               ),
@@ -10079,11 +10371,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         Positioned(
                           left: 0,
                           right: 0,
-                          bottom: (progress * buttonHeight) - 1.5,
+                          bottom: (progress * slotSize) - 1.5,
                           child: Container(
                             height: 2.0,
                             decoration: BoxDecoration(
-                              color: borderColor.withValues(alpha: 0.85),
+                              color: borderColor.withValues(alpha: 0.9),
                               boxShadow: [
                                 BoxShadow(
                                   color: borderColor.withValues(alpha: 0.9),
@@ -10095,116 +10387,90 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           ),
                         ),
 
-                      // 3. Button Content: Icon + Title + Subtitle
+                      // 3. Centered Skill Icon
                       Center(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 3 : 6, vertical: 2),
-                          child: iconAsset != null
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Opacity(
-                                      opacity: isEnabled ? 1.0 : (progress > 0.4 ? 0.72 : 0.42),
-                                      child: Image.asset(
-                                        iconAsset,
-                                        width: isNarrow ? 26 : 34,
-                                        height: isNarrow ? 26 : 34,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (_, _, _) => Icon(
-                                          icon,
-                                          size: isNarrow ? 14 : 16,
-                                          color: isEnabled ? Colors.white : Colors.white38,
-                                        ),
-                                      ),
+                          padding: const EdgeInsets.all(6),
+                          child: Opacity(
+                            opacity: isEnabled ? 1.0 : (progress > 0.4 ? 0.65 : 0.35),
+                            child: iconAsset != null
+                                ? Image.asset(
+                                    iconAsset,
+                                    width: slotSize - 14,
+                                    height: slotSize - 14,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, _, _) => Icon(
+                                      icon,
+                                      size: isNarrow ? 22 : 26,
+                                      color: isEnabled ? Colors.white : Colors.white38,
                                     ),
-                                    SizedBox(width: isNarrow ? 3 : 6),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            title,
-                                            style: TextStyle(
-                                              fontSize: isNarrow ? 7.8 : 9.2,
-                                              fontWeight: FontWeight.w900,
-                                              color: isEnabled
-                                                  ? Colors.white
-                                                  : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
-                                              letterSpacing: 0.3,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                          const SizedBox(height: 1.5),
-                                          Text(
-                                            subtitle,
-                                            style: TextStyle(
-                                              fontSize: isNarrow ? 6.2 : 7.2,
-                                              color: isEnabled
-                                                  ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
-                                                  : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
-                                              fontWeight: FontWeight.bold,
-                                              letterSpacing: 0.2,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          icon,
-                                          size: isNarrow ? 11 : 13,
-                                          color: isEnabled
-                                              ? Colors.white
-                                              : (progress > 0.4 ? Colors.white70 : Colors.white38),
-                                        ),
-                                        const SizedBox(width: 2.5),
-                                        Flexible(
-                                          child: Text(
-                                            title,
-                                            style: TextStyle(
-                                              fontSize: isNarrow ? 7.8 : 9.0,
-                                              fontWeight: FontWeight.w900,
-                                              color: isEnabled
-                                                  ? Colors.white
-                                                  : (progress > 0.4 ? Colors.white.withValues(alpha: 0.85) : Colors.white38),
-                                              letterSpacing: 0.3,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      subtitle,
-                                      style: TextStyle(
-                                        fontSize: isNarrow ? 6.2 : 7.2,
-                                        color: isEnabled
-                                            ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
-                                            : (progress > 0 ? const Color(0xFFFFCC80) : Colors.white24),
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  )
+                                : Icon(
+                                    icon,
+                                    size: isNarrow ? 22 : 26,
+                                    color: isEnabled ? Colors.white : Colors.white38,
+                                  ),
+                          ),
                         ),
                       ),
+
+                      // 4. Keycap Hotkey Badge (Top-Left)
+                      if (hotkeyLabel != null)
+                        Positioned(
+                          top: 3,
+                          left: 3,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.0),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0E0C14).withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(
+                                color: isEnabled
+                                    ? (isFinisher ? const Color(0xFFFFD54F) : borderColor.withValues(alpha: 0.9))
+                                    : Colors.white24,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              hotkeyLabel,
+                              style: TextStyle(
+                                fontSize: isNarrow ? 7.5 : 8.5,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'monospace',
+                                color: isEnabled
+                                    ? (isFinisher ? const Color(0xFFFFD54F) : Colors.white)
+                                    : Colors.white54,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // 5. Compact Cinder Cost / Yield Badge (Bottom-Center)
+                      if (cooldownRemaining <= 0.0)
+                        Positioned(
+                          bottom: 2,
+                          left: 3,
+                          right: 3,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.78),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                isGenerator ? '+$cinderYield🔥' : '${skill?.cinderCost ?? 0}🔥',
+                                style: TextStyle(
+                                  fontSize: isNarrow ? 7.0 : 8.0,
+                                  fontWeight: FontWeight.w900,
+                                  color: isGenerator
+                                      ? const Color(0xFF69F0AE)
+                                      : (isEnabled ? const Color(0xFFFFD54F) : const Color(0xFFFFAB40).withValues(alpha: 0.75)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
 
                       // 4. Subtle Shimmer / Radiant Overlay for Ready State
                       if (isEnabled)
@@ -10260,6 +10526,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
               ),
             ),
+          ),
           );
         }
 
@@ -10322,6 +10589,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         fontSize: isNarrow ? 9.5 : 11.0,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Sculptor Level & XP: Leveling up grants +1★ Skill Point! Higher levels + Great Crucible (Castle) upgrades unlock Tier 2/3/Apex skills.',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF141E2B),
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.5), width: 0.8),
+                        ),
+                        child: Text(
+                          'LV.${_engine.skillTreeState.sculptorLevel} (${_engine.skillTreeState.sculptorXp}/${_engine.skillTreeState.xpToNextLevel} XP)',
+                          style: const TextStyle(
+                            fontSize: 8.0,
+                            color: Colors.cyanAccent,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -10674,11 +10961,58 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ),
                 ),
 
-              // Action Buttons Row: 5 Active Cinder Disciplined Commander Abilities
+              // Action Buttons Row: 5 Square Iconic Keybound Skill Slots
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (slotIdx) {
                   final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
-                  if (skill == null) return const SizedBox.shrink();
+                  final double slotSize = isNarrow ? 50.0 : 58.0;
+                  if (skill == null) {
+                    return Padding(
+                      padding: EdgeInsets.only(right: slotIdx < 4 ? 8.0 : 0.0),
+                      child: Tooltip(
+                        preferBelow: false,
+                        message: 'Slot ${slotIdx + 1} Empty — Unlock skills in [SKILL TREE]',
+                        child: Container(
+                          width: slotSize,
+                          height: slotSize,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0E0D14),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white10, width: 1.0),
+                          ),
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                top: 3,
+                                left: 3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.0),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF14121A),
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(color: Colors.white12, width: 0.8),
+                                  ),
+                                  child: Text(
+                                    '${slotIdx + 1}',
+                                    style: TextStyle(
+                                      fontSize: isNarrow ? 7.5 : 8.5,
+                                      fontWeight: FontWeight.w900,
+                                      fontFamily: 'monospace',
+                                      color: Colors.white24,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Center(
+                                child: Icon(Icons.lock_outline, size: 18, color: Colors.white12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
 
                   final bool isFinisher = skill.cinderCost >= 80;
                   final bool isGenerator = skill.cinderCost == 0;
@@ -10693,50 +11027,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   final String subtitleText = isOnCooldown
                       ? '${cdRemaining.toStringAsFixed(1)}s CD'
                       : (isGenerator
-                          ? '+$cinderYield🔥 • GENERATOR'
-                          : (isEnabled
-                              ? '${skill.cinderCost}🔥 • READY'
-                              : '${unit.crucibleCinders}/${skill.cinderCost}🔥 ${(progress * 100).toInt()}%'));
+                          ? '+$cinderYield🔥'
+                          : '${skill.cinderCost}🔥');
 
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: slotIdx < 4 ? 3.0 : 0.0),
-                      child: buildActionButton(
-                        skill: skill,
-                        title: isNarrow && skill.name.length > 7
-                            ? '${skill.name.substring(0, 6)}.'
-                            : skill.name.toUpperCase(),
-                        subtitle: subtitleText,
-                        icon: skill.icon,
-                        iconAsset: skill.iconAsset,
-                        hotkeyLabel: '${slotIdx + 1}',
-                        activeColor: isFinisher
-                            ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
-                            : skill.primaryColor,
-                        borderColor: isFinisher
-                            ? (isEnabled ? skill.borderColor : Colors.white24)
-                            : skill.borderColor,
-                        isEnabled: isEnabled,
-                        progress: progress,
-                        isGenerator: isGenerator,
-                        isFinisher: isFinisher,
-                        cooldownRemaining: cdRemaining,
-                        tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
-                        onPressed: () {
-                          if (isFinisher) {
-                            _startForgeStrikeFinisher(unit, explicitTarget);
-                          } else {
-                            setState(() {
-                              _engine.executeUnitAction(
-                                unit,
-                                isReposition: false,
-                                explicitTarget: explicitTarget,
-                                actionType: skill.actionType,
-                              );
-                            });
-                          }
-                        },
-                      ),
+                  return Padding(
+                    padding: EdgeInsets.only(right: slotIdx < 4 ? 8.0 : 0.0),
+                    child: buildActionButton(
+                      skill: skill,
+                      title: skill.name.toUpperCase(),
+                      subtitle: subtitleText,
+                      icon: skill.icon,
+                      iconAsset: skill.iconAsset,
+                      hotkeyLabel: '${slotIdx + 1}',
+                      activeColor: isFinisher
+                          ? (isEnabled ? skill.primaryColor : const Color(0xFF3E2723))
+                          : skill.primaryColor,
+                      borderColor: isFinisher
+                          ? (isEnabled ? skill.borderColor : Colors.white24)
+                          : skill.borderColor,
+                      isEnabled: isEnabled,
+                      progress: progress,
+                      isGenerator: isGenerator,
+                      isFinisher: isFinisher,
+                      cooldownRemaining: cdRemaining,
+                      tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
+                      onPressed: () {
+                        if (isFinisher) {
+                          _startForgeStrikeFinisher(unit, explicitTarget);
+                        } else {
+                          setState(() {
+                            _engine.executeUnitAction(
+                              unit,
+                              isReposition: false,
+                              explicitTarget: explicitTarget,
+                              actionType: skill.actionType,
+                            );
+                          });
+                        }
+                      },
                     ),
                   );
                 }),
@@ -12278,6 +12606,12 @@ class _CombatVfxOverlayPainter extends CustomPainter {
         case 'shatter':
           _drawShockwave(canvas, vfx, progress);
           break;
+        case 'heavy_slam':
+          _drawHeavySlam(canvas, vfx, progress);
+          break;
+        case 'heal_pulse':
+          _drawHealPulse(canvas, vfx, progress);
+          break;
         case 'bloodnova':
           _drawBloodnova(canvas, vfx, progress);
           break;
@@ -12371,36 +12705,127 @@ class _CombatVfxOverlayPainter extends CustomPainter {
   void _drawSlash(Canvas canvas, _CombatVfx vfx, double progress) {
     final target = vfx.targetOffset;
     final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final slashLen = 50.0 + progress * 20.0;
+    final slashLen = 62.0 + progress * 28.0;
 
-    // Glowing impact slash arc
-    final paint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..strokeWidth = (4.0 * (1.0 - progress)).clamp(1.0, 4.0)
+    // 1. Wide curved crescent slash arc with outer glow + white-hot core
+    final arcPath = Path();
+    final p1 = Offset(target.dx - slashLen * 0.55, target.dy - slashLen * 0.42);
+    final p2 = Offset(target.dx + slashLen * 0.55, target.dy + slashLen * 0.42);
+    final ctrl = Offset(target.dx + slashLen * 0.25, target.dy - slashLen * 0.35);
+    arcPath.moveTo(p1.dx, p1.dy);
+    arcPath.quadraticBezierTo(ctrl.dx, ctrl.dy, p2.dx, p2.dy);
+
+    final glowPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha((alpha * 0.65).round())
+      ..strokeWidth = (11.0 * (1.0 - progress)).clamp(2.0, 11.0)
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
+    canvas.drawPath(arcPath, glowPaint);
 
-    final p1 = Offset(target.dx - slashLen * 0.5, target.dy - slashLen * 0.4);
-    final p2 = Offset(target.dx + slashLen * 0.5, target.dy + slashLen * 0.4);
-    canvas.drawLine(p1, p2, paint);
+    final corePaint = Paint()
+      ..color = Colors.white.withAlpha(alpha)
+      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(0.8, 3.5)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawPath(arcPath, corePaint);
 
-    // Cross-slash spark
+    // 2. Cross-slash spark & radiating impact sparks
     final crossPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha((alpha * 0.8).round())
-      ..strokeWidth = 2.0 * (1.0 - progress)
+      ..color = vfx.secondaryColor.withAlpha((alpha * 0.85).round())
+      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(0.8, 3.0)
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
-    final cp1 = Offset(target.dx + slashLen * 0.35, target.dy - slashLen * 0.35);
-    final cp2 = Offset(target.dx - slashLen * 0.35, target.dy + slashLen * 0.35);
-    canvas.drawLine(cp1, cp2, crossPaint);
+    canvas.drawLine(
+      Offset(target.dx + slashLen * 0.38, target.dy - slashLen * 0.38),
+      Offset(target.dx - slashLen * 0.38, target.dy + slashLen * 0.38),
+      crossPaint,
+    );
 
-    // Impact burst flash circle
-    if (progress < 0.4) {
-      final flashRadius = 14.0 * (progress / 0.4);
+    final sparkPaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha(alpha)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < 6; i++) {
+      final angle = (i * 3.14159 * 2) / 6 + 0.35;
+      final r1 = 12.0 + progress * 24.0;
+      final r2 = r1 + (14.0 * (1.0 - progress));
+      canvas.drawLine(
+        Offset(target.dx + cos(angle) * r1, target.dy + sin(angle) * r1),
+        Offset(target.dx + cos(angle) * r2, target.dy + sin(angle) * r2),
+        sparkPaint,
+      );
+    }
+
+    // 3. Initial crisp impact flash
+    if (progress < 0.35) {
+      final t = progress / 0.35;
       final flashPaint = Paint()
-        ..color = Colors.white.withAlpha(((1.0 - (progress / 0.4)) * 200).round())
+        ..color = Colors.white.withAlpha(((1.0 - t) * 230).round())
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(target, flashRadius, flashPaint);
+      canvas.drawCircle(target, 18.0 * t, flashPaint);
+    }
+  }
+
+  void _drawHeavySlam(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.targetOffset;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+    final radius = 16.0 + progress * 68.0;
+
+    // Ground impact ellipse shockwave
+    final rect = Rect.fromCenter(center: Offset(center.dx, center.dy + 12), width: radius * 2.1, height: radius * 0.9);
+    final ringPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (5.5 * (1.0 - progress)).clamp(1.2, 5.5);
+    canvas.drawOval(rect, ringPaint);
+
+    // Radiating stone/kinetic shatter shards
+    final shardPaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha(alpha)
+      ..strokeWidth = (3.2 * (1.0 - progress)).clamp(1.0, 3.2)
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < 8; i++) {
+      final angle = (i * 3.14159 * 2) / 8;
+      final rIn = radius * 0.35;
+      final rOut = radius * 0.95;
+      canvas.drawLine(
+        Offset(center.dx + cos(angle) * rIn, center.dy + sin(angle) * rIn * 0.55 + 8),
+        Offset(center.dx + cos(angle) * rOut, center.dy + sin(angle) * rOut * 0.55 + 8),
+        shardPaint,
+      );
+    }
+
+    if (progress < 0.3) {
+      final flashPaint = Paint()
+        ..color = Colors.white.withAlpha(((1.0 - progress / 0.3) * 220).round())
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, 22.0 * (progress / 0.3), flashPaint);
+    }
+  }
+
+  void _drawHealPulse(Canvas canvas, _CombatVfx vfx, double progress) {
+    final center = vfx.targetOffset;
+    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
+    final rise = progress * 38.0;
+
+    // Rising restorative emerald/gold ring
+    final ringPaint = Paint()
+      ..color = vfx.primaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(1.0, 3.0);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(center.dx, center.dy + 10 - rise), width: 46.0 + progress * 16.0, height: 18.0),
+      ringPaint,
+    );
+
+    // Rising light motes
+    final motePaint = Paint()
+      ..color = vfx.secondaryColor.withAlpha(alpha)
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 5; i++) {
+      final dx = (i - 2) * 11.0;
+      final dy = 12.0 - rise * (0.7 + (i % 2) * 0.45);
+      canvas.drawCircle(Offset(center.dx + dx, center.dy + dy), 2.5 * (1.0 - progress * 0.5), motePaint);
     }
   }
 
@@ -13448,5 +13873,70 @@ class SculptorDisciplineVisuals {
           s4Tooltip: 'Cataclysmic Pyre: APEX! 250% (350% Perfect Forge Crit) Fire Nova across all enemy ranks!',
         );
     }
+  }
+}
+
+class _StaggeredMeteorBarrage extends StatefulWidget {
+  const _StaggeredMeteorBarrage({super.key});
+
+  @override
+  State<_StaggeredMeteorBarrage> createState() => _StaggeredMeteorBarrageState();
+}
+
+class _StaggeredMeteorBarrageState extends State<_StaggeredMeteorBarrage> {
+  static const List<({int delayMs, Alignment alignment, double width, double height})> _bursts = [
+    (delayMs: 0, alignment: Alignment(0.24, -0.14), width: 270, height: 205),
+    (delayMs: 260, alignment: Alignment(0.56, 0.02), width: 290, height: 220),
+    (delayMs: 520, alignment: Alignment(0.36, 0.22), width: 265, height: 200),
+  ];
+
+  final List<bool> _active = [true, false, false];
+  final List<Timer> _timers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    for (int i = 1; i < _bursts.length; i++) {
+      _timers.add(Timer(Duration(milliseconds: _bursts[i].delayMs), () {
+        if (mounted) {
+          setState(() => _active[i] = true);
+        }
+      }));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        for (int i = 0; i < _bursts.length; i++)
+          if (_active[i])
+            Align(
+              alignment: _bursts[i].alignment,
+              child: SizedBox(
+                width: _bursts[i].width,
+                height: _bursts[i].height,
+                child: SpriteSheetAnimation(
+                  key: ValueKey('meteor_burst_$i'),
+                  assetPath: 'assets/images/Spells/meteor storm.png',
+                  columns: 3,
+                  rows: 4,
+                  totalFrames: 12,
+                  duration: const Duration(milliseconds: 950),
+                  loop: false,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+      ],
+    );
   }
 }

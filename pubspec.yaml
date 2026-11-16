@@ -69,7 +69,26 @@ flutter:
     - assets/images/Crypt Stalkers/
     - assets/images/Spells/
     - assets/images/UI/
-    - assets/audio/
+    - assets/audio/Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav
+    - assets/audio/Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav
+    - assets/audio/Bluezone_BC0297_stone_impact_hammer_015.wav
+    - assets/audio/CHAINMvmt_InsJ_Chains_Metal_Movement_Distant_Moderate_02-01.wav
+    - assets/audio/combat_bgm_ambient.mp3
+    - assets/audio/Dinosaur Growl 3_Mono.wav
+    - assets/audio/GOREBone_Bone Breaks Celery 01_JSE_GMP.wav
+    - assets/audio/GORESplt_Gore Splatter 01_JSE_GMP.wav
+    - assets/audio/Heavy Body Crunch 02.wav
+    - assets/audio/sfx_block.wav
+    - assets/audio/sfx_card.wav
+    - assets/audio/sfx_hit.wav
+    - assets/audio/sfx_slash.wav
+    - assets/audio/sfx_spell.wav
+    - assets/audio/sfx_victory.wav
+    - assets/audio/SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav
+    - assets/audio/SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav
+    - assets/audio/WEAPArmr_Metal Shield Block Hits_JSE_MW.wav
+    - assets/audio/WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav
+    - assets/audio/WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav
     - assets/animations/
     - assets/animations/vfx/
     - assets/images/backgrounds/

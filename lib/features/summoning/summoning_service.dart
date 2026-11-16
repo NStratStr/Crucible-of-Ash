@@ -63,8 +63,8 @@ class SummoningService {
       title: 'OUTSKIRTS REFUGEE INTAKE',
       subtitle: 'Rescuing Petrified Wanderer Husks',
       loreDescription:
-          'Infuse concentrated Ichor into brittle chalk husks recovered from the perimeter roads. Shatter the calcified crust to awaken viable frontline thralls.',
-      currencyName: 'Ichor',
+          'Infuse concentrated Gold into brittle chalk husks recovered from the perimeter roads. Shatter the calcified crust to awaken viable frontline thralls.',
+      currencyName: 'Gold',
       singleCost: 100,
       multiCost: 900, // 10 pulls for 900 (10% discount)
       usesSigils: false,
@@ -96,7 +96,7 @@ class SummoningService {
       subtitle: 'Occult Vanguard & Ghoul Extraction',
       loreDescription:
           'Mine the ancient subterranean catacombs to unearth bone archers, spectral stalkers, and calcified blight spellweavers with heightened affinity.',
-      currencyName: 'Ichor',
+      currencyName: 'Gold',
       singleCost: 120,
       multiCost: 1000,
       usesSigils: false,
@@ -147,6 +147,7 @@ class SummoningService {
     required int count,
     required int currentIchor,
     required int currentSigils,
+    bool guaranteeStarterVanguard = false,
     Random? rng,
   }) {
     final banner = banners[bannerType]!;
@@ -161,13 +162,35 @@ class SummoningService {
       }
     } else {
       if (currentIchor < cost) {
-        throw StateError('Insufficient Ichor: Required $cost, available $currentIchor');
+        throw StateError('Insufficient Gold: Required $cost, available $currentIchor');
       }
     }
 
     final List<UnitEntity> summoned = [];
     for (int i = 0; i < count; i++) {
-      summoned.add(_rollSingleUnit(banner, random, i));
+      if (guaranteeStarterVanguard && i == 0) {
+        summoned.add(UnitEntity(
+          id: 'summon_starter_footman_${DateTime.now().microsecondsSinceEpoch}',
+          speciesId: 'iron_footman',
+          name: 'Iron Footman',
+          customAvatarAsset: 'assets/images/iron_footman_idle.png',
+          generation: 1,
+          rarity: UnitRarity.uncommon,
+          archetype: Archetype.juggernaut,
+          slot: FormationSlot.front2,
+          level: 1,
+          maxLevel: 10,
+          currentHp: 900,
+          maxHp: 900,
+          attack: 115,
+          defense: 150,
+          speed: 95,
+          nativeTraitId: 'iron_bastion',
+          lineageAncestors: const [],
+        ));
+      } else {
+        summoned.add(_rollSingleUnit(banner, random, i));
+      }
     }
 
     return SummonResult(

@@ -44,7 +44,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   set teamVitae(int val) => focus = val.clamp(0, maxFocus);
 
   // Crucible Skill Tree & 5-Slot Loadout State
-  late final CrucibleSkillTreeState skillTreeState = CrucibleSkillTreeState();
+  late final CrucibleSkillTreeState skillTreeState;
 
   /// Rank & Rite Spec Sec 2 & Sec 6: Active Unit awaiting turn execution during pause
   CombatUnitState? activeActingUnit;
@@ -145,10 +145,10 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   bool get isFlawlessClear => isVictory && casualtiesCount == 0;
 
-  // GDD §7.1: Crypt Currencies & Reagents
-  int get rewardUnboundAsh => isVictory ? (240 + (starRating * 80)) : 45;
-  int get rewardDistilledVitae => isVictory ? (18 + (starRating * 6)) : 2;
-  int get rewardPetrifiedPlinths => isVictory ? (isBossEncounterFlag ? 4 : 2) : 0;
+  // GDD §7.1: Crypt Currencies & Reagents (tuned for steady Chapter 1+ progression)
+  int get rewardUnboundAsh => isVictory ? (60 + (starRating * 30) + (isBossEncounterFlag ? 120 : 0)) : 20;
+  int get rewardDistilledVitae => isVictory ? (6 + (starRating * 3) + (isBossEncounterFlag ? 12 : 0)) : 1;
+  int get rewardPetrifiedPlinths => isVictory ? (isBossEncounterFlag ? 3 : 1) : 0;
   String? get rewardBossReagent {
     if (!isVictory) return null;
     final boss = enemyUnits.where((u) => u.footprint != UnitFootprint.single1x1 || u.id.contains('boss')).firstOrNull;
@@ -202,9 +202,9 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
 
-  int unboundAshWallet = 600;
-  int distilledVitaeWallet = 60;
-  int petrifiedPlinthsWallet = 12;
+  int unboundAshWallet = 0;
+  int distilledVitaeWallet = 0;
+  int petrifiedPlinthsWallet = 0;
   bool hasClaimedEncounterVictoryLoot = false;
 
   void claimVictoryRewards() {
@@ -345,6 +345,8 @@ class SpatialCombatEngine extends ChangeNotifier {
   int chainAssistsCount = 0;
   int totalActionsCount = 0; // Total attacks/skills/ultimates resolved in battle
   int playerTurnDecisionsCount = 0; // Total tactical player decision rounds completed
+  int maxDeployableUnits;
+  int spindleTier;
 
   SpatialCombatEngine({
     List<UnitEntity>? initialPlayerEntities,
@@ -356,7 +358,11 @@ class SpatialCombatEngine extends ChangeNotifier {
     RelicService? relicService,
     this.commandService,
     this.plinthService,
-  })  : encounterTitle = title ?? 'The Sunder at Ashen Gate',
+    CrucibleSkillTreeState? skillTreeState,
+    this.maxDeployableUnits = 2,
+    this.spindleTier = 1,
+  })  : skillTreeState = skillTreeState ?? CrucibleSkillTreeState(),
+        encounterTitle = title ?? 'The Sunder at Ashen Gate',
         encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
     final waves = (enemyWaves != null && enemyWaves.isNotEmpty)
         ? enemyWaves
@@ -662,7 +668,6 @@ class SpatialCombatEngine extends ChangeNotifier {
     // --- POPULATE PLAYER SQUAD ONTO SPATIAL GRID ---
     if (playerEntities != null && playerEntities.isNotEmpty) {
       final activeGen = commandService?.activeGeneralType;
-      skillTreeState.configureDefaultsForGeneral(activeGen ?? GeneralType.malakor);
       final double morriganSpeedMult = activeGen == GeneralType.morrigan ? 1.10 : 1.0;
       final double valeriaArmorMult = activeGen == GeneralType.valeria ? 1.25 : 1.0;
 
@@ -734,81 +739,58 @@ class SpatialCombatEngine extends ChangeNotifier {
                 ? (i == 1 ? UnitArchetype.vanguardMelee : UnitArchetype.reachMidline)
                 : mapArchetypeToSpatial(p.archetype));
 
+        final int sculptorMaxHp = isCommanderLead
+            ? (effectiveMaxHp * skillTreeState.sculptorHpMultiplier * skillTreeState.passiveHpMultiplier).round()
+            : effectiveMaxHp;
+        final int sculptorHp = isCommanderLead
+            ? (effectiveHp * skillTreeState.sculptorHpMultiplier * skillTreeState.passiveHpMultiplier).round()
+            : effectiveHp;
+        final int sculptorArmor = isCommanderLead
+            ? (effectiveDef * skillTreeState.sculptorDefMultiplier).round() + skillTreeState.passiveBonusArmor
+            : effectiveDef;
+        final int sculptorAtk = isCommanderLead
+            ? (effectiveAtk * skillTreeState.sculptorAtkMultiplier * skillTreeState.passiveAtkMultiplier).round()
+            : effectiveAtk;
+        final int sculptorSpd = isCommanderLead
+            ? finalSpeed + skillTreeState.passiveBonusSpeed
+            : finalSpeed;
+
+        final int spindleApBonus = spindleTier >= 3 ? 1500 : (spindleTier == 2 ? 500 : 0);
+        final int spindleCinderBonus = spindleTier >= 3 ? 25 : (spindleTier == 2 ? 10 : 0);
+        final double spindleApRateBonus = spindleTier >= 3 ? 0.10 : 0.0;
+
         playerUnits.add(CombatUnitState(
           id: unitId,
           name: unitName,
           templateId: unitTemplate,
           isPlayer: true,
           isAshSculptor: isCommanderLead,
-          crucibleCinders: isCommanderLead ? 15 : 0,
+          crucibleCinders: isCommanderLead ? (15 + spindleCinderBonus + skillTreeState.passiveStartingCinders) : 0,
           customAssetPath: unitAsset,
           footprint: UnitFootprint.single1x1,
           archetype: unitArchetype,
-          occupiedNodes: [
-            GridNode(column: autoNode.column, row: autoNode.row, occupantUnitId: unitId),
-          ],
+          occupiedNodes: i < maxDeployableUnits
+              ? [
+                  GridNode(column: autoNode.column, row: autoNode.row, occupantUnitId: unitId),
+                ]
+              : [],
           level: p.level,
-          maxHp: effectiveMaxHp,
-          hp: effectiveHp,
-          maxArmor: effectiveDef,
-          armor: effectiveDef,
-          attack: effectiveAtk,
-          speed: finalSpeed,
-          currentAp: initialAp,
+          maxHp: sculptorMaxHp,
+          hp: sculptorHp,
+          maxArmor: sculptorArmor,
+          armor: sculptorArmor,
+          attack: sculptorAtk,
+          speed: sculptorSpd,
+          currentAp: initialAp + spindleApBonus,
           nativeTraitId: p.nativeTraitId,
           graftedTraitId: effectiveGraftId,
           chiseledTraitIds: p.chiseledTraitIds,
-          critRateBonus: relicBonuses.bonusCritRate,
-          critDamageBonus: relicBonuses.bonusCritDamage,
+          critRateBonus: relicBonuses.bonusCritRate + (isCommanderLead ? skillTreeState.passiveCritRateBonus : 0.0),
+          critDamageBonus: relicBonuses.bonusCritDamage + (isCommanderLead ? skillTreeState.passiveCritDamageBonus : 0.0),
           armorPenetrationBonus: relicBonuses.bonusArmorPenetration,
-          apRateMultiplier: 1.0 + (relicBonuses.bonusUltimateCharge * 0.4),
+          apRateMultiplier: 1.0 + spindleApRateBonus + (relicBonuses.bonusUltimateCharge * 0.4),
           ultimateChargeBonus: relicBonuses.bonusUltimateCharge,
-          lifestealBonus: relicBonuses.bonusLifesteal,
-        ));
-      }
-
-      // Guarantee tactical 3-unit squad (Ash Sculptor Commander + 2 distinct Companions) even if saved brigade had solo unit
-      if (playerUnits.length < 2) {
-        playerUnits.add(CombatUnitState(
-          id: 'iron_footman',
-          name: 'Iron Footman',
-          templateId: 'iron_footman',
-          customAssetPath: 'assets/images/iron_footman_idle.png',
-          isPlayer: true,
-          archetype: UnitArchetype.vanguardMelee,
-          footprint: UnitFootprint.single1x1,
-          occupiedNodes: const [
-            GridNode(column: 0, row: 0, occupantUnitId: 'iron_footman'),
-          ],
-          maxHp: 560,
-          hp: 560,
-          maxArmor: 70,
-          armor: 70,
-          attack: 60,
-          speed: 95,
-          currentAp: 2500,
-          aegisShield: 40,
-        ));
-      }
-      if (playerUnits.length < 3) {
-        playerUnits.add(CombatUnitState(
-          id: 'grave_duelist',
-          name: 'Grave Duelist',
-          templateId: 'grave_duelist',
-          customAssetPath: 'assets/images/grave_duelist.png',
-          isPlayer: true,
-          archetype: UnitArchetype.reachMidline,
-          footprint: UnitFootprint.single1x1,
-          occupiedNodes: const [
-            GridNode(column: 1, row: 2, occupantUnitId: 'grave_duelist'),
-          ],
-          maxHp: 440,
-          hp: 440,
-          maxArmor: 35,
-          armor: 35,
-          attack: 85,
-          speed: 125,
-          currentAp: 5000,
+          lifestealBonus: relicBonuses.bonusLifesteal + (isCommanderLead ? skillTreeState.passiveLifestealBonus : 0.0),
         ));
       }
     } else {
@@ -1991,12 +1973,14 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   void applyFormationPreset(String presetType) {
     if (!isPreBattlePhase) return;
-    final aliveAllies = playerUnits.where((u) => u.isAlive).toList();
-    if (aliveAllies.isEmpty) return;
+    final allAlive = playerUnits.where((u) => u.isAlive).toList();
+    if (allAlive.isEmpty) return;
 
-    for (final u in aliveAllies) {
+    for (final u in allAlive) {
       u.occupiedNodes.clear();
     }
+
+    final aliveAllies = allAlive.take(maxDeployableUnits).toList();
 
     final vanguards = aliveAllies.where((u) => u.archetype == UnitArchetype.vanguardMelee).toList();
     final midliners = aliveAllies.where((u) => u.archetype == UnitArchetype.reachMidline).toList();
@@ -3022,15 +3006,19 @@ class SpatialCombatEngine extends ChangeNotifier {
       sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + cinderGain);
       final double mult = skillNode.effectiveMultiplier;
 
-      if (activeGen == GeneralType.valeria) {
-        // Cold Iron Slam: 130% ATK, reduces armor, staggers AP, generates cinders
+      if (actionType == 'cold_iron_slam' || (actionType == 'basic' && activeGen == GeneralType.valeria)) {
+        // Cold Iron Slam: 130% ATK, reduces armor, staggers AP, +35 Aegis Shield & 4% Max HP sustain, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
         final int shred = skillNode.rank >= 3 ? 50 : (skillNode.rank == 2 ? 35 : 20);
         final int staggerAp = skillNode.rank >= 3 ? 3500 : (skillNode.rank == 2 ? 2500 : 1500);
         validTarget.armor = max(0, validTarget.armor - shred);
         validTarget.currentAp = max(0, validTarget.currentAp - staggerAp);
-        addLog('IRON SCULPTOR: Cold Iron Slam shatters ${validTarget.name} for $dmg DMG (+$cinderGain Cinders -> ${sculptor.crucibleCinders}/100, -$shred Armor, -$staggerAp AP)!');
+        final int selfHeal = max(1, (sculptor.maxHp * 0.04).round());
+        sculptor.hp = min(sculptor.maxHp, sculptor.hp + selfHeal);
+        sculptor.aegisShield += 35;
+        sculptor.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        addLog('IRON SCULPTOR: Cold Iron Slam shatters ${validTarget.name} for $dmg DMG (+$selfHeal HP, +35 Aegis, +$cinderGain Cinders -> ${sculptor.crucibleCinders}/100, -$shred Armor, -$staggerAp AP)!');
         dispatchAction(SpatialActionEvent(
           id: 'slam_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
@@ -3039,11 +3027,14 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetId: validTarget.id,
           targetName: validTarget.name,
           damage: dmg,
+          isHeal: false,
+          healAmount: selfHeal,
+          healTargetId: sculptor.id,
           isPlayerAttacker: true,
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.vladislav) {
+      } else if (actionType == 'siphon_rend' || (actionType == 'basic' && activeGen == GeneralType.vladislav)) {
         // Siphon Rend: 135% ATK, drains DMG as HP, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
@@ -3059,12 +3050,14 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetId: validTarget.id,
           targetName: validTarget.name,
           damage: dmg,
-          isHeal: true,
+          isHeal: false,
+          healAmount: leechHp,
+          healTargetId: sculptor.id,
           isPlayerAttacker: true,
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.morrigan) {
+      } else if (actionType == 'corrosive_touch' || (actionType == 'basic' && activeGen == GeneralType.morrigan)) {
         // Corrosive Touch: 130% ATK, Poison stacks, -AP stagger, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
@@ -3085,38 +3078,42 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
+      } else if (actionType == 'vitae_mending' || actionType == 'mending_ash') {
+        final rawDmg = (sculptor.effectiveAttack * 1.10).round();
+        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final livingAllies = playerUnits.where((u) => u.isAlive).toList()
+          ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
+        final lowest = livingAllies.firstOrNull;
+        int mendingHealAmt = 0;
+        if (lowest != null) {
+          mendingHealAmt = 60 + (sculptor.effectiveAttack * 0.20).round();
+          lowest.hp = min(lowest.maxHp, lowest.hp + mendingHealAmt);
+          addLog('VITAE SCULPTOR: Mending Ash strikes ${validTarget.name} for $dmg DMG & mends ${lowest.name} for +$mendingHealAmt HP (+$cinderGain Cinders -> ${sculptor.crucibleCinders}/100)!');
+        }
+        dispatchAction(SpatialActionEvent(
+          id: 'mending_${currentTick}_${sculptor.id}',
+          attackerId: sculptor.id,
+          attackerName: sculptor.name,
+          skillName: 'Mending Ash',
+          targetId: validTarget.id,
+          targetName: validTarget.name,
+          damage: dmg,
+          isHeal: false,
+          healAmount: mendingHealAmt,
+          healTargetId: lowest?.id ?? sculptor.id,
+          isPlayerAttacker: true,
+          pattern: TargetPattern.singleTarget,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       } else {
-        if (actionType == 'vitae_mending' || actionType == 'mending_ash') {
-          final rawDmg = (sculptor.effectiveAttack * 1.10).round();
-          final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
-          final livingAllies = playerUnits.where((u) => u.isAlive).toList()
-            ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
-          final lowest = livingAllies.firstOrNull;
-          if (lowest != null) {
-            final healAmt = 60 + (sculptor.effectiveAttack * 0.20).round();
-            lowest.hp = min(lowest.maxHp, lowest.hp + healAmt);
-            addLog('VITAE SCULPTOR: Mending Ash strikes ${validTarget.name} for $dmg DMG & mends ${lowest.name} for +$healAmt HP (+$cinderGain Cinders -> ${sculptor.crucibleCinders}/100)!');
-          }
-          dispatchAction(SpatialActionEvent(
-            id: 'mending_${currentTick}_${sculptor.id}',
-            attackerId: sculptor.id,
-            attackerName: sculptor.name,
-            skillName: 'Mending Ash',
-            targetId: validTarget.id,
-            targetName: validTarget.name,
-            damage: dmg,
-            isHeal: true,
-            isPlayerAttacker: true,
-            pattern: TargetPattern.singleTarget,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-          ));
-        } else {
-        // Forge Cleave (Default Ash): 140% ATK + Bleed stacks, generates cinders
+        // Forge Cleave (Default Ash): 140% ATK + Bleed stacks + 6% Max HP sustain, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
         final int bleedGain = skillNode.rank >= 3 ? 3 : (skillNode.rank == 2 ? 2 : 1);
         validTarget.bleedStacks += bleedGain;
-        addLog('ASH SCULPTOR: Forge Cleave strikes ${validTarget.name} for $dmg DMG (+$cinderGain Cinders -> ${sculptor.crucibleCinders}/100, +$bleedGain Bleed)!');
+        final int selfHeal = max(1, (sculptor.maxHp * 0.06).round());
+        sculptor.hp = min(sculptor.maxHp, sculptor.hp + selfHeal);
+        addLog('ASH SCULPTOR: Forge Cleave strikes ${validTarget.name} for $dmg DMG (+$selfHeal HP, +$cinderGain Cinders -> ${sculptor.crucibleCinders}/100, +$bleedGain Bleed)!');
         dispatchAction(SpatialActionEvent(
           id: 'cleave_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
@@ -3126,11 +3123,13 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetName: validTarget.name,
           damage: dmg,
           bleedStacks: bleedGain,
+          isHeal: false,
+          healAmount: selfHeal,
+          healTargetId: sculptor.id,
           isPlayerAttacker: true,
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-        }
       }
 
     } else if (actionType == 'sundering_brand' || actionType == 'sundering_judgment' || actionType == 'crimson_brand' || actionType == 'miasmic_brand' || (actionType == 'signature' && sculptor.isSunderingBrandReady)) {
@@ -3138,7 +3137,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (sculptor.crucibleCinders < 30) return;
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
 
-      if (activeGen == GeneralType.valeria) {
+      if (actionType == 'sundering_judgment' || (actionType == 'signature' && activeGen == GeneralType.valeria)) {
         // Sundering Judgment: 180% Holy DMG, shreds 30% Armor, 3s Vulnerable
         final rawDmg = (sculptor.effectiveAttack * 1.80).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
@@ -3157,7 +3156,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.vladislav) {
+      } else if (actionType == 'crimson_brand' || (actionType == 'signature' && activeGen == GeneralType.vladislav)) {
         // Crimson Brand: 165% ATK, 3 Bleeds, detonates active bleeds for 2x
         final rawDmg = (sculptor.effectiveAttack * 1.65).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
@@ -3182,7 +3181,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.morrigan) {
+      } else if (actionType == 'miasmic_brand' || (actionType == 'signature' && activeGen == GeneralType.morrigan)) {
         // Miasmic Brand: 160% ATK, infects column with 3 Poison and Vulnerable
         final rawDmg = (sculptor.effectiveAttack * 1.60).round();
         final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
@@ -3430,6 +3429,52 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
 
+    } else if (actionType == 'fire_barrage') {
+      // --- SKILL 2/AOE MAGE: 35 CINDERS (CINDER FIRE BARRAGE) ---
+      if (sculptor.crucibleCinders < 35) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 35);
+
+      final barrageNode = skillTreeState.allSkills['calamity_fire_barrage'];
+      final double mult = barrageNode?.effectiveMultiplier ?? 1.55;
+      final int rank = barrageNode?.rank ?? 1;
+      final int burnTicks = 90 + (rank - 1) * 30;
+      final double armorMelt = rank >= 3 ? 0.75 : (rank == 2 ? 0.85 : 1.0);
+      final rawDmg = (sculptor.effectiveAttack * mult).round();
+
+      final livingEnemies = opposingSquad.where((u) => u.isAlive).toList();
+      final primaryEnemy = livingEnemies.contains(validTarget) ? validTarget : livingEnemies.first;
+      int primaryDmg = 0;
+      final Map<String, int> secHits = {};
+
+      for (final enemy in livingEnemies) {
+        final d = enemy.takeDamage(rawDmg, isPhysical: false);
+        enemy.burnDuration = max(enemy.burnDuration, burnTicks);
+        if (armorMelt < 1.0) {
+          enemy.armor = (enemy.armor * armorMelt).round();
+        }
+        if (enemy.id == primaryEnemy.id) {
+          primaryDmg = d;
+        } else {
+          secHits[enemy.id] = d;
+        }
+      }
+
+      addLog('ASH SCULPTOR: Cinder Fire Barrage rains meteors across ${livingEnemies.length} foes (+${(burnTicks / 30.0).toStringAsFixed(1)}s Burn)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'fire_barrage_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Cinder Fire Barrage',
+        targetId: primaryEnemy.id,
+        targetName: 'All Enemies',
+        damage: primaryDmg,
+        isHolyOrMagic: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.horizontalRowScythe,
+        secondaryTargetHits: secHits,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
     } else if (actionType == 'ember_whirlwind' || actionType == 'dawn_retribution' || actionType == 'blood_vortex' || actionType == 'ossuary_catacomb') {
       // --- SKILL 4: 45 CINDERS (HEAVY ASSAULT / DEVASTATION) ---
       if (sculptor.crucibleCinders < 45) return;
@@ -3657,13 +3702,14 @@ class SpatialCombatEngine extends ChangeNotifier {
     }
   }
 
-  /// Retinue Companion Synergy 2: Retinue Striker free reaction ambush on Branded / Critical targets
+  /// Retinue Companion Synergy 2: Allied Retinue Follow-Up Strike on Branded / Critical targets
   void _triggerCryptStalkerAmbush(CombatUnitState target) {
-    final stalker = playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive && (u.id == 'crypt_stalker' || u.archetype == UnitArchetype.reachMidline)).firstOrNull;
-    if (stalker != null && target.isAlive) {
-      final stalkerDmg = target.takeDamage((stalker.effectiveAttack * 0.85).round(), isPhysical: true);
+    final allies = playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive && u.occupiedNodes.isNotEmpty).toList();
+    final striker = allies.where((u) => u.archetype == UnitArchetype.reachMidline).firstOrNull ?? allies.firstOrNull;
+    if (striker != null && target.isAlive) {
+      final followUpDmg = target.takeDamage((striker.effectiveAttack * 0.85).round(), isPhysical: true);
       target.bleedStacks += 2;
-      addLog('  ⚡ [RETINUE AMBUSH] ${stalker.name} shadow-pounces ${target.name} for $stalkerDmg DMG (+2 Bleed)!');
+      addLog('  ⚡ [RETINUE FOLLOW-UP] ${striker.name} strikes ${target.name} for $followUpDmg DMG (+2 Bleed)!');
     }
   }
 
@@ -4041,10 +4087,12 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Starts the combat encounter, transitioning from Pre-Battle Deployment to Live 30Hz Simulation
   void startBattle() {
-    // If any units were left on the staging bench, automatically assign them to available tiles
+    // If any units were left on the staging bench, automatically assign them up to maxDeployableUnits
+    int deployedCount = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty).length;
     final unplaced = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).toList();
-    if (unplaced.isNotEmpty) {
+    if (unplaced.isNotEmpty && deployedCount < maxDeployableUnits) {
       for (final unit in unplaced) {
+        if (deployedCount >= maxDeployableUnits) break;
         // Preferred row based on archetype
         final preferredRow = unit.archetype == UnitArchetype.vanguardMelee
             ? 0
@@ -4058,6 +4106,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             if (!isOccupied) {
               unit.occupiedNodes.clear();
               unit.occupiedNodes.add(GridNode(column: c, row: r, occupantUnitId: unit.id));
+              deployedCount++;
               placed = true;
               break;
             }
@@ -4101,6 +4150,14 @@ class SpatialCombatEngine extends ChangeNotifier {
         existingOccupant.occupiedNodes.clear();
         addLog('${existingOccupant.name} was returned to the staging bench.');
       }
+    } else if (unit.occupiedNodes.isEmpty) {
+      final int deployedCount = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty).length;
+      if (deployedCount >= maxDeployableUnits) {
+        lastBannerMessage = '⚠️ SQUAD LIMIT ($deployedCount/$maxDeployableUnits): Drop onto a deployed companion to swap, or bench one first!';
+        addLog('Deployment cap ($maxDeployableUnits) reached; swap with a deployed unit or bench one first.');
+        notifyListeners();
+        return false;
+      }
     }
 
     unit.occupiedNodes.clear();
@@ -4125,8 +4182,10 @@ class SpatialCombatEngine extends ChangeNotifier {
   /// Automatically places any unplaced reserve bench units onto available formation tiles
   void autoDeployAllFromBench() {
     if (!isPreBattlePhase) return;
+    int deployedCount = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isNotEmpty).length;
     final unplaced = playerUnits.where((u) => u.isAlive && u.occupiedNodes.isEmpty).toList();
     for (final unit in unplaced) {
+      if (deployedCount >= maxDeployableUnits) break;
       final preferredRow = unit.archetype == UnitArchetype.vanguardMelee
           ? 0
           : (unit.archetype == UnitArchetype.backlineCaster ? 2 : 1);
@@ -4137,6 +4196,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           if (!isOccupied) {
             unit.occupiedNodes.clear();
             unit.occupiedNodes.add(GridNode(column: c, row: r, occupantUnitId: unit.id));
+            deployedCount++;
             placed = true;
             break;
           }
@@ -4297,14 +4357,16 @@ class SpatialCombatEngine extends ChangeNotifier {
     for (int i = 1; i < updatedSquad.length && i < 3; i++) {
       final p = updatedSquad[i];
       List<GridNode> nodes = [];
-      if (playerUnits.length > i && playerUnits[i].occupiedNodes.isNotEmpty) {
-        nodes = playerUnits[i].occupiedNodes.map((n) => GridNode(
-          column: n.column,
-          row: n.row,
-          occupantUnitId: p.id,
-        )).toList();
-      } else {
-        nodes = [autoFormationNodes[i]];
+      if (i < maxDeployableUnits) {
+        if (playerUnits.length > i && playerUnits[i].occupiedNodes.isNotEmpty) {
+          nodes = playerUnits[i].occupiedNodes.map((n) => GridNode(
+            column: n.column,
+            row: n.row,
+            occupantUnitId: p.id,
+          )).toList();
+        } else {
+          nodes = [autoFormationNodes[i]];
+        }
       }
 
       final relicBonuses = relicService?.calculateBonuses(p.id) ?? const UnitRelicBonuses();
@@ -4544,25 +4606,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       return false;
     }
 
-    if (!isPreBattlePhase) {
-      // Check if unit has at least 50% AP (5,000 AP)
-      if (!unit.canAffordMovement) {
-        final currentApPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
-        lastBannerMessage = '⚠️ INSUFFICIENT AP: Moving costs 50% AP (${unit.name} has $currentApPct%)';
-        addLog('${unit.name} cannot move! Needs at least 50% AP (has $currentApPct%).');
-        return false;
-      }
-
-      // Restrict movement to unit's moveRange (e.g. 1 tile adjacent/diagonal)
-      if (!unit.canMoveTo(targetCol, targetRow)) {
-        addLog('${unit.name} cannot reach (Col ${targetCol + 1}, Row $targetRow)! Movement limit is ${unit.moveRange} tile(s).');
-        return false;
-      }
-    }
+    if (targetCol < 0 || targetCol > 2 || targetRow < 0 || targetRow > 2) return false;
 
     final oldCol = unit.occupiedNodes.first.column;
     final oldRow = unit.occupiedNodes.first.row;
-    final apCost = isPreBattlePhase ? 0 : CombatUnitState.moveApCost;
+    final int apCost = isPreBattlePhase ? 0 : min(unit.currentAp, CombatUnitState.moveApCost);
 
     // Check if target node is occupied by another friendly unit -> Tactical Formation Swap!
     final existingOccupant = playerUnits

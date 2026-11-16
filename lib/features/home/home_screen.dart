@@ -34,6 +34,10 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback? onOpenPlinthSculptory;
   final VoidCallback? onOpenCatacombDelves;
+  final VoidCallback? onOpenSkillTree;
+  final VoidCallback? onOpenRetinueSquad;
+  final int unspentSkillPoints;
+  final bool guideFirstSkillUpgrade;
   final void Function({
     required String facilityId,
     required int newTier,
@@ -71,6 +75,10 @@ class HomeScreen extends StatefulWidget {
     required this.onOpenSettings,
     this.onOpenPlinthSculptory,
     this.onOpenCatacombDelves,
+    this.onOpenSkillTree,
+    this.onOpenRetinueSquad,
+    this.unspentSkillPoints = 0,
+    this.guideFirstSkillUpgrade = false,
     this.onUpgradeFacility,
     this.onCloudDataRestored,
     this.showCloseButton = true,
@@ -83,6 +91,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   HomeViewMode _viewMode = HomeViewMode.sanctuaryTown;
   String? _hoveredBuilding;
+  bool _dismissedSkillTutorial = false;
 
   String _toRoman(int num) {
     switch (num) {
@@ -327,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
             iconColor: const Color(0xFFB3261E),
             value: '${widget.totalIchor}',
             valueColor: const Color(0xFFEF5350),
-            tooltip: 'Raw Ichor (Fusion & Evolution)',
+            tooltip: 'Raw Gold (Fusion & Evolution)',
           ),
           const SizedBox(width: 6),
           _buildCurrencyPill(
@@ -695,6 +704,63 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            if (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 76, left: 24, right: 24),
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 460),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF121822),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF69F0AE), width: 1.6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF69F0AE).withValues(alpha: 0.35),
+                                blurRadius: 18,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.auto_fix_high, color: Color(0xFF69F0AE), size: 22),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'STAGE 1 CLEARED! Tap SKILLS (${widget.unspentSkillPoints}★) below to unlock & equip your 2nd Skill before Battle 2.',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () => setState(() => _dismissedSkillTutorial = true),
+                                child: const Text(
+                                  'SKIP',
+                                  style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // Floating Quick Action Dock Overlay over Sanctuary background
             Positioned(
               left: 24,
@@ -715,12 +781,68 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFE5A93C), widget.onOpenCampaign),
-                      _buildQuickActionBtn('CRUCIBLE', Icons.bloodtype_outlined, const Color(0xFFFF7043), widget.onOpenCrucible),
-                      _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
-                      _buildQuickActionBtn('SUMMON', Icons.person_add_alt_1, const Color(0xFFFFD54F), widget.onOpenSummoning),
-                      _buildQuickActionBtn('ROSTER', Icons.people_alt_outlined, const Color(0xFFAB47BC), widget.onOpenBrigadeRoster),
-                      _buildQuickActionBtn('UPGRADE', Icons.account_balance, const Color(0xFFFFD54F), () => _openSanctuaryArchitecture(null)),
+                      IgnorePointer(
+                        ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
+                        child: Opacity(
+                          opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
+                          child: _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFE5A93C), widget.onOpenCampaign),
+                        ),
+                      ),
+                      Container(
+                        decoration: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial)
+                            ? BoxDecoration(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF69F0AE), width: 1.6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF69F0AE).withValues(alpha: 0.55),
+                                    blurRadius: 14,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              )
+                            : null,
+                        child: _buildQuickActionBtn(
+                          widget.unspentSkillPoints > 0 ? 'SKILLS (${widget.unspentSkillPoints}★)' : 'SKILLS',
+                          Icons.auto_fix_high,
+                          (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? const Color(0xFF69F0AE) : const Color(0xFF00E5FF),
+                          widget.onOpenSkillTree ?? widget.onOpenBrigadeRoster,
+                        ),
+                      ),
+                      IgnorePointer(
+                        ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
+                        child: Opacity(
+                          opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
+                          child: _buildQuickActionBtn(
+                            'RETINUE',
+                            Icons.groups_outlined,
+                            const Color(0xFFAB47BC),
+                            widget.onOpenRetinueSquad ?? widget.onOpenBrigadeRoster,
+                          ),
+                        ),
+                      ),
+                      IgnorePointer(
+                        ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
+                        child: Opacity(
+                          opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
+                          child: _buildQuickActionBtn('CRUCIBLE', Icons.bloodtype_outlined, const Color(0xFFFF7043), widget.onOpenCrucible),
+                        ),
+                      ),
+                      IgnorePointer(
+                        ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
+                        child: Opacity(
+                          opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
+                          child: _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
+                        ),
+                      ),
+                      IgnorePointer(
+                        ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
+                        child: Opacity(
+                          opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
+                          child: _buildQuickActionBtn('UPGRADE', Icons.account_balance, const Color(0xFFFFD54F), () => _openSanctuaryArchitecture(null)),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1309,9 +1431,9 @@ class _HomeScreenState extends State<HomeScreen> {
         'borderColor': const Color(0xFFFF7043),
       },
       {
-        'title': 'PLINTH SCULPTORY',
-        'subtitle': 'Carve battle plinths & socket harvested Titan Cores',
-        'badge': 'PEDESTAL RUNES',
+        'title': 'TITAN CORE ALTAR',
+        'subtitle': 'Socket harvested Titan Cores & Runic Shards',
+        'badge': 'TITAN CORES',
         'badgeColor': const Color(0xFF00E5FF),
         'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
         'action': widget.onOpenPlinthSculptory ?? () {},

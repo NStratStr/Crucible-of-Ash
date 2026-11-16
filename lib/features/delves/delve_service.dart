@@ -223,21 +223,21 @@ class DelveService extends ChangeNotifier {
     r2b.connectedRoomIds.addAll([r3a.id, r3b.id]);
     r2c.connectedRoomIds.addAll([r3a.id, r3b.id]);
 
-    // --- Column 4: Floor Culmination (Extraction Stone or Archon Boss on Floor 3/5) ---
-    final bool isBossFloor = (floor == 3 || floor == 5);
+    // --- Column 4: Floor Culmination (Extraction Stone or Tower Boss every 5th Floor) ---
+    final bool isBossFloor = (floor % 5 == 0);
     final r4 = DelveRoom(
       id: 'f${floor}_c4_r0',
       floor: floor,
       column: 4,
       rowIndex: 0,
       type: isBossFloor ? DelveRoomType.catacombArchon : DelveRoomType.extractionStone,
-      title: isBossFloor ? 'Throne of the Catacomb Archon' : 'Stygian Extraction Runestone',
+      title: isBossFloor ? 'Floor $floor Boss: Catacomb Archon' : 'Stygian Extraction Runestone',
       description: isBossFloor
-          ? 'The subterranean colossus awakes from centuries of slumber in stagnant ash.'
+          ? 'Every 5th Tower Floor awakens a colossal guardian guarding milestone Sigils & Quicksilver.'
           : 'A shimmering azure runestone offering safe extraction to the Citadel or descent deeper.',
-      rewardIchor: (isBossFloor ? 250 : 80) * rewardScale.round(),
-      rewardOre: (isBossFloor ? 60 : 20) * rewardScale.round(),
-      rewardSigils: (isBossFloor ? 12 : 5) * rewardScale.round(),
+      rewardIchor: ((isBossFloor ? 250 : 80) * rewardScale).round(),
+      rewardOre: ((isBossFloor ? 60 : 20) * rewardScale).round(),
+      rewardSigils: isBossFloor ? (2 + (floor ~/ 5)) : (5 * rewardScale).round(),
       rewardPlinthShards: isBossFloor ? 6 : 3,
     );
     rooms[r4.id] = r4;

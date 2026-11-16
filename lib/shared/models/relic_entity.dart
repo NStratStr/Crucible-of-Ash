@@ -10,6 +10,13 @@ enum RelicSlot {
 }
 
 extension RelicSlotArmature on RelicSlot {
+  static const List<RelicSlot> activeSlots = [
+    RelicSlot.weapon,
+    RelicSlot.armor,
+    RelicSlot.talisman,
+    RelicSlot.sigil,
+  ];
+
   /// Master GDD §7.3 Armature Relic Gear Slot Names
   String get armatureSlotName {
     switch (this) {

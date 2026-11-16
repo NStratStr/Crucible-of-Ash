@@ -37,6 +37,8 @@ class SpatialActionEvent {
   final int damage;
   final bool isCrit;
   final bool isHeal;
+  final int healAmount;
+  final String? healTargetId;
   final int bleedStacks;
   final bool isPlayerAttacker;
   final TargetPattern pattern;
@@ -64,6 +66,8 @@ class SpatialActionEvent {
     required this.damage,
     this.isCrit = false,
     this.isHeal = false,
+    this.healAmount = 0,
+    this.healTargetId,
     this.bleedStacks = 0,
     required this.isPlayerAttacker,
     this.pattern = TargetPattern.singleTarget,

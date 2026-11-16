@@ -58,7 +58,7 @@ class RestHavenDialog extends StatelessWidget {
       onDismiss();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No upgradable relics equipped. Salvaged materials for +150 Ichor!'),
+          content: Text('No upgradable relics equipped. Salvaged materials for +150 Gold!'),
           backgroundColor: Color(0xFFE5A93C),
         ),
       );

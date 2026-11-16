@@ -14,6 +14,7 @@ class RelicForgeScreen extends StatefulWidget {
   final ValueChanged<int>? onOreChanged;
   final int currentChapter;
   final int completedLinearStages;
+  final int forgeTier;
 
   const RelicForgeScreen({
     super.key,
@@ -25,6 +26,7 @@ class RelicForgeScreen extends StatefulWidget {
     this.onOreChanged,
     this.currentChapter = 1,
     this.completedLinearStages = 0,
+    this.forgeTier = 1,
   });
 
   @override
@@ -55,23 +57,30 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     if (mounted) setState(() {});
   }
 
+  int get _forgeIchorCost => widget.forgeTier >= 2 ? 80 : 100;
+
+  int get _forgeOreCost => widget.forgeTier >= 3 ? 19 : 25;
+
+  int _refineOreCost(RelicEntity relic) =>
+      widget.forgeTier >= 3 ? (relic.upgradeCostOre * 0.75).round().clamp(1, 9999) : relic.upgradeCostOre;
+
   void _forgeNewRelic() {
-    const int ichorCost = 100;
-    const int oreCost = 25;
+    final int ichorCost = _forgeIchorCost;
+    final int oreCost = _forgeOreCost;
     if (widget.totalIchor < ichorCost) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient Ichor! Requires 100 Ichor to forge a Relic.'),
-          backgroundColor: Color(0xFFB3261E),
+        SnackBar(
+          content: Text('Insufficient Gold! Requires $ichorCost Gold to forge a Relic.'),
+          backgroundColor: const Color(0xFFB3261E),
         ),
       );
       return;
     }
     if (widget.cursedOre < oreCost) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient Cursed Ore! Requires 25 Cursed Ore from expedition skirmishes.'),
-          backgroundColor: Color(0xFF00695C),
+        SnackBar(
+          content: Text('Insufficient Cursed Ore! Requires $oreCost Cursed Ore from expedition skirmishes.'),
+          backgroundColor: const Color(0xFF00695C),
         ),
       );
       return;
@@ -86,7 +95,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Forged ${forged.name} (${forged.rarity.name.toUpperCase()})! Spent 100 Ichor & 25 Ore.'),
+        content: Text('Forged ${forged.name} (${forged.rarity.name.toUpperCase()})! Spent $ichorCost Gold & $oreCost Ore.'),
         backgroundColor: forged.rarityColor,
       ),
     );
@@ -257,7 +266,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
-              children: RelicSlot.values.map((slot) {
+              children: RelicSlotArmature.activeSlots.map((slot) {
                 final relic = equippedRelics.where((r) => r.slot == slot).firstOrNull;
                 return Expanded(
                   child: _buildEquipmentSlotCard(slot: slot, relic: relic, unitId: selectedUnit.id),
@@ -409,7 +418,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             child: Row(
               children: [
                 _buildFilterChip('ALL SLOTS', null),
-                ...RelicSlot.values.map((s) => _buildFilterChip(s.name.toUpperCase(), s)),
+                ...RelicSlotArmature.activeSlots.map((s) => _buildFilterChip(s.name.toUpperCase(), s)),
               ],
             ),
           ),
@@ -445,7 +454,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             child: unequipped.isEmpty
                 ? Center(
                     child: Text(
-                      'No unequipped ${_slotFilter != null ? _slotFilter!.name.toUpperCase() : ""} ${_setTypeFilter != null ? RelicEntity.setName(_setTypeFilter!) : ""} relics in inventory.\nForge more using Ichor above!',
+                      'No unequipped ${_slotFilter != null ? _slotFilter!.name.toUpperCase() : ""} ${_setTypeFilter != null ? RelicEntity.setName(_setTypeFilter!) : ""} relics in inventory.\nForge more using Gold above!',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white38, fontSize: 11),
                     ),
@@ -480,11 +489,11 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     }
 
     final cost = relic.upgradeCostIchor;
-    final int oreCost = relic.upgradeCostOre;
+    final int oreCost = _refineOreCost(relic);
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Insufficient Ichor! Refinement requires $cost Ichor.'),
+          content: Text('Insufficient Gold! Refinement requires $cost Gold.'),
           backgroundColor: const Color(0xFFB3261E),
         ),
       );
@@ -854,7 +863,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                   child: Text(
-                    'REFINE (${relic.upgradeCostIchor}I / ${relic.upgradeCostOre}O)',
+                    'REFINE (${relic.upgradeCostIchor}I / ${_refineOreCost(relic)}O)',
                     style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
                   ),
                 ),

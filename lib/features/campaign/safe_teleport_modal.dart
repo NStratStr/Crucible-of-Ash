@@ -139,7 +139,7 @@ class SafeTeleportModal extends StatelessWidget {
                   child: _buildLootTile(
                     icon: Icons.water_drop,
                     color: const Color(0xFFEF5350),
-                    label: 'RAW ICHOR',
+                    label: 'RAW GOLD',
                     amount: '+$accumulatedIchor',
                   ),
                 ),

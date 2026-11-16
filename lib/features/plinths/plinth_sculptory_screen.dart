@@ -10,6 +10,7 @@ class PlinthSculptoryScreen extends StatefulWidget {
   final int totalIchor;
   final ValueChanged<int>? onIchorChanged;
   final VoidCallback? onClose;
+  final int forgeTier;
 
   const PlinthSculptoryScreen({
     super.key,
@@ -18,6 +19,7 @@ class PlinthSculptoryScreen extends StatefulWidget {
     required this.totalIchor,
     this.onIchorChanged,
     this.onClose,
+    this.forgeTier = 1,
   });
 
   @override

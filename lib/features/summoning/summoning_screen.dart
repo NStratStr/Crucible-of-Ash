@@ -8,6 +8,7 @@ class SummoningScreen extends StatefulWidget {
   final int bloodlineSigils;
   final Function(SummonResult result) onSummonExecuted;
   final VoidCallback? onClose;
+  final bool isFirstSummon;
 
   const SummoningScreen({
     super.key,
@@ -15,6 +16,7 @@ class SummoningScreen extends StatefulWidget {
     required this.bloodlineSigils,
     required this.onSummonExecuted,
     this.onClose,
+    this.isFirstSummon = false,
   });
 
   static Future<void> showAsModal({
@@ -22,6 +24,7 @@ class SummoningScreen extends StatefulWidget {
     required int totalIchor,
     required int bloodlineSigils,
     required Function(SummonResult result) onSummonExecuted,
+    bool isFirstSummon = false,
   }) {
     return showDialog(
       context: context,
@@ -31,6 +34,7 @@ class SummoningScreen extends StatefulWidget {
         bloodlineSigils: bloodlineSigils,
         onSummonExecuted: onSummonExecuted,
         onClose: () => Navigator.of(ctx).pop(),
+        isFirstSummon: isFirstSummon,
       ),
     );
   }
@@ -42,6 +46,7 @@ class SummoningScreen extends StatefulWidget {
 class _SummoningScreenState extends State<SummoningScreen> {
   SummonBannerType _selectedBannerType = SummonBannerType.ashenBloodline;
   bool _isPerformingRitual = false;
+  bool _hasUsedGuaranteedStarter = false;
   List<UnitEntity>? _revealedUnits;
   int _revealedIndex = 0;
 
@@ -200,7 +205,7 @@ class _SummoningScreenState extends State<SummoningScreen> {
             icon: Icons.water_drop,
             color: const Color(0xFFEF5350),
             value: '${widget.totalIchor}',
-            tooltip: 'Raw Ichor',
+            tooltip: 'Raw Gold',
           ),
           const SizedBox(width: 8),
           _buildCurrencyBadge(
@@ -662,12 +667,17 @@ class _SummoningScreenState extends State<SummoningScreen> {
         _isPerformingRitual = true;
       });
 
+      final bool guaranteeStarter = widget.isFirstSummon && !_hasUsedGuaranteedStarter;
       final result = SummoningService.performSummon(
         bannerType: _selectedBannerType,
         count: count,
         currentIchor: widget.totalIchor,
         currentSigils: widget.bloodlineSigils,
+        guaranteeStarterVanguard: guaranteeStarter,
       );
+      if (guaranteeStarter) {
+        _hasUsedGuaranteedStarter = true;
+      }
 
       // Invoke parent callback to deduct currencies & update reserve inventory
       widget.onSummonExecuted(result);

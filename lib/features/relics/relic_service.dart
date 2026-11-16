@@ -312,7 +312,7 @@ class RelicService extends ChangeNotifier {
     int chapter = 1,
     int stageDepth = 1,
   }) {
-    final slots = RelicSlot.values;
+    const slots = RelicSlotArmature.activeSlots;
     // Mission-specific equipment sets: each chapter features distinct thematic gear
     final allowedSets = RelicEntity.setsForChapter(chapter);
 

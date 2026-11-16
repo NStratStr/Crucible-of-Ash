@@ -17,6 +17,12 @@ enum CrucibleSkillBranch {
   apex,       // Crown Finishers (White-Gold Overdrive)
 }
 
+enum SculptorClassArchetype {
+  forgeBerserker, // Paths: Wrath (Armor Shred) & Calamity (AoE / Vortex) + Apex
+  ironcladWarden, // Paths: Bastion (Armor / Stuns) & Vitae (Squad Healing) + Apex
+  bloodAlchemist, // Paths: Resonance (Sanguine Bleed & Mire Blight) + Apex
+}
+
 class CrucibleSkillNode {
   final String id;
   final String name;
@@ -37,6 +43,7 @@ class CrucibleSkillNode {
   final double baseMultiplier;
   final int maxRank;
   final double cooldownSeconds;
+  final bool isPassive;
 
   int rank; // Current rank (1..maxRank = unlocked/upgraded)
 
@@ -61,6 +68,7 @@ class CrucibleSkillNode {
     this.maxRank = 3,
     this.rank = 1,
     this.cooldownSeconds = 6.0,
+    this.isPassive = false,
   });
 
   bool get isUnlocked => rank > 0;
@@ -88,6 +96,41 @@ class CrucibleSkillTreeState {
   final Map<String, CrucibleSkillNode> allSkills = {};
   final List<String> equippedSkillIds = List.filled(5, '');
   int availableSkillPoints = 0;
+  int sculptorLevel = 1;
+  int sculptorXp = 0;
+  int castleCrucibleTier = 1;
+  SculptorClassArchetype activeClass = SculptorClassArchetype.forgeBerserker;
+
+  int get xpToNextLevel => sculptorLevel * 300;
+
+  double get sculptorHpMultiplier => 1.0 + (sculptorLevel - 1) * 0.06;
+  double get sculptorAtkMultiplier => 1.0 + (sculptorLevel - 1) * 0.05;
+  double get sculptorDefMultiplier => 1.0 + (sculptorLevel - 1) * 0.05;
+
+  /// Awards Sculptor XP and converts level-ups into +1★ Skill Point each.
+  int addSculptorXp(int amount) {
+    if (amount <= 0) return 0;
+    sculptorXp += amount;
+    int levelsGained = 0;
+    while (sculptorXp >= xpToNextLevel) {
+      sculptorXp -= xpToNextLevel;
+      sculptorLevel++;
+      availableSkillPoints++;
+      levelsGained++;
+    }
+    return levelsGained;
+  }
+
+  List<CrucibleSkillBranch> get visibleBranchesForActiveClass {
+    switch (activeClass) {
+      case SculptorClassArchetype.forgeBerserker:
+        return [CrucibleSkillBranch.wrath, CrucibleSkillBranch.calamity, CrucibleSkillBranch.apex];
+      case SculptorClassArchetype.ironcladWarden:
+        return [CrucibleSkillBranch.bastion, CrucibleSkillBranch.vitae, CrucibleSkillBranch.apex];
+      case SculptorClassArchetype.bloodAlchemist:
+        return [CrucibleSkillBranch.resonance, CrucibleSkillBranch.apex];
+    }
+  }
 
   CrucibleSkillTreeState() {
     _initializeAllSkills();
@@ -113,12 +156,12 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFFB3261E),
       borderColor: const Color(0xFFFF8A80),
       actionType: 'forge_cleave',
-      summary: 'Main cinder generator consuming 0 Cinders. Generates +18 Cinders on strike and inflicts Bleed.',
+      summary: 'Main cinder generator consuming 0 Cinders. Generates +18 Cinders, inflicts Bleed, and restores 6% Max HP on hit.',
       baseMultiplier: 1.40,
       rankDescriptions: [
-        'Rank 1: 140% ATK cleave + 1 Bleed stack. Generates +18 Cinders (6.0s CD).',
-        'Rank 2: 175% ATK cleave + 2 Bleeds + 10% armor pierce. Generates +22 Cinders (5.4s CD).',
-        'Rank 3: 210% ATK cleave + 3 Bleeds + row splash. Generates +26 Cinders (4.8s CD).',
+        'Rank 1: 140% ATK cleave + 1 Bleed stack + 6% Max HP self-heal. Generates +18 Cinders (6.0s CD).',
+        'Rank 2: 175% ATK cleave + 2 Bleeds + 6% Max HP self-heal + 10% armor pierce. Generates +22 Cinders (5.4s CD).',
+        'Rank 3: 210% ATK cleave + 3 Bleeds + 6% Max HP self-heal + row splash. Generates +26 Cinders (4.8s CD).',
       ],
     );
 
@@ -138,12 +181,12 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFFC2185B),
       borderColor: const Color(0xFFFF4081),
       actionType: 'sundering_brand',
-      summary: 'Molten brand that permanently shatters armor and triggers retinue ambushes.',
+      summary: 'Molten brand that shatters armor and triggers a free Retinue Follow-Up Strike from a deployed companion.',
       baseMultiplier: 1.75,
       rankDescriptions: [
-        'Rank 1: 175% ATK DMG, shatters 50% Armor, triggers Crypt Stalker ambush.',
+        'Rank 1: 175% ATK DMG, shatters 50% Armor, triggers Retinue Follow-Up Strike (companion hits for 85% ATK).',
         'Rank 2: 215% ATK DMG, shatters 65% Armor + inflicts 3s Vulnerable.',
-        'Rank 3: 260% ATK DMG, completely breaks Armor (100% shred) + triggers double ambush.',
+        'Rank 3: 260% ATK DMG, completely breaks Armor (100% shred) + triggers double Retinue Follow-Up.',
       ],
     );
 
@@ -195,6 +238,30 @@ class CrucibleSkillTreeState {
       ],
     );
 
+    allSkills['calamity_fire_barrage'] = CrucibleSkillNode(
+      tier: 2,
+      requiredBranchPoints: 0,
+      prerequisiteSkillId: 'passive_calamity_cinders',
+      id: 'calamity_fire_barrage',
+      name: 'Cinder Fire Barrage',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.calamity,
+      defaultSlot: 2,
+      cinderCost: 35,
+      cooldownSeconds: 9.0,
+      icon: Icons.local_fire_department,
+      primaryColor: const Color(0xFFFF5722),
+      borderColor: const Color(0xFFFFD54F),
+      actionType: 'fire_barrage',
+      summary: 'Calls down a blazing meteor barrage across ALL enemies, inflicting heavy Magic AoE damage and Burn.',
+      baseMultiplier: 1.55,
+      rankDescriptions: [
+        'Rank 1: 155% Magic AoE Fire Barrage across all enemies + 3.0s Burn (35🔥 • 9.0s CD).',
+        'Rank 2: 195% Magic AoE Fire Barrage + 4.0s Burn + melts 15% Armor.',
+        'Rank 3: 240% Magic AoE Fire Barrage + 5.0s Burn + melts 25% Armor.',
+      ],
+    );
+
     allSkills['ash_pyre'] = CrucibleSkillNode(
       tier: 4,
       requiredBranchPoints: 3,
@@ -237,19 +304,19 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFF5D4037),
       borderColor: const Color(0xFFFFD54F),
       actionType: 'cold_iron_slam',
-      summary: 'Tower shield slam consuming 0 Cinders. Main cinder generator (+18 Cinders), shreds armor, and staggers turn order.',
+      summary: 'Tower shield slam consuming 0 Cinders. Generates +18 Cinders, shreds armor, staggers turn order, and grants +35 Aegis & 4% Max HP sustain.',
       baseMultiplier: 1.30,
       rankDescriptions: [
-        'Rank 1: 130% ATK DMG, shreds 20 Armor, -1,500 AP stagger. Generates +6 Cinders.',
-        'Rank 2: 165% ATK DMG, shreds 35 Armor, -2,500 AP stagger. Generates +8 Cinders.',
-        'Rank 3: 200% ATK DMG, shreds 50 Armor, stuns target for 1 turn. Generates +10 Cinders.',
+        'Rank 1: 130% ATK DMG, shreds 20 Armor, -1,500 AP stagger, +35 Aegis Shield & 4% Max HP heal. Generates +6 Cinders.',
+        'Rank 2: 165% ATK DMG, shreds 35 Armor, -2,500 AP stagger, +35 Aegis Shield & 4% Max HP heal. Generates +8 Cinders.',
+        'Rank 3: 200% ATK DMG, shreds 50 Armor, stuns target for 1 turn, +35 Aegis Shield & 4% Max HP heal. Generates +10 Cinders.',
       ],
     );
 
     allSkills['iron_judgment'] = CrucibleSkillNode(
       tier: 3,
       requiredBranchPoints: 2,
-      prerequisiteSkillId: 'ash_brand',
+      prerequisiteSkillId: 'passive_wrath_crit',
       id: 'iron_judgment',
       name: 'Sundering Judgment',
       discipline: CrucibleSkillDiscipline.iron,
@@ -274,7 +341,7 @@ class CrucibleSkillTreeState {
     allSkills['iron_bulwark'] = CrucibleSkillNode(
       tier: 3,
       requiredBranchPoints: 2,
-      prerequisiteSkillId: 'ash_bastion',
+      prerequisiteSkillId: 'passive_bastion_armor',
       id: 'iron_bulwark',
       name: 'Iron Bulwark',
       discipline: CrucibleSkillDiscipline.iron,
@@ -299,7 +366,7 @@ class CrucibleSkillTreeState {
     allSkills['iron_retribution'] = CrucibleSkillNode(
       tier: 3,
       requiredBranchPoints: 2,
-      prerequisiteSkillId: 'ash_bastion',
+      prerequisiteSkillId: 'passive_bastion_aegis',
       id: 'iron_retribution',
       name: 'Dawn Retribution',
       discipline: CrucibleSkillDiscipline.iron,
@@ -374,7 +441,7 @@ class CrucibleSkillTreeState {
     allSkills['sanguine_brand'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'sanguine_rend',
+      prerequisiteSkillId: 'passive_res_leech',
       id: 'sanguine_brand',
       name: 'Crimson Brand',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -424,7 +491,7 @@ class CrucibleSkillTreeState {
     allSkills['sanguine_vortex'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'ash_whirlwind',
+      prerequisiteSkillId: 'passive_calamity_burn',
       id: 'sanguine_vortex',
       name: 'Blood Vortex',
       discipline: CrucibleSkillDiscipline.sanguine,
@@ -499,7 +566,7 @@ class CrucibleSkillTreeState {
     allSkills['mire_brand'] = CrucibleSkillNode(
       tier: 3,
       requiredBranchPoints: 2,
-      prerequisiteSkillId: 'mire_touch',
+      prerequisiteSkillId: 'passive_res_dot',
       id: 'mire_brand',
       name: 'Miasmic Brand',
       discipline: CrucibleSkillDiscipline.mire,
@@ -647,7 +714,7 @@ class CrucibleSkillTreeState {
     allSkills['vitae_bloom'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'vitae_mending',
+      prerequisiteSkillId: 'passive_vitae_heal',
       id: 'vitae_bloom',
       name: 'Sanctified Bloom',
       discipline: CrucibleSkillDiscipline.ash,
@@ -719,17 +786,299 @@ class CrucibleSkillTreeState {
       ],
     );
 
+    // ==========================================
+    // PASSIVE TIER UPGRADES (5 RANKS EACH • LONG-TERM PROGRESSION)
+    // ==========================================
+    allSkills['passive_wrath_atk'] = CrucibleSkillNode(
+      id: 'passive_wrath_atk',
+      name: 'Pyre-Tempered Edge',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.wrath,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.flash_on,
+      primaryColor: const Color(0xFFB71C1C),
+      borderColor: const Color(0xFFFF8A80),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently increases Ash Sculptor ATK by +6% per rank (up to +30%).',
+      baseMultiplier: 0.06,
+      rankDescriptions: [
+        'Rank 1: +6% Ash Sculptor ATK.',
+        'Rank 2: +12% Ash Sculptor ATK.',
+        'Rank 3: +18% Ash Sculptor ATK.',
+        'Rank 4: +24% Ash Sculptor ATK.',
+        'Rank 5: +30% Ash Sculptor ATK.',
+      ],
+    );
+
+    allSkills['passive_wrath_crit'] = CrucibleSkillNode(
+      id: 'passive_wrath_crit',
+      name: 'Relentless Cinders',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.wrath,
+      tier: 2,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.bolt,
+      primaryColor: const Color(0xFFD84315),
+      borderColor: const Color(0xFFFFAB40),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +5% Crit Chance & +10% Crit Damage per rank.',
+      baseMultiplier: 0.05,
+      rankDescriptions: [
+        'Rank 1: +5% Crit Chance, +10% Crit DMG.',
+        'Rank 2: +10% Crit Chance, +20% Crit DMG.',
+        'Rank 3: +15% Crit Chance, +30% Crit DMG.',
+        'Rank 4: +20% Crit Chance, +40% Crit DMG.',
+        'Rank 5: +25% Crit Chance, +50% Crit DMG.',
+      ],
+    );
+
+    allSkills['passive_calamity_cinders'] = CrucibleSkillNode(
+      id: 'passive_calamity_cinders',
+      name: 'Stoked Furnace',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.calamity,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.whatshot,
+      primaryColor: const Color(0xFFE65100),
+      borderColor: const Color(0xFFFFD54F),
+      actionType: 'passive',
+      summary: 'PASSIVE: Start each battle with +5 extra Cinders per rank (up to +25🔥).',
+      baseMultiplier: 5.0,
+      rankDescriptions: [
+        'Rank 1: +5 Starting Cinders.',
+        'Rank 2: +10 Starting Cinders.',
+        'Rank 3: +15 Starting Cinders.',
+        'Rank 4: +20 Starting Cinders.',
+        'Rank 5: +25 Starting Cinders.',
+      ],
+    );
+
+    allSkills['passive_calamity_burn'] = CrucibleSkillNode(
+      id: 'passive_calamity_burn',
+      name: 'Wildfire Intensity',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.calamity,
+      tier: 2,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.local_fire_department,
+      primaryColor: const Color(0xFFFF6D00),
+      borderColor: const Color(0xFFFFAB40),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently increases Sculptor ATK & Speed (+5% ATK, +4 SPD per rank).',
+      baseMultiplier: 0.05,
+      rankDescriptions: [
+        'Rank 1: +5% ATK, +4 Speed.',
+        'Rank 2: +10% ATK, +8 Speed.',
+        'Rank 3: +15% ATK, +12 Speed.',
+        'Rank 4: +20% ATK, +16 Speed.',
+        'Rank 5: +25% ATK, +20 Speed.',
+      ],
+    );
+
+    allSkills['passive_bastion_armor'] = CrucibleSkillNode(
+      id: 'passive_bastion_armor',
+      name: 'Granite Plating',
+      discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.bastion,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.security,
+      primaryColor: const Color(0xFF006064),
+      borderColor: const Color(0xFF00E5FF),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +20 Armor & +6% Max HP per rank.',
+      baseMultiplier: 20.0,
+      rankDescriptions: [
+        'Rank 1: +20 Armor, +6% Max HP.',
+        'Rank 2: +40 Armor, +12% Max HP.',
+        'Rank 3: +60 Armor, +18% Max HP.',
+        'Rank 4: +80 Armor, +24% Max HP.',
+        'Rank 5: +100 Armor, +30% Max HP.',
+      ],
+    );
+
+    allSkills['passive_bastion_aegis'] = CrucibleSkillNode(
+      id: 'passive_bastion_aegis',
+      name: 'Aegis Resonance',
+      discipline: CrucibleSkillDiscipline.iron,
+      branch: CrucibleSkillBranch.bastion,
+      tier: 2,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.shield,
+      primaryColor: const Color(0xFF0277BD),
+      borderColor: const Color(0xFF80D8FF),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +25 Armor & +4% ATK per rank.',
+      baseMultiplier: 25.0,
+      rankDescriptions: [
+        'Rank 1: +25 Armor, +4% ATK.',
+        'Rank 2: +50 Armor, +8% ATK.',
+        'Rank 3: +75 Armor, +12% ATK.',
+        'Rank 4: +100 Armor, +16% ATK.',
+        'Rank 5: +125 Armor, +20% ATK.',
+      ],
+    );
+
+    allSkills['passive_vitae_heal'] = CrucibleSkillNode(
+      id: 'passive_vitae_heal',
+      name: 'Living Mineral Sap',
+      discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.vitae,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.favorite,
+      primaryColor: const Color(0xFF1B5E20),
+      borderColor: const Color(0xFF69F0AE),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +7% Max HP & +4 Speed per rank.',
+      baseMultiplier: 0.07,
+      rankDescriptions: [
+        'Rank 1: +7% Max HP, +4 Speed.',
+        'Rank 2: +14% Max HP, +8 Speed.',
+        'Rank 3: +21% Max HP, +12 Speed.',
+        'Rank 4: +28% Max HP, +16 Speed.',
+        'Rank 5: +35% Max HP, +20 Speed.',
+      ],
+    );
+
+    allSkills['passive_res_leech'] = CrucibleSkillNode(
+      id: 'passive_res_leech',
+      name: 'Crimson Vein',
+      discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.resonance,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.bloodtype,
+      primaryColor: const Color(0xFF6A1B9A),
+      borderColor: const Color(0xFFEA80FC),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +5% ATK & +4% Lifesteal per rank.',
+      baseMultiplier: 0.04,
+      rankDescriptions: [
+        'Rank 1: +5% ATK, +4% Lifesteal.',
+        'Rank 2: +10% ATK, +8% Lifesteal.',
+        'Rank 3: +15% ATK, +12% Lifesteal.',
+        'Rank 4: +20% ATK, +16% Lifesteal.',
+        'Rank 5: +25% ATK, +20% Lifesteal.',
+      ],
+    );
+
+    allSkills['passive_res_dot'] = CrucibleSkillNode(
+      id: 'passive_res_dot',
+      name: 'Virulent Hemorrhage',
+      discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.resonance,
+      tier: 2,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.coronavirus,
+      primaryColor: const Color(0xFF4A148C),
+      borderColor: const Color(0xFFCE93D8),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +5% Crit Chance & +5 Speed per rank.',
+      baseMultiplier: 0.05,
+      rankDescriptions: [
+        'Rank 1: +5% Crit Chance, +5 Speed.',
+        'Rank 2: +10% Crit Chance, +10 Speed.',
+        'Rank 3: +15% Crit Chance, +15 Speed.',
+        'Rank 4: +20% Crit Chance, +20 Speed.',
+        'Rank 5: +25% Crit Chance, +25 Speed.',
+      ],
+    );
+
+    allSkills['passive_apex_mastery'] = CrucibleSkillNode(
+      id: 'passive_apex_mastery',
+      name: 'Eternal Crucible Mastery',
+      discipline: CrucibleSkillDiscipline.ash,
+      branch: CrucibleSkillBranch.apex,
+      tier: 4,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.auto_awesome,
+      primaryColor: const Color(0xFFFF8F00),
+      borderColor: const Color(0xFFFFD54F),
+      actionType: 'passive',
+      summary: 'APEX PASSIVE: +8% ATK, +8% Max HP, +25 Armor & +5 Speed per rank.',
+      baseMultiplier: 0.08,
+      rankDescriptions: [
+        'Rank 1: +8% ATK & HP, +25 Armor, +5 Speed.',
+        'Rank 2: +16% ATK & HP, +50 Armor, +10 Speed.',
+        'Rank 3: +24% ATK & HP, +75 Armor, +15 Speed.',
+        'Rank 4: +32% ATK & HP, +100 Armor, +20 Speed.',
+        'Rank 5: +40% ATK & HP, +125 Armor, +25 Speed.',
+      ],
+    );
   }
 
   void configureStartingDiscipline(CrucibleSkillBranch branch, {bool startWithBasics = true}) {
+    switch (branch) {
+      case CrucibleSkillBranch.wrath:
+      case CrucibleSkillBranch.calamity:
+        activeClass = SculptorClassArchetype.forgeBerserker;
+        break;
+      case CrucibleSkillBranch.bastion:
+      case CrucibleSkillBranch.vitae:
+        activeClass = SculptorClassArchetype.ironcladWarden;
+        break;
+      case CrucibleSkillBranch.resonance:
+      case CrucibleSkillBranch.apex:
+        activeClass = SculptorClassArchetype.bloodAlchemist;
+        break;
+    }
+
     if (startWithBasics) {
       // Start with only Slot 1 (0-Cinder generator) at Rank 1.
-      // Slots 2, 3, 4, 5 start empty and are unlocked through combat victories & Skill Points.
+      // All other skills start locked at Rank 0, and Slots 2..5 start empty.
+      for (final s in allSkills.values) {
+        s.rank = 0;
+      }
       equippedSkillIds[1] = '';
       equippedSkillIds[2] = '';
       equippedSkillIds[3] = '';
       equippedSkillIds[4] = '';
       availableSkillPoints = 0;
+      sculptorLevel = 1;
+      sculptorXp = 0;
 
       switch (branch) {
         case CrucibleSkillBranch.wrath:
@@ -749,8 +1098,8 @@ class CrucibleSkillTreeState {
           allSkills['vitae_mending']?.rank = 1;
           break;
         case CrucibleSkillBranch.calamity:
-          equippedSkillIds[0] = 'ash_whirlwind';
-          allSkills['ash_whirlwind']?.rank = 1;
+          equippedSkillIds[0] = 'ash_cleave';
+          allSkills['ash_cleave']?.rank = 1;
           break;
         case CrucibleSkillBranch.apex:
           equippedSkillIds[0] = 'ash_cleave';
@@ -863,24 +1212,80 @@ class CrucibleSkillTreeState {
     return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + vitaePointsSpent + calamityPointsSpent;
   }
 
+  int _r(String id) => allSkills[id]?.rank ?? 0;
+
+  double get passiveAtkMultiplier =>
+      1.0 +
+      (_r('passive_wrath_atk') * 0.06) +
+      (_r('passive_calamity_burn') * 0.05) +
+      (_r('passive_bastion_aegis') * 0.04) +
+      (_r('passive_res_leech') * 0.05) +
+      (_r('passive_apex_mastery') * 0.08);
+
+  double get passiveHpMultiplier =>
+      1.0 +
+      (_r('passive_bastion_armor') * 0.06) +
+      (_r('passive_vitae_heal') * 0.07) +
+      (_r('passive_apex_mastery') * 0.08);
+
+  int get passiveBonusArmor =>
+      (_r('passive_bastion_armor') * 20) +
+      (_r('passive_bastion_aegis') * 25) +
+      (_r('passive_apex_mastery') * 25);
+
+  int get passiveBonusSpeed =>
+      (_r('passive_calamity_burn') * 4) +
+      (_r('passive_vitae_heal') * 4) +
+      (_r('passive_res_dot') * 5) +
+      (_r('passive_apex_mastery') * 5);
+
+  int get passiveStartingCinders => _r('passive_calamity_cinders') * 5;
+
+  double get passiveCritRateBonus =>
+      (_r('passive_wrath_crit') * 0.05) + (_r('passive_res_dot') * 0.05);
+
+  double get passiveCritDamageBonus => _r('passive_wrath_crit') * 0.10;
+
+  double get passiveLifestealBonus => _r('passive_res_leech') * 0.04;
+
+  int requiredSculptorLevelForTier(int tier) {
+    if (tier <= 1) return 1;
+    if (tier == 2) return 2;
+    if (tier == 3) return 4;
+    return 6;
+  }
+
+  int requiredCastleTierForSkillTier(int tier) {
+    if (tier <= 2) return 1;
+    if (tier == 3) return 2;
+    return 3;
+  }
+
   bool isSkillPrerequisiteMet(String skillId) {
     final skill = allSkills[skillId];
     if (skill == null) return false;
+
+    final reqLv = requiredSculptorLevelForTier(skill.tier);
+    final reqCastle = requiredCastleTierForSkillTier(skill.tier);
+    if (sculptorLevel < reqLv || castleCrucibleTier < reqCastle) {
+      return false;
+    }
 
     // Apex Crown Finishers require 3 points spent anywhere or in discipline
     if (skill.branch == CrucibleSkillBranch.apex) {
       return totalPointsSpent >= 3;
     }
 
-    // Branch points requirement
-    if (getPointsSpentInBranch(skill.branch) < skill.requiredBranchPoints) {
+    // Branch points requirement (Tier 2 unlocks as soon as its Tier 1 starter is unlocked)
+    if (skill.tier > 2 && getPointsSpentInBranch(skill.branch) < skill.requiredBranchPoints) {
       return false;
     }
 
-    // Specific predecessor skill must be at least Rank 2 (meaning at least 1 upgrade invested in it)
+    // Specific predecessor skill must be unlocked (Rank 1+ for Tier 2, Rank 2+ for Tier 3+)
     if (skill.prerequisiteSkillId != null) {
       final prereq = allSkills[skill.prerequisiteSkillId];
-      if (prereq == null || prereq.rank < 2) {
+      final minPrereqRank = skill.tier <= 2 ? 1 : 2;
+      if (prereq == null || prereq.rank < minPrereqRank) {
         return false;
       }
     }
@@ -892,6 +1297,15 @@ class CrucibleSkillTreeState {
     final skill = allSkills[skillId];
     if (skill == null) return '';
 
+    final reqLv = requiredSculptorLevelForTier(skill.tier);
+    final reqCastle = requiredCastleTierForSkillTier(skill.tier);
+    if (sculptorLevel < reqLv) {
+      return 'Requires Sculptor Lv. $reqLv (Current: Lv. $sculptorLevel).';
+    }
+    if (castleCrucibleTier < reqCastle) {
+      return 'Requires Great Crucible (Castle) Tier $reqCastle (Current: Tier $castleCrucibleTier).';
+    }
+
     if (skill.branch == CrucibleSkillBranch.apex) {
       if (totalPointsSpent < 3) {
         return 'Requires 3 points invested across any branch ($totalPointsSpent/3).';
@@ -901,14 +1315,15 @@ class CrucibleSkillTreeState {
 
     final branchName = skill.branch.name.toUpperCase();
     final ptsSpent = getPointsSpentInBranch(skill.branch);
-    if (ptsSpent < skill.requiredBranchPoints) {
+    if (skill.tier > 2 && ptsSpent < skill.requiredBranchPoints) {
       return 'Requires ${skill.requiredBranchPoints} pt${skill.requiredBranchPoints > 1 ? "s" : ""} in Path of $branchName ($ptsSpent/${skill.requiredBranchPoints}).';
     }
 
     if (skill.prerequisiteSkillId != null) {
       final prereq = allSkills[skill.prerequisiteSkillId];
-      if (prereq != null && prereq.rank < 2) {
-        return 'Requires Rank 2 in ${prereq.name} (invest 1 SP in ${prereq.name}).';
+      final minPrereqRank = skill.tier <= 2 ? 1 : 2;
+      if (prereq != null && prereq.rank < minPrereqRank) {
+        return 'Requires Rank $minPrereqRank in ${prereq.name}.';
       }
     }
 

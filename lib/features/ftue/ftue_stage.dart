@@ -30,15 +30,15 @@ extension FtueStageMeta on FtueStage {
   String get title {
     switch (this) {
       case FtueStage.awakening:
-        return 'SCREEN 1: THE AWAKENING';
+        return 'ACT I: THE AWAKENING';
       case FtueStage.encounter1:
-        return 'SCREEN 2: INITIATIVE TICKS';
+        return 'STAGE 1-1: ASHEN OUTPOST';
       case FtueStage.encounter2:
-        return 'SCREEN 3: THE HEX WHEEL & FOCUS';
+        return 'STAGE 1-2: SUNKEN TRENCH';
       case FtueStage.crucibleFusion:
-        return 'SCREEN 4: CRUCIBLE TRANSMUTATION';
+        return 'STAGE 1-3: SIPHON THRESHOLD';
       case FtueStage.encounter3:
-        return 'SCREEN 5: GATEKEEPER PURGE';
+        return 'STAGE 1-5: ABYSSAL JUGGERNAUT';
       case FtueStage.completed:
         return 'CAMPAIGN UNLEASHED';
     }
@@ -47,34 +47,34 @@ extension FtueStageMeta on FtueStage {
   String get shortObjective {
     switch (this) {
       case FtueStage.awakening:
-        return 'Bind your Progenitor General covenant';
+        return 'Choose your Ash Sculptor Crucible Discipline';
       case FtueStage.encounter1:
-        return 'Win skirmish; observe Speed ticks & Vanguard shields';
+        return 'Clear Ashen Outpost solo to rescue your Vanguard Husk & earn +1★ Skill Point';
       case FtueStage.encounter2:
-        return 'Exploit Hex affinities and deploy Commander Focus Orders';
+        return 'Unlock Slot 2 in the Skill Tree and defeat the Sunken Trench pack';
       case FtueStage.crucibleFusion:
-        return 'Transmute duplicate War-Hounds into Gen 2 Cerberus Spawn';
+        return 'Conquer Siphon Threshold to recruit your 2nd Retinue companion';
       case FtueStage.encounter3:
-        return 'Vanquish the Ashen Gatekeeper Colossus with your Gen 2 Champion';
+        return 'Challenge the Abyssal Juggernaut Elite with your 3-unit squad';
       case FtueStage.completed:
-        return 'Traverse the Ashen Campaign DAG and challenge the Endgame Gauntlet';
+        return 'Conquer Chapter 1, forge Relics, and unlock Apex Crucible skills';
     }
   }
 
   String get tacticalAdvice {
     switch (this) {
       case FtueStage.awakening:
-        return 'Lord Vladislav offers +8% Lifesteal against bleeding targets, while Lady Valeria grants frontline Vanguard +25% Armor and Retaliation.';
+        return 'Your Discipline sets your starting Slot 1 Cinder generator. You will unlock Slots 2–5 and higher ranks by earning Skill Points from campaign victories.';
       case FtueStage.encounter1:
-        return 'The initiative engine ticks Turn Meters toward 100 based on Speed. Frontline Vanguard absorbs melee strikes while backline Arcanum casts safely.';
+        return 'Drag your Ash Sculptor between Frontline, Midline, and Backline lanes to intercept or flank. Winning 1-1 rescues a Vanguard Husk and grants +1★ Skill Point.';
       case FtueStage.encounter2:
-        return 'Clockwise matchups deal +30% damage, counter-clockwise deal 0.75x with 25% Glancing blows. Dealing & taking 500 damage yields 1 Focus point.';
+        return 'Open the Crucible Skill Tree (top HUD or Citadel Home) to spend your ★ Skill Point on a Slot 2 Cinder spender, then deploy your Vanguard Husk in front.';
       case FtueStage.crucibleFusion:
-        return 'Max-level progenitors transfer 10% of their final stats, plus one grafted passive trait. The resulting Gen 2 beast gains increased level caps and base power.';
+        return 'Use Cinders from basic strikes to unleash heavy skills and stagger armored foes. Clearing 1-3 recruits a Grave Duelist into your 3rd squad slot.';
       case FtueStage.encounter3:
-        return 'The Gatekeeper Colossus possesses immense Armor. Deploy your newly forged Gen 2 Cerberus with Rend Flesh and Commander Focus to breach its defenses.';
+        return 'With a 3-unit squad and 3+ Skill Points invested, exploit flanking trajectories and Retinue passives to break the Abyssal Juggernaut and claim your first Rare Relic.';
       case FtueStage.completed:
-        return 'You have mastered the foundational mechanics of Project Ashen Crucible. Forge relics, breed Pureblood Gen 4 titans, and conquer the World Titan.';
+        return 'Expand your roster in the Retinue Squad & Crucible Altar, equip Relics from the Forge, and push toward the Chapter 1 Boss.';
     }
   }
 

@@ -221,8 +221,9 @@ class UnitEntity {
   double get xpProgressRatio => isMaxLevel ? 1.0 : (currentXp / xpToNextLevel).clamp(0.0, 1.0);
 
   /// Grants XP to the unit, computing any level-up threshold crossings and compounding stat gains.
-  UnitEntity addXp(int xpGained) {
-    if (isMaxLevel) return this;
+  UnitEntity addXp(int xpGained, {int? levelCap}) {
+    final int effectiveCap = levelCap != null ? levelCap.clamp(1, maxLevel) : maxLevel;
+    if (level >= effectiveCap) return this;
 
     int newXp = currentXp + xpGained;
     int newLevel = level;
@@ -231,19 +232,25 @@ class UnitEntity {
     int newAtk = attack;
     int newDef = defense;
     int newSpd = speed;
+    double newCritRate = critRate;
+    double newCritDamage = critDamage;
 
-    while (newLevel < maxLevel && newXp >= (newLevel * 100)) {
+    while (newLevel < effectiveCap && newXp >= (newLevel * 100)) {
       newXp -= (newLevel * 100);
       newLevel += 1;
-      final hpGain = (newMaxHp * 0.10).round().clamp(15, 200);
+      final hpGain = (newMaxHp * 0.05).round().clamp(12, 120);
       newMaxHp += hpGain;
       newHp += hpGain;
-      newAtk += (newAtk * 0.08).round().clamp(5, 50);
-      newDef += (newDef * 0.06).round().clamp(4, 40);
-      newSpd += 2;
+      newAtk += (newAtk * 0.04).round().clamp(3, 30);
+      newDef += (newDef * 0.03).round().clamp(2, 24);
+      newSpd += (newLevel % 5 == 0) ? 2 : 1;
+      if (newLevel % 10 == 0) {
+        newCritRate = (newCritRate + 0.02).clamp(0.0, 0.75);
+        newCritDamage += 0.05;
+      }
     }
 
-    if (newLevel >= maxLevel) {
+    if (newLevel >= effectiveCap) {
       newXp = 0;
     }
 
@@ -255,6 +262,8 @@ class UnitEntity {
       attack: newAtk,
       defense: newDef,
       speed: newSpd,
+      critRate: newCritRate,
+      critDamage: newCritDamage,
     );
   }
 
@@ -643,6 +652,7 @@ class UnitEntity {
     final nextRarity = UnitRarity.values[rarity.index + 1];
     return copyWith(
       rarity: nextRarity,
+      maxLevel: (maxLevel + 10).clamp(10, 60),
       graftedTraitId: newGraftedTraitId ?? graftedTraitId,
       maxHp: (maxHp * 1.15).round(),
       currentHp: (currentHp * 1.15).round(),

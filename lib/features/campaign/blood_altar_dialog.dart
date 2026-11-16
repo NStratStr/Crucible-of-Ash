@@ -89,7 +89,7 @@ class BloodAltarDialog extends StatelessWidget {
             _buildChoiceButton(
               context: context,
               title: 'BLOOD TITHE (SACRIFICE 25% SQUAD HP)',
-              subtitle: 'Extract +350 Crucible Ichor & +2 Commander Focus.',
+              subtitle: 'Extract +350 Crucible Gold & +2 Commander Focus.',
               icon: Icons.water_drop,
               color: const Color(0xFFB3261E),
               onTap: () => Navigator.pop(context, BloodAltarChoice.bloodTithe),

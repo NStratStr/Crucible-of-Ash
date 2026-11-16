@@ -16,6 +16,9 @@ import '../../features/combat/combat_resolution_service.dart';
 import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/combat/post_battle_loot_dialog.dart';
 import '../../features/combat_spatial/spatial_battle_screen.dart';
+import '../../features/combat_spatial/spatial_combat_engine.dart';
+import '../../features/combat_spatial/crucible_skill_tree_dialog.dart';
+import '../../features/combat_spatial/crucible_retinue_squad_dialog.dart';
 import '../../features/combat_spatial/models/crucible_skill_tree_models.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
@@ -84,6 +87,7 @@ class _AppShellState extends State<AppShell> {
   final Set<String> _claimedThreeStarStages = {};
   bool _hasCompletedAwakening = false;
   bool _isSpatialCombatActive = true;
+  CrucibleSkillTreeState _crucibleSkillTreeState = CrucibleSkillTreeState();
 
   late InitiativeTickManager _tickManager;
   late CombatResolutionService _combatService;
@@ -100,6 +104,7 @@ class _AppShellState extends State<AppShell> {
   List<List<UnitEntity>>? _activeEnemyWaves;
   final Set<EndgameTrialType> _clearedGauntletTrials = {};
   EndgameTrialType? _activeGauntletTrial;
+  DungeonDifficultyTier _activeGauntletTier = DungeonDifficultyTier.standard;
   Archetype _codexSelectedArchetype = Archetype.juggernaut;
   bool _isInitialized = false;
   bool _isAscensionDialogOpen = false;
@@ -154,6 +159,7 @@ class _AppShellState extends State<AppShell> {
       _solarIron = saved.solarIron;
       _quicksilver = saved.quicksilver;
       _crucibleTier = saved.crucibleTier;
+      _crucibleSkillTreeState.castleCrucibleTier = _crucibleTier;
       _forgeTier = saved.forgeTier;
       _hospiceTier = saved.hospiceTier;
       _spindleTier = saved.spindleTier;
@@ -239,6 +245,7 @@ class _AppShellState extends State<AppShell> {
           _solarIron = saved.solarIron;
           _quicksilver = saved.quicksilver;
           _crucibleTier = saved.crucibleTier;
+      _crucibleSkillTreeState.castleCrucibleTier = _crucibleTier;
           _forgeTier = saved.forgeTier;
           _hospiceTier = saved.hospiceTier;
           _spindleTier = saved.spindleTier;
@@ -602,6 +609,7 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _tickManager.updateSquads(allies: sculptorStarter);
       _inventory = [];
+      _crucibleSkillTreeState.configureStartingDiscipline(chosen, startWithBasics: true);
       _hasCompletedAwakening = true;
       if (_ftueService.currentStage == FtueStage.awakening) {
         _ftueService.advanceStage();
@@ -716,7 +724,7 @@ class _AppShellState extends State<AppShell> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'DUNGEON EXTRACTED! Safely returned with 100% loot (+$ichorExtracted Ichor, +$oreExtracted Ore, +$sigilsExtracted Sigils)!',
+              'DUNGEON EXTRACTED! Safely returned with 100% loot (+$ichorExtracted Gold, +$oreExtracted Ore, +$sigilsExtracted Sigils)!',
             ),
             backgroundColor: const Color(0xFF00B4D8),
             duration: const Duration(seconds: 4),
@@ -770,11 +778,25 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  int get _castleUnitLevelCap {
+    switch (_crucibleTier) {
+      case 1:
+        return 20;
+      case 2:
+        return 30;
+      case 3:
+        return 50;
+      default:
+        return 60;
+    }
+  }
+
   List<String> _grantBrigadeXp(int amount) {
     final List<String> levelUps = [];
+    final int cap = _castleUnitLevelCap;
     final leveled = _tickManager.allies.map((u) {
       final oldLevel = u.level;
-      final updated = u.addXp(amount);
+      final updated = u.addXp(amount, levelCap: cap);
       if (updated.level > oldLevel) {
         levelUps.add('${updated.name} (Lv. $oldLevel➔${updated.level})');
       }
@@ -787,7 +809,7 @@ class _AppShellState extends State<AppShell> {
     if (reserveXp > 0 && _inventory.isNotEmpty) {
       _inventory = _inventory.map((u) {
         final oldLevel = u.level;
-        final updated = u.addXp(reserveXp);
+        final updated = u.addXp(reserveXp, levelCap: cap);
         if (updated.level > oldLevel) {
           levelUps.add('${updated.name} [Reserve] (Lv. $oldLevel➔${updated.level})');
         }
@@ -821,7 +843,7 @@ class _AppShellState extends State<AppShell> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Blood Tithe accepted: Sacrificed 25% HP for +350 Ichor and +2 Focus!'),
+          content: Text('Blood Tithe accepted: Sacrificed 25% HP for +350 Gold and +2 Focus!'),
           backgroundColor: Color(0xFFB3261E),
         ),
       );
@@ -895,7 +917,7 @@ class _AppShellState extends State<AppShell> {
         _markNodeCompleted(node.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Tomb desecrated! Plundered ${relic.displayName} & +250 Ichor.'),
+            content: Text('Tomb desecrated! Plundered ${relic.displayName} & +250 Gold.'),
             backgroundColor: const Color(0xFFFFB300),
           ),
         );
@@ -915,7 +937,7 @@ class _AppShellState extends State<AppShell> {
         _markNodeCompleted(node.id);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('TRAP TRIGGERED! Necrotic Miasma afflicted brigade (-15% HP), but extracted +350 Ichor!'),
+            content: Text('TRAP TRIGGERED! Necrotic Miasma afflicted brigade (-15% HP), but extracted +350 Gold!'),
             backgroundColor: Color(0xFFB3261E),
           ),
         );
@@ -1003,14 +1025,19 @@ class _AppShellState extends State<AppShell> {
 
     final int earnedIchor = isFirstClear ? baseIchor : max(15, (baseIchor * 0.25).round());
     final int earnedOre = isFirstClear ? baseOre : max(3, (baseOre * 0.20).round());
-    // Bloodline Sigils are strictly capped: only granted on First Clear or 3-Star Mastery unlock
-    final int earnedSigils = (isFirstClear ? baseSigils : 0) + (isThreeStarRewardUnlocked ? 1 : 0);
+    final bool isStage1_2Node = _activeNode?.id == 'linear_1-2' || _activeNode?.name.contains('Sunken Trench') == true;
+    final bool isEliteStageNode = _activeNode?.type == CampaignNodeType.elite;
+    final int milestoneSigil = (isFirstClear && (isStage1_2Node || (isEliteStageNode && baseSigils == 0))) ? 1 : 0;
+    // Bloodline Sigils are strictly capped: only granted on First Clear, Stage 1-2/Elite milestones, or 3-Star Mastery unlock
+    final int earnedSigils = (isFirstClear ? baseSigils : 0) + milestoneSigil + (isThreeStarRewardUnlocked ? 1 : 0);
 
-    final xpReward = _activeNode == null
+    final double stageXpScale = 1.0 + ((_currentChapter - 1) * 0.40) + (max(0, stageNum - 1) * 0.08);
+    final int baseXpReward = _activeNode == null
         ? 350
         : (_activeNode!.type == CampaignNodeType.boss
             ? (isFirstClear ? 1000 : 400)
             : (_activeNode!.type == CampaignNodeType.elite ? (isFirstClear ? 500 : 250) : (isFirstClear ? 250 : 120)));
+    final int xpReward = (baseXpReward * stageXpScale).round();
     final levelUps = _grantBrigadeXp(xpReward);
 
     setState(() {
@@ -1053,22 +1080,17 @@ class _AppShellState extends State<AppShell> {
       final isEliteNode = _activeNode?.type == CampaignNodeType.elite;
       final isBossNode = _activeNode?.type == CampaignNodeType.boss;
 
-      // Deterministic early pacing: Stage 1-1 guarantees rescuing the captive vanguard husk.
-      // Other skirmishes have a balanced 25% capture rate; elites have 60%; bosses drop high-tier rewards.
-      bool shouldCapture = false;
-      if (isStage1_1) {
-        shouldCapture = true;
-      } else if (isEliteNode) {
-        shouldCapture = (DateTime.now().millisecond % 100) < 60;
-      } else if (!isBossNode) {
-        shouldCapture = (DateTime.now().millisecond % 100) < 25;
-      }
-
-      if (shouldCapture) {
-        captured = _captureThrallAfterBattle(
-          scoutedAffinities: isStage1_1 ? [Archetype.juggernaut] : _activeNode?.scoutedAffinities,
-          fixedName: isStage1_1 ? 'Rescued Vanguard Husk' : null,
-          fixedSpeciesId: isStage1_1 ? 'rotting_husk' : null,
+      // Sculptor XP & Level-Ups -> Skill Points (+1★ per Sculptor level-up)
+      // Stage 1-1 first clear gives 300 XP to reach Lv. 2 (+1★) for the Skill Tree tutorial.
+      _crucibleSkillTreeState.castleCrucibleTier = _crucibleTier;
+      final int sculptorXpGain = (isStage1_1 && isFirstClear) ? max(300, xpReward) : xpReward;
+      final int oldSculptorLevel = _crucibleSkillTreeState.sculptorLevel;
+      final int sculptorLevelsGained = _crucibleSkillTreeState.addSculptorXp(sculptorXpGain);
+      final int earnedSkillPoints = sculptorLevelsGained;
+      if (sculptorLevelsGained > 0) {
+        levelUps.insert(
+          0,
+          'Ash Sculptor (Lv. $oldSculptorLevel➔${_crucibleSkillTreeState.sculptorLevel} • +$sculptorLevelsGained★ Skill Point${sculptorLevelsGained > 1 ? "s" : ""}!)',
         );
       }
 
@@ -1085,6 +1107,25 @@ class _AppShellState extends State<AppShell> {
 
       bool isFirstConquest = false;
       if (_activeGauntletTrial != null) {
+        final int catCount = _activeGauntletTier.catalystCount;
+        setState(() {
+          switch (_activeGauntletTrial!) {
+            case EndgameTrialType.worldTitan:
+              _solarIron += catCount;
+              break;
+            case EndgameTrialType.lineageCrypt:
+              _brimSlagCores += catCount;
+              break;
+            case EndgameTrialType.deathlessCrypt:
+              _quicksilver += catCount;
+              break;
+            case EndgameTrialType.abyssalDescent:
+            case EndgameTrialType.abyssalDescentII:
+            case EndgameTrialType.abyssalDescentIII:
+              _bloodlineSigils += catCount;
+              break;
+          }
+        });
         if (!_clearedGauntletTrials.contains(_activeGauntletTrial)) {
           isFirstConquest = true;
           _clearedGauntletTrials.add(_activeGauntletTrial!);
@@ -1094,6 +1135,7 @@ class _AppShellState extends State<AppShell> {
           });
         }
         _activeGauntletTrial = null;
+        _activeGauntletTier = DungeonDifficultyTier.standard;
       }
 
       // Relic Drops are guaranteed on first clear; on repeat farm runs, chance is 15% (elite) / 30% (boss)
@@ -1195,8 +1237,9 @@ class _AppShellState extends State<AppShell> {
 
       if (mounted) {
         final String spoilsText = '⚔️ VICTORY: +$scaledAsh Ash • +$distilledVitae Vitae • +$petrifiedPlinths Plinths'
+            '${earnedSkillPoints > 0 ? " • +$earnedSkillPoints★ Skill Point" : ""}'
             '${relicDrop != null ? " • Relic: $relicDrop" : ""}'
-            '${captured != null ? " • Captured: ${captured.name}" : ""}';
+            '${captured != null ? " • Recruited: ${captured.name}" : ""}';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1215,6 +1258,13 @@ class _AppShellState extends State<AppShell> {
       }
 
       if (_activeDelveRoom != null) {
+        final bool isTowerBossRoom = _activeDelveRoom!.type == DelveRoomType.catacombArchon;
+        if (isTowerBossRoom) {
+          setState(() {
+            _quicksilver += 1;
+            _bloodlineSigils += 1;
+          });
+        }
         _delveService.completeRoom(
           _activeDelveRoom!.id,
           extraIchor: scaledAsh,
@@ -1239,7 +1289,102 @@ class _AppShellState extends State<AppShell> {
           _currentIndex = 0;
           _activeNode = null;
         });
+        if (isStage1_1 && earnedSkillPoints > 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _openOutOfBattleSkillTree();
+          });
+        } else if (captured != null) {
+          final recruited = captured;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showCompanionRecruitedDialog(recruited);
+          });
+        }
       }
+  }
+
+  void _showCompanionRecruitedDialog(UnitEntity companion) {
+    final bool isFootman = companion.speciesId == 'iron_footman' || companion.name.contains('Footman');
+    final String roleText = isFootman
+        ? 'FRONTLINE VANGUARD • CONCUSSIVE SHIELD SLAM'
+        : 'FLANKING SKIRMISHER • LACERATING CROSS-SLASH';
+    final String howToUse = isFootman
+        ? '• POSITIONING: Drag Iron Footman in front of The Ash Sculptor to absorb hits and stun enemies.\n'
+          '• COMPANION SKILL: Tap his portrait in the bottom-left Retinue Tray during battle to unleash Concussive Shield Slam.\n'
+          '• UPGRADES: Use Crucible Ash & Vitae in [SQUAD & STAT UPGRADES] or [RETINUE] to boost his HP & ATK.'
+        : '• POSITIONING: Drag ${companion.name} into an open flank lane to strike weak targets.\n'
+          '• COMPANION SKILL: Tap their portrait in the bottom-left Retinue Tray during battle to trigger their Signature Skill.\n'
+          '• MANAGEMENT: Swap or upgrade companions anytime via [RETINUE] or [CHOOSE SQUAD].';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141620),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF69F0AE), width: 1.6),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.group_add_rounded, color: Color(0xFF69F0AE), size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'COMPANION RECRUITED: ${companion.name.toUpperCase()}',
+                style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 14, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                roleText,
+                style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.6),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${companion.name} has been rescued and added to your Active Squad (and is always accessible in RETINUE / CHOOSE SQUAD).',
+                style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1E2B),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Text(
+                  howToUse,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11.2, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _openOutOfBattleRetinueSquad();
+            },
+            child: const Text('OPEN RETINUE', style: TextStyle(color: Color(0xFFAB47BC), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('GOT IT', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
@@ -1386,8 +1531,15 @@ class _AppShellState extends State<AppShell> {
           style: const TextStyle(color: Color(0xFFFF8A80), fontWeight: FontWeight.bold, fontSize: 12),
         ),
         backgroundColor: const Color(0xFF1B0F12),
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 6),
         behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'TRAIN / EQUIP',
+          textColor: const Color(0xFFFFD54F),
+          onPressed: () {
+            if (mounted) _openOutOfBattleRetinueSquad();
+          },
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: const BorderSide(color: Color(0xFFFF5252), width: 1.2),
@@ -1533,7 +1685,7 @@ class _AppShellState extends State<AppShell> {
     if (_totalIchor < ichorCost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Insufficient Ichor! Requires $ichorCost Ichor, but you have $_totalIchor.'),
+          content: Text('Insufficient Gold! Requires $ichorCost Gold, but you have $_totalIchor.'),
           backgroundColor: const Color(0xFFB3261E),
         ),
       );
@@ -1544,11 +1696,21 @@ class _AppShellState extends State<AppShell> {
     bool wasRarityPromotion = false;
 
     // 1. Check active squad
+    final int cap = _castleUnitLevelCap;
     final allyIndex = _tickManager.allies.indexWhere((u) => u.id == unitId);
     if (allyIndex != -1) {
       final ally = _tickManager.allies[allyIndex];
       wasRarityPromotion = replacementUnit != null && replacementUnit.rarity != ally.rarity;
-      final leveled = replacementUnit ?? ally.addXp(xpAmount);
+      if (replacementUnit == null && ally.level >= cap) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Castle Crucible Tier $_crucibleTier caps units at Lv. $cap — upgrade the Crucible in Sanctuary to unlock higher levels!'),
+            backgroundColor: const Color(0xFF4E342E),
+          ),
+        );
+        return;
+      }
+      final leveled = replacementUnit ?? ally.addXp(xpAmount, levelCap: cap);
       updatedUnit = leveled;
 
       final newAllies = List<UnitEntity>.from(_tickManager.allies);
@@ -1560,7 +1722,16 @@ class _AppShellState extends State<AppShell> {
       if (invIndex != -1) {
         final unit = _inventory[invIndex];
         wasRarityPromotion = replacementUnit != null && replacementUnit.rarity != unit.rarity;
-        final leveled = replacementUnit ?? unit.addXp(xpAmount);
+        if (replacementUnit == null && unit.level >= cap) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Castle Crucible Tier $_crucibleTier caps units at Lv. $cap — upgrade the Crucible in Sanctuary to unlock higher levels!'),
+              backgroundColor: const Color(0xFF4E342E),
+            ),
+          );
+          return;
+        }
+        final leveled = replacementUnit ?? unit.addXp(xpAmount, levelCap: cap);
         updatedUnit = leveled;
 
         _inventory[invIndex] = leveled;
@@ -1652,7 +1823,7 @@ class _AppShellState extends State<AppShell> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Sarcophagus unsealed: Unlocked Crypt Ghoul & +250 Ichor!'),
+        content: Text('Sarcophagus unsealed: Unlocked Crypt Ghoul & +250 Gold!'),
         backgroundColor: Color(0xFFB3261E),
       ),
     );
@@ -1784,11 +1955,31 @@ class _AppShellState extends State<AppShell> {
 
     List<UnitEntity> enemies;
     if (room.type == DelveRoomType.catacombArchon) {
-      enemies = StarterBrigades.createGorgorothBossEnemies();
+      if (room.floor >= 15) {
+        enemies = StarterBrigades.createAbyssalDescentTier3Enemies();
+      } else if (room.floor >= 10) {
+        enemies = StarterBrigades.createWorldTitanEnemies();
+      } else {
+        enemies = StarterBrigades.createGorgorothBossEnemies();
+      }
     } else if (room.type == DelveRoomType.wanderingElite) {
-      enemies = StarterBrigades.createEliteEnemiesForChapter(room.floor);
+      enemies = StarterBrigades.createEliteEnemiesForChapter(room.floor.clamp(1, 3));
     } else {
-      enemies = StarterBrigades.createSkirmishEnemiesForChapter(room.floor);
+      enemies = StarterBrigades.createSkirmishEnemiesForChapter(room.floor.clamp(1, 3));
+    }
+
+    // Smooth Tower floor scaling above Floor 1
+    if (room.floor > 1) {
+      final double floorScale = 1.0 + (room.floor - 1) * 0.16;
+      enemies = enemies.map((e) {
+        final scaledHp = (e.maxHp * floorScale).round();
+        return e.copyWith(
+          maxHp: scaledHp,
+          currentHp: scaledHp,
+          attack: (e.attack * (1.0 + (room.floor - 1) * 0.12)).round(),
+          defense: (e.defense * (1.0 + (room.floor - 1) * 0.10)).round(),
+        );
+      }).toList();
     }
 
     final delveNode = CampaignNode(
@@ -1837,6 +2028,7 @@ class _AppShellState extends State<AppShell> {
             totalIchor: _totalIchor,
             onIchorChanged: (val) => setState(() => _totalIchor = val),
             onClose: () => Navigator.of(ctx).pop(),
+            forgeTier: _forgeTier,
           ),
         );
       },
@@ -1844,13 +2036,16 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _handleOpenEndgameGauntlet() async {
-    final trial = await EndgameGauntletDialog.show(
+    final selection = await EndgameGauntletDialog.show(
       context,
       activeSquad: _tickManager.allies,
       clearedTrials: _clearedGauntletTrials,
     );
-    if (!mounted || trial == null) return;
+    if (!mounted || selection == null) return;
+    final trial = selection.type;
+    final tier = selection.tier;
     _activeGauntletTrial = trial;
+    _activeGauntletTier = tier;
 
     List<UnitEntity> enemies;
     String trialName;
@@ -1909,6 +2104,22 @@ class _AppShellState extends State<AppShell> {
         break;
     }
 
+    if (tier != DungeonDifficultyTier.standard) {
+      enemies = enemies.map((e) {
+        final scaledHp = (e.maxHp * tier.enemyHpMult).round();
+        return e.copyWith(
+          maxHp: scaledHp,
+          currentHp: scaledHp,
+          attack: (e.attack * tier.enemyAtkMult).round(),
+          defense: (e.defense * tier.enemyDefMult).round(),
+        );
+      }).toList();
+      trialName = '$trialName [${tier.label}]';
+      rewardIchor = (rewardIchor * tier.rewardMult).round();
+      rewardOre = (rewardOre * tier.rewardMult).round();
+      rewardSigils += tier.bonusSigils;
+    }
+
     final gauntletNode = CampaignNode(
       id: 'gauntlet_${DateTime.now().millisecondsSinceEpoch}',
       depth: 4,
@@ -1960,7 +2171,18 @@ class _AppShellState extends State<AppShell> {
       if (reagentType == 'quicksilver') _quicksilver -= reagentCost;
       if (reagentType == 'sigils') _bloodlineSigils -= reagentCost;
 
-      if (facilityId == 'crucible') _crucibleTier = newTier;
+      if (facilityId == 'crucible') {
+        _crucibleTier = newTier;
+        _crucibleSkillTreeState.castleCrucibleTier = newTier;
+        final int newCap = _castleUnitLevelCap;
+        final updatedAllies = _tickManager.allies.map((u) {
+          if (u.speciesId == 'ash_sculptor' && u.maxLevel < newCap) {
+            return u.copyWith(maxLevel: newCap);
+          }
+          return u;
+        }).toList();
+        _tickManager.updateSquads(allies: updatedAllies);
+      }
       if (facilityId == 'forge') _forgeTier = newTier;
       if (facilityId == 'hospice') _hospiceTier = newTier;
       if (facilityId == 'spindle' || facilityId == 'beacon') _spindleTier = newTier;
@@ -2024,6 +2246,17 @@ class _AppShellState extends State<AppShell> {
           Navigator.of(dialogCtx).pop();
           _openPlinthSculptorySheet();
         },
+        onOpenSkillTree: () {
+          Navigator.of(dialogCtx).pop();
+          _openOutOfBattleSkillTree();
+        },
+        onOpenRetinueSquad: () {
+          Navigator.of(dialogCtx).pop();
+          _openOutOfBattleRetinueSquad();
+        },
+        unspentSkillPoints: _crucibleSkillTreeState.availableSkillPoints,
+        guideFirstSkillUpgrade: _crucibleSkillTreeState.availableSkillPoints > 0 &&
+            _crucibleSkillTreeState.allSkills.values.where((s) => s.isUnlocked).length <= 1,
         onOpenCatacombDelves: () {
           Navigator.of(dialogCtx).pop();
           _openCatacombDelveSheet();
@@ -2038,8 +2271,45 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  SpatialCombatEngine _createPreviewSpatialEngine() {
+    return SpatialCombatEngine(
+      initialPlayerEntities: _tickManager.allies,
+      initialEnemyEntities: _tickManager.enemies,
+      relicService: _relicService,
+      commandService: _commandService,
+      plinthService: _plinthService,
+      skillTreeState: _crucibleSkillTreeState,
+    );
+  }
+
+  void _openOutOfBattleSkillTree() {
+    final previewEngine = _createPreviewSpatialEngine();
+    CrucibleSkillTreeDialog.show(context, previewEngine).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _openOutOfBattleRetinueSquad() {
+    final previewEngine = _createPreviewSpatialEngine();
+    CrucibleRetinueSquadDialog.show(
+      context,
+      engine: previewEngine,
+      currentSquadUnits: _tickManager.allies,
+      reserveUnits: _inventory,
+      relicService: _relicService,
+      onSquadUpdated: (updatedSquad, updatedReserves) {
+        setState(() {
+          _tickManager.updateSquads(allies: updatedSquad);
+          _inventory = List.from(updatedReserves);
+        });
+        _saveCurrentState();
+      },
+    );
+  }
+
   void _resetToFreshPrologue() {
     setState(() {
+      _crucibleSkillTreeState = CrucibleSkillTreeState();
       _totalIchor = 0;
       _cursedOre = 0;
       _bloodlineSigils = 0;
@@ -2089,15 +2359,28 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _handleOpenSummoning() {
+    final bool isFirstSummon = (_tickManager.allies.length + _inventory.length) <= 1;
     SummoningScreen.showAsModal(
       context: context,
       totalIchor: _totalIchor,
       bloodlineSigils: _bloodlineSigils,
+      isFirstSummon: isFirstSummon,
       onSummonExecuted: (result) {
         setState(() {
           _totalIchor = max(0, _totalIchor - result.ichorSpent);
           _bloodlineSigils = max(0, _bloodlineSigils - result.sigilsSpent);
-          _inventory = [..._inventory, ...result.summonedUnits];
+          final updatedAllies = List<UnitEntity>.from(_tickManager.allies);
+          final remaining = <UnitEntity>[];
+          final int squadCap = (_hospiceTier >= 2 || _maxUnlockedChapter > 1 || _clearedGauntletTrials.isNotEmpty) ? 3 : 2;
+          for (final u in result.summonedUnits) {
+            if (updatedAllies.length < squadCap) {
+              updatedAllies.add(u);
+            } else {
+              remaining.add(u);
+            }
+          }
+          _tickManager.updateSquads(allies: updatedAllies);
+          _inventory = [..._inventory, ...remaining];
         });
         _saveCurrentState();
       },
@@ -2184,6 +2467,8 @@ class _AppShellState extends State<AppShell> {
                           encounterTitle: _activeNode?.name ?? 'Boss Arena: Gorgoroth the Flayed',
                           backdropAsset: _activeNode?.customBackgroundAsset ?? 'assets/images/backgrounds/battlefield_ashen_plains.png',
                           isBossEncounter: _activeNode?.type == CampaignNodeType.boss || _activeNode?.id == 'gorgoroth_boss_arena' || _activeNode == null,
+                          maxDeployableUnits: (_hospiceTier >= 2 || _maxUnlockedChapter > 1 || _clearedGauntletTrials.isNotEmpty) ? 3 : 2,
+                          spindleTier: _spindleTier,
                           onVictory: () {
                             _onCombatVictory();
                           },
@@ -2195,6 +2480,7 @@ class _AppShellState extends State<AppShell> {
                           },
                           relicService: _relicService,
                           plinthService: _plinthService,
+                          skillTreeState: _crucibleSkillTreeState,
                           onOpenPlinthSculptory: _openPlinthSculptorySheet,
                           onBackToStandardCombat: () {
                             setState(() {
@@ -2256,6 +2542,7 @@ class _AppShellState extends State<AppShell> {
                     onOreChanged: (val) => setState(() => _cursedOre = val),
                     currentChapter: _currentChapter,
                     completedLinearStages: _completedLinearStages,
+                    forgeTier: _forgeTier,
                   ),
                   // Tab 4: Brigade Roster
                   _buildRosterScreen(allPlayerUnits),
@@ -2354,6 +2641,19 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  CrucibleSkillBranch _branchForGeneral(GeneralType type) {
+    switch (type) {
+      case GeneralType.vladislav:
+        return CrucibleSkillBranch.resonance;
+      case GeneralType.valeria:
+        return CrucibleSkillBranch.bastion;
+      case GeneralType.malakor:
+        return CrucibleSkillBranch.vitae;
+      case GeneralType.morrigan:
+        return CrucibleSkillBranch.wrath;
+    }
+  }
+
   Future<void> _showGeneralSelectionDialog() async {
     final chosen = await GeneralSelectionDialog.show(
       context,
@@ -2377,6 +2677,9 @@ class _AppShellState extends State<AppShell> {
       _activeGeneralType = chosen;
       _commandService.setActiveGeneral(chosen);
       _phylacteryRanks = Map.of(_commandService.allPhylacteryRanks);
+      final int earnedPoints = _crucibleSkillTreeState.availableSkillPoints + _crucibleSkillTreeState.totalPointsSpent;
+      _crucibleSkillTreeState.configureStartingDiscipline(_branchForGeneral(chosen), startWithBasics: true);
+      _crucibleSkillTreeState.availableSkillPoints = earnedPoints;
     });
     _saveCurrentState();
     final profile = _commandService.currentProfile;
@@ -2398,6 +2701,22 @@ class _AppShellState extends State<AppShell> {
         categoryTag: 'Lineage',
         bloodlineSigils: _bloodlineSigils,
         actions: [
+          IconButton(
+            tooltip: 'Crucible Skill Tree (${_crucibleSkillTreeState.availableSkillPoints}★)',
+            icon: Icon(
+              Icons.auto_fix_high,
+              size: 20,
+              color: _crucibleSkillTreeState.availableSkillPoints > 0
+                  ? const Color(0xFFFFD54F)
+                  : const Color(0xFF00E5FF),
+            ),
+            onPressed: _openOutOfBattleSkillTree,
+          ),
+          IconButton(
+            tooltip: 'Retinue Squad (1+2)',
+            icon: const Icon(Icons.groups, size: 20, color: Color(0xFF69F0AE)),
+            onPressed: _openOutOfBattleRetinueSquad,
+          ),
           IconButton(
             tooltip: 'Grimoire Deck Archives',
             icon: const Icon(Icons.auto_stories, size: 20, color: Color(0xFFBA68C8)),
@@ -2593,7 +2912,7 @@ class _AppShellState extends State<AppShell> {
                             border: Border.all(color: const Color(0xFFE57373), width: 0.8),
                           ),
                           child: Text(
-                            '$_totalIchor ICHOR',
+                            '$_totalIchor GOLD',
                             style: const TextStyle(
                               color: Color(0xFFFF8A80),
                               fontSize: 9,

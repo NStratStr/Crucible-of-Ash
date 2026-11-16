@@ -8,6 +8,7 @@ class SanctuaryDistrictData {
   final IconData icon;
   final Color themeColor;
   final String catalystName;
+  final String catalystSource;
   final String catalystType; // 'brimSlag', 'solarIron', 'quicksilver', 'sigils'
   final IconData catalystIcon;
   final Color catalystColor;
@@ -24,6 +25,7 @@ class SanctuaryDistrictData {
     required this.icon,
     required this.themeColor,
     required this.catalystName,
+    this.catalystSource = '',
     required this.catalystType,
     required this.catalystIcon,
     required this.catalystColor,
@@ -144,13 +146,14 @@ class _SanctuaryFacilityUpgradeDialogState
       icon: Icons.bloodtype_outlined,
       themeColor: Color(0xFFFF7043),
       catalystName: 'Brim-Slag Core',
+      catalystSource: 'Drops: Den of Fangs & Campaign Bosses',
       catalystType: 'brimSlag',
       catalystIcon: Icons.whatshot,
       catalystColor: Color(0xFFFF9100),
       maxTier: 4,
       tierPerks: {
         1: 'Gen 1 & 2 Fusion unlocked. Max Unit Level Cap: Lv. 20.',
-        2: 'Gen 3 Fusion unlocked (Max Lv. 30). Trait Grafting Ichor cost discounted by -20%.',
+        2: 'Gen 3 Fusion unlocked (Max Lv. 30). Trait Grafting Gold cost discounted by -20%.',
         3: 'Gen 4 & 5 Fusion unlocked (Max Lv. 50). Duplicate Ascension grants +10% extra stat bonus.',
         4: 'Gen 6 Apex Sovereigns unlocked (Max Lv. 60). 100% stat inheritance efficiency.',
       },
@@ -161,18 +164,19 @@ class _SanctuaryFacilityUpgradeDialogState
     SanctuaryDistrictData(
       id: 'forge',
       name: 'THE RELIC FORGE',
-      subtitle: 'Enchanted Armory & Plinth Sculptory',
+      subtitle: 'Enchanted Armory & Masterwork Refinement',
       icon: Icons.build_outlined,
       themeColor: Color(0xFF42A5F5),
       catalystName: 'Solar-Iron',
+      catalystSource: 'Drops: Ashen World Titan Dungeon',
       catalystType: 'solarIron',
       catalystIcon: Icons.shield_outlined,
       catalystColor: Color(0xFF80D8FF),
       maxTier: 3,
       tierPerks: {
-        1: 'Common & Uncommon Relics. Basic Stone Plinths available.',
-        2: '4-Piece Set Bonuses unlocked. Cold Iron Plinths (+15% Armor) & Crypt Bone Plinths (+25% Vampiric Siphon).',
-        3: 'Obsidian Plinths (+10% ATK) & Sovereign Gold Plinths (+10% All Stats). Relic Reforging ore cost -25%.',
+        1: 'Base Relic Forging & Refinement unlocked for Sculptor and Retinue units.',
+        2: 'Relic Forging Gold cost reduced by -20% (100 → 80 Gold).',
+        3: 'Relic Forging & Refinement Cursed Ore cost reduced by -25%.',
       },
       tierIchorCosts: {2: 200, 3: 500},
       tierOreCosts: {2: 120, 3: 300},
@@ -185,13 +189,14 @@ class _SanctuaryFacilityUpgradeDialogState
       icon: Icons.person_add_alt_1,
       themeColor: Color(0xFFFFD54F),
       catalystName: 'Bloodline Sigil',
+      catalystSource: 'Drops: Abyssal Descent, Elites & 3★ Clears',
       catalystType: 'sigils',
       catalystIcon: Icons.military_tech,
       catalystColor: Color(0xFFFFD54F),
       maxTier: 4,
       tierPerks: {
-        1: 'Standard Thrall Convocation. Reserve Roster Capacity: 15 Units.',
-        2: 'Reserve Roster Capacity: 25 Units. Faction Convocation (+15% Ash Legion / Crypt Stalkers rate).',
+        1: 'Battle Squad Cap: 2 Units (Sculptor + 1 Companion). Reserve Roster: 15 Units.',
+        2: 'Battle Squad Cap: 3 Units (Sculptor + 2 Companions)! Reserve Roster: 25 Units. Faction Convocation (+15% rate).',
         3: 'Reserve Roster Capacity: 40 Units. Elite Bloodline Rites (+1 guaranteed 3-Star veteran per 10 summons).',
         4: 'Reserve Roster Capacity: 60 Units. Legendary Pilgrims & Commander duplicate rites unlocked.',
       },
@@ -202,18 +207,19 @@ class _SanctuaryFacilityUpgradeDialogState
     SanctuaryDistrictData(
       id: 'spindle',
       name: 'QUICKSILVER SPINDLE',
-      subtitle: 'Resonance Beacon & Leyline Focus Reservoir',
+      subtitle: 'Resonance Beacon & Cinder Leyline Conduit',
       icon: Icons.auto_awesome,
       themeColor: Color(0xFFAB47BC),
       catalystName: 'Quicksilver',
+      catalystSource: 'Drops: Tomb of the Deathless Dungeon',
       catalystType: 'quicksilver',
       catalystIcon: Icons.bubble_chart_outlined,
       catalystColor: Color(0xFFCE93D8),
       maxTier: 3,
       tierPerks: {
-        1: '4-Card Hand. 3 Max Focus in battle.',
-        2: '5 Max Focus. Brigade starts combat with +500 Action Points (faster opening strike).',
-        3: '7 Max Focus. Brigade starts combat with +1,500 Action Points. Card redraw cost reduced by 50%.',
+        1: 'Standard Combat Pacing. Sculptor starts battle with 15 Cinders.',
+        2: 'Brigade starts combat with +500 Action Points & Sculptor starts with 25 Cinders.',
+        3: 'Brigade starts combat with +1,500 Action Points, 40 Starting Cinders, & +10% AP charge rate.',
       },
       tierIchorCosts: {2: 250, 3: 600},
       tierOreCosts: {2: 50, 3: 120},
@@ -676,7 +682,7 @@ class _SanctuaryFacilityUpgradeDialogState
                             Row(
                               children: [
                                 _buildCostItem(
-                                  label: 'Crucible Ichor',
+                                  label: 'Crucible Gold',
                                   cost: nextIchorCost,
                                   stock: _ichor,
                                   icon: Icons.bloodtype,
@@ -700,6 +706,18 @@ class _SanctuaryFacilityUpgradeDialogState
                                 ),
                               ],
                             ),
+
+                            if (activeDistrict.catalystSource.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                activeDistrict.catalystSource,
+                                style: TextStyle(
+                                  color: activeDistrict.catalystColor.withValues(alpha: 0.85),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
 
                             const SizedBox(height: 16),
 
@@ -806,7 +824,7 @@ class _SanctuaryFacilityUpgradeDialogState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildReagentBadge('Ichor', _ichor, Icons.bloodtype, const Color(0xFFFF5252)),
+          _buildReagentBadge('Gold', _ichor, Icons.bloodtype, const Color(0xFFFF5252)),
           _buildReagentBadge('Ore', _ore, Icons.diamond_outlined, const Color(0xFF42A5F5)),
           _buildReagentBadge('Sigils', _sigils, Icons.military_tech, const Color(0xFFFFD54F)),
           _buildReagentBadge('Brim-Slag', _brimSlag, Icons.whatshot, const Color(0xFFFF9100)),

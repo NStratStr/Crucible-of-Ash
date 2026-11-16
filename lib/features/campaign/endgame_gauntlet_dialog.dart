@@ -1,6 +1,134 @@
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
 
+enum DungeonDifficultyTier {
+  initiate,
+  standard,
+  tormentI,
+  tormentII,
+  tormentIII,
+}
+
+extension DungeonDifficultyTierMeta on DungeonDifficultyTier {
+  String get label {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 'INITIATE';
+      case DungeonDifficultyTier.standard:
+        return 'STANDARD';
+      case DungeonDifficultyTier.tormentI:
+        return 'TORMENT I';
+      case DungeonDifficultyTier.tormentII:
+        return 'TORMENT II';
+      case DungeonDifficultyTier.tormentIII:
+        return 'TORMENT III';
+    }
+  }
+
+  double get enemyHpMult {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 0.50;
+      case DungeonDifficultyTier.standard:
+        return 1.0;
+      case DungeonDifficultyTier.tormentI:
+        return 1.45;
+      case DungeonDifficultyTier.tormentII:
+        return 2.0;
+      case DungeonDifficultyTier.tormentIII:
+        return 2.75;
+    }
+  }
+
+  double get enemyAtkMult {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 0.65;
+      case DungeonDifficultyTier.standard:
+        return 1.0;
+      case DungeonDifficultyTier.tormentI:
+        return 1.25;
+      case DungeonDifficultyTier.tormentII:
+        return 1.55;
+      case DungeonDifficultyTier.tormentIII:
+        return 1.95;
+    }
+  }
+
+  double get enemyDefMult {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 0.65;
+      case DungeonDifficultyTier.standard:
+        return 1.0;
+      case DungeonDifficultyTier.tormentI:
+        return 1.20;
+      case DungeonDifficultyTier.tormentII:
+        return 1.45;
+      case DungeonDifficultyTier.tormentIII:
+        return 1.75;
+    }
+  }
+
+  double get rewardMult {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 0.65;
+      case DungeonDifficultyTier.standard:
+        return 1.0;
+      case DungeonDifficultyTier.tormentI:
+        return 1.5;
+      case DungeonDifficultyTier.tormentII:
+        return 2.25;
+      case DungeonDifficultyTier.tormentIII:
+        return 3.25;
+    }
+  }
+
+  int get bonusSigils {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return 0;
+      case DungeonDifficultyTier.standard:
+        return 0;
+      case DungeonDifficultyTier.tormentI:
+        return 1;
+      case DungeonDifficultyTier.tormentII:
+        return 2;
+      case DungeonDifficultyTier.tormentIII:
+        return 3;
+    }
+  }
+
+  int get catalystCount {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+      case DungeonDifficultyTier.standard:
+        return 1;
+      case DungeonDifficultyTier.tormentI:
+      case DungeonDifficultyTier.tormentII:
+        return 2;
+      case DungeonDifficultyTier.tormentIII:
+        return 3;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case DungeonDifficultyTier.initiate:
+        return const Color(0xFF69F0AE);
+      case DungeonDifficultyTier.standard:
+        return const Color(0xFF80D8FF);
+      case DungeonDifficultyTier.tormentI:
+        return const Color(0xFFFFB74D);
+      case DungeonDifficultyTier.tormentII:
+        return const Color(0xFFAB47BC);
+      case DungeonDifficultyTier.tormentIII:
+        return const Color(0xFFFF5252);
+    }
+  }
+}
+
 enum EndgameTrialType {
   worldTitan,
   lineageCrypt,
@@ -32,7 +160,7 @@ class EndgameTrialDefinition {
   });
 }
 
-class EndgameGauntletDialog extends StatelessWidget {
+class EndgameGauntletDialog extends StatefulWidget {
   final List<UnitEntity>? activeSquad;
   final Set<EndgameTrialType> clearedTrials;
 
@@ -49,7 +177,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Chapter-Capping Colossus Siege',
       description: 'Face the colossal Generation 4 Pureblood Titan with 4,500 HP, backed by Void Archons and Iron Harbingers.',
       modifier: 'TITANIC FURY: Boss attacks strike all frontline Vanguard units simultaneously.',
-      rewardsText: 'Guaranteed Legendary Relic • +2,000 Ichor • +1,500 Brigade XP',
+      rewardsText: 'Solar-Iron (Relic Forge) • Legendary Relic • +2,000 Gold',
       icon: Icons.shield,
       themeColor: Color(0xFFD32F2F),
     ),
@@ -59,7 +187,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Beastline Lineage Trial (2+ Beasts or Skirmishers Required)',
       description: 'A dark cavern teeming with Cerberus Alpha and stealth predators that inflict heavy bleed afflictions.',
       modifier: 'BLOOD MOON: All critical strike damage is amplified by +50%.',
-      rewardsText: 'Pureblood War-Hound Thrall • +800 Ichor • +800 Brigade XP',
+      rewardsText: 'Brim-Slag Cores (Great Crucible) • +800 Gold • +800 Brigade XP',
       icon: Icons.pets,
       themeColor: Color(0xFFFB8C00),
     ),
@@ -69,7 +197,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Undead & Occultist Trial (2+ Undead/Occultists Required)',
       description: 'Ancient sepulcher guarded by deathless sorcerers who wield soul-siphoning curses and necrotic rot.',
       modifier: 'GRAVE CHILL: Fallen enemies explode in frigid miasma; healing potency reduced by 25%.',
-      rewardsText: 'Pureblood Lich Sovereign • +900 Ichor • +2 Bloodline Sigils',
+      rewardsText: 'Quicksilver (Quicksilver Spindle) • +900 Gold • +2 Bloodline Sigils',
       icon: Icons.brightness_3,
       themeColor: Color(0xFF7E57C2),
     ),
@@ -79,7 +207,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Affinity Shift Trial',
       description: 'Descend into the dark abyss where Arch-Lich Malgok wields toxic miasma and resurrective thralls.',
       modifier: 'CORROSIVE MIASMA: Non-Occultist units suffer 30 poison damage at start of turn.',
-      rewardsText: 'Epic Relic • +1,200 Ichor • +1,000 Brigade XP',
+      rewardsText: 'Epic Relic • +1,200 Gold • +1,000 Brigade XP',
       icon: Icons.dark_mode,
       themeColor: Color(0xFF8E24AA),
     ),
@@ -89,7 +217,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Void Corruption Trial',
       description: 'Mutated abyss where void-warped champions deal heavy rot and occult strikes automatically blight.',
       modifier: 'VOID CORRUPTION: Non-Occultists take 45 poison at turn start; Occultist strikes apply Blight.',
-      rewardsText: 'Epic/Legendary Relic • +1,600 Ichor • +2 Bloodline Sigils',
+      rewardsText: 'Epic/Legendary Relic • +1,600 Gold • +2 Bloodline Sigils',
       icon: Icons.grain,
       themeColor: Color(0xFF5E35B1),
     ),
@@ -99,18 +227,18 @@ class EndgameGauntletDialog extends StatelessWidget {
       subtitle: 'Abyssal Eclipse Siege',
       description: 'Pinnacle abyssal nightmare where the Colossal Void Archon and Arch-Lich unleash dual catastrophic modifiers.',
       modifier: 'ABYSSAL ECLIPSE: Boss cleaves all frontline Vanguard units AND non-Occultists suffer 40 poison damage.',
-      rewardsText: 'Guaranteed Legendary Relic • +2,500 Ichor • +3 Bloodline Sigils',
+      rewardsText: 'Guaranteed Legendary Relic • +2,500 Gold • +3 Bloodline Sigils',
       icon: Icons.brightness_auto,
       themeColor: Color(0xFFB71C1C),
     ),
   ];
 
-  static Future<EndgameTrialType?> show(
+  static Future<({EndgameTrialType type, DungeonDifficultyTier tier})?> show(
     BuildContext context, {
     List<UnitEntity>? activeSquad,
     Set<EndgameTrialType> clearedTrials = const {},
   }) {
-    return showModalBottomSheet<EndgameTrialType>(
+    return showModalBottomSheet<({EndgameTrialType type, DungeonDifficultyTier tier})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -120,6 +248,16 @@ class EndgameGauntletDialog extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  State<EndgameGauntletDialog> createState() => _EndgameGauntletDialogState();
+}
+
+class _EndgameGauntletDialogState extends State<EndgameGauntletDialog> {
+  DungeonDifficultyTier _selectedTier = DungeonDifficultyTier.initiate;
+
+  List<UnitEntity>? get activeSquad => widget.activeSquad;
+  Set<EndgameTrialType> get clearedTrials => widget.clearedTrials;
 
   int get _beastAndSkirmisherCount {
     if (activeSquad == null) return 2;
@@ -216,7 +354,7 @@ class EndgameGauntletDialog extends StatelessWidget {
       }
     }
 
-    Navigator.pop(context, trial.type);
+    Navigator.pop(context, (type: trial.type, tier: _selectedTier));
   }
 
   @override
@@ -291,13 +429,74 @@ class EndgameGauntletDialog extends StatelessWidget {
           ),
           const Divider(color: Colors.white12, height: 1),
 
+          // Difficulty Tier Selector Bar (Higher-Stat Dungeon Modes)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: const Color(0xFF15141D),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'DUNGEON STAT TIER:',
+                      style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_selectedTier.enemyHpMult.toStringAsFixed(2)}× HP • ${_selectedTier.enemyAtkMult.toStringAsFixed(2)}× ATK • ${_selectedTier.rewardMult.toStringAsFixed(2)}× Loot${_selectedTier.bonusSigils > 0 ? " +${_selectedTier.bonusSigils} Sigils" : ""}',
+                      style: TextStyle(color: _selectedTier.color, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: DungeonDifficultyTier.values.map((tier) {
+                    final bool isSelected = _selectedTier == tier;
+                    return Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: tier != DungeonDifficultyTier.tormentIII ? 6 : 0),
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedTier = tier),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            decoration: BoxDecoration(
+                              color: isSelected ? tier.color.withValues(alpha: 0.18) : const Color(0xFF0C0B10),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isSelected ? tier.color : Colors.white12,
+                                width: isSelected ? 1.5 : 0.8,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                tier.label,
+                                style: TextStyle(
+                                  color: isSelected ? tier.color : Colors.white54,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+
           // Trial Cards
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 _buildGauntletHeroBanner(),
-                ...trials.map((t) => Padding(
+                ...EndgameGauntletDialog.trials.map((t) => Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: _buildTrialCard(context, t),
                     )),

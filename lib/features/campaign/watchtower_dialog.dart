@@ -160,14 +160,14 @@ class WatchtowerDialog extends StatelessWidget {
                         icon: Icons.radar,
                         color: const Color(0xFF4FC3F7),
                         title: 'Chart Enemy Blindspots',
-                        subtitle: 'Extract tactical routes: Harvest +250 Ichor from mapped supply veins.',
+                        subtitle: 'Extract tactical routes: Harvest +250 Gold from mapped supply veins.',
                         onTap: () {
                           Navigator.pop(context);
                           onGainIchor(250);
                           onDismiss();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Tactical routes mapped: Harvested +250 Ichor!'),
+                              content: Text('Tactical routes mapped: Harvested +250 Gold!'),
                               backgroundColor: Color(0xFF006064),
                             ),
                           );

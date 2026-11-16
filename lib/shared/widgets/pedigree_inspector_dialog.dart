@@ -197,7 +197,7 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
               ),
               const SizedBox(width: 2),
               Text(
-                '$cost Ichor',
+                '$cost Gold',
                 style: TextStyle(
                   fontSize: 8.5,
                   color: canAfford ? Colors.white70 : Colors.white30,
@@ -1220,7 +1220,7 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                               ],
                             ),
                             Text(
-                              'Available: $_currentIchor Ichor',
+                              'Available: $_currentIchor Gold',
                               style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
                             ),
                           ],
@@ -1346,7 +1346,7 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
                                   child: Text(
                                     unit.plinthMaterial == entry.$1
                                         ? '✓ ${entry.$2}'
-                                        : '${entry.$2} (${entry.$3} Ichor)',
+                                        : '${entry.$2} (${entry.$3} Gold)',
                                     style: TextStyle(
                                       color: unit.plinthMaterial == entry.$1
                                           ? const Color(0xFFFFD54F)

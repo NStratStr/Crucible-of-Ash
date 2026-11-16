@@ -1778,7 +1778,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                         const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
                         const SizedBox(width: 4),
                         Text(
-                          '+${node.rewardIchor} ICHOR',
+                          '+${node.rewardIchor} GOLD',
                           style: const TextStyle(
                             color: Color(0xFFE5A93C),
                             fontWeight: FontWeight.bold,

@@ -499,7 +499,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 16),
               const SizedBox(width: 6),
               const Text(
-                'ICHOR: ',
+                'GOLD: ',
                 style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 10, fontWeight: FontWeight.bold),
               ),
               Text(
@@ -592,7 +592,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 12),
                     const SizedBox(width: 4),
                     Text(
-                      '$_requiredIchorCost Ichor',
+                      '$_requiredIchorCost Gold',
                       style: TextStyle(
                         color: _hasSufficientIchor ? Colors.white : const Color(0xFFEF9A9A),
                         fontWeight: FontWeight.bold,
@@ -639,7 +639,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             const SizedBox(height: 6),
             Text(
               !_hasSufficientIchor
-                  ? '⚠ INSUFFICIENT ICHOR: Requires $_requiredIchorCost (have ${widget.totalIchor})'
+                  ? '⚠ INSUFFICIENT GOLD: Requires $_requiredIchorCost (have ${widget.totalIchor})'
                   : '⚠ INSUFFICIENT BLOODLINE SIGILS: Requires 1 (have ${widget.bloodlineSigils})',
               style: const TextStyle(color: Color(0xFFEF5350), fontSize: 9.5, fontWeight: FontWeight.w600),
             ),
@@ -924,7 +924,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Insufficient Ichor! Requires $cost Ichor to consecrate ${unit.name} to ${unit.nextRarityLabel}.'),
+          content: Text('Insufficient Gold! Requires $cost Gold to consecrate ${unit.name} to ${unit.nextRarityLabel}.'),
           backgroundColor: const Color(0xFFB3261E),
         ),
       );
@@ -979,7 +979,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     if (widget.totalIchor < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Insufficient Ichor! Requires $cost Ichor to infuse ${unit.name}.'),
+          content: Text('Insufficient Gold! Requires $cost Gold to infuse ${unit.name}.'),
           backgroundColor: const Color(0xFFB3261E),
         ),
       );
