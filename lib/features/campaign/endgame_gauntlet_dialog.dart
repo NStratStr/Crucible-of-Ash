@@ -514,7 +514,7 @@ class _EndgameGauntletDialogState extends State<EndgameGauntletDialog> {
 
   Widget _buildGauntletHeroBanner() {
     final int masteredCount = clearedTrials.length;
-    final int totalCount = trials.length;
+    final int totalCount = EndgameGauntletDialog.trials.length;
     final bool isTorment1 = clearedTrials.contains(EndgameTrialType.abyssalDescent);
     final bool isTorment2 = clearedTrials.contains(EndgameTrialType.abyssalDescentII);
     final bool isTorment3 = clearedTrials.contains(EndgameTrialType.abyssalDescentIII);

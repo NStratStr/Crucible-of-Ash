@@ -44,10 +44,11 @@ void main() {
             body: Builder(
               builder: (ctx) => ElevatedButton(
                 onPressed: () async {
-                  selected = await EndgameGauntletDialog.show(
+                  final res = await EndgameGauntletDialog.show(
                     ctx,
                     clearedTrials: {EndgameTrialType.worldTitan},
                   );
+                  selected = res?.type;
                 },
                 child: const Text('OPEN GAUNTLET'),
               ),
