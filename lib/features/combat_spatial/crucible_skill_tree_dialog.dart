@@ -611,6 +611,7 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       );
     }
 
+    int? lastTier;
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -624,20 +625,75 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
           final slotNumber = state.equippedSkillIds.indexOf(skill.id) + 1;
           final isPrereqMet = state.isSkillPrerequisiteMet(skill.id);
           final isTutorialTarget = _isFirstSkillTutorial(state) && !skill.isUnlocked && state.canUpgradeSkill(skill.id);
+          final bool showTierHeader = lastTier != skill.tier;
+          lastTier = skill.tier;
+          final prereqNode = skill.prerequisiteSkillId != null ? state.allSkills[skill.prerequisiteSkillId] : null;
+          final int minPrereqRank = skill.tier <= 2 ? 1 : 2;
+          final bool prereqNodeMet = prereqNode != null && prereqNode.rank >= minPrereqRank;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? skill.primaryColor.withValues(alpha: 0.20)
-                  : (isTutorialTarget
-                      ? const Color(0xFF13261E)
-                      : (isPrereqMet ? const Color(0xFF181B26) : const Color(0xFF11131A))),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFFFFD54F)
-                    : (isTutorialTarget
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showTierHeader)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 6),
+                  child: Row(
+                    children: [
+                      Text(
+                        skill.tier == 1
+                            ? 'TIER 1 • FOUNDATION & PASSIVES'
+                            : (skill.tier == 2
+                                ? 'TIER 2 • SPECIALIZATION'
+                                : (skill.tier == 3 ? 'TIER 3 • MASTERY' : 'TIER 4 • APEX CROWN')),
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Divider(color: Colors.white12, height: 1)),
+                    ],
+                  ),
+                ),
+              if (prereqNode != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 18, bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.subdirectory_arrow_right,
+                        size: 14,
+                        color: prereqNodeMet ? const Color(0xFF69F0AE) : const Color(0xFFFFB74D),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Path from ${prereqNode.name} (Rank $minPrereqRank+)',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: prereqNodeMet ? const Color(0xFF69F0AE) : const Color(0xFFFFB74D),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? skill.primaryColor.withValues(alpha: 0.20)
+                      : (isTutorialTarget
+                          ? const Color(0xFF13261E)
+                          : (isPrereqMet ? const Color(0xFF181B26) : const Color(0xFF11131A))),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFFFFD54F)
+                        : (isTutorialTarget
                         ? const Color(0xFF69F0AE)
                         : (isEquipped ? skill.borderColor : (isPrereqMet ? Colors.white12 : Colors.white10))),
                 width: (isSelected || isTutorialTarget) ? 1.6 : 1.0,
@@ -750,15 +806,17 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
               subtitle: Text(
                 isPrereqMet ? skill.summary : '🔒 ${state.getPrerequisiteRequirementText(skill.id)}',
                 style: TextStyle(
-                  fontSize: 9.0,
+                  fontSize: 9.5,
                   color: isPrereqMet ? Colors.white60 : const Color(0xFFFF8A80),
                   fontWeight: isPrereqMet ? FontWeight.normal : FontWeight.bold,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               ),
             ),
+            ),
+            ],
           );
         }),
       ],

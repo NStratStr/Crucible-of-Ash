@@ -1297,37 +1297,38 @@ class CrucibleSkillTreeState {
     final skill = allSkills[skillId];
     if (skill == null) return '';
 
+    final List<String> missing = [];
     final reqLv = requiredSculptorLevelForTier(skill.tier);
     final reqCastle = requiredCastleTierForSkillTier(skill.tier);
     if (sculptorLevel < reqLv) {
-      return 'Requires Sculptor Lv. $reqLv (Current: Lv. $sculptorLevel).';
+      missing.add('Sculptor Lv. $reqLv (Now Lv. $sculptorLevel)');
     }
     if (castleCrucibleTier < reqCastle) {
-      return 'Requires Great Crucible (Castle) Tier $reqCastle (Current: Tier $castleCrucibleTier).';
+      missing.add('Crucible Tier $reqCastle (Now T$castleCrucibleTier)');
     }
 
     if (skill.branch == CrucibleSkillBranch.apex) {
       if (totalPointsSpent < 3) {
-        return 'Requires 3 points invested across any branch ($totalPointsSpent/3).';
+        missing.add('3 pts in any branch ($totalPointsSpent/3)');
       }
-      return 'Apex Crown Overdrive Unlocked!';
+      return missing.isEmpty ? 'Apex Crown Overdrive Unlocked!' : 'Requires: ${missing.join(' • ')}';
     }
 
     final branchName = skill.branch.name.toUpperCase();
     final ptsSpent = getPointsSpentInBranch(skill.branch);
     if (skill.tier > 2 && ptsSpent < skill.requiredBranchPoints) {
-      return 'Requires ${skill.requiredBranchPoints} pt${skill.requiredBranchPoints > 1 ? "s" : ""} in Path of $branchName ($ptsSpent/${skill.requiredBranchPoints}).';
+      missing.add('${skill.requiredBranchPoints} pts in $branchName ($ptsSpent/${skill.requiredBranchPoints})');
     }
 
     if (skill.prerequisiteSkillId != null) {
       final prereq = allSkills[skill.prerequisiteSkillId];
       final minPrereqRank = skill.tier <= 2 ? 1 : 2;
       if (prereq != null && prereq.rank < minPrereqRank) {
-        return 'Requires Rank $minPrereqRank in ${prereq.name}.';
+        missing.add('Rank $minPrereqRank in ${prereq.name}');
       }
     }
 
-    return 'Prerequisites satisfied';
+    return missing.isEmpty ? 'Prerequisites satisfied' : 'Requires: ${missing.join(' • ')}';
   }
 
   bool canUpgradeSkill(String skillId) {
@@ -1389,7 +1390,14 @@ class CrucibleSkillTreeState {
   bool get isSeismicCataclysmActive => calamityPointsSpent >= 3;
 
   List<CrucibleSkillNode> getSkillsForBranch(CrucibleSkillBranch branch) {
-    return allSkills.values.where((s) => s.branch == branch).toList();
+    final list = allSkills.values.where((s) => s.branch == branch).toList();
+    list.sort((a, b) {
+      final tierCmp = a.tier.compareTo(b.tier);
+      if (tierCmp != 0) return tierCmp;
+      if (a.isPassive != b.isPassive) return a.isPassive ? -1 : 1;
+      return a.cinderCost.compareTo(b.cinderCost);
+    });
+    return list;
   }
 
   List<CrucibleSkillNode> getSkillsForDiscipline(CrucibleSkillDiscipline discipline) {
