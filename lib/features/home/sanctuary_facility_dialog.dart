@@ -383,21 +383,32 @@ class _SanctuaryFacilityUpgradeDialogState
 
             if (_upgradeNotification != null) _buildCelebrationBanner(),
 
-            // Content Area: Left Tab Bar + Right Details Panel
+            // Content Area: Left Tab Bar (desktop) / Top Horizontal Bar (mobile) + Details Panel
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // District List / Tabs
-                  Container(
-                    width: 260,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF090A10),
-                      border: Border(right: BorderSide(color: Colors.white12, width: 1)),
-                    ),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: districts.length,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isCompact = constraints.maxWidth < 620;
+                  return Flex(
+                    direction: isCompact ? Axis.vertical : Axis.horizontal,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // District List / Tabs
+                      Container(
+                        width: isCompact ? double.infinity : 260,
+                        height: isCompact ? 76 : null,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF090A10),
+                          border: isCompact
+                              ? const Border(bottom: BorderSide(color: Colors.white12, width: 1))
+                              : const Border(right: BorderSide(color: Colors.white12, width: 1)),
+                        ),
+                        child: ListView.builder(
+                          scrollDirection: isCompact ? Axis.horizontal : Axis.vertical,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isCompact ? 6 : 8,
+                            horizontal: isCompact ? 8 : 0,
+                          ),
+                          itemCount: districts.length,
                       itemBuilder: (ctx, idx) {
                         final d = districts[idx];
                         final tier = _getTier(d.id);
@@ -412,6 +423,7 @@ class _SanctuaryFacilityUpgradeDialogState
                             });
                           },
                           child: AnimatedContainer(
+                            width: isCompact ? 190 : null,
                             duration: const Duration(milliseconds: 150),
                             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -754,6 +766,8 @@ class _SanctuaryFacilityUpgradeDialogState
                     ),
                   ),
                 ],
+              );
+                },
               ),
             ),
           ],

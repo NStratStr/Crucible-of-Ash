@@ -436,13 +436,16 @@ class _EndgameGauntletDialogState extends State<EndgameGauntletDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     const Text(
                       'DUNGEON STAT TIER:',
                       style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8),
                     ),
-                    const Spacer(),
                     Text(
                       '${_selectedTier.enemyHpMult.toStringAsFixed(2)}× HP • ${_selectedTier.enemyAtkMult.toStringAsFixed(2)}× ATK • ${_selectedTier.rewardMult.toStringAsFixed(2)}× Loot${_selectedTier.bonusSigils > 0 ? " +${_selectedTier.bonusSigils} Sigils" : ""}',
                       style: TextStyle(color: _selectedTier.color, fontSize: 10, fontWeight: FontWeight.bold),
@@ -450,17 +453,18 @@ class _EndgameGauntletDialogState extends State<EndgameGauntletDialog> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: DungeonDifficultyTier.values.map((tier) {
-                    final bool isSelected = _selectedTier == tier;
-                    return Expanded(
-                      child: Padding(
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: DungeonDifficultyTier.values.map((tier) {
+                      final bool isSelected = _selectedTier == tier;
+                      return Padding(
                         padding: EdgeInsets.only(right: tier != DungeonDifficultyTier.tormentIII ? 6 : 0),
                         child: InkWell(
                           onTap: () => setState(() => _selectedTier = tier),
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                             decoration: BoxDecoration(
                               color: isSelected ? tier.color.withValues(alpha: 0.18) : const Color(0xFF0C0B10),
                               borderRadius: BorderRadius.circular(6),
@@ -482,9 +486,9 @@ class _EndgameGauntletDialogState extends State<EndgameGauntletDialog> {
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ],
             ),

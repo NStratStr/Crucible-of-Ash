@@ -704,6 +704,23 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
+            // 6. ASHEN TOWER (Lower-Right Spire Approach)
+            if (widget.onOpenCatacombDelves != null)
+              Positioned(
+                bottom: h * 0.16,
+                right: w * 0.12,
+                child: _buildInteractiveWaypointNode(
+                  id: 'ashen_tower',
+                  title: 'ASHEN TOWER',
+                  subtitle: '5-Floor Boss Climb',
+                  icon: Icons.castle_outlined,
+                  badgeColor: const Color(0xFF00E5FF),
+                  shieldAsset: 'assets/images/UI/Skull Shield Icon Transparent.png',
+                  scale: buildingScale,
+                  onTap: widget.onOpenCatacombDelves!,
+                ),
+              ),
+
             if (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial)
               Positioned.fill(
                 child: GestureDetector(
@@ -1440,8 +1457,8 @@ class _HomeScreenState extends State<HomeScreen> {
         'borderColor': const Color(0xFF00E5FF),
       },
       {
-        'title': 'CATACOMB DELVES',
-        'subtitle': 'Stygian dungeon expeditions, risk/reward extraction & loot sack',
+        'title': 'ASHEN TOWER',
+        'subtitle': 'Endless 5-floor Boss climb, extraction & Quicksilver milestones',
         'badge': 'STYGIAN ABYSS',
         'badgeColor': const Color(0xFFE040FB),
         'iconAsset': 'assets/images/UI/Flame Shield icon Transparent.png',

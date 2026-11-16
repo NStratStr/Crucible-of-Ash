@@ -558,7 +558,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
           if (widget.onOpenCatacombDelves != null)
             IconButton(
               icon: const Icon(Icons.explore, color: Color(0xFF00E5FF), size: 18),
-              tooltip: 'Catacomb Delves (Stygian Expeditions)',
+              tooltip: 'Ashen Tower (5-Floor Boss Climb)',
               onPressed: widget.onOpenCatacombDelves,
             ),
           // Tri-Currency Display
@@ -718,7 +718,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                         left: 12,
                         child: ElevatedButton.icon(
                           icon: const Icon(Icons.explore, size: 16),
-                          label: const Text('CATACOMB DELVES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                          label: const Text('ASHEN TOWER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0F1A24),
                             foregroundColor: const Color(0xFF00E5FF),

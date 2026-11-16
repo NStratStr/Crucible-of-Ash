@@ -10317,6 +10317,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             message: richTooltipSpan == null ? tooltipMessage : null,
             child: InkWell(
               onTap: isEnabled ? onPressed : null,
+              onTapDown: skill == null
+                  ? null
+                  : (_) {
+                      if (_hoveredSkillNode?.id != skill.id) {
+                        setState(() => _hoveredSkillNode = skill);
+                      }
+                    },
+              onTapUp: skill == null
+                  ? null
+                  : (_) {
+                      if (_hoveredSkillNode?.id == skill.id) {
+                        setState(() => _hoveredSkillNode = null);
+                      }
+                    },
+              onTapCancel: skill == null
+                  ? null
+                  : () {
+                      if (_hoveredSkillNode?.id == skill.id) {
+                        setState(() => _hoveredSkillNode = null);
+                      }
+                    },
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 width: slotSize,

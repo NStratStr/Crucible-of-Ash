@@ -230,7 +230,7 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                     _buildSpoilPreviewItem('ORE', '+${room.rewardOre}', const Color(0xFFFF9800)),
                     _buildSpoilPreviewItem('SIGILS', '+${room.rewardSigils}', const Color(0xFFFFD54F)),
                     _buildSpoilPreviewItem(
-                      'PLINTHS',
+                      'SHARDS',
                       '+${_service.isGloomActive ? room.rewardPlinthShards * 2 : room.rewardPlinthShards}',
                       const Color(0xFF00E5FF),
                     ),
@@ -790,8 +790,8 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
               children: [
                 // 1. Top Header Bar
                 GothicHeaderBar(
-                  title: 'CATACOMB DELVES',
-                  categoryTag: 'STYGIAN EXPEDITION',
+                  title: 'ASHEN TOWER',
+                  categoryTag: '5-FLOOR BOSS CLIMB',
                   actions: [
                     // Crypt Keys Pill
                     Container(
@@ -937,6 +937,37 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                     color: Color(0xFF00E5FF),
                     letterSpacing: 1.1,
                   ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: floor.floorNumber % 5 == 0
+                            ? const Color(0xFFB3261E).withValues(alpha: 0.25)
+                            : const Color(0xFF131B26),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: floor.floorNumber % 5 == 0
+                              ? const Color(0xFFFF5252)
+                              : const Color(0xFF00E5FF).withValues(alpha: 0.45),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        floor.floorNumber % 5 == 0
+                            ? 'TOWER BOSS FLOOR • +QUICKSILVER & SIGIL'
+                            : 'TOWER FL. ${floor.floorNumber} • NEXT BOSS: FL. ${((floor.floorNumber - 1) ~/ 5 + 1) * 5}',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: floor.floorNumber % 5 == 0 ? const Color(0xFFFF8A80) : const Color(0xFF80D8FF),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   floor.subtitle,
@@ -1095,12 +1126,12 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '+${room.rewardIchor} Ash',
-                  style: const TextStyle(fontSize: 9, color: Color(0xFFE91E63)),
+                  '+${room.rewardIchor} Gold',
+                  style: const TextStyle(fontSize: 9, color: Color(0xFFFFD54F)),
                 ),
                 if (room.rewardPlinthShards > 0)
                   Text(
-                    '+${room.rewardPlinthShards} Plinths',
+                    '+${room.rewardPlinthShards} Shards',
                     style: const TextStyle(fontSize: 9, color: Color(0xFF00E5FF)),
                   ),
               ],

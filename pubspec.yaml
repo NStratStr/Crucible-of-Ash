@@ -65,10 +65,38 @@ flutter:
   assets:
     - assets/images/
     - assets/images/icons/skills/
-    - assets/images/Ash Legion/
-    - assets/images/Crypt Stalkers/
+    - assets/images/Ash Legion/lady_valeria_g1.png
+    - assets/images/Ash Legion/lady_valeria_g3.png
+    - assets/images/Ash Legion/lady_valeria_g6.png
+    - assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png
+    - assets/images/Crypt Stalkers/CRY-01-VAN-G3 Ossuary Juggernaut.png
+    - assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png
+    - assets/images/Crypt Stalkers/CRY-04-MAG-G3 Sanguine Sorcerer.png
+    - assets/images/Crypt Stalkers/CRY-04-MAG-G6 Sanguine Archon.png
+    - assets/images/Crypt Stalkers/CRY-05-SUP-G1 Blood Alchemist.png
+    - assets/images/Crypt Stalkers/CRY-05-SUP-G3 Saunguine Priestess.png
+    - assets/images/Crypt Stalkers/CRY-05-SUP-G6 Saunguine Matron.png
+    - assets/images/Crypt Stalkers/Grave Ghoul - CRY - 02 -G1.jpg
+    - assets/images/Crypt Stalkers/lord_vladislav_g1.png
+    - assets/images/Crypt Stalkers/lord_vladislav_g3.png
+    - assets/images/Crypt Stalkers/lord_vladislav_g6.png
+    - assets/images/Crypt Stalkers/[CRY-05-SUP-G3] Sanguine Scourge.png
+    - assets/images/Crypt Stalkers/[CRY-05-SUP-G6] Sanguine High-Inquisitor.png
     - assets/images/Spells/
-    - assets/images/UI/
+    - assets/images/UI/building_crucible_furnace.png
+    - assets/images/UI/building_relic_forge.png
+    - assets/images/UI/building_resonance_beacon.png
+    - assets/images/UI/Campaign Map Shield Icon Transpartent.png
+    - assets/images/UI/Crossed Sword Shield Icon Transparent.png
+    - assets/images/UI/Flame Shield icon Transparent.png
+    - assets/images/UI/frontier_outpost_haven.jpg
+    - assets/images/UI/Main Page HUD background with less people.png
+    - assets/images/UI/Main page HUD background.png
+    - assets/images/UI/Relic Forge Shield Icon Transparent.png
+    - assets/images/UI/Ruby Shield Icon transparent.png
+    - assets/images/UI/Settings Shield Icon Transparent.png
+    - assets/images/UI/Skull Shield Icon Transparent.png
+    - assets/images/UI/Solar Inquisitor - ASH - 02 -  ASN - G3 Tansparent.png
     - assets/audio/Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav
     - assets/audio/Bluezone_BC0261_mountain_dweller_tool_axe_whoosh_impact_003.wav
     - assets/audio/Bluezone_BC0297_stone_impact_hammer_015.wav

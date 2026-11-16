@@ -413,7 +413,8 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
           const SizedBox(height: 8),
 
           // Slot Filter Bar
-          Padding(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [

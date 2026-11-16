@@ -170,25 +170,45 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
             // 3-Branch Archetype Tabs + Crown Apex
             _buildBranchTabs(state),
 
-            // Main Body: Branch Pathway & Keystone (Left) + Skill Inspector (Right)
+            // Main Body: Branch Pathway & Keystone + Skill Inspector (responsive for mobile)
             Expanded(
-              child: Row(
-                children: [
-                  // Left: Branch Skills & Keystone Card
-                  Expanded(
-                    flex: 5,
-                    child: _buildBranchSkillPathway(skillsInBranch, state),
-                  ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isCompact = constraints.maxWidth < 640;
+                  if (isCompact) {
+                    return Column(
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: _buildBranchSkillPathway(skillsInBranch, state),
+                        ),
+                        Container(height: 1, color: Colors.white12),
+                        Expanded(
+                          flex: 4,
+                          child: _buildSkillDetailInspector(selectedSkill, state),
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      // Left: Branch Skills & Keystone Card
+                      Expanded(
+                        flex: 5,
+                        child: _buildBranchSkillPathway(skillsInBranch, state),
+                      ),
 
-                  // Divider
-                  Container(width: 1, color: Colors.white12),
+                      // Divider
+                      Container(width: 1, color: Colors.white12),
 
-                  // Right: Skill Detail Inspector & Upgrade / Equip Panel
-                  Expanded(
-                    flex: 4,
-                    child: _buildSkillDetailInspector(selectedSkill, state),
-                  ),
-                ],
+                      // Right: Skill Detail Inspector & Upgrade / Equip Panel
+                      Expanded(
+                        flex: 4,
+                        child: _buildSkillDetailInspector(selectedSkill, state),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
