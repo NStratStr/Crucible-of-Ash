@@ -191,9 +191,9 @@ class _PedigreeInspectorDialogState extends State<PedigreeInspectorDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.water_drop,
+                Icons.monetization_on,
                 size: 9,
-                color: canAfford ? const Color(0xFFEF5350) : Colors.white30,
+                color: canAfford ? const Color(0xFFFFD54F) : Colors.white30,
               ),
               const SizedBox(width: 2),
               Text(

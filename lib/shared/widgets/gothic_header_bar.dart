@@ -132,12 +132,12 @@ class GothicHeaderBar extends StatelessWidget implements PreferredSizeWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (totalIchor != null) ...[
-            const Icon(Icons.water_drop, color: Color(0xFFEF5350), size: 12),
+            const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 12),
             const SizedBox(width: 3),
             Text(
               '$totalIchor',
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFFFFE082),
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
                 fontSize: 10.0,
@@ -160,12 +160,12 @@ class GothicHeaderBar extends StatelessWidget implements PreferredSizeWidget {
           ],
           if (bloodlineSigils != null) ...[
             const SizedBox(width: 8),
-            const Icon(Icons.workspace_premium, color: Color(0xFFFFD54F), size: 12),
+            const Icon(Icons.military_tech, color: Color(0xFFFF80AB), size: 12),
             const SizedBox(width: 3),
             Text(
               '$bloodlineSigils',
               style: const TextStyle(
-                color: Color(0xFFFFD54F),
+                color: Color(0xFFFF80AB),
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
                 fontSize: 10.0,

@@ -332,11 +332,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Tri-Currency Display
           _buildCurrencyPill(
-            icon: Icons.water_drop,
-            iconColor: const Color(0xFFB3261E),
+            icon: Icons.monetization_on,
+            iconColor: const Color(0xFFFFD54F),
             value: '${widget.totalIchor}',
-            valueColor: const Color(0xFFEF5350),
-            tooltip: 'Raw Gold (Fusion & Evolution)',
+            valueColor: const Color(0xFFFFE082),
+            tooltip: 'Gold (Upgrades, Forging & Training)',
           ),
           const SizedBox(width: 6),
           _buildCurrencyPill(
@@ -344,15 +344,15 @@ class _HomeScreenState extends State<HomeScreen> {
             iconColor: const Color(0xFF26A69A),
             value: '${widget.cursedOre}',
             valueColor: const Color(0xFF80CBC4),
-            tooltip: 'Cursed Ore (Relic Reforging)',
+            tooltip: 'Cursed Ore (Relic Forging & Sanctuary)',
           ),
           const SizedBox(width: 6),
           _buildCurrencyPill(
             icon: Icons.military_tech,
-            iconColor: const Color(0xFFFFD54F),
+            iconColor: const Color(0xFFFF80AB),
             value: '${widget.bloodlineSigils}',
-            valueColor: const Color(0xFFFFE082),
-            tooltip: 'Bloodline Sigils (Phylactery & Sanguine Altars)',
+            valueColor: const Color(0xFFFF80AB),
+            tooltip: 'Bloodline Sigils (Summoning & Hospice)',
           ),
 
           const SizedBox(width: 10),

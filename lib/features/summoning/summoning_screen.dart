@@ -202,15 +202,15 @@ class _SummoningScreenState extends State<SummoningScreen> {
 
           // Currencies
           _buildCurrencyBadge(
-            icon: Icons.water_drop,
-            color: const Color(0xFFEF5350),
+            icon: Icons.monetization_on,
+            color: const Color(0xFFFFD54F),
             value: '${widget.totalIchor}',
-            tooltip: 'Raw Gold',
+            tooltip: 'Gold',
           ),
           const SizedBox(width: 8),
           _buildCurrencyBadge(
             icon: Icons.military_tech,
-            color: const Color(0xFFFFD54F),
+            color: const Color(0xFFFF80AB),
             value: '${widget.bloodlineSigils}',
             tooltip: 'Bloodline Sigils',
           ),
@@ -530,8 +530,8 @@ class _SummoningScreenState extends State<SummoningScreen> {
   }
 
   Widget _buildActionControlPanel(BannerConfig banner, bool canAfford1x, bool canAfford10x) {
-    final currencyIcon = banner.usesSigils ? Icons.military_tech : Icons.water_drop;
-    final currencyColor = banner.usesSigils ? const Color(0xFFFFD54F) : const Color(0xFFEF5350);
+    final currencyIcon = banner.usesSigils ? Icons.military_tech : Icons.monetization_on;
+    final currencyColor = banner.usesSigils ? const Color(0xFFFF80AB) : const Color(0xFFFFD54F);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

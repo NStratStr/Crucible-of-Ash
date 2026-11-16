@@ -496,7 +496,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         children: [
           Row(
             children: [
-              const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 16),
+              const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 16),
               const SizedBox(width: 6),
               const Text(
                 'GOLD: ',
@@ -589,7 +589,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.water_drop, color: Color(0xFFE5A93C), size: 12),
+                    const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 12),
                     const SizedBox(width: 4),
                     Text(
                       '$_requiredIchorCost Gold',

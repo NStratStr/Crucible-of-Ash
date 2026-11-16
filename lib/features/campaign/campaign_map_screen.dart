@@ -567,13 +567,13 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ichor
-                const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 12),
+                // Gold
+                const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 12),
                 const SizedBox(width: 2),
                 Text(
                   '${widget.totalIchor}',
                   style: const TextStyle(
-                    color: Color(0xFFEF5350),
+                    color: Color(0xFFFFE082),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
                     fontSize: 9.5,
@@ -594,20 +594,12 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                 ),
                 const SizedBox(width: 5),
                 // Bloodline Sigils
-                ClipOval(
-                  child: Image.asset(
-                    'assets/images/blood_altar_sigil.jpg',
-                    width: 12,
-                    height: 12,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.military_tech, color: Color(0xFFE5A93C), size: 12),
-                  ),
-                ),
+                const Icon(Icons.military_tech, color: Color(0xFFFF80AB), size: 12),
                 const SizedBox(width: 2),
                 Text(
                   '${widget.bloodlineSigils}',
                   style: const TextStyle(
-                    color: Color(0xFFFFD54F),
+                    color: Color(0xFFFF80AB),
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
                     fontSize: 9.5,
@@ -1085,11 +1077,11 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 11),
+                      const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 11),
                       const SizedBox(width: 2),
                       Text(
                         '+${stage.rewardIchor}',
-                        style: const TextStyle(color: Color(0xFFEF5350), fontSize: 9.0, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Color(0xFFFFE082), fontSize: 9.0, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(width: 4),
                       const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 11),
@@ -1775,7 +1767,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.water_drop, color: Color(0xFFB3261E), size: 14),
+                        const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 14),
                         const SizedBox(width: 4),
                         Text(
                           '+${node.rewardIchor} GOLD',
