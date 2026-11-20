@@ -374,7 +374,7 @@ class CombatUnitState {
     this.customAssetPath,
     this.nativeTraitId,
     this.graftedTraitId,
-    this.chiseledTraitIds = const [],
+    List<String>? chiseledTraitIds,
     this.consecutiveTurnsStationary = 0,
     this.hasStanceBonusReady = false,
     this.movedSinceLastTurn = false,
@@ -388,6 +388,7 @@ class CombatUnitState {
     this.lifestealBonus = 0.0,
   })  : stagger = stagger ?? maxStagger,
         baseMaxHp = baseMaxHp ?? maxHp,
+        chiseledTraitIds = chiseledTraitIds != null ? List<String>.from(chiseledTraitIds) : [],
         isDisplacementImmune = isDisplacementImmune ?? (footprint != UnitFootprint.single1x1),
         activeStance = activeStance ?? _defaultStanceForArchetype(archetype);
 

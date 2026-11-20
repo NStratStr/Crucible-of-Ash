@@ -291,8 +291,26 @@ void main() {
         lineageAncestors: const [],
       );
 
+      const protagonist = UnitEntity(
+        id: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        speciesId: 'ash_sculptor',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 1,
+        maxLevel: 20,
+        currentHp: 800,
+        maxHp: 800,
+        attack: 60,
+        defense: 40,
+        speed: 50,
+        nativeTraitId: 'ash_sculptor_core',
+        lineageAncestors: const [],
+      );
+
       final engine = SpatialCombatEngine(
-        initialPlayerEntities: [testUnit],
+        initialPlayerEntities: [protagonist, testUnit],
         initialEnemyEntities: [enemyUnit],
         relicService: relicService,
       );

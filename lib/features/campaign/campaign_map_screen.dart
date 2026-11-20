@@ -349,7 +349,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
             : null,
         titleSpacing: widget.onOpenHome != null ? 0 : 8,
         title: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 160),
+          constraints: BoxConstraints(maxWidth: isMobile ? 150 : 240),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -377,6 +377,8 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                               CampaignMapScreen.chapterTitle(widget.currentChapter),
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
+                                color: const Color(0xFFFFD54F),
+                                fontFamily: 'serif',
                                 letterSpacing: 0.8,
                                 fontWeight: FontWeight.bold,
                                 fontSize: isMobile ? 9.5 : 11,
@@ -410,7 +412,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
         ),
         centerTitle: false,
         actions: [
-          // View Mode Toggle (Linear Ladder vs. Catacomb Delve)
+          // View Mode Toggle (Linear Story Track vs. Branching Expedition)
           Container(
             margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
             padding: const EdgeInsets.all(2),
@@ -422,65 +424,71 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                InkWell(
-                  onTap: () => setState(() => _viewMode = CampaignViewMode.linearLadder),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _viewMode == CampaignViewMode.linearLadder ? const Color(0xFFE5A93C) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.linear_scale,
-                          size: 11,
-                          color: _viewMode == CampaignViewMode.linearLadder ? Colors.black : Colors.white60,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'CAMPAIGN',
-                          style: TextStyle(
+                Tooltip(
+                  message: 'Linear 10-stage Story Track',
+                  child: InkWell(
+                    onTap: () => setState(() => _viewMode = CampaignViewMode.linearLadder),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _viewMode == CampaignViewMode.linearLadder ? const Color(0xFFE5A93C) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.linear_scale,
+                            size: 11,
                             color: _viewMode == CampaignViewMode.linearLadder ? Colors.black : Colors.white60,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 8.5,
-                            letterSpacing: 0.6,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 3),
+                          Text(
+                            'STORY',
+                            style: TextStyle(
+                              color: _viewMode == CampaignViewMode.linearLadder ? Colors.black : Colors.white60,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 8.5,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                InkWell(
-                  onTap: () => setState(() => _viewMode = CampaignViewMode.catacombDelve),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _viewMode == CampaignViewMode.catacombDelve ? const Color(0xFF00E5FF) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.account_tree_outlined,
-                          size: 11,
-                          color: _viewMode == CampaignViewMode.catacombDelve ? Colors.black : const Color(0xFF00E5FF),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'DUNGEON',
-                          style: TextStyle(
+                Tooltip(
+                  message: 'Branching Overworld Expedition',
+                  child: InkWell(
+                    onTap: () => setState(() => _viewMode = CampaignViewMode.catacombDelve),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _viewMode == CampaignViewMode.catacombDelve ? const Color(0xFF00E5FF) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.account_tree_outlined,
+                            size: 11,
                             color: _viewMode == CampaignViewMode.catacombDelve ? Colors.black : const Color(0xFF00E5FF),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 8.5,
-                            letterSpacing: 0.6,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 3),
+                          Text(
+                            'EXPEDITION',
+                            style: TextStyle(
+                              color: _viewMode == CampaignViewMode.catacombDelve ? Colors.black : const Color(0xFF00E5FF),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 8.5,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -543,27 +551,15 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               ),
             ),
           ),
-          if (!isMobile && (widget.onLaunchGorgorothBoss != null || widget.onLaunchMvpSkirmish != null))
-            IconButton(
-              icon: const Icon(Icons.flash_on, color: Color(0xFFFFD54F), size: 18),
-              tooltip: 'Boss Arena: Gorgoroth Trial',
-              onPressed: widget.onLaunchGorgorothBoss ?? widget.onLaunchMvpSkirmish,
+          // Tri-Currency Display Pill
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF181824),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF38384E)),
             ),
-          if (!isMobile && widget.onOpenEndgameGauntlet != null)
-            IconButton(
-              icon: const Icon(Icons.workspace_premium, color: Color(0xFFE5A93C), size: 18),
-              tooltip: 'Endgame Gauntlet',
-              onPressed: widget.onOpenEndgameGauntlet,
-            ),
-          if (widget.onOpenCatacombDelves != null)
-            IconButton(
-              icon: const Icon(Icons.explore, color: Color(0xFF00E5FF), size: 18),
-              tooltip: 'Ashen Tower (5-Floor Boss Climb)',
-              onPressed: widget.onOpenCatacombDelves,
-            ),
-          // Tri-Currency Display
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -822,6 +818,25 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                             fontFamily: 'monospace',
                           ),
                         ),
+                        if (widget.onOpenCatacombDelves != null) ...[
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Ashen Tower: 5-Floor Roguelike Climb',
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.explore, size: 14),
+                              label: const Text('ASHEN TOWER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0F1A24),
+                                foregroundColor: const Color(0xFF00E5FF),
+                                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.0),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: widget.onOpenCatacombDelves,
+                            ),
+                          ),
+                        ],
                         if (widget.onOpenEndgameGauntlet != null) ...[
                           const SizedBox(width: 8),
                           ElevatedButton.icon(
@@ -1195,7 +1210,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
     final bool hasBossTrial = widget.onLaunchGorgorothBoss != null;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -1237,7 +1252,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                 const SizedBox(height: 1),
                 Text(
                   hasBossTrial
-                      ? 'Instant 2x2 Colossus Boss Fight • Stagger, Break Bar & Core Exposure (+50% Crit)'
+                      ? 'Practice 2x2 Colossus Boss Trial • Stagger, Break Bar & Core Exposure (+50% Crit)'
                       : 'Ash Legion vs Crypt Stalkers • Boss Gorgoroth the Flayed • Vladislav Grimoire',
                   style: const TextStyle(
                     color: Colors.white70,

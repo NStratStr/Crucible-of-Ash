@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/audio/global_audio_service.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/trait_entity.dart';
 import '../../shared/models/unit_entity.dart';
@@ -17,6 +18,7 @@ class CrucibleScreen extends StatefulWidget {
   final ValueChanged<int>? onSigilsChanged;
   final void Function(UnitEntity child, List<String> sacrificedParentIds)? onFusionExecuted;
   final void Function(UnitEntity updatedUnit, int ichorCost)? onUnitLeveled;
+  final int crucibleTier;
 
   const CrucibleScreen({
     super.key,
@@ -28,6 +30,7 @@ class CrucibleScreen extends StatefulWidget {
     this.onSigilsChanged,
     this.onFusionExecuted,
     this.onUnitLeveled,
+    this.crucibleTier = 1,
   });
 
   @override
@@ -102,23 +105,42 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   String _selectedSpeciesFilter = 'ALL';
   int? _selectedGenFilter;
 
+  int get _maxAllowedFusionGen =>
+      widget.crucibleTier >= 4 ? 6 : (widget.crucibleTier == 3 ? 5 : (widget.crucibleTier == 2 ? 3 : 2));
+
+  int get _nextFusionGen =>
+      (_progenitorA == null || _progenitorB == null) ? 1 : (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
+
+  bool get _isGenUnlockedByTier => _nextFusionGen <= _maxAllowedFusionGen;
+
+  int get _requiredTierForNextGen =>
+      _nextFusionGen <= 2 ? 1 : (_nextFusionGen == 3 ? 2 : (_nextFusionGen <= 5 ? 3 : 4));
+
   int get _requiredIchorCost {
     if (_progenitorA == null || _progenitorB == null) return 0;
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
+    final nextGen = _nextFusionGen;
+    int baseCost;
     switch (nextGen) {
       case 2:
-        return 150;
+        baseCost = 150;
+        break;
       case 3:
-        return 300;
+        baseCost = 300;
+        break;
       case 4:
-        return 500;
+        baseCost = 500;
+        break;
       case 5:
-        return 800;
+        baseCost = 800;
+        break;
       case 6:
-        return 1200;
+        baseCost = 1200;
+        break;
       default:
-        return 150;
+        baseCost = 150;
+        break;
     }
+    return widget.crucibleTier >= 2 ? (baseCost * 0.80).round() : baseCost;
   }
 
   int get _requiredSigilsCost {
@@ -145,6 +167,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       _progenitorB != null &&
       _progenitorA!.speciesId == _progenitorB!.speciesId &&
       _selectedGraftTraitId != null &&
+      _isGenUnlockedByTier &&
       _hasSufficientResources &&
       !_isPerformingRitual;
 
@@ -238,7 +261,9 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       speciesBaseSpd: 100,
       childNativeTraitId: _progenitorA!.nativeTraitId,
       selectedGraftTraitId: _selectedGraftTraitId!,
+      crucibleTier: widget.crucibleTier,
     );
+    GlobalAudioService().playSfx('sfx_fusion', volumeMultiplier: 0.70);
 
     // Deduct currencies
     if (widget.onIchorChanged != null && ichorCost > 0) {
@@ -385,8 +410,8 @@ class _CrucibleScreenState extends State<CrucibleScreen>
       child: Scaffold(
         backgroundColor: const Color(0xFF111114),
         appBar: GothicHeaderBar(
-          title: 'Crucible of Blood',
-          categoryTag: 'Ritual',
+          title: 'Blood Altar',
+          categoryTag: 'Fusion',
           totalIchor: widget.totalIchor,
           bloodlineSigils: widget.bloodlineSigils,
         ),
@@ -406,6 +431,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               children: [
                 // Tri-Currency Status Bar
                 _buildCurrencyStatusBar(),
+                _buildCrucibleTierBanner(),
 
                 // Altar Slots
                 _buildProgenitorSelectionAltar(),
@@ -425,11 +451,13 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                     label: Text(
                       _isPerformingRitual
                           ? 'TRANSMUTING SOULS...'
-                          : (!_hasSufficientResources
-                              ? 'INSUFFICIENT RESOURCES'
-                              : (_requiredSigilsCost > 0
-                                  ? '👑 CONSECRATE PUREBLOOD SOVEREIGN'
-                                  : 'IGNITE CRUCIBLE OF BLOOD')),
+                          : (!_isGenUnlockedByTier
+                              ? 'REQUIRES CRUCIBLE TIER $_requiredTierForNextGen'
+                              : (!_hasSufficientResources
+                                  ? 'INSUFFICIENT RESOURCES'
+                                  : (_requiredSigilsCost > 0
+                                      ? '👑 CONSECRATE PUREBLOOD SOVEREIGN'
+                                      : 'IGNITE BLOOD ALTAR'))),
                       style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -528,8 +556,62 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     );
   }
 
+  Widget _buildCrucibleTierBanner() {
+    final String tierRoman = const ['I', 'II', 'III', 'IV'][(widget.crucibleTier - 1).clamp(0, 3)];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141D),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFF7043).withValues(alpha: 0.35)),
+      ),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.whatshot, color: Color(0xFFFF7043), size: 14),
+              const SizedBox(width: 5),
+              Text(
+                'CRUCIBLE TIER $tierRoman • MAX GEN $_maxAllowedFusionGen',
+                style: const TextStyle(
+                  color: Color(0xFFFFAB91),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.7,
+                ),
+              ),
+            ],
+          ),
+          if (widget.crucibleTier >= 2) _buildTierPerkChip('-20% GOLD', const Color(0xFFFFD54F)),
+          if (widget.crucibleTier >= 3) _buildTierPerkChip('+10% DUP ASCENSION', const Color(0xFF81C784)),
+          if (widget.crucibleTier >= 4) _buildTierPerkChip('100% INHERITANCE', const Color(0xFF80D8FF)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierPerkChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   Widget _buildResourceCostCard() {
-    final nextGen = (max(_progenitorA!.generation, _progenitorB!.generation) + 1).clamp(1, 6);
+    final nextGen = _nextFusionGen;
     final isPureblood = nextGen >= 4;
 
     return Container(
@@ -540,7 +622,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
             : const Color(0xFF1A1A24),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: !_hasSufficientResources
+          color: (!_isGenUnlockedByTier || !_hasSufficientResources)
               ? const Color(0xFFE53935)
               : (isPureblood ? const Color(0xFFFFD700) : const Color(0xFFE5A93C)),
           width: 1.2,
@@ -573,7 +655,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           const SizedBox(height: 6),
           Row(
             children: [
-              // Ichor Cost
+              // Gold Cost
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -602,6 +684,10 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                   ],
                 ),
               ),
+              if (widget.crucibleTier >= 2) ...[
+                const SizedBox(width: 6),
+                _buildTierPerkChip('-20% TIER II', const Color(0xFF81C784)),
+              ],
               if (_requiredSigilsCost > 0) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -635,12 +721,18 @@ class _CrucibleScreenState extends State<CrucibleScreen>
               ],
             ],
           ),
-          if (!_hasSufficientResources) ...[
+          if (!_isGenUnlockedByTier) ...[
+            const SizedBox(height: 6),
+            Text(
+              '⚠ UPGRADE GREAT CRUCIBLE TO TIER $_requiredTierForNextGen IN SANCTUARY TO UNLOCK GEN $_nextFusionGen FUSION',
+              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 9.5, fontWeight: FontWeight.w600),
+            ),
+          ] else if (!_hasSufficientResources) ...[
             const SizedBox(height: 6),
             Text(
               !_hasSufficientIchor
                   ? '⚠ INSUFFICIENT GOLD: Requires $_requiredIchorCost (have ${widget.totalIchor})'
-                  : '⚠ INSUFFICIENT BLOODLINE SIGILS: Requires 1 (have ${widget.bloodlineSigils})',
+                  : '⚠ INSUFFICIENT BLOODLINE SIGILS: Requires $_requiredSigilsCost (have ${widget.bloodlineSigils})',
               style: const TextStyle(color: Color(0xFFEF5350), fontSize: 9.5, fontWeight: FontWeight.w600),
             ),
           ],
@@ -956,11 +1048,21 @@ class _CrucibleScreenState extends State<CrucibleScreen>
     final promoted = _progenitorA!.promoteRarity(
       newGraftedTraitId: _selectedGraftTraitId ?? _progenitorA!.graftedTraitId ?? _progenitorB!.nativeTraitId,
     );
+    final int boostedMaxHp = (promoted.maxHp * 1.10).round();
+    final UnitEntity finalPromoted = widget.crucibleTier >= 3
+        ? promoted.copyWith(
+            maxHp: boostedMaxHp,
+            currentHp: boostedMaxHp,
+            attack: (promoted.attack * 1.10).round(),
+            defense: (promoted.defense * 1.10).round(),
+            speed: (promoted.speed * 1.10).round(),
+          )
+        : promoted;
 
     if (widget.onFusionExecuted != null) {
-      widget.onFusionExecuted!(promoted, [parentAId, parentBId]);
+      widget.onFusionExecuted!(finalPromoted, [parentAId, parentBId]);
     } else {
-      widget.onFusionComplete(promoted);
+      widget.onFusionComplete(finalPromoted);
     }
 
     if (mounted) {
@@ -970,7 +1072,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         _progenitorB = null;
         _selectedGraftTraitId = null;
       });
-      _showFusionSuccessModal(promoted);
+      _showFusionSuccessModal(finalPromoted);
     }
   }
 
@@ -1043,7 +1145,7 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                   ),
                   icon: const Icon(Icons.flash_on, size: 14, color: Color(0xFFE5A93C)),
                   label: const Text('AUTO-PAIR', style: TextStyle(color: Color(0xFFE5A93C), fontSize: 10, fontWeight: FontWeight.bold)),
-                  onPressed: _autoSlotFirstCompatiblePair,
+                  onPressed: () => setState(_autoSlotFirstCompatiblePair),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -1267,9 +1369,9 @@ class _CrucibleScreenState extends State<CrucibleScreen>
                           ),
                         const SizedBox(height: 4),
                         Text(
-                          isMaxLevel ? '10% YIELD' : '5% YIELD',
+                          (widget.crucibleTier >= 4 || isMaxLevel) ? '10% YIELD' : '5% YIELD',
                           style: TextStyle(
-                            color: isMaxLevel ? const Color(0xFF4CAF50) : const Color(0xFF8E8EA0),
+                            color: (widget.crucibleTier >= 4 || isMaxLevel) ? const Color(0xFF4CAF50) : const Color(0xFF8E8EA0),
                             fontSize: 8,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1379,13 +1481,14 @@ class _CrucibleScreenState extends State<CrucibleScreen>
   // ===========================================================================
 
   Widget _buildInheritancePreviewCard() {
-    final double ratioA = (_progenitorA!.level >= _progenitorA!.maxLevel) ? 0.10 : 0.05;
-    final double ratioB = (_progenitorB!.level >= _progenitorB!.maxLevel) ? 0.10 : 0.05;
+    final double ratioA = (widget.crucibleTier >= 4 || _progenitorA!.level >= _progenitorA!.maxLevel) ? 0.10 : 0.05;
+    final double ratioB = (widget.crucibleTier >= 4 || _progenitorB!.level >= _progenitorB!.maxLevel) ? 0.10 : 0.05;
+    final double efficiencyMult = widget.crucibleTier >= 4 ? 1.05 : 1.0;
 
-    final int bonusHp = ((_progenitorA!.maxHp * ratioA) + (_progenitorB!.maxHp * ratioB)).round();
-    final int bonusAtk = ((_progenitorA!.attack * ratioA) + (_progenitorB!.attack * ratioB)).round();
-    final int bonusDef = ((_progenitorA!.defense * ratioA) + (_progenitorB!.defense * ratioB)).round();
-    final int bonusSpd = ((_progenitorA!.speed * ratioA) + (_progenitorB!.speed * ratioB)).round();
+    final int bonusHp = (((_progenitorA!.maxHp * ratioA) + (_progenitorB!.maxHp * ratioB)) * efficiencyMult).round();
+    final int bonusAtk = (((_progenitorA!.attack * ratioA) + (_progenitorB!.attack * ratioB)) * efficiencyMult).round();
+    final int bonusDef = (((_progenitorA!.defense * ratioA) + (_progenitorB!.defense * ratioB)) * efficiencyMult).round();
+    final int bonusSpd = (((_progenitorA!.speed * ratioA) + (_progenitorB!.speed * ratioB)) * efficiencyMult).round();
 
     final int nextGen = (_progenitorA!.generation >= _progenitorB!.generation
             ? _progenitorA!.generation
@@ -1434,7 +1537,9 @@ class _CrucibleScreenState extends State<CrucibleScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Inheritance Potency: A(${(ratioA * 100).toInt()}%) + B(${(ratioB * 100).toInt()}%)',
+              Text(
+                  'Inheritance Potency: A(${(ratioA * 100).toInt()}%) + B(${(ratioB * 100).toInt()}%)'
+                  '${widget.crucibleTier >= 4 ? " (100% Eff.)" : ""}',
                   style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9)),
               Text(
                 ratioA == 0.10 && ratioB == 0.10 ? 'PUREBLOOD RITE' : 'IMPURE TRANSFER',

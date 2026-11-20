@@ -50,6 +50,8 @@ class SpatialCombatEngine extends ChangeNotifier {
   CombatUnitState? activeActingUnit;
   bool isTurnExecutionPaused = false;
   bool hasCastTuningSlipThisTurn = false;
+  String? focusedEnemyUnitId;
+  int _lastPlagueFeastTick = -999;
 
   // Deck & Hand Management
   final List<SpatialCombatCard> drawPile = [];
@@ -214,7 +216,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     petrifiedPlinthsWallet += rewardPetrifiedPlinths;
     skillTreeState.availableSkillPoints += 1;
     hasClaimedEncounterVictoryLoot = true;
-    addLog('💎 VICTORY SPOILS CLAIMED: +$rewardUnboundAsh Ash, +$rewardDistilledVitae Vitae, +$rewardPetrifiedPlinths Plinths, +1★ Skill Point!');
+    addLog('💎 VICTORY SPOILS CLAIMED: +$rewardUnboundAsh Gold, +$rewardDistilledVitae Cursed Ore, +1★ Skill Point!');
     notifyListeners();
   }
 
@@ -1037,6 +1039,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     maxFocus = 7;
     isBulletTime = false;
     hasClaimedEncounterVictoryLoot = false;
+    focusedEnemyUnitId = null;
+    _lastPlagueFeastTick = -999;
     skillTreeState.resetAllCooldowns();
 
     // --- ENEMY SQUAD: PYRE SYNOD COHORT ---
@@ -1175,27 +1179,6 @@ class SpatialCombatEngine extends ChangeNotifier {
       attack: 82,
       speed: 125,
       currentAp: 5000,
-      ultimateGauge: 100,
-      ultimateCooldown: 0,
-    );
-
-    // 4. Blood Scribe: Occult Catalyst Retinue (Cinder Conduit feeds +10 Cinders to Sculptor)
-    final bloodScribe = CombatUnitState(
-      id: 'blood_scribe',
-      name: 'Blood Scribe',
-      templateId: 'blood_scribe',
-      isPlayer: true,
-      archetype: UnitArchetype.backlineCaster,
-      footprint: UnitFootprint.single1x1,
-      occupiedNodes: [
-        const GridNode(column: 1, row: 2, occupantUnitId: 'blood_scribe'),
-      ],
-      maxHp: 310,
-      hp: 310,
-      maxArmor: 20,
-      armor: 20,
-      attack: 75,
-      speed: 100,
       ultimateGauge: 100,
       ultimateCooldown: 0,
     );
@@ -1484,7 +1467,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (unit.isAlive && unit.bleedStacks > 0) {
           final bleedDmg = (unit.bleedStacks * 18 * reckoningDamageMultiplier).round();
           unit.takeDamage(bleedDmg, ignoreArmor: true, isPhysical: true);
-          addLog('${unit.name} suffers $bleedDmg Bleed damage ($unit.hp/${unit.maxHp} HP).');
+          addLog('${unit.name} suffers $bleedDmg Bleed damage (${unit.hp}/${unit.maxHp} HP).');
           dispatchAction(SpatialActionEvent(
             id: 'bleed_${currentTick}_${unit.id}',
             attackerId: 'status_bleed',
@@ -1502,7 +1485,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         if (unit.isAlive && unit.poisonStacks > 0) {
           final poisonDmg = (unit.poisonStacks * 14 * reckoningDamageMultiplier).round();
           unit.takeDamage(poisonDmg, ignoreArmor: true, isPhysical: false);
-          addLog('${unit.name} suffers $poisonDmg Poison true damage ($unit.hp/${unit.maxHp} HP, -${unit.poisonStacks * 2}% ATK/SPD).');
+          addLog('${unit.name} suffers $poisonDmg Poison true damage (${unit.hp}/${unit.maxHp} HP, -${unit.poisonStacks * 2}% ATK/SPD).');
           dispatchAction(SpatialActionEvent(
             id: 'poison_${currentTick}_${unit.id}',
             attackerId: 'status_poison',
@@ -1622,12 +1605,12 @@ class SpatialCombatEngine extends ChangeNotifier {
               originCol: 1,
               originRow: 0,
               targetNodes: cataclysmNodes,
-              triggerTick: currentTick + 20,
-              totalWindupTicks: 20,
+              triggerTick: currentTick + 60,
+              totalWindupTicks: 60,
               rawDamage: max(220, (bossUnit.attack * 2.8).round()),
             );
-            lastBannerMessage = '🔥 ENKINDLED APEX: HEARTH CATACLYSM WINDING UP!';
-            addLog('BOSS APEX: ${bossUnit.name} initiates HEARTH CATACLYSM incinerating Frontline and Midline in 20 ticks! Break with Smite or Retreat to Backline!');
+            lastBannerMessage = '🔥 ENKINDLED APEX: HEARTH CATACLYSM WINDING UP (2.0s)!';
+            addLog('BOSS APEX: ${bossUnit.name} initiates HEARTH CATACLYSM incinerating Frontline and Midline in 2.0s (60 ticks)! Break with Smite or Retreat to Backline!');
           } else {
             final telegraphNodes = [
               const GridNode(column: 1, row: 0),
@@ -1641,17 +1624,17 @@ class SpatialCombatEngine extends ChangeNotifier {
               originCol: 1,
               originRow: 0,
               targetNodes: telegraphNodes,
-              triggerTick: currentTick + 15,
-              totalWindupTicks: 15,
+              triggerTick: currentTick + 54,
+              totalWindupTicks: 54,
               rawDamage: bossUnit.id == 'gorgoroth_boss' ? 280 : max(180, (bossUnit.attack * 2.4).round()),
             );
-            lastBannerMessage = '⚠️ ${bossUnit.name.toUpperCase()} WINDS UP: MOLTEN GREAT-CLEAVER!';
-            addLog('TELEGRAPH: ${bossUnit.name} prepares Molten Great-Cleaver striking Col 2 T-Cleave in 15 ticks!');
+            lastBannerMessage = '⚠️ ${bossUnit.name.toUpperCase()} WINDS UP: MOLTEN GREAT-CLEAVER (1.8s)!';
+            addLog('TELEGRAPH: ${bossUnit.name} prepares Molten Great-Cleaver striking Col 2 T-Cleave in 1.8s (54 ticks)!');
           }
         }
       } else if (isMalakor) {
-        // Malakor Sunder telegraph at tick 120 / 240
-        if ((currentTick == 120 || currentTick == 240) && bossUnit.pendingIntent == null) {
+        // Malakor Sunder telegraph periodically every 120 ticks
+        if ((currentTick >= 120 && currentTick % 120 == 0) && bossUnit.pendingIntent == null) {
           final sunderNodes = [
             const GridNode(column: 1, row: 0),
             const GridNode(column: 1, row: 1),
@@ -1664,12 +1647,12 @@ class SpatialCombatEngine extends ChangeNotifier {
             originCol: 1,
             originRow: 0,
             targetNodes: sunderNodes,
-            triggerTick: currentTick + 15,
-            totalWindupTicks: 15,
+            triggerTick: currentTick + 54,
+            totalWindupTicks: 54,
             rawDamage: max(200, (bossUnit.attack * 2.2).round()),
           );
-          lastBannerMessage = '⚠️ MALAKOR WINDS UP: IRON SUNDER (CENTER COLUMN)!';
-          addLog('TELEGRAPH: Malakor the Unbroken prepares Iron Sunder striking Center Column in 15 ticks!');
+          lastBannerMessage = '⚠️ MALAKOR WINDS UP: IRON SUNDER (CENTER COLUMN, 1.8s)!';
+          addLog('TELEGRAPH: Malakor the Unbroken prepares Iron Sunder striking Center Column in 1.8s (54 ticks)!');
         }
       } else if (isMorvath) {
         // Morvath periodic ground corruption
@@ -1682,7 +1665,10 @@ class SpatialCombatEngine extends ChangeNotifier {
         }
 
         final bool isLowHp = bossUnit.hp <= (bossUnit.maxHp * 0.50);
-        if ((isLowHp || currentTick == 140 || currentTick == 280) && bossUnit.pendingIntent == null && !bossUnit.isChannelingPlagueFeast) {
+        if (((isLowHp && (currentTick - _lastPlagueFeastTick) >= 180) || currentTick == 140 || currentTick == 280) &&
+            bossUnit.pendingIntent == null &&
+            !bossUnit.isChannelingPlagueFeast) {
+          _lastPlagueFeastTick = currentTick;
           bossUnit.isChannelingPlagueFeast = true;
           bossUnit.pendingIntent = SpatialTelegraphIntent(
             id: 'plague_feast_$currentTick',
@@ -1691,12 +1677,12 @@ class SpatialCombatEngine extends ChangeNotifier {
             originCol: 1,
             originRow: 0,
             targetNodes: necroticMireNodes.isNotEmpty ? necroticMireNodes.toList() : [const GridNode(column: 1, row: 0)],
-            triggerTick: currentTick + 25,
-            totalWindupTicks: 25,
+            triggerTick: currentTick + 75,
+            totalWindupTicks: 75,
             rawDamage: 50,
           );
           lastBannerMessage = '☣️ PLAGUE FEAST: MORVATH SIPHONS FOUL SOULS (2.5s)! EVACUATE MIRE!';
-          addLog('BOSS APEX: Morvath channels Plague Feast! Step off corrupted tiles or take siphon damage!');
+          addLog('BOSS APEX: Morvath channels Plague Feast! Step off corrupted tiles within 2.5s or take siphon damage!');
         }
       }
 
@@ -1738,7 +1724,14 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (unit.isPlayer && !isSculptorCommander) {
         _channelRetinueCinders(unit);
       }
-      _executeUnitTurn(unit, actionType: isSculptorCommander ? 'cinder_strike' : 'auto');
+      final CombatUnitState? focusedTarget = (unit.isPlayer && focusedEnemyUnitId != null)
+          ? enemyUnits.where((u) => u.id == focusedEnemyUnitId && u.isAlive).firstOrNull
+          : null;
+      _executeUnitTurn(
+        unit,
+        explicitTarget: focusedTarget,
+        actionType: isSculptorCommander ? 'cinder_strike' : 'auto',
+      );
       if (isActionPauseEnabled) {
         break;
       }
@@ -1750,24 +1743,54 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _resolveGorgorothIntent(CombatUnitState boss, SpatialTelegraphIntent intent) => _resolveBossIntent(boss, intent);
-
   void _resolveBossIntent(CombatUnitState boss, SpatialTelegraphIntent intent) {
     if (intent.skillName == 'Plague Feast') {
       int siphonedTotal = 0;
+      CombatUnitState? primaryTarget;
+      int primaryDmg = 0;
+      final Map<String, int> secondaryHits = {};
       for (final node in intent.targetNodes) {
         final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
         if (occupant != null) {
-          final dmg = occupant.takeDamage(intent.rawDamage, ignoreArmor: true);
+          final dmg = applyDamageToTarget(
+            occupant,
+            intent.rawDamage,
+            attacker: boss,
+            trajectory: AttackTrajectory.lobbedMagic,
+            ignoreArmor: true,
+            isPhysical: false,
+          );
           siphonedTotal += dmg;
+          if (primaryTarget == null) {
+            primaryTarget = occupant;
+            primaryDmg = dmg;
+          } else {
+            secondaryHits[occupant.id] = (secondaryHits[occupant.id] ?? 0) + dmg;
+          }
           addLog('☣️ SIPHON HIT: ${occupant.name} lost $dmg HP to Plague Feast!');
         }
       }
-      if (siphonedTotal > 0) {
+      if (siphonedTotal > 0 && primaryTarget != null) {
         final healAmt = siphonedTotal * 2;
         boss.hp = min(boss.maxHp, boss.hp + healAmt);
         lastBannerMessage = '☣️ MORVATH HEALED +$healAmt HP FROM PLAGUE FEAST!';
         addLog('BOSS HEAL: Morvath siphoned and regenerated +$healAmt HP!');
+        dispatchAction(SpatialActionEvent(
+          id: 'plague_feast_impact_$currentTick',
+          attackerId: boss.id,
+          attackerName: boss.name,
+          skillName: 'Plague Feast',
+          targetId: primaryTarget.id,
+          targetName: primaryTarget.name,
+          damage: primaryDmg,
+          secondaryTargetHits: secondaryHits,
+          isHeal: true,
+          healAmount: healAmt,
+          healTargetId: boss.id,
+          isPlayerAttacker: false,
+          pattern: intent.pattern,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ));
       } else {
         lastBannerMessage = '🛡️ EVADED! Zero allies caught in Plague Feast mire!';
         addLog('FEAST EVADED: All allies moved off corrupted tiles in time!');
@@ -1779,14 +1802,27 @@ class SpatialCombatEngine extends ChangeNotifier {
     addLog('${boss.name} releases ${intent.skillName} across ${intent.pattern.name} zone!');
     int hitCount = 0;
     CombatUnitState? primaryTarget;
-    int totalDmg = 0;
+    int primaryDmg = 0;
+    final Map<String, int> secondaryHits = {};
 
     for (final node in intent.targetNodes) {
       final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
       if (occupant != null) {
-        final dmg = occupant.takeDamage(intent.rawDamage);
-        totalDmg += dmg;
-        primaryTarget ??= occupant;
+        final dmg = applyDamageToTarget(
+          occupant,
+          intent.rawDamage,
+          attacker: boss,
+          trajectory: AttackTrajectory.directPhysical,
+          isPhysical: true,
+        );
+        if (primaryTarget == null) {
+          primaryTarget = occupant;
+          primaryDmg = dmg;
+        } else if (occupant.id != primaryTarget.id) {
+          secondaryHits[occupant.id] = (secondaryHits[occupant.id] ?? 0) + dmg;
+        } else {
+          primaryDmg += dmg;
+        }
         addLog('CRITICAL HIT: ${occupant.name} struck for $dmg DMG by ${intent.skillName}!');
         hitCount++;
       }
@@ -1803,7 +1839,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         skillName: intent.skillName,
         targetId: primaryTarget.id,
         targetName: primaryTarget.name,
-        damage: totalDmg,
+        damage: primaryDmg,
+        secondaryTargetHits: secondaryHits,
         isCrit: true,
         isPlayerAttacker: false,
         pattern: intent.pattern,
@@ -1815,21 +1852,35 @@ class SpatialCombatEngine extends ChangeNotifier {
   void _resolveEnemyTelegraphedAttack(CombatUnitState enemy, SpatialTelegraphIntent intent) {
     addLog('${enemy.name} fires ${intent.skillName} across telegraphed grid nodes!');
     CombatUnitState? struckTarget;
-    int appliedDmg = 0;
+    int primaryDmg = 0;
+    final Map<String, int> secondaryHits = {};
+    final bool isCasterAttack = enemy.archetype == UnitArchetype.backlineCaster;
 
     for (final node in intent.targetNodes) {
       final occupant = playerUnits.where((u) => u.isAlive && u.occupies(node.column, node.row)).firstOrNull;
-      if (occupant != null) {
-        final dmg = occupant.takeDamage(intent.rawDamage);
-        appliedDmg += dmg;
-        struckTarget ??= occupant;
+      if (occupant != null && occupant.id != struckTarget?.id && !secondaryHits.containsKey(occupant.id)) {
+        final dmg = applyDamageToTarget(
+          occupant,
+          intent.rawDamage,
+          attacker: enemy,
+          trajectory: isCasterAttack ? AttackTrajectory.lobbedMagic : AttackTrajectory.directPhysical,
+          isPhysical: !isCasterAttack,
+        );
+        if (struckTarget == null) {
+          struckTarget = occupant;
+          primaryDmg = dmg;
+        } else {
+          secondaryHits[occupant.id] = dmg;
+        }
 
         if (enemy.id == 'cinder_witch') {
           occupant.burnDuration = max(occupant.burnDuration, 60); // 2s Burn
         }
 
         addLog('HIT: ${occupant.name} struck for $dmg DMG by ${intent.skillName} at (Col ${node.column + 1}, Row ${node.row})!');
-        break; // Single column or target impact
+        if (intent.pattern == TargetPattern.singleTarget) {
+          break;
+        }
       }
     }
 
@@ -1844,7 +1895,8 @@ class SpatialCombatEngine extends ChangeNotifier {
         skillName: intent.skillName,
         targetId: struckTarget.id,
         targetName: struckTarget.name,
-        damage: appliedDmg,
+        damage: primaryDmg,
+        secondaryTargetHits: secondaryHits,
         isPlayerAttacker: false,
         pattern: intent.pattern,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -1863,6 +1915,7 @@ class SpatialCombatEngine extends ChangeNotifier {
   int applyDamageToTarget(
     CombatUnitState target,
     int rawDamage, {
+    CombatUnitState? attacker,
     AttackTrajectory trajectory = AttackTrajectory.directPhysical,
     int? attackerRow,
     bool ignoreArmor = false,
@@ -1873,9 +1926,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       return 0;
     }
     double finalDmg = rawDamage.toDouble();
-    if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: attackerRow)) {
+    final int? effectiveAttackerRow = attackerRow ?? attacker?.occupiedNodes.firstOrNull?.row;
+    if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: effectiveAttackerRow)) {
       finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
       addLog('🛡️ VANGUARD COVER: ${target.name} takes -25% damage behind Vanguard line!');
+    }
+    if (attacker != null && attacker.armorPenetrationBonus > 0 && !ignoreArmor && target.armor > 0) {
+      finalDmg *= (1.0 + attacker.armorPenetrationBonus * 0.5);
     }
     // GDD Sec 7.1: Ashen Reckoning 2.0x Damage Multiplier
     if (isAshenReckoningActive) {
@@ -1908,6 +1965,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
     final applied = target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
+    if (attacker != null && attacker.isAlive && attacker.lifestealBonus > 0 && applied > 0) {
+      final int lsHeal = max(1, (applied * attacker.lifestealBonus).round());
+      attacker.hp = min(attacker.maxHp, attacker.hp + lsHeal);
+      if (attacker.isPlayer) totalHealingDone += lsHeal;
+    }
     if (target.isPlayer && (target.id.contains('footman') || target.templateId.contains('footman')) && applied > 0) {
       final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
       if (sculptor != null && sculptor.isAlive) {
@@ -1916,11 +1978,12 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
     if (target.chiseledTraitIds.contains('iron_thorns') && isPhysical && applied > 0) {
-      // Find attacker if viable
       final enemiesOrAllies = target.isPlayer ? enemyUnits : playerUnits;
       final livingAttackers = enemiesOrAllies.where((u) => u.isAlive).toList();
-      if (livingAttackers.isNotEmpty) {
-        final reflectAttacker = livingAttackers.first;
+      final CombatUnitState? reflectAttacker = (attacker != null && attacker.isAlive)
+          ? attacker
+          : livingAttackers.firstOrNull;
+      if (reflectAttacker != null) {
         final reflectDmg = max(5, (applied * 0.25).round());
         reflectAttacker.takeDamage(reflectDmg, ignoreArmor: true, isPhysical: true);
         addLog('  ⚡ [CHISEL: IRON THORNS] ${target.name} reflects $reflectDmg true damage to ${reflectAttacker.name}!');
@@ -2111,6 +2174,8 @@ class SpatialCombatEngine extends ChangeNotifier {
     isTurnExecutionPaused = false;
     activeActingUnit = null;
     isPreBattlePhase = true;
+    focusedEnemyUnitId = null;
+    _lastPlagueFeastTick = -999;
     lastBannerMessage = '⚔️ TRIAL ENGAGED: $bTitle';
     _spawnEnemyWaveEntities(bossEntities, isBossWave: true);
 
@@ -2156,7 +2221,6 @@ class SpatialCombatEngine extends ChangeNotifier {
     if (unit.isDisplacementImmune || unit.occupiedNodes.isEmpty) return;
     final uCol = unit.occupiedNodes.first.column;
     final startRow = unit.occupiedNodes.first.row;
-    final friendlySquad = unit.isPlayer ? playerUnits : enemyUnits;
     final allObstacles = [...playerUnits, ...enemyUnits].where((u) => u.id != unit.id && (u.isAlive || u.isSolidObstacle)).toList();
 
     int currentRow = startRow;
@@ -2353,7 +2417,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         final target = _resolveColumnTarget(unitCol: 1, targetingPlayers: true) ??
             _resolveColumnTarget(unitCol: 2, targetingPlayers: true);
         if (target != null) {
-          final dmg = target.takeDamage(unit.attack);
+          final dmg = applyDamageToTarget(target, unit.attack, attacker: unit, isPhysical: true);
           addLog('${unit.name} crushes ${target.name} for $dmg DMG.');
           dispatchAction(SpatialActionEvent(
             id: 'act_${currentTick}_${unit.id}',
@@ -2478,15 +2542,15 @@ class SpatialCombatEngine extends ChangeNotifier {
       bleedDetonationsCount++;
       final burstDmg = (detonatedStacks * 28 * reckoningDamageMultiplier).round();
       final directDmg = target.takeDamage(burstDmg, ignoreArmor: true, isPhysical: true);
-      addLog('🩸 BLEED DETONATION! \ consumed \ bleed on \ for \ kinetic burst!');
+      addLog('🩸 BLEED DETONATION! ${attacker.name} consumed $detonatedStacks bleed on ${target.name} for $directDmg kinetic burst!');
 
       final tCol = target.occupiedNodes.firstOrNull?.column ?? 0;
       final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
       for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => (n.column - tCol).abs() <= 1 && (n.row - tRow).abs() <= 1))) {
         final splashDmg = neighbor.takeDamage((burstDmg * 0.50).round(), ignoreArmor: true, isPhysical: true);
-        addLog('  🩸 Splash Detonation: \ took \ burst damage!');
+        addLog('  🩸 Splash Detonation: ${neighbor.name} took $splashDmg burst damage!');
       }
-      lastBannerMessage = '🩸 BLEED DETONATION: \ shattered for \ burst!';
+      lastBannerMessage = '🩸 BLEED DETONATION: ${target.name} shattered for $directDmg burst!';
     }
 
     // 2. Solar Ignition (Holy or Magic strike on Burning enemy)
@@ -2498,10 +2562,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       final tRow = target.occupiedNodes.firstOrNull?.row ?? 0;
       for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.column == tCol || n.row == tRow))) {
         neighbor.burnDuration = max(neighbor.burnDuration, 60);
-        addLog('  🔥 Solar Ignition spread to \ (2s Burn)!');
+        addLog('  🔥 Solar Ignition spread to ${neighbor.name} (2s Burn)!');
       }
-      addLog('🔥 SOLAR IGNITION! \ ignited \ for +\ Holy Burn DMG!');
-      lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf \ squad!';
+      addLog('🔥 SOLAR IGNITION! ${attacker.name} ignited ${target.name} for +$bonusBurnDmg Holy Burn DMG!');
+      lastBannerMessage = '🔥 SOLAR IGNITION: Holy flames engulf ${target.name} squad!';
     }
 
     // 3. Armor Shattered -> Stagger & Interruption
@@ -2512,12 +2576,12 @@ class SpatialCombatEngine extends ChangeNotifier {
         final canceledSkill = target.pendingIntent!.skillName;
         target.pendingIntent = null;
         interruptsCount++;
-        addLog('🛑 STRIKE INTERRUPTED! \ shattered \'s stance, canceling \!');
-        lastBannerMessage = '🛑 STRIKE INTERRUPTED: \'s \ canceled!';
+        addLog("🛑 STRIKE INTERRUPTED! ${attacker.name} shattered ${target.name}'s stance, canceling $canceledSkill!");
+        lastBannerMessage = "🛑 STRIKE INTERRUPTED: ${target.name}'s $canceledSkill canceled!";
         _triggerChainAssist(attacker, target);
       } else {
-        addLog('⚡ ARMOR SHATTERED! \ is STAGGERED (-2,500 AP, Vulnerable 3s)!');
-        lastBannerMessage = '⚡ ARMOR SHATTERED: \ staggered!';
+        addLog('⚡ ARMOR SHATTERED! ${target.name} is STAGGERED (-2,500 AP, Vulnerable 3s)!');
+        lastBannerMessage = '⚡ ARMOR SHATTERED: ${target.name} staggered!';
         _triggerChainAssist(attacker, target);
       }
     }
@@ -2545,10 +2609,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       final actualDmg = wallCrushDmg > 18 ? wallCrushDmg : 18;
       final taken = target.takeDamage(actualDmg, ignoreArmor: true, isPhysical: true);
       target.currentAp = target.currentAp > 2000 ? target.currentAp - 2000 : 0;
-      addLog('WALL SPLAT! \ slammed into the arena boundary for \ crush DMG (-2,000 TM Daze)!');
-      lastBannerMessage = 'WALL SPLAT: \ crushed against arena barrier!';
+      addLog('WALL SPLAT! ${target.name} slammed into the arena boundary for $taken crush DMG (-2,000 TM Daze)!');
+      lastBannerMessage = 'WALL SPLAT: ${target.name} crushed against arena barrier!';
       dispatchAction(SpatialActionEvent(
-        id: 'splat_\_',
+        id: 'splat_${currentTick}_${totalActionsCount}_${target.id}',
         attackerId: attacker.id,
         attackerName: attacker.name,
         skillName: 'Wall Splat Crush',
@@ -2575,10 +2639,10 @@ class SpatialCombatEngine extends ChangeNotifier {
       target.currentAp = target.currentAp > 1500 ? target.currentAp - 1500 : 0;
       collider.currentAp = collider.currentAp > 1500 ? collider.currentAp - 1500 : 0;
 
-      addLog('BOWLING COLLISION! \ bowled backward into \! Both take \ collision damage (-1,500 TM)!');
-      lastBannerMessage = 'COLLISION: \ bowled into \!';
+      addLog('BOWLING COLLISION! ${target.name} bowled backward into ${collider.name}! Both take $taken1 collision damage (-1,500 TM)!');
+      lastBannerMessage = 'COLLISION: ${target.name} bowled into ${collider.name}!';
       dispatchAction(SpatialActionEvent(
-        id: 'collide_\_',
+        id: 'collide_${currentTick}_${totalActionsCount}_${target.id}',
         attackerId: attacker.id,
         attackerName: attacker.name,
         skillName: 'Bowling Collision',
@@ -2598,9 +2662,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       ];
       target.currentAp = target.currentAp > 1000 ? target.currentAp - 1000 : 0;
       final rowLabel = targetRow == 1 ? 'Mid' : 'Back';
-      addLog('KNOCKBACK! \ pushed back to Row \ (-1,000 TM)!');
+      addLog('KNOCKBACK! ${target.name} pushed back to Row $rowLabel (-1,000 TM)!');
       dispatchAction(SpatialActionEvent(
-        id: 'knock_\_',
+        id: 'knock_${currentTick}_${totalActionsCount}_${target.id}',
         attackerId: attacker.id,
         attackerName: attacker.name,
         skillName: 'Knockback Push',
@@ -2628,13 +2692,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     chainAssistsCount++;
     final assistDmg = (ally.effectiveAttack * 0.45).round();
     final actualAssistDmg = assistDmg > 12 ? assistDmg : 12;
-    final dmgDealt = target.takeDamage(actualAssistDmg, isPhysical: true);
+    final dmgDealt = applyDamageToTarget(target, actualAssistDmg, attacker: ally, isPhysical: true);
 
-    addLog('TAG-TEAM ASSIST! \ coordinated with \, striking \ for \ bonus DMG!');
-    lastBannerMessage = 'ASSIST! \ follow-up strike for \ DMG!';
+    addLog('TAG-TEAM ASSIST! ${ally.name} coordinated with ${primaryAttacker.name}, striking ${target.name} for $dmgDealt bonus DMG!');
+    lastBannerMessage = 'ASSIST! ${ally.name} follow-up strike for $dmgDealt DMG!';
 
     dispatchAction(SpatialActionEvent(
-      id: 'assist_\_',
+      id: 'assist_${currentTick}_${totalActionsCount}_${ally.id}_${target.id}',
       attackerId: ally.id,
       attackerName: ally.name,
       skillName: 'Tag-Team Assist',
@@ -2661,7 +2725,7 @@ class SpatialCombatEngine extends ChangeNotifier {
 
     if (key.contains('vladislav')) {
       final rawDmg = (unit.effectiveAttack * 1.60).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       appliedBleed = 2;
       target.bleedStacks += appliedBleed;
       final drainHeal = max(15, (dmg * 0.35).round());
@@ -2671,7 +2735,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg DMG (+2 Bleed, +$drainHeal HP drained)!');
     } else if (key.contains('valeria')) {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       target.sunderArmor(0.25);
       target.currentAp = max(0, target.currentAp - 1500);
       for (final ally in friendlySquad.where((u) => u.isAlive && u.currentDepth == RowDepth.front)) {
@@ -2681,26 +2745,26 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName for $dmg DMG, sunders 25% Armor, and shields Frontline (+25 Aegis)!');
     } else if (key.contains('malakor')) {
       final rawDmg = (unit.effectiveAttack * 1.60).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       target.burnDuration = max(target.burnDuration, 90);
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
       pattern = TargetPattern.stAshlarCross;
       addLog('★ SIGNATURE SKILL: ${unit.name} calls down $skillName on ${target.name} for $dmg Holy DMG (3s Burn & Vulnerable)!');
     } else if (key.contains('morrigan')) {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       target.poisonStacks += 3;
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
       pattern = TargetPattern.stAshlarCross;
       addLog('★ SIGNATURE SKILL: ${unit.name} weaves $skillName on ${target.name} for $dmg DMG (+3 Poison & Vulnerable)!');
     } else if (key.contains('void_bound') || (key.contains('sentinel') && key.contains('obsidian'))) {
       final rawDmg = (unit.effectiveAttack * 1.40).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       target.armor = max(0, target.armor - 20);
       unit.aegisShield += 35;
       unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
       for (final other in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.currentDepth == target.currentDepth)) {
-        final shock = other.takeDamage(30, isPhysical: false);
+        final shock = applyDamageToTarget(other, 30, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         secondaryHits[other.id] = shock;
       }
       pattern = TargetPattern.horizontalRowScythe;
@@ -2710,24 +2774,24 @@ class SpatialCombatEngine extends ChangeNotifier {
         ..sort((a, b) => a.ehp.compareTo(b.ehp));
       final actualTarget = lowestEhpTarget.firstOrNull ?? target;
       final rawDmg = (unit.effectiveAttack * 1.65).round();
-      dmg = actualTarget.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(actualTarget, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, isPhysical: true);
       actualTarget.bleedStacks += 2;
       unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2000);
       pattern = TargetPattern.reachMidToFront;
       addLog('★ SIGNATURE SKILL: ${unit.name} phases behind ${actualTarget.name} with $skillName for $dmg CRIT DMG (+2 Bleed, +2,000 AP)!');
     } else if (key.contains('void_ray') || key.contains('acolyte_slinger')) {
       final rawDmg = (unit.effectiveAttack * 1.55).round();
-      dmg = target.takeDamage(rawDmg, ignoreArmor: true, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, ignoreArmor: true, isPhysical: false);
       target.sunderArmor(0.20);
       pattern = TargetPattern.piercingColumnSkewer;
       addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName piercing ${target.name} for $dmg True DMG & sunders 20% Armor!');
     } else if (key.contains('arch_warlock') || key.contains('cultist_apprentice')) {
       final rawDmg = (unit.effectiveAttack * 1.50).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       target.currentAp = max(0, target.currentAp - 2000);
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
       for (final other in opposingSquad.where((u) => u.isAlive && u.id != target.id).take(2)) {
-        final pull = other.takeDamage(35, isPhysical: false);
+        final pull = applyDamageToTarget(other, 35, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         other.currentAp = max(0, other.currentAp - 1000);
         secondaryHits[other.id] = pull;
       }
@@ -2735,7 +2799,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} creates $skillName on ${target.name} for $dmg DMG (Gravity Singularity pulls enemy line)!');
     } else if (key.contains('dark_gate') || key.contains('chanter')) {
       final rawDmg = (unit.effectiveAttack * 1.30).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       final allies = friendlySquad.where((u) => u.isAlive).toList()
         ..sort((a, b) => a.currentAp.compareTo(b.currentAp));
       final lowestApAlly = allies.firstOrNull;
@@ -2748,7 +2812,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} opens $skillName for $dmg DMG and grants +3,000 AP & +35 Aegis to ${lowestApAlly?.name ?? unit.name}!');
     } else if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       target.armor = max(0, target.armor - 20);
       target.currentAp = max(0, target.currentAp - 2000);
       unit.aegisShield += 40;
@@ -2763,7 +2827,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       lastBannerMessage = '🛡️ BASTION\'S AEGIS: Iron Footman warded the Ash Sculptor (+40 Aegis)!';
     } else if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
       final rawDmg = (unit.effectiveAttack * 1.85).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, isPhysical: true);
       appliedBleed = 3;
       target.bleedStacks += appliedBleed;
       unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2500);
@@ -2777,20 +2841,20 @@ class SpatialCombatEngine extends ChangeNotifier {
       lastBannerMessage = '🗡️ PHANTOM AMBUSH: Grave Duelist channeled +12 Cinders to the Sculptor!';
     } else if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
       final rawDmg = (unit.effectiveAttack * 1.55).round();
-      dmg = target.takeDamage(rawDmg, ignoreArmor: true, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, ignoreArmor: true, isPhysical: true);
       target.vulnerableDuration = max(target.vulnerableDuration, 90);
       pattern = TargetPattern.piercingColumnSkewer;
       addLog('★ SIGNATURE SKILL: ${unit.name} fires $skillName piercing ${target.name} for $dmg True DMG & Vulnerable (3s)!');
     } else if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
       final rawDmg = (unit.effectiveAttack * 1.50).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: true);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       appliedBleed = 2;
       target.bleedStacks += appliedBleed;
       unit.hasteDuration = max(unit.hasteDuration, 90);
       addLog('★ SIGNATURE SKILL: ${unit.name} mauls ${target.name} with $skillName for $dmg DMG (+2 Bleed & 3s Haste)!');
     } else if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
       final rawDmg = (unit.effectiveAttack * 1.30).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       final allies = friendlySquad.where((u) => u.isAlive).toList()
         ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
       final lowestAlly = allies.firstOrNull;
@@ -2806,7 +2870,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName for $dmg DMG and restores +40 HP & +20 Aegis to ${lowestAlly?.name ?? unit.name}!');
     } else if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
       final rawDmg = (unit.effectiveAttack * 1.55).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: false);
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       target.burnDuration = max(target.burnDuration, 60);
       appliedBleed = 1;
       target.bleedStacks += appliedBleed;
@@ -2817,9 +2881,22 @@ class SpatialCombatEngine extends ChangeNotifier {
       addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg Arcane DMG (+2s Burn, +1 Focus)!');
     } else {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
-      dmg = target.takeDamage(rawDmg, isPhysical: unit.archetype != UnitArchetype.backlineCaster);
+      final bool isPhysicalHit = unit.archetype != UnitArchetype.backlineCaster;
+      dmg = applyDamageToTarget(
+        target,
+        rawDmg,
+        attacker: unit,
+        trajectory: isPhysicalHit ? AttackTrajectory.directPhysical : AttackTrajectory.lobbedMagic,
+        isPhysical: isPhysicalHit,
+      );
       for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id).take(1)) {
-        final splash = neighbor.takeDamage((rawDmg * 0.5).round());
+        final splash = applyDamageToTarget(
+          neighbor,
+          (rawDmg * 0.5).round(),
+          attacker: unit,
+          trajectory: isPhysicalHit ? AttackTrajectory.directPhysical : AttackTrajectory.lobbedMagic,
+          isPhysical: isPhysicalHit,
+        );
         secondaryHits[neighbor.id] = splash;
       }
       addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg DMG!');
@@ -2894,7 +2971,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       final bool isBacklineMarksman = unit.currentDepth == RowDepth.back;
       final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0 || isBacklineMarksman;
       final int baseDmg = isFlankingBonus ? (unit.effectiveAttack * 1.4).round() : unit.effectiveAttack;
-      final dmg = target.takeDamage(baseDmg, isPhysical: true);
+      final dmg = applyDamageToTarget(
+        target,
+        baseDmg,
+        attacker: unit,
+        trajectory: isFlankingBonus ? AttackTrajectory.flanking : AttackTrajectory.directPhysical,
+        isPhysical: true,
+      );
 
       // Skirmishers / Assassins inflict bleed (4 on Flanking crit, 2 on basic hit); Marksmen inflict 1
       final bool isMarksman = unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest');
@@ -2920,7 +3003,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         skillName = isFlankingBonus ? 'Riposte Evisceration' : 'Flensing Twin-Thrust';
         if (target.bleedStacks > appliedBleed) {
           final bonusDmg = (dmg * 0.30).round();
-          target.takeDamage(bonusDmg, isPhysical: true);
+          applyDamageToTarget(target, bonusDmg, attacker: unit, trajectory: AttackTrajectory.flanking, isPhysical: true);
           unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 1500);
           addLog('🗡️ GRAVE DUELIST [FLENSING RIPOSTE] exploits bleeding flesh for +$bonusDmg CRIT DMG & +1,500 AP tempo!');
         }
@@ -3009,7 +3092,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (actionType == 'cold_iron_slam' || (actionType == 'basic' && activeGen == GeneralType.valeria)) {
         // Cold Iron Slam: 130% ATK, reduces armor, staggers AP, +35 Aegis Shield & 4% Max HP sustain, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         final int shred = skillNode.rank >= 3 ? 50 : (skillNode.rank == 2 ? 35 : 20);
         final int staggerAp = skillNode.rank >= 3 ? 3500 : (skillNode.rank == 2 ? 2500 : 1500);
         validTarget.armor = max(0, validTarget.armor - shred);
@@ -3037,7 +3120,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'siphon_rend' || (actionType == 'basic' && activeGen == GeneralType.vladislav)) {
         // Siphon Rend: 135% ATK, drains DMG as HP, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         final double leechPct = skillNode.rank >= 3 ? 0.85 : (skillNode.rank == 2 ? 0.60 : 0.40);
         final leechHp = (dmg * leechPct).round();
         sculptor.hp = min(sculptor.maxHp, sculptor.hp + leechHp);
@@ -3060,7 +3143,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'corrosive_touch' || (actionType == 'basic' && activeGen == GeneralType.morrigan)) {
         // Corrosive Touch: 130% ATK, Poison stacks, -AP stagger, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         final int poisonGain = skillNode.rank >= 3 ? 4 : (skillNode.rank == 2 ? 3 : 2);
         final int staggerAp = skillNode.rank >= 3 ? 3000 : (skillNode.rank == 2 ? 2000 : 1000);
         validTarget.poisonStacks += poisonGain;
@@ -3080,7 +3163,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
       } else if (actionType == 'vitae_mending' || actionType == 'mending_ash') {
         final rawDmg = (sculptor.effectiveAttack * 1.10).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         final livingAllies = playerUnits.where((u) => u.isAlive).toList()
           ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
         final lowest = livingAllies.firstOrNull;
@@ -3108,7 +3191,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else {
         // Forge Cleave (Default Ash): 140% ATK + Bleed stacks + 6% Max HP sustain, generates cinders
         final rawDmg = (sculptor.effectiveAttack * mult).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         final int bleedGain = skillNode.rank >= 3 ? 3 : (skillNode.rank == 2 ? 2 : 1);
         validTarget.bleedStacks += bleedGain;
         final int selfHeal = max(1, (sculptor.maxHp * 0.06).round());
@@ -3140,7 +3223,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (actionType == 'sundering_judgment' || (actionType == 'signature' && activeGen == GeneralType.valeria)) {
         // Sundering Judgment: 180% Holy DMG, shreds 30% Armor, 3s Vulnerable
         final rawDmg = (sculptor.effectiveAttack * 1.80).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         validTarget.armor = (validTarget.armor * 0.70).round();
         validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 90);
         addLog('IRON SCULPTOR: Sundering Judgment smites ${validTarget.name} for $dmg DMG (-30% Armor, 3s Vulnerable)!');
@@ -3159,13 +3242,19 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'crimson_brand' || (actionType == 'signature' && activeGen == GeneralType.vladislav)) {
         // Crimson Brand: 165% ATK, 3 Bleeds, detonates active bleeds for 2x
         final rawDmg = (sculptor.effectiveAttack * 1.65).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         final priorBleeds = validTarget.bleedStacks;
         validTarget.bleedStacks += 3;
         int bleedDetonationDmg = 0;
         if (priorBleeds > 0) {
-          bleedDetonationDmg = priorBleeds * 25;
-          validTarget.takeDamage(bleedDetonationDmg, ignoreArmor: true, isPhysical: false);
+          bleedDetonationDmg = applyDamageToTarget(
+            validTarget,
+            priorBleeds * 25,
+            attacker: sculptor,
+            trajectory: AttackTrajectory.lobbedMagic,
+            ignoreArmor: true,
+            isPhysical: false,
+          );
         }
         addLog('SANGUINE SCULPTOR: Crimson Brand carves ${validTarget.name} for $dmg DMG (+3 Bleeds, detonate: +$bleedDetonationDmg)!');
         dispatchAction(SpatialActionEvent(
@@ -3184,7 +3273,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'miasmic_brand' || (actionType == 'signature' && activeGen == GeneralType.morrigan)) {
         // Miasmic Brand: 160% ATK, infects column with 3 Poison and Vulnerable
         final rawDmg = (sculptor.effectiveAttack * 1.60).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         validTarget.poisonStacks += 3;
         final targetCol = validTarget.occupiedNodes.firstOrNull?.column ?? 0;
         for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol))) {
@@ -3207,7 +3296,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else {
         // Sundering Brand (Default Ash): 175% ATK, shatters 50% Armor, triggers Crypt Stalker Ambush
         final rawDmg = (sculptor.effectiveAttack * 1.75).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: true);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
         validTarget.armor = (validTarget.armor * 0.50).round();
         validTarget.vulnerableDuration = max(validTarget.vulnerableDuration, 60);
         addLog('ASH SCULPTOR: Sundering Brand scorches ${validTarget.name} for $dmg DMG & shatters 50% Armor!');
@@ -3231,7 +3320,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (sculptor.crucibleCinders < 25) return;
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 25);
 
-      if (activeGen == GeneralType.valeria) {
+      if (actionType == 'iron_bulwark') {
         // Iron Bulwark: +35 Armor & cleanses debuffs across squad
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.armor += 35;
@@ -3253,7 +3342,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.vladislav) {
+      } else if (actionType == 'vein_tether') {
         // Vein Tether: 4s Haste & +25 Aegis to all living allies
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.aegisShield += 25;
@@ -3272,7 +3361,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
-      } else if (activeGen == GeneralType.morrigan) {
+      } else if (actionType == 'bone_ward') {
         // Bone Ward: 30% max HP ossuary shields to all living allies
         final shieldAmt = (sculptor.maxHp * 0.30).round();
         for (final ally in playerUnits.where((u) => u.isAlive)) {
@@ -3375,6 +3464,9 @@ class SpatialCombatEngine extends ChangeNotifier {
       final deadAlly = playerUnits.where((u) => !u.isAlive).firstOrNull;
       if (deadAlly != null) {
         deadAlly.hp = (deadAlly.maxHp * 0.40).round();
+        deadAlly.isPetrifiedPlinth = false;
+        deadAlly.isShattered = false;
+        deadAlly.plinthDurability = 3;
         deadAlly.aegisShield = 40;
         deadAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
         deadAlly.currentAp = 5000;
@@ -3405,25 +3497,35 @@ class SpatialCombatEngine extends ChangeNotifier {
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
       _triggerFontOfRebirth(30);
       final rawDmg = (sculptor.effectiveAttack * 1.75).round();
-      int totalDmg = 0;
+      final livingEnemies = opposingSquad.where((u) => u.isAlive).toList();
+      final primaryEnemy = livingEnemies.contains(validTarget) ? validTarget : livingEnemies.first;
+      int primaryDmg = 0;
+      final Map<String, int> secHits = {};
       int enemiesHit = 0;
-      for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
-        final d = enemy.takeDamage(rawDmg, isPhysical: false);
+      for (final enemy in livingEnemies) {
+        final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         enemy.vulnerableDuration = max(enemy.vulnerableDuration, 90);
         enemy.currentAp = max(0, enemy.currentAp - 1500);
-        totalDmg += d;
+        if (enemy.id == primaryEnemy.id) {
+          primaryDmg = d;
+        } else {
+          secHits[enemy.id] = d;
+        }
         enemiesHit++;
       }
       _checkSeismicCataclysm(enemiesHit);
+      final int totalDmg = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
       addLog('CALAMITY SCULPTOR: Sunburst Nova engulfs all 9 enemy tiles for $totalDmg DMG (3s Blind, -1,500 AP stagger)!');
       dispatchAction(SpatialActionEvent(
         id: 'nova_${currentTick}_${sculptor.id}',
         attackerId: sculptor.id,
         attackerName: sculptor.name,
         skillName: 'Sunburst Nova',
-        targetId: validTarget.id,
+        targetId: primaryEnemy.id,
         targetName: 'All 9 Enemy Tiles',
-        damage: totalDmg,
+        damage: primaryDmg,
+        secondaryTargetHits: secHits,
+        isHolyOrMagic: true,
         isPlayerAttacker: true,
         pattern: TargetPattern.stAshlarCross,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3447,7 +3549,7 @@ class SpatialCombatEngine extends ChangeNotifier {
       final Map<String, int> secHits = {};
 
       for (final enemy in livingEnemies) {
-        final d = enemy.takeDamage(rawDmg, isPhysical: false);
+        final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         enemy.burnDuration = max(enemy.burnDuration, burnTicks);
         if (armorMelt < 1.0) {
           enemy.armor = (enemy.armor * armorMelt).round();
@@ -3483,27 +3585,32 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (actionType == 'ember_whirlwind') {
         // Ember Whirlwind: 210% AoE Cleave across frontline + 2 Burns + shreds 25 Armor
         final rawDmg = (sculptor.effectiveAttack * 2.10).round();
-        int totalDmg = 0;
-        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList()) {
-          final d = enemy.takeDamage(rawDmg, isPhysical: true);
+        final frontTargets = opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.row == 0)).toList();
+        final targets = frontTargets.isNotEmpty ? frontTargets : [validTarget];
+        final primaryEnemy = targets.contains(validTarget) ? validTarget : targets.first;
+        int primaryDmg = 0;
+        final Map<String, int> secHits = {};
+        for (final enemy in targets) {
+          final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, isPhysical: true);
           enemy.burnDuration = max(enemy.burnDuration, 90);
           enemy.armor = max(0, enemy.armor - 25);
-          totalDmg += d;
+          if (enemy.id == primaryEnemy.id) {
+            primaryDmg = d;
+          } else {
+            secHits[enemy.id] = d;
+          }
         }
-        if (totalDmg == 0) {
-          totalDmg = validTarget.takeDamage(rawDmg, isPhysical: true);
-          validTarget.burnDuration = max(validTarget.burnDuration, 90);
-          validTarget.armor = max(0, validTarget.armor - 25);
-        }
+        final int totalDmg = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
         addLog('ASH SCULPTOR: Ember Whirlwind tears across front ranks for $totalDmg DMG (+2 Burns, -25 Armor)!');
         dispatchAction(SpatialActionEvent(
           id: 'whirlwind_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
           attackerName: sculptor.name,
           skillName: 'Ember Whirlwind',
-          targetId: validTarget.id,
+          targetId: primaryEnemy.id,
           targetName: 'Frontline Enemies',
-          damage: totalDmg,
+          damage: primaryDmg,
+          secondaryTargetHits: secHits,
           isPlayerAttacker: true,
           pattern: TargetPattern.horizontalRowScythe,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3512,11 +3619,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'dawn_retribution') {
         // Dawn Retribution: 220% Holy Strike + staggers all targets by -2,500 AP + counter-reflect stance
         final rawDmg = (sculptor.effectiveAttack * 2.20).round();
-        final dmg = validTarget.takeDamage(rawDmg, isPhysical: false);
+        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
         for (final enemy in opposingSquad.where((u) => u.isAlive)) {
           enemy.currentAp = max(0, enemy.currentAp - 2500);
         }
-        sculptor.chiseledTraitIds.add('iron_thorns');
+        if (!sculptor.chiseledTraitIds.contains('iron_thorns')) {
+          sculptor.chiseledTraitIds.add('iron_thorns');
+        }
         addLog('IRON SCULPTOR: Dawn Retribution smites ${validTarget.name} for $dmg DMG & delays all foes (-2,500 AP)!');
         dispatchAction(SpatialActionEvent(
           id: 'retribution_${currentTick}_${sculptor.id}',
@@ -3526,6 +3635,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetId: validTarget.id,
           targetName: validTarget.name,
           damage: dmg,
+          isHolyOrMagic: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.singleTarget,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3534,14 +3644,21 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else if (actionType == 'blood_vortex') {
         // Blood Vortex: 200% Blood Siphon across all bleeding foes + restores 20% Max HP to squad
         final rawDmg = (sculptor.effectiveAttack * 2.00).round();
-        int totalLeeched = 0;
         final bleedingFoes = opposingSquad.where((u) => u.isAlive && u.bleedStacks > 0).toList();
         final targets = bleedingFoes.isNotEmpty ? bleedingFoes : [validTarget];
+        final primaryEnemy = targets.contains(validTarget) ? validTarget : targets.first;
+        int primaryDmg = 0;
+        final Map<String, int> secHits = {};
         for (final t in targets) {
-          final d = t.takeDamage(rawDmg, isPhysical: true);
-          totalLeeched += d;
+          final d = applyDamageToTarget(t, rawDmg, attacker: sculptor, isPhysical: true);
           t.bleedStacks += 2;
+          if (t.id == primaryEnemy.id) {
+            primaryDmg = d;
+          } else {
+            secHits[t.id] = d;
+          }
         }
+        final int totalLeeched = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
         final squadHeal = (sculptor.maxHp * 0.20).round();
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.hp = min(ally.maxHp, ally.hp + squadHeal);
@@ -3552,10 +3669,13 @@ class SpatialCombatEngine extends ChangeNotifier {
           attackerId: sculptor.id,
           attackerName: sculptor.name,
           skillName: 'Blood Vortex',
-          targetId: validTarget.id,
+          targetId: primaryEnemy.id,
           targetName: 'Bleeding Enemies',
-          damage: totalLeeched,
+          damage: primaryDmg,
+          secondaryTargetHits: secHits,
           isHeal: true,
+          healAmount: squadHeal,
+          healTargetId: sculptor.id,
           isPlayerAttacker: true,
           pattern: TargetPattern.horizontalRowScythe,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3565,25 +3685,36 @@ class SpatialCombatEngine extends ChangeNotifier {
         // Ossuary Catacomb: 200% Blight Rupture + stuns target column for 1 turn + +40 Ossuary barrier
         final rawDmg = (sculptor.effectiveAttack * 2.00).round();
         final targetCol = validTarget.occupiedNodes.firstOrNull?.column ?? 0;
-        int totalDmg = 0;
-        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol))) {
-          final d = enemy.takeDamage(rawDmg, isPhysical: false);
+        final colEnemies = opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol)).toList();
+        final targets = colEnemies.isNotEmpty ? colEnemies : [validTarget];
+        final primaryEnemy = targets.contains(validTarget) ? validTarget : targets.first;
+        int primaryDmg = 0;
+        final Map<String, int> secHits = {};
+        for (final enemy in targets) {
+          final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
           enemy.currentAp = 0; // Stun / reset AP
           enemy.poisonStacks += 3;
-          totalDmg += d;
+          if (enemy.id == primaryEnemy.id) {
+            primaryDmg = d;
+          } else {
+            secHits[enemy.id] = d;
+          }
         }
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.aegisShield += 40;
         }
+        final int totalDmg = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
         addLog('MIRE SCULPTOR: Ossuary Catacomb impales Column ${targetCol + 1} ($totalDmg DMG, Stunned, +40 Squad Barrier)!');
         dispatchAction(SpatialActionEvent(
           id: 'catacomb_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
           attackerName: sculptor.name,
           skillName: 'Ossuary Catacomb',
-          targetId: validTarget.id,
+          targetId: primaryEnemy.id,
           targetName: 'Column ${targetCol + 1}',
-          damage: totalDmg,
+          damage: primaryDmg,
+          secondaryTargetHits: secHits,
+          isHolyOrMagic: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.piercingColumnSkewer,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3597,31 +3728,51 @@ class SpatialCombatEngine extends ChangeNotifier {
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 80);
       final double mult = isForgeCrit ? 3.50 : 2.50;
       final rawDmg = (sculptor.effectiveAttack * mult).round();
-      int totalApexDmg = 0;
 
-      for (final enemy in opposingSquad.where((u) => u.isAlive).toList()) {
+      final bool isWrathApex = actionType.contains('wrath') || (actionType == 'ultimate' && activeGen == GeneralType.valeria);
+      final bool isExsangApex = actionType.contains('exsanguination') || (actionType == 'ultimate' && activeGen == GeneralType.vladislav);
+      final bool isSporeApex = actionType.contains('spore') || (actionType == 'ultimate' && activeGen == GeneralType.morrigan);
+
+      final livingEnemies = opposingSquad.where((u) => u.isAlive).toList();
+      final primaryEnemy = livingEnemies.contains(validTarget) ? validTarget : livingEnemies.first;
+      int primaryDmg = 0;
+      final Map<String, int> secHits = {};
+
+      for (final enemy in livingEnemies) {
         int finalHit = rawDmg;
-        if (activeGen == GeneralType.vladislav && (enemy.hp / max(1, enemy.maxHp)) <= 0.25) {
+        if (isExsangApex && (enemy.hp / max(1, enemy.maxHp)) <= 0.25) {
           finalHit = (rawDmg * 1.5).round(); // Exsanguination execution threshold
-        } else if (activeGen == GeneralType.morrigan && enemy.poisonStacks > 0) {
+        } else if (isSporeApex && enemy.poisonStacks > 0) {
           finalHit = (rawDmg * 1.3).round(); // Spore detonation on poisoned foes
         }
-        final dmg = enemy.takeDamage(finalHit, isPhysical: activeGen != GeneralType.valeria && activeGen != GeneralType.morrigan);
-        if (activeGen == GeneralType.malakor) {
-          enemy.burnDuration = max(enemy.burnDuration, 90);
-        } else if (activeGen == GeneralType.vladislav) {
+        final bool isPhysicalApex = !isWrathApex && !isSporeApex;
+        final dmg = applyDamageToTarget(
+          enemy,
+          finalHit,
+          attacker: sculptor,
+          trajectory: isPhysicalApex ? AttackTrajectory.directPhysical : AttackTrajectory.lobbedMagic,
+          isPhysical: isPhysicalApex,
+        );
+        if (isExsangApex) {
           enemy.bleedStacks += 2;
-        } else if (activeGen == GeneralType.morrigan) {
+        } else if (isSporeApex) {
           enemy.poisonStacks += 3;
+        } else if (!isWrathApex) {
+          enemy.burnDuration = max(enemy.burnDuration, 90);
         }
-        totalApexDmg += dmg;
+        if (enemy.id == primaryEnemy.id) {
+          primaryDmg = dmg;
+        } else {
+          secHits[enemy.id] = dmg;
+        }
       }
 
-      final apexName = activeGen == GeneralType.valeria
+      final int totalApexDmg = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
+      final apexName = isWrathApex
           ? 'Wrath of the Dawnbound'
-          : (activeGen == GeneralType.vladislav
+          : (isExsangApex
               ? 'Exsanguination Apex'
-              : (activeGen == GeneralType.morrigan ? 'Cataclysmic Spore' : 'Cataclysmic Pyre'));
+              : (isSporeApex ? 'Cataclysmic Spore' : 'Cataclysmic Pyre'));
 
       if (isForgeCrit) {
         addLog('🔥 CRUCIBLE APEX OVERDRIVE: PERFECT FORGE STRIKE! $apexName supercharged to 350% ATK ($totalApexDmg DMG)!');
@@ -3633,10 +3784,12 @@ class SpatialCombatEngine extends ChangeNotifier {
         attackerId: sculptor.id,
         attackerName: sculptor.name,
         skillName: isForgeCrit ? '$apexName (PERFECT FORGE!)' : apexName,
-        targetId: validTarget.id,
+        targetId: primaryEnemy.id,
         targetName: 'All Enemy Ranks',
-        damage: totalApexDmg,
+        damage: primaryDmg,
+        secondaryTargetHits: secHits,
         isCrit: isForgeCrit,
+        isHolyOrMagic: isWrathApex || isSporeApex,
         isPlayerAttacker: true,
         pattern: TargetPattern.horizontalRowScythe,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3645,7 +3798,7 @@ class SpatialCombatEngine extends ChangeNotifier {
     } else {
       // --- DEFAULT INTERVAL BASIC ATTACK (+4 CINDERS) ---
       sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
-      final dmg = validTarget.takeDamage(sculptor.effectiveAttack, isPhysical: true);
+      final dmg = applyDamageToTarget(validTarget, sculptor.effectiveAttack, attacker: sculptor, isPhysical: true);
 
       addLog('${sculptor.name}: Cinder Strike cleaves ${validTarget.name} for $dmg DMG (+4 Cinders -> ${sculptor.crucibleCinders}/100)!');
       dispatchAction(SpatialActionEvent(
@@ -3707,7 +3860,13 @@ class SpatialCombatEngine extends ChangeNotifier {
     final allies = playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive && u.occupiedNodes.isNotEmpty).toList();
     final striker = allies.where((u) => u.archetype == UnitArchetype.reachMidline).firstOrNull ?? allies.firstOrNull;
     if (striker != null && target.isAlive) {
-      final followUpDmg = target.takeDamage((striker.effectiveAttack * 0.85).round(), isPhysical: true);
+      final followUpDmg = applyDamageToTarget(
+        target,
+        (striker.effectiveAttack * 0.85).round(),
+        attacker: striker,
+        trajectory: AttackTrajectory.flanking,
+        isPhysical: true,
+      );
       target.bleedStacks += 2;
       addLog('  ⚡ [RETINUE FOLLOW-UP] ${striker.name} strikes ${target.name} for $followUpDmg DMG (+2 Bleed)!');
     }
@@ -3750,7 +3909,7 @@ class SpatialCombatEngine extends ChangeNotifier {
           unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
 
           final int baseDmg = hasHoldTheLineBonus ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
-          final dmg = target.takeDamage(baseDmg, isPhysical: true);
+          final dmg = applyDamageToTarget(target, baseDmg, attacker: unit, isPhysical: true);
           final skillName = hasHoldTheLineBonus
               ? (unit.id == 'lady_valeria' ? 'Solar Sunder Cleave' : 'Earth-Shattering Bash')
               : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : (unit.id == 'iron_footman' ? 'Shield Bash' : 'Vanguard Sunder'));
@@ -3764,7 +3923,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             // Lateral cleave across adjacent enemies in Row 0
             final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
             for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1))) {
-              final cleaveDmg = neighbor.takeDamage((baseDmg * 0.60).round(), isPhysical: true);
+              final cleaveDmg = applyDamageToTarget(neighbor, (baseDmg * 0.60).round(), attacker: unit, isPhysical: true);
               neighbor.currentAp = max(0, neighbor.currentAp - 1500);
               lateralHits[neighbor.id] = cleaveDmg;
               addLog('  Lateral Cleave: ${neighbor.name} struck for $cleaveDmg DMG (-1,500 AP reset)!');
@@ -3824,7 +3983,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             opposingSquad.where((u) => u.isAlive).firstOrNull;
         final shockwaveDmg = (unit.attack * 0.60).round();
         if (target != null) {
-          final dmg = target.takeDamage(shockwaveDmg);
+          final dmg = applyDamageToTarget(target, shockwaveDmg, attacker: unit, isPhysical: true);
           // Apply 15 armor chip / stagger
           target.armor = max(0, target.armor - 15);
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
@@ -3900,8 +4059,14 @@ class SpatialCombatEngine extends ChangeNotifier {
       final frontEnemies = enemySquad.where((u) => u.isAlive && u.occupies(unit.occupiedNodes.first.column, 0)).toList();
       final target = validExplicit ?? frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
       if (target != null) {
-        final dmg = (unit.effectiveAttack * 1.1).round();
-        target.takeDamage(dmg, isPhysical: false);
+        final rawDmg = (unit.effectiveAttack * 1.1).round();
+        final dmg = applyDamageToTarget(
+          target,
+          rawDmg,
+          attacker: unit,
+          trajectory: AttackTrajectory.lobbedMagic,
+          isPhysical: false,
+        );
         unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
         // Rank & Rite Spec Sec 4: Apply 1-row Knockback with Kinetic Splat
         applyKnockback(target, 1, baseImpactDamage: dmg);
@@ -3953,7 +4118,13 @@ class SpatialCombatEngine extends ChangeNotifier {
         for (int r = 0; r <= 2; r++) {
           final occupant = opposingSquad.where((u) => u.isAlive && u.occupies(targetCol, r)).firstOrNull;
           if (occupant != null) {
-            final dmg = occupant.takeDamage(unit.effectiveAttack, isPhysical: false);
+            final dmg = applyDamageToTarget(
+              occupant,
+              unit.effectiveAttack,
+              attacker: unit,
+              trajectory: AttackTrajectory.lobbedMagic,
+              isPhysical: false,
+            );
             hitCount++;
             if (primaryTarget == null) {
               primaryTarget = occupant;
@@ -3995,7 +4166,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       } else {
         final target = validExplicit ?? opposingSquad.where((u) => u.isAlive).firstOrNull;
         if (target != null) {
-          final dmg = target.takeDamage(unit.attack);
+          final dmg = applyDamageToTarget(
+            target,
+            unit.attack,
+            attacker: unit,
+            trajectory: AttackTrajectory.lobbedMagic,
+            isPhysical: false,
+          );
           unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
           addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
           final graftProc = _applyGraftedTraitProc(unit, target, dmg);
@@ -4629,7 +4806,7 @@ class SpatialCombatEngine extends ChangeNotifier {
         [GridNode(column: targetCol, row: targetRow, occupantUnitId: unit.id)],
         apPenalty: apCost,
       );
-      final costStr = isPreBattlePhase ? '[Pre-Battle Swap]' : '[-5,000 AP / -50% Swap]';
+      final costStr = isPreBattlePhase ? '[Pre-Battle Swap]' : '[-2,500 AP / -25% Swap]';
       lastBannerMessage = '⇄ FORMATION SWAP: ${unit.name} exchanged positions with ${existingOccupant.name} $costStr';
       addLog('FORMATION SWAP: ${unit.name} and ${existingOccupant.name} swapped tiles $costStr.');
       notifyListeners();
@@ -4652,7 +4829,7 @@ class SpatialCombatEngine extends ChangeNotifier {
             : '✨ COMMANDER STANCE: AEGIS REARGUARD (Rearguard Wards Activated)';
         addLog('STANCE TRANSITION: Lady Valeria assumed $valeriaStance!');
       } else {
-        final costStr = isPreBattlePhase ? '[Pre-Battle Free Placement]' : '[-5,000 AP / -50%]';
+        final costStr = isPreBattlePhase ? '[Pre-Battle Free Placement]' : '[-2,500 AP / -25%]';
         addLog('${unit.name} shifted from (Col ${oldCol + 1}, Row $oldRow) to (Col ${targetCol + 1}, Row $targetRow) $costStr.');
       }
       notifyListeners();

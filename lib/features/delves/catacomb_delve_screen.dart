@@ -78,6 +78,10 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
     }
 
     if (room.isCleared) {
+      if (room.type == DelveRoomType.catacombArchon) {
+        _showExtractionRunestoneModal(room);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${room.title} has already been conquered.'),
@@ -226,14 +230,9 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildSpoilPreviewItem('GOLD', '+${room.rewardIchor}', const Color(0xFFE91E63)),
-                    _buildSpoilPreviewItem('ORE', '+${room.rewardOre}', const Color(0xFFFF9800)),
-                    _buildSpoilPreviewItem('SIGILS', '+${room.rewardSigils}', const Color(0xFFFFD54F)),
-                    _buildSpoilPreviewItem(
-                      'SHARDS',
-                      '+${_service.isGloomActive ? room.rewardPlinthShards * 2 : room.rewardPlinthShards}',
-                      const Color(0xFF00E5FF),
-                    ),
+                    _buildSpoilPreviewItem('GOLD', '+${room.rewardIchor}', const Color(0xFFFFD54F)),
+                    _buildSpoilPreviewItem('ORE', '+${room.rewardOre}', const Color(0xFF26A69A)),
+                    _buildSpoilPreviewItem('SIGILS', '+${room.rewardSigils}', const Color(0xFFFF80AB)),
                   ],
                 ),
               ),
@@ -580,14 +579,9 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildSpoilPreviewItem('GOLD', '${_service.accumulatedIchor}', const Color(0xFFE91E63)),
-                        _buildSpoilPreviewItem('ORE', '${_service.accumulatedOre}', const Color(0xFFFF9800)),
-                        _buildSpoilPreviewItem('SIGILS', '${_service.accumulatedSigils}', const Color(0xFFFFD54F)),
-                        _buildSpoilPreviewItem(
-                          'PLINTHS',
-                          '${_service.accumulatedPlinthShards}',
-                          const Color(0xFF00E5FF),
-                        ),
+                        _buildSpoilPreviewItem('GOLD', '${_service.accumulatedIchor}', const Color(0xFFFFD54F)),
+                        _buildSpoilPreviewItem('ORE', '${_service.accumulatedOre}', const Color(0xFF26A69A)),
+                        _buildSpoilPreviewItem('SIGILS', '${_service.accumulatedSigils}', const Color(0xFFFF80AB)),
                       ],
                     ),
                   ],
@@ -683,10 +677,9 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildExtractSummaryRow('Raw Ash & Gold', '+${spoils['ichor']}', const Color(0xFFE91E63)),
-                    _buildExtractSummaryRow('Cursed Ore', '+${spoils['ore']}', const Color(0xFFFF9800)),
-                    _buildExtractSummaryRow('Bloodline Sigils', '+${spoils['sigils']}', const Color(0xFFFFD54F)),
-                    _buildExtractSummaryRow('Petrified Plinth Shards', '+${spoils['plinths']}', const Color(0xFF00E5FF)),
+                    _buildExtractSummaryRow('Gold', '+${spoils['ichor']}', const Color(0xFFFFD54F)),
+                    _buildExtractSummaryRow('Cursed Ore', '+${spoils['ore']}', const Color(0xFF26A69A)),
+                    _buildExtractSummaryRow('Bloodline Sigils', '+${spoils['sigils']}', const Color(0xFFFF80AB)),
                   ],
                 ),
               ),
@@ -910,7 +903,7 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
           Icon(Icons.warning, size: 14, color: Colors.white),
           SizedBox(width: 6),
           Text(
-            'STYGIAN GLOOM: Enemies have +25% Crit • Petrified Plinth Shard drops DOUBLED (2x)!',
+            'STYGIAN GLOOM: Enemies have +25% Crit • Gold & Ore drops increased!',
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         ],
@@ -1129,10 +1122,10 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
                   '+${room.rewardIchor} Gold',
                   style: const TextStyle(fontSize: 9, color: Color(0xFFFFD54F)),
                 ),
-                if (room.rewardPlinthShards > 0)
+                if (room.rewardSigils > 0)
                   Text(
-                    '+${room.rewardPlinthShards} Shards',
-                    style: const TextStyle(fontSize: 9, color: Color(0xFF00E5FF)),
+                    '+${room.rewardSigils} Sigil',
+                    style: const TextStyle(fontSize: 9, color: Color(0xFFFF80AB)),
                   ),
               ],
             ),
@@ -1234,6 +1227,9 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
   }
 
   Widget _buildLootSackBar() {
+    final clearedBossRoom = _service.currentFloorData?.rooms.values
+        .where((r) => r.type == DelveRoomType.catacombArchon && r.isCleared)
+        .firstOrNull;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
@@ -1246,16 +1242,28 @@ class _CatacombDelveScreenState extends State<CatacombDelveScreen> {
           Expanded(
             child: Row(
               children: [
-                _buildLootPill(Icons.opacity, '${_service.accumulatedIchor}', const Color(0xFFE91E63)),
+                _buildLootPill(Icons.monetization_on, '${_service.accumulatedIchor}', const Color(0xFFFFD54F)),
                 const SizedBox(width: 8),
-                _buildLootPill(Icons.diamond, '${_service.accumulatedOre}', const Color(0xFFFF9800)),
+                _buildLootPill(Icons.diamond_outlined, '${_service.accumulatedOre}', const Color(0xFF26A69A)),
                 const SizedBox(width: 8),
-                _buildLootPill(Icons.auto_awesome, '${_service.accumulatedSigils}', const Color(0xFFFFD54F)),
-                const SizedBox(width: 8),
-                _buildLootPill(Icons.foundation, '${_service.accumulatedPlinthShards}', const Color(0xFF00E5FF)),
+                _buildLootPill(Icons.military_tech, '${_service.accumulatedSigils}', const Color(0xFFFF80AB)),
               ],
             ),
           ),
+          if (clearedBossRoom != null) ...[
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFFFD54F),
+                side: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              icon: const Icon(Icons.arrow_downward, size: 14),
+              label: Text('DESCEND F${_service.currentFloor + 1}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              onPressed: () => _showExtractionRunestoneModal(clearedBossRoom),
+            ),
+            const SizedBox(width: 8),
+          ],
           // Quick Extract Button
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(

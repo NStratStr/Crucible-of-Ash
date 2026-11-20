@@ -1,6 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/audio/global_audio_service.dart';
 import '../../core/combat_math.dart';
 import '../../shared/models/unit_entity.dart';
+import '../../shared/widgets/gothic_header_bar.dart';
 import 'summoning_service.dart';
 
 class SummoningScreen extends StatefulWidget {
@@ -9,6 +12,8 @@ class SummoningScreen extends StatefulWidget {
   final Function(SummonResult result) onSummonExecuted;
   final VoidCallback? onClose;
   final bool isFirstSummon;
+  final int hospiceTier;
+  final int currentReserveCount;
 
   const SummoningScreen({
     super.key,
@@ -17,6 +22,8 @@ class SummoningScreen extends StatefulWidget {
     required this.onSummonExecuted,
     this.onClose,
     this.isFirstSummon = false,
+    this.hospiceTier = 1,
+    this.currentReserveCount = 0,
   });
 
   static Future<void> showAsModal({
@@ -25,6 +32,8 @@ class SummoningScreen extends StatefulWidget {
     required int bloodlineSigils,
     required Function(SummonResult result) onSummonExecuted,
     bool isFirstSummon = false,
+    int hospiceTier = 1,
+    int currentReserveCount = 0,
   }) {
     return showDialog(
       context: context,
@@ -35,6 +44,8 @@ class SummoningScreen extends StatefulWidget {
         onSummonExecuted: onSummonExecuted,
         onClose: () => Navigator.of(ctx).pop(),
         isFirstSummon: isFirstSummon,
+        hospiceTier: hospiceTier,
+        currentReserveCount: currentReserveCount,
       ),
     );
   }
@@ -45,20 +56,36 @@ class SummoningScreen extends StatefulWidget {
 
 class _SummoningScreenState extends State<SummoningScreen> {
   SummonBannerType _selectedBannerType = SummonBannerType.ashenBloodline;
+  late int _currentIchor;
+  late int _currentSigils;
+  late int _currentReserveCount;
   bool _isPerformingRitual = false;
   bool _hasUsedGuaranteedStarter = false;
   List<UnitEntity>? _revealedUnits;
   int _revealedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _currentIchor = widget.totalIchor;
+    _currentSigils = widget.bloodlineSigils;
+    _currentReserveCount = widget.currentReserveCount;
+    if (widget.isFirstSummon || (_currentSigils >= 1 && _currentIchor < 250)) {
+      _selectedBannerType = SummonBannerType.consecratedSigil;
+    }
+  }
+
+  String _roman(int tier) => const ['I', 'II', 'III', 'IV'][(tier - 1).clamp(0, 3)];
+
+  @override
   Widget build(BuildContext context) {
     final banner = SummoningService.banners[_selectedBannerType]!;
     final bool canAffordSingle = banner.usesSigils
-        ? widget.bloodlineSigils >= banner.singleCost
-        : widget.totalIchor >= banner.singleCost;
+        ? _currentSigils >= banner.singleCost
+        : _currentIchor >= banner.singleCost;
     final bool canAffordMulti = banner.usesSigils
-        ? widget.bloodlineSigils >= banner.multiCost
-        : widget.totalIchor >= banner.multiCost;
+        ? _currentSigils >= banner.multiCost
+        : _currentIchor >= banner.multiCost;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D14),
@@ -153,121 +180,39 @@ class _SummoningScreenState extends State<SummoningScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF14141E).withValues(alpha: 0.95),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.35),
-            width: 1.0,
-          ),
+    return GothicHeaderBar(
+      title: 'THE HOSPICE INTAKE GATES',
+      categoryTag: 'TIER ${_roman(widget.hospiceTier)} • $_currentReserveCount/${SummoningService.reserveCapacityForHospiceTier(widget.hospiceTier)}',
+      totalIchor: _currentIchor,
+      bloodlineSigils: _currentSigils,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 12),
+        child: Image.asset(
+          'assets/images/UI/Flame Shield icon Transparent.png',
+          width: 22,
+          height: 22,
+          errorBuilder: (_, __, ___) => const Icon(Icons.fireplace, color: Color(0xFFFFD54F), size: 20),
         ),
       ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/images/UI/Flame Shield icon Transparent.png',
-            width: 24,
-            height: 24,
-            errorBuilder: (_, __, ___) => const Icon(Icons.fireplace, color: Color(0xFFFFD54F), size: 22),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text(
-                'THE HOSPICE INTAKE GATES',
-                style: TextStyle(
-                  color: Color(0xFFFFD54F),
-                  fontFamily: 'serif',
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                'TRIAGE PETRIFIED REFUGEES • AWAKEN WITH LIVING VITAE',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 8.5,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ],
-          ),
-
-          const Spacer(),
-
-          // Currencies
-          _buildCurrencyBadge(
-            icon: Icons.monetization_on,
-            color: const Color(0xFFFFD54F),
-            value: '${widget.totalIchor}',
-            tooltip: 'Gold',
-          ),
-          const SizedBox(width: 8),
-          _buildCurrencyBadge(
-            icon: Icons.military_tech,
-            color: const Color(0xFFFF80AB),
-            value: '${widget.bloodlineSigils}',
-            tooltip: 'Bloodline Sigils',
-          ),
-
-          const SizedBox(width: 10),
-
-          // Rates & Probability Info Button
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.info_outline, color: Color(0xFFFFD54F), size: 20),
+          tooltip: 'Convocation Rates & Probabilities',
+          onPressed: () {
+            GlobalAudioService().playSfx('sfx_ui_click', volumeMultiplier: 0.45);
+            _showRatesDialog(context);
+          },
+        ),
+        if (widget.onClose != null)
           IconButton(
-            icon: const Icon(Icons.info_outline, color: Color(0xFFFFD54F), size: 22),
-            tooltip: 'Convocation Rates & Probabilities',
-            onPressed: () => _showRatesDialog(context),
+            icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+            tooltip: 'Leave Altar',
+            onPressed: () {
+              GlobalAudioService().playSfx('sfx_ui_click', volumeMultiplier: 0.40);
+              widget.onClose!();
+            },
           ),
-
-          // Close Button
-          if (widget.onClose != null)
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white70, size: 22),
-              tooltip: 'Leave Altar',
-              onPressed: widget.onClose,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCurrencyBadge({
-    required IconData icon,
-    required Color color,
-    required String value,
-    required String tooltip,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E2C),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.w900,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -490,15 +435,54 @@ class _SummoningScreenState extends State<SummoningScreen> {
             ),
           ),
           const Divider(color: Colors.white12, height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildRateIndicator('GEN 1 THRALL', '${(banner.gen1Rate * 100).toInt()}%', const Color(0xFFB0BEC5)),
-              _buildRateIndicator('GEN 2 ELITE', '${(banner.gen2Rate * 100).toInt()}%', const Color(0xFFFFB74D)),
-              _buildRateIndicator('GEN 3 PUREBLOOD', '${(banner.gen3Rate * 100).toInt()}%', const Color(0xFFFFD54F)),
-            ],
+          Builder(
+            builder: (_) {
+              final rates = SummoningService.effectiveRatesForBanner(banner, hospiceTier: widget.hospiceTier);
+              return Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildRateIndicator('GEN 1 THRALL', '${(rates.gen1 * 100).round()}%', const Color(0xFFB0BEC5)),
+                      _buildRateIndicator('GEN 2 ELITE', '${(rates.gen2 * 100).round()}%', const Color(0xFFFFB74D)),
+                      _buildRateIndicator('GEN 3 PUREBLOOD', '${(rates.gen3 * 100).round()}%', const Color(0xFFFFD54F)),
+                    ],
+                  ),
+                  if (widget.hospiceTier >= 2) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _buildHospicePerkTag('T2: +15% Elite/Pureblood Rate', const Color(0xFFFFB74D)),
+                        if (widget.hospiceTier >= 3)
+                          _buildHospicePerkTag('T3: Guaranteed Gen 3 on 10x', const Color(0xFF81C784)),
+                        if (widget.hospiceTier >= 4)
+                          _buildHospicePerkTag('T4: Legendary Pilgrims & Commander Rites', const Color(0xFFFFD54F)),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHospicePerkTag(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 8.0, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -662,7 +646,21 @@ class _SummoningScreenState extends State<SummoningScreen> {
   }
 
   void _executeSummon(int count) {
+    final int reserveCap = SummoningService.reserveCapacityForHospiceTier(widget.hospiceTier);
+    if (_currentReserveCount + count > reserveCap) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Reserve Roster full ($_currentReserveCount/$reserveCap)! Fuse duplicates in the Blood Altar or upgrade Hospice Gates in Sanctuary.',
+          ),
+          backgroundColor: const Color(0xFFB3261E),
+        ),
+      );
+      return;
+    }
+
     try {
+      GlobalAudioService().playSfx('sfx_summon_pull', volumeMultiplier: 0.65);
       setState(() {
         _isPerformingRitual = true;
       });
@@ -671,9 +669,10 @@ class _SummoningScreenState extends State<SummoningScreen> {
       final result = SummoningService.performSummon(
         bannerType: _selectedBannerType,
         count: count,
-        currentIchor: widget.totalIchor,
-        currentSigils: widget.bloodlineSigils,
+        currentIchor: _currentIchor,
+        currentSigils: _currentSigils,
         guaranteeStarterVanguard: guaranteeStarter,
+        hospiceTier: widget.hospiceTier,
       );
       if (guaranteeStarter) {
         _hasUsedGuaranteedStarter = true;
@@ -683,6 +682,9 @@ class _SummoningScreenState extends State<SummoningScreen> {
       widget.onSummonExecuted(result);
 
       setState(() {
+        _currentIchor = max(0, _currentIchor - result.ichorSpent);
+        _currentSigils = max(0, _currentSigils - result.sigilsSpent);
+        _currentReserveCount += result.summonedUnits.length;
         _isPerformingRitual = false;
         _revealedUnits = result.summonedUnits;
         _revealedIndex = 0;

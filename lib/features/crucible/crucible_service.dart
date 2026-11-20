@@ -17,6 +17,7 @@ class CrucibleService {
     required int speciesBaseSpd,
     required String childNativeTraitId,
     required String selectedGraftTraitId,
+    int crucibleTier = 1,
   }) {
     assert(
       parentA.speciesId == parentB.speciesId,
@@ -25,14 +26,15 @@ class CrucibleService {
 
     final int nextGeneration = (max(parentA.generation, parentB.generation) + 1).clamp(1, 6);
 
-    // 10% transfer at max level; 5% transfer if premature
-    final double ratioA = (parentA.level >= parentA.maxLevel) ? 0.10 : 0.05;
-    final double ratioB = (parentB.level >= parentB.maxLevel) ? 0.10 : 0.05;
+    // 10% transfer at max level; 5% transfer if premature (Tier 4 grants full 10% efficiency + 5% resonance)
+    final double ratioA = (crucibleTier >= 4 || parentA.level >= parentA.maxLevel) ? 0.10 : 0.05;
+    final double ratioB = (crucibleTier >= 4 || parentB.level >= parentB.maxLevel) ? 0.10 : 0.05;
+    final double efficiencyMult = crucibleTier >= 4 ? 1.05 : 1.0;
 
-    final int bonusHp = ((parentA.maxHp * ratioA) + (parentB.maxHp * ratioB)).round();
-    final int bonusAtk = ((parentA.attack * ratioA) + (parentB.attack * ratioB)).round();
-    final int bonusDef = ((parentA.defense * ratioA) + (parentB.defense * ratioB)).round();
-    final int bonusSpd = ((parentA.speed * ratioA) + (parentB.speed * ratioB)).round();
+    final int bonusHp = (((parentA.maxHp * ratioA) + (parentB.maxHp * ratioB)) * efficiencyMult).round();
+    final int bonusAtk = (((parentA.attack * ratioA) + (parentB.attack * ratioB)) * efficiencyMult).round();
+    final int bonusDef = (((parentA.defense * ratioA) + (parentB.defense * ratioB)) * efficiencyMult).round();
+    final int bonusSpd = (((parentA.speed * ratioA) + (parentB.speed * ratioB)) * efficiencyMult).round();
 
     int finalMaxHp = speciesBaseHp + bonusHp;
     int finalAtk = speciesBaseAtk + bonusAtk;

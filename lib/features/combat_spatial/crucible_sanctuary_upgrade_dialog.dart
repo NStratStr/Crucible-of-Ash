@@ -1,7 +1,5 @@
 import 'crucible_skill_tree_dialog.dart';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'models/crucible_skill_tree_models.dart';
 import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 
@@ -92,22 +90,22 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
                   ),
                   const Spacer(),
 
-                  // Currencies / Drops Counter
+                  // Currencies / Drops Counter (Unified Gold / Cursed Ore / Sigils)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0C0A12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFB0BEC5).withValues(alpha: 0.4), width: 0.8),
+                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.4), width: 0.8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.blur_on, size: 12, color: Color(0xFFB0BEC5)),
+                        const Icon(Icons.monetization_on, size: 12, color: Color(0xFFFFD54F)),
                         const SizedBox(width: 3),
                         Text(
-                          '${engine.unboundAshWallet} ASH',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white),
+                          '${engine.unboundAshWallet} GOLD',
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFFFE082)),
                         ),
                       ],
                     ),
@@ -118,16 +116,16 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
                     decoration: BoxDecoration(
                       color: const Color(0xFF0C0A12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.4), width: 0.8),
+                      border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.4), width: 0.8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.opacity, size: 12, color: Color(0xFFFF5252)),
+                        const Icon(Icons.diamond_outlined, size: 12, color: Color(0xFF80CBC4)),
                         const SizedBox(width: 3),
                         Text(
-                          '${engine.distilledVitaeWallet} VITAE',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFFF8A80)),
+                          '${engine.distilledVitaeWallet} ORE',
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF80CBC4)),
                         ),
                       ],
                     ),
@@ -138,16 +136,16 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
                     decoration: BoxDecoration(
                       color: const Color(0xFF0C0A12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF80D8FF).withValues(alpha: 0.4), width: 0.8),
+                      border: Border.all(color: const Color(0xFFFF80AB).withValues(alpha: 0.4), width: 0.8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.foundation, size: 12, color: Color(0xFF80D8FF)),
+                        const Icon(Icons.military_tech, size: 12, color: Color(0xFFFF80AB)),
                         const SizedBox(width: 3),
                         Text(
-                          '${engine.petrifiedPlinthsWallet} PLINTHS',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF80D8FF)),
+                          '${engine.petrifiedPlinthsWallet} SIGILS',
+                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFFF80AB)),
                         ),
                       ],
                     ),

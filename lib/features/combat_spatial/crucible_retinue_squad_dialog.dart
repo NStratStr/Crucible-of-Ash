@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
-import '../../shared/data/starter_brigades.dart';
-import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import '../../features/relics/relic_service.dart';
 
@@ -92,11 +90,9 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
 
     setState(() {
       UnitEntity? outgoingEntity;
-      String? outgoingUnitId;
 
       if (_selectedCompanionSlot < _squad.length) {
         outgoingEntity = _squad[_selectedCompanionSlot];
-        outgoingUnitId = outgoingEntity.id;
         _squad[_selectedCompanionSlot] = incomingMinion;
       } else {
         _squad.add(incomingMinion);
@@ -123,13 +119,12 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isLandscapeMobile = screenHeight < 550;
 
-    // Gather all 8 archetype minion candidates (combining squad + reserves)
+    // Gather owned minion candidates (combining reserves + active squad)
     final Map<String, UnitEntity> allMinionCatalog = {};
-    for (final u in StarterBrigades.createReserveInventory()) {
-      allMinionCatalog[u.speciesId] = u;
-    }
     for (final u in _reserves) {
-      allMinionCatalog[u.speciesId] = u;
+      if (!u.id.contains('sculptor') && !u.speciesId.contains('sculptor')) {
+        allMinionCatalog[u.speciesId] = u;
+      }
     }
     for (final u in _squad) {
       if (!u.id.contains('sculptor') && !u.speciesId.contains('sculptor')) {

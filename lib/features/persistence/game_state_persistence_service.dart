@@ -24,6 +24,8 @@ class GameSaveData {
   final int currentAscension;
   final int maxUnlockedAscension;
   final int completedLinearStages;
+  final Map<int, int> completedStagesByChapter;
+  final String? ftueStageName;
   final bool hasCompletedAwakening;
   final List<UnitEntity> allies;
   final List<UnitEntity> reserveInventory;
@@ -32,6 +34,7 @@ class GameSaveData {
   final Map<GeneralType, List<String>> customGrimoires;
   final Map<String, int> stageStars;
   final Set<String> claimedThreeStarStages;
+  final Map<String, dynamic>? skillTreeJson;
   final int lastSavedTimestamp;
 
   const GameSaveData({
@@ -52,6 +55,8 @@ class GameSaveData {
     this.currentAscension = 0,
     this.maxUnlockedAscension = 0,
     this.completedLinearStages = 0,
+    this.completedStagesByChapter = const {},
+    this.ftueStageName,
     this.hasCompletedAwakening = false,
     required this.allies,
     required this.reserveInventory,
@@ -60,6 +65,7 @@ class GameSaveData {
     this.customGrimoires = const {},
     this.stageStars = const {},
     this.claimedThreeStarStages = const {},
+    this.skillTreeJson,
     required this.lastSavedTimestamp,
   });
 
@@ -83,6 +89,8 @@ class GameSaveData {
       'currentAscension': currentAscension,
       'maxUnlockedAscension': maxUnlockedAscension,
       'completedLinearStages': completedLinearStages,
+      'completedStagesByChapter': completedStagesByChapter.map((k, v) => MapEntry(k.toString(), v)),
+      'ftueStageName': ftueStageName,
       'hasCompletedAwakening': hasCompletedAwakening,
       'allies': allies.map((u) => u.toJson()).toList(),
       'reserveInventory': reserveInventory.map((u) => u.toJson()).toList(),
@@ -91,6 +99,7 @@ class GameSaveData {
       'customGrimoires': customGrimoires.map((k, v) => MapEntry(k.name, v)),
       'stageStars': stageStars,
       'claimedThreeStarStages': claimedThreeStarStages.toList(),
+      'skillTreeJson': skillTreeJson,
       'lastSavedTimestamp': lastSavedTimestamp,
     };
   }
@@ -143,6 +152,25 @@ class GameSaveData {
       }
     }
 
+    final rawChapterStages = json['completedStagesByChapter'] as Map<String, dynamic>?;
+    final Map<int, int> completedStagesByChapter = {};
+    if (rawChapterStages != null) {
+      rawChapterStages.forEach((k, v) {
+        final ch = int.tryParse(k);
+        if (ch != null) completedStagesByChapter[ch] = (v as num).toInt();
+      });
+    } else {
+      final legacyCurrentCh = (json['currentChapter'] as num?)?.toInt() ?? 1;
+      final legacyMaxCh = (json['maxUnlockedChapter'] as num?)?.toInt() ?? 1;
+      final legacyCompleted = (json['completedLinearStages'] as num?)?.toInt() ?? 0;
+      for (int c = 1; c < legacyMaxCh; c++) {
+        completedStagesByChapter[c] = 10;
+      }
+      if (legacyCompleted > 0) {
+        completedStagesByChapter[legacyCurrentCh] = legacyCompleted;
+      }
+    }
+
     return GameSaveData(
       totalIchor: (json['totalIchor'] as num?)?.toInt() ?? 450,
       cursedOre: (json['cursedOre'] as num?)?.toInt() ?? 75,
@@ -161,6 +189,8 @@ class GameSaveData {
       currentAscension: (json['currentAscension'] as num?)?.toInt() ?? 0,
       maxUnlockedAscension: (json['maxUnlockedAscension'] as num?)?.toInt() ?? 0,
       completedLinearStages: (json['completedLinearStages'] as num?)?.toInt() ?? 0,
+      completedStagesByChapter: completedStagesByChapter,
+      ftueStageName: json['ftueStageName'] as String?,
       hasCompletedAwakening: (json['hasCompletedAwakening'] as bool?) ?? false,
       allies: allies,
       reserveInventory: reserveInventory,
@@ -174,6 +204,7 @@ class GameSaveData {
       claimedThreeStarStages: ((json['claimedThreeStarStages'] as List<dynamic>?) ?? [])
           .map((e) => e.toString())
           .toSet(),
+      skillTreeJson: json['skillTreeJson'] as Map<String, dynamic>?,
       lastSavedTimestamp: (json['lastSavedTimestamp'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );

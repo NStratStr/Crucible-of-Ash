@@ -26,6 +26,8 @@ import '../../shared/widgets/pedigree_inspector_dialog.dart';
 import '../../shared/widgets/gothic_character_sheet_card.dart';
 import '../../shared/widgets/gothic_header_bar.dart';
 
+part 'widgets/spatial_battle_vfx_painters.dart';
+
 /// Experimental Spatial Combat Simulation Screen (GDD v3.2 Extension)
 /// Features:
 /// - 3-Row x 5-Column Isometric/Tactical battlefield plane
@@ -227,7 +229,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       }
     });
   }
-  late final SpatialCombatEngine _engine;
+  late SpatialCombatEngine _engine;
   List<UnitEntity> _currentSquadUnits = [];
   List<UnitEntity> _reserveUnits = [];
   Ticker? _frameTicker;
@@ -237,9 +239,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   String? _selectedEnemyUnitId;
   String? _hoveredEnemyUnitId;
   String? _draggedUnitId;
-  String? _selectedCardId;
-  String? _hoveredCardId;
-  SpatialCombatCard? _draggedCard;
   String? _selectedUltimateUnitId;
   String? _draggedUltimateUnitId;
   int? _hoveredTileGRow;
@@ -256,8 +255,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   String? _lastHandledEventId;
   final List<SpatialActionEvent> _actionEventQueue = [];
   bool _isActionSequenceRunning = false;
+  int _activeAttackSequenceId = 0;
   String? _attackingUnitId;
+  String? _attackingSkillName;
+  final Map<String, String> _activeImpactSlashUnits = {};
+  final Map<String, int> _visualUnitHp = {};
+  final Map<String, int> _lastCommittedUnitHp = {};
+  final Set<String> _visualAliveOverrideIds = {};
+  bool _holdEndOfBattleOverlay = false;
+  final Map<String, Offset> _lastKnown2DUnitOffsets = {};
   int? _activeFireBarrageMs;
+  List<Alignment> _fireBarrageTargetAlignments = [];
   CrucibleSkillNode? _hoveredSkillNode;
   String? _activeSynergyBannerText;
   Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
@@ -274,7 +282,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   final List<Timer> _animTimers = [];
   final List<_CombatVfx> _activeVfx = [];
   final List<_GroundShockwaveRipple> _groundRipples = [];
-  final List<_ActiveCombatSpriteVfx> _activeSpriteVfx = [];
   Offset _screenShakeOffset = Offset.zero;
   double _shakeIntensity = 0.0;
   double _shakeRemainingSec = 0.0;
@@ -295,6 +302,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   bool _forgeStrikeIsPerfect = false;
   CombatUnitState? _forgeStrikeUnit;
   CombatUnitState? _forgeStrikeTarget;
+  String _forgeStrikeActionType = 'cataclysmic_pyre';
+  bool _wasRunningBeforeForgeStrike = false;
 
   // Ambient Dark Fantasy Combat Audio
   AudioPlayer? _bgmPlayer;
@@ -302,7 +311,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   int _sfxIndex = 0;
   static const int _maxSfxPlayers = 8;
   bool _isMuted = false;
-  bool _isDockCollapsed = false;
   bool _isLogDrawerVisible = false;
   bool _hasBossEnraged = false;
   bool _wasBossStaggered = false;
@@ -352,6 +360,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
     SpriteSheetAnimation.precache('assets/images/Spells/meteor storm.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden idle.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden attack.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/blood alchemist idle.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/blood alchemist attack animation.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -374,6 +386,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       spindleTier: widget.spindleTier,
     );
     _engine.isActionPauseEnabled = true;
+    for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
+      _visualUnitHp[u.id] = u.hp;
+      _lastCommittedUnitHp[u.id] = u.hp;
+    }
     _engine.addListener(_onEngineUpdate);
     _startLoop();
     _initAudio();
@@ -513,12 +529,107 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
     // Check if a new combat action event was dispatched
     final event = _engine.activeActionEvent;
-    if (event != null && event.id != _lastHandledEventId) {
+    final bool isNewEvent = event != null && event.id != _lastHandledEventId;
+
+    final Set<String> deferredIds = {};
+    if (isNewEvent && !_isDotEvent(event)) {
+      deferredIds.add(event.targetId);
+      deferredIds.addAll(event.secondaryTargetHits.keys);
+      if (event.isHeal || event.healAmount > 0) {
+        deferredIds.add(event.healTargetId ?? event.attackerId);
+      }
+    }
+
+    for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
+      if (!_visualUnitHp.containsKey(u.id)) {
+        _visualUnitHp[u.id] = u.hp;
+        _lastCommittedUnitHp[u.id] = u.hp;
+      } else if (deferredIds.contains(u.id)) {
+        final int heldHp = _lastCommittedUnitHp[u.id] ?? u.hp;
+        _visualUnitHp[u.id] = heldHp;
+        if (heldHp > 0 && !u.isAlive) {
+          _visualAliveOverrideIds.add(u.id);
+        }
+      } else if (!_isActionSequenceRunning && _actionEventQueue.isEmpty && !isNewEvent) {
+        _visualUnitHp[u.id] = u.hp;
+        _lastCommittedUnitHp[u.id] = u.hp;
+        _visualAliveOverrideIds.remove(u.id);
+      }
+    }
+
+    if (isNewEvent) {
       _lastHandledEventId = event.id;
-      _enqueueCombatEvent(event);
+      if (_isDotEvent(event)) {
+        _triggerLightweightDotPop(event);
+      } else {
+        if (_engine.isVictory || _engine.isDefeat) {
+          _holdEndOfBattleOverlay = true;
+        }
+        _enqueueCombatEvent(event);
+      }
+    }
+
+    if (!_isActionSequenceRunning && _actionEventQueue.isEmpty && !isNewEvent && !_isSlowMoFinisher) {
+      _visualAliveOverrideIds.clear();
+      _holdEndOfBattleOverlay = false;
     }
 
     setState(() {});
+  }
+
+  bool _isDotEvent(SpatialActionEvent e) {
+    return e.attackerId.startsWith('status_') ||
+        e.skillName == 'Hemorrhage' ||
+        e.skillName == 'Caustic Toxin' ||
+        e.skillName == 'Ignition';
+  }
+
+  void _triggerLightweightDotPop(SpatialActionEvent event) {
+    final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
+    final target = allUnits.where((u) => u.id == event.targetId).firstOrNull;
+    final int nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    if (target != null) {
+      _visualUnitHp[target.id] = target.hp;
+      _lastCommittedUnitHp[target.id] = target.hp;
+      if (!target.isAlive) {
+        _visualAliveOverrideIds.remove(target.id);
+      }
+    }
+
+    final bool isBleed = event.skillName == 'Hemorrhage';
+    final bool isPoison = event.skillName == 'Caustic Toxin';
+    final String prefix = isBleed ? '🩸' : (isPoison ? '☠️' : '🔥');
+    final Color popColor = isBleed
+        ? const Color(0xFFFF3D00)
+        : (isPoison ? const Color(0xFF69F0AE) : const Color(0xFFFF9100));
+    final Color borderColor = isBleed
+        ? const Color(0xFFDD2C00)
+        : (isPoison ? const Color(0xFF00C853) : const Color(0xFFE65100));
+
+    final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
+    final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (8.0 + existingCount * 6.0);
+
+    _floatingPops.add(_FloatingCombatText(
+      id: 'dot_${event.id}_$nowMs',
+      unitId: event.targetId,
+      text: '$prefix -${event.damage}',
+      color: popColor,
+      borderColor: borderColor,
+      fontSize: 10.5,
+      isCrit: false,
+      createdMs: nowMs,
+      durationMs: _scaledMs(1400),
+      horizontalDrift: drift,
+    ));
+
+    if (_engine.activeActionEvent?.id == event.id && _actionEventQueue.isEmpty && !_isActionSequenceRunning) {
+      Future.microtask(() {
+        if (mounted && _engine.activeActionEvent?.id == event.id) {
+          _engine.clearActiveAction();
+        }
+      });
+    }
   }
 
   Offset _getUnitCenterIsometricOffset(CombatUnitState unit, {double tileWidth = 152.0, double tileHeight = 76.0}) {
@@ -622,6 +733,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     void executePhysicalImpact() {
       if (!mounted) return;
 
+      final int seqId = ++_activeAttackSequenceId;
+      final String impactSkillName = event.skillName;
+
       // 1. Clear any active cut-in banner so the battlefield and damage numbers are completely unblocked!
       setState(() {
         _activeUltimateUnit = null;
@@ -670,8 +784,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         durationMs = 700;
         _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
         _playSfx('WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav');
+        final hitIds = <String>{event.targetId, ...event.secondaryTargetHits.keys};
+        final alignments = <Alignment>[];
+        for (final hitId in hitIds) {
+          final hitUnit = _engine.enemyUnits.where((e) => e.id == hitId).firstOrNull;
+          if (hitUnit != null && hitUnit.occupiedNodes.isNotEmpty) {
+            double avgRow = 0;
+            double avgCol = 0;
+            for (final n in hitUnit.occupiedNodes) {
+              avgRow += n.row;
+              avgCol += n.column;
+            }
+            avgRow /= hitUnit.occupiedNodes.length;
+            avgCol /= hitUnit.occupiedNodes.length;
+            alignments.add(Alignment(
+              (0.16 + avgRow * 0.28).clamp(0.10, 0.85),
+              (-0.22 + avgCol * 0.28).clamp(-0.35, 0.45),
+            ));
+          }
+        }
+        _fireBarrageTargetAlignments = alignments.isNotEmpty
+            ? alignments
+            : const [Alignment(0.38, 0.05)];
         _activeFireBarrageMs = impactNowMs;
-        Timer(const Duration(milliseconds: 1550), () {
+        final int clearDelayMs = 950 + ((_fireBarrageTargetAlignments.length - 1).clamp(0, 6) * 140) + 100;
+        Timer(Duration(milliseconds: clearDelayMs), () {
           if (mounted && _activeFireBarrageMs == impactNowMs) {
             setState(() {
               _activeFireBarrageMs = null;
@@ -754,14 +891,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
       }
 
+      final int scaledVfxDurationMs = _scaledMs(durationMs);
+      final bool isTravelVfx = vfxType == 'arrow' || vfxType == 'firebolt' || vfxType == 'beam' || vfxType == 'bloodsiphon';
+
       final newVfx = _CombatVfx(
         id: 'vfx_${event.id}_$impactNowMs',
         startOffset: casterOffset,
         targetOffset: targetOffset,
+        sourceUnitId: event.attackerId,
+        targetUnitId: event.targetId,
         primaryColor: primaryColor,
         secondaryColor: secondaryColor,
         type: vfxType,
-        durationMs: durationMs,
+        durationMs: scaledVfxDurationMs,
         createdMs: impactNowMs,
       );
 
@@ -776,62 +918,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               id: 'vfx_${event.id}_sec_${secId}_$impactNowMs',
               startOffset: targetOffset,
               targetOffset: secOffset,
+              sourceUnitId: event.targetId,
+              targetUnitId: secId,
               primaryColor: primaryColor.withValues(alpha: 0.9),
               secondaryColor: secondaryColor.withValues(alpha: 0.8),
               type: vfxType == 'beam' ? 'shockwave' : vfxType,
-              durationMs: (durationMs * 0.85).round(),
+              durationMs: (scaledVfxDurationMs * 0.85).round(),
               createdMs: impactNowMs,
             ));
           }
         });
-      }
-
-      // Visceral Thematic Death Bursts & Ragdoll Dissolves on Unit Defeat
-      if (target != null && !target.isAlive) {
-        final isBoss = target.id == 'gorgoroth_boss' || target.footprint != UnitFootprint.single1x1;
-        final String deathType = isBoss
-            ? 'death_boss'
-            : (target.bleedStacks > 0
-                ? 'death_bleed'
-                : (event.isHolyOrMagic ? 'death_solar' : 'death_kinetic'));
-        final Color deathColor = isBoss
-            ? const Color(0xFFFF3D00)
-            : (deathType == 'death_bleed'
-                ? const Color(0xFFFF1744)
-                : (deathType == 'death_solar' ? const Color(0xFFFFD54F) : const Color(0xFF90A4AE)));
-
-        _activeVfx.add(_CombatVfx(
-          id: 'death_${target.id}_$impactNowMs',
-          startOffset: targetOffset,
-          targetOffset: targetOffset,
-          primaryColor: deathColor,
-          secondaryColor: isBoss ? const Color(0xFFFFD54F) : Colors.white70,
-          type: deathType,
-          durationMs: isBoss ? 1200 : 750,
-          createdMs: impactNowMs,
-        ));
-
-        if (isBoss) {
-          _triggerScreenShake(intensity: 14.0);
-          _triggerHitStop(durationMs: 250);
-          _triggerCameraImpactZoom(zoomScale: 1.15, durationMs: 1000);
-        }
-      }
-
-      // Check if this attack was a lethal finisher against the last enemy in wave/battle
-      final bool isLethalFinisher = target != null && !target.isPlayer && !target.isAlive && _engine.enemyUnits.where((u) => u.isAlive).isEmpty;
-      if (isLethalFinisher) {
-        _isSlowMoFinisher = true;
-        _triggerCameraImpactZoom(zoomScale: 1.09, durationMs: 900);
-        _playSfx('sfx_victory.wav');
-        final slowMoTimer = Timer(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            setState(() {
-              _isSlowMoFinisher = false;
-            });
-          }
-        });
-        _animTimers.add(slowMoTimer);
       }
 
       // Trigger short Tactical Synergy Callout Banners
@@ -869,52 +965,104 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final bool isSculptorStrike = event.attackerId == 'ash_sculptor' || event.skillName.contains('Cinder') || event.skillName.contains('Sundering') || event.skillName.contains('Bastion') || event.skillName.contains('Pyre') || event.skillName.contains('Cataclysmic');
       final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
       final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || hasNamedSkill || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
+      final int impactDelayMs = _scaledMs((isUltimate || isSignature) ? 450 : 380);
 
-      // Motion Comfort: Normal attacks and minion swings NEVER shake or zoom the camera.
-      // Only monumental Apex Pyre / Forge Strike finishers trigger a controlled micro-bump.
-      if (isApexStrike && _enableScreenShake) {
-        _triggerScreenShake(intensity: event.isCrit ? 4.5 : 3.0);
-      }
-
-      if (isHeavyImpact) {
-        _triggerHitStop(durationMs: isApexStrike ? 85 : (isUltimate ? 60 : 30));
-        if (isApexStrike) {
-          _triggerCameraImpactZoom(
-            zoomScale: 1.05,
-            durationMs: 300,
-          );
-        }
-        _groundRipples.add(_GroundShockwaveRipple(
-          id: 'ripple_${event.id}_$impactNowMs',
-          origin: targetOffset,
-          color: (isBossStrike || isBloodnova || event.bleedStacks > 0)
-              ? const Color(0xFFFF1744)
-              : (event.isHolyOrMagic || event.skillName.contains('Solar') || event.skillName.contains('Dawnbound') || event.skillName.contains('Brand'))
-                  ? const Color(0xFFFFD54F)
-                  : (event.isCrit ? const Color(0xFFFF9100) : const Color(0xFF00E5FF)),
-          maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
-          createdMs: impactNowMs,
-          durationMs: 650,
-        ));
-      }
-
+      // Start attacker windup + traveling spell/projectile animation effects FIRST before damage is revealed
       setState(() {
-        _activeVfx.add(newVfx);
-        _activeVfx.addAll(secondaryVfxList);
+        if (isTravelVfx) {
+          _activeVfx.add(newVfx);
+        }
         _attackingUnitId = event.attackerId;
-        _damagedUnitId = event.targetId;
-        _damagedUnitIds.clear();
-        _damagedUnitIds.add(event.targetId);
-        if (event.secondaryTargetHits.isNotEmpty) {
-          _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
+        _attackingSkillName = impactSkillName;
+      });
+
+      final List<String> impactCreatedVfxIds = [];
+
+      // Trigger hit-flash, shockwaves, visual HP commit, death burst, and damage numbers at the strike impact frame
+      final tImpact = Timer(Duration(milliseconds: impactDelayMs), () {
+        if (!mounted) return;
+        final int popNowMs = DateTime.now().millisecondsSinceEpoch;
+        final liveUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
+
+        // Motion Comfort: Normal attacks and minion swings NEVER shake or zoom the camera.
+        // Only monumental Apex Pyre / Forge Strike finishers trigger a controlled micro-bump.
+        if (isApexStrike && _enableScreenShake) {
+          _triggerScreenShake(intensity: event.isCrit ? 4.5 : 3.0);
         }
 
-        // Construct distinct styled floating pop
-        String popText;
-        Color popColor;
-        Color popBorder;
-        double popSize = 11.5;
-        bool isCrit = event.isCrit || (target?.isStaggered == true);
+        if (isHeavyImpact) {
+          _triggerHitStop(durationMs: isApexStrike ? 85 : (isUltimate ? 60 : 30));
+          if (isApexStrike) {
+            _triggerCameraImpactZoom(
+              zoomScale: 1.05,
+              durationMs: 300,
+            );
+          }
+          _groundRipples.add(_GroundShockwaveRipple(
+            id: 'ripple_${event.id}_$popNowMs',
+            origin: targetOffset,
+            targetUnitId: event.targetId,
+            color: (isBossStrike || isBloodnova || event.bleedStacks > 0)
+                ? const Color(0xFFFF1744)
+                : (event.isHolyOrMagic || event.skillName.contains('Solar') || event.skillName.contains('Dawnbound') || event.skillName.contains('Brand'))
+                    ? const Color(0xFFFFD54F)
+                    : (event.isCrit ? const Color(0xFFFF9100) : const Color(0xFF00E5FF)),
+            maxRadius: isUltimate ? 160.0 : (isBossStrike ? 140.0 : (isBloodnova ? 130.0 : 100.0)),
+            createdMs: popNowMs,
+            durationMs: _scaledMs(650),
+          ));
+        }
+
+        // Visceral Thematic Death Bursts & Ragdoll Dissolves on Unit Defeat
+        if (target != null && !target.isAlive) {
+          final isBoss = target.id == 'gorgoroth_boss' || target.footprint != UnitFootprint.single1x1;
+          final String deathType = isBoss
+              ? 'death_boss'
+              : (target.bleedStacks > 0
+                  ? 'death_bleed'
+                  : (event.isHolyOrMagic ? 'death_solar' : 'death_kinetic'));
+          final Color deathColor = isBoss
+              ? const Color(0xFFFF3D00)
+              : (deathType == 'death_bleed'
+                  ? const Color(0xFFFF1744)
+                  : (deathType == 'death_solar' ? const Color(0xFFFFD54F) : const Color(0xFF90A4AE)));
+          final deathVfxId = 'death_${target.id}_$popNowMs';
+          impactCreatedVfxIds.add(deathVfxId);
+          _activeVfx.add(_CombatVfx(
+            id: deathVfxId,
+            startOffset: targetOffset,
+            targetOffset: targetOffset,
+            sourceUnitId: target.id,
+            targetUnitId: target.id,
+            primaryColor: deathColor,
+            secondaryColor: isBoss ? const Color(0xFFFFD54F) : Colors.white70,
+            type: deathType,
+            durationMs: _scaledMs(isBoss ? 1100 : 700),
+            createdMs: popNowMs,
+          ));
+
+          if (isBoss) {
+            _triggerScreenShake(intensity: 14.0);
+            _triggerHitStop(durationMs: 250);
+            _triggerCameraImpactZoom(zoomScale: 1.15, durationMs: 1000);
+          }
+        }
+
+        // Check if this attack was a lethal finisher against the last enemy in wave/battle
+        final bool isLethalFinisher = target != null && !target.isPlayer && !target.isAlive && _engine.enemyUnits.where((u) => u.isAlive).isEmpty;
+        if (isLethalFinisher) {
+          _isSlowMoFinisher = true;
+          _triggerCameraImpactZoom(zoomScale: 1.09, durationMs: 900);
+          _playSfx('sfx_victory.wav');
+          final slowMoTimer = Timer(Duration(milliseconds: _scaledMs(900)), () {
+            if (mounted) {
+              setState(() {
+                _isSlowMoFinisher = false;
+              });
+            }
+          });
+          _animTimers.add(slowMoTimer);
+        }
 
         final bool isEnemyTargetWithLifesteal = event.isHeal &&
             event.healAmount == 0 &&
@@ -923,150 +1071,273 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             caster != null &&
             target.isPlayer != caster.isPlayer;
 
-        if (event.isHeal && !isEnemyTargetWithLifesteal) {
-          if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
-            popText = '+60 🛡️ AEGIS';
-            popColor = const Color(0xFF80D8FF);
-            popBorder = const Color(0xFF00E5FF);
-          } else if (event.skillName == 'Stoke the Embers') {
-            popText = '+15 🔥 CINDERS';
-            popColor = const Color(0xFFFFD54F);
-            popBorder = const Color(0xFFFFC107);
-          } else {
-            final int shownHeal = event.healAmount > 0 ? event.healAmount : event.damage;
-            popText = '+${shownHeal > 0 ? shownHeal : "HEAL"} 💚';
-            popColor = const Color(0xFF69F0AE);
-            popBorder = const Color(0xFF00E676);
-          }
-        } else {
-          if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
-            popText = '🩸 -${event.damage} BLOODNOVA!';
-            popColor = const Color(0xFFFF1744);
-            popBorder = const Color(0xFF880E4F);
-            popSize = 13.5;
-          } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Siphon Rend')) {
-            popText = '🩸 -${event.damage}';
-            popColor = const Color(0xFFFF5252);
-            popBorder = const Color(0xFFB71C1C);
-            popSize = 12.5;
-          } else if (isCrit) {
-            popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '💥 -${event.damage} CRIT!';
-            popColor = const Color(0xFFFFD54F);
-            popBorder = const Color(0xFFFF9100);
-            popSize = 15.5;
-          } else if (event.bleedStacks > 0) {
-            popText = '🩸 -${event.damage} BLEED';
-            popColor = const Color(0xFFFF3D00);
-            popBorder = const Color(0xFFDD2C00);
-            popSize = 12.0;
-          } else {
-            popText = '-${event.damage}';
-            popColor = const Color(0xFFFF8A80);
-            popBorder = const Color(0xFFD50000);
-          }
-        }
-
-        _unitFloatingPops[event.targetId] = popText;
-
-        // Allow natural stacking by not wiping existing active pops immediately
-        final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
-        final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (existingCount * 8.0);
-
-        _floatingPops.add(_FloatingCombatText(
-          id: 'pop_${event.id}_$impactNowMs',
-          unitId: event.targetId,
-          text: popText,
-          color: popColor,
-          borderColor: popBorder,
-          fontSize: popSize,
-          isCrit: isCrit,
-          createdMs: impactNowMs,
-          durationMs: isCrit ? 2200 : 1750,
-          horizontalDrift: drift,
-        ));
-
-        // Spawn a separate green heal pop & rising pulse over the actual healed unit!
-        final int effectiveHeal = event.healAmount > 0
-            ? event.healAmount
-            : (isEnemyTargetWithLifesteal ? (event.damage * 0.4).round() : 0);
-        if (effectiveHeal > 0) {
-          final String healedUnitId = event.healTargetId ?? event.attackerId;
-          final healedUnit = allUnits.where((u) => u.id == healedUnitId).firstOrNull;
-          if (healedUnit != null) {
+        setState(() {
+          if (!isTravelVfx) {
             _activeVfx.add(_CombatVfx(
-              id: 'heal_${event.id}_$impactNowMs',
-              startOffset: _getUnitCenterIsometricOffset(healedUnit),
-              targetOffset: _getUnitCenterIsometricOffset(healedUnit),
-              primaryColor: const Color(0xFF69F0AE),
-              secondaryColor: const Color(0xFFFFD54F),
-              type: 'heal_pulse',
-              durationMs: 650,
-              createdMs: impactNowMs,
+              id: newVfx.id,
+              startOffset: newVfx.startOffset,
+              targetOffset: newVfx.targetOffset,
+              sourceUnitId: newVfx.sourceUnitId,
+              targetUnitId: newVfx.targetUnitId,
+              primaryColor: newVfx.primaryColor,
+              secondaryColor: newVfx.secondaryColor,
+              type: newVfx.type,
+              durationMs: newVfx.durationMs,
+              createdMs: popNowMs,
+            ));
+            impactCreatedVfxIds.add(newVfx.id);
+          }
+          for (final secVfx in secondaryVfxList) {
+            _activeVfx.add(_CombatVfx(
+              id: secVfx.id,
+              startOffset: secVfx.startOffset,
+              targetOffset: secVfx.targetOffset,
+              sourceUnitId: secVfx.sourceUnitId,
+              targetUnitId: secVfx.targetUnitId,
+              primaryColor: secVfx.primaryColor,
+              secondaryColor: secVfx.secondaryColor,
+              type: secVfx.type,
+              durationMs: secVfx.durationMs,
+              createdMs: popNowMs,
+            ));
+            impactCreatedVfxIds.add(secVfx.id);
+          }
+
+          _damagedUnitId = event.targetId;
+          _damagedUnitIds.clear();
+          _damagedUnitIds.add(event.targetId);
+          if (event.secondaryTargetHits.isNotEmpty) {
+            _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
+          }
+
+          // Commit deferred visual HP for primary target, secondary targets, and healed unit
+          void commitUnitVisualHp(String uid) {
+            final matched = liveUnits.where((u) => u.id == uid).firstOrNull;
+            if (matched != null) {
+              _visualUnitHp[uid] = matched.hp;
+              _lastCommittedUnitHp[uid] = matched.hp;
+            }
+            _visualAliveOverrideIds.remove(uid);
+          }
+
+          commitUnitVisualHp(event.targetId);
+          for (final secId in event.secondaryTargetHits.keys) {
+            commitUnitVisualHp(secId);
+          }
+          final int effectiveHeal = event.healAmount > 0
+              ? event.healAmount
+              : (isEnemyTargetWithLifesteal ? (event.damage * 0.4).round() : 0);
+          if (event.isHeal || effectiveHeal > 0) {
+            commitUnitVisualHp(event.healTargetId ?? event.attackerId);
+          }
+
+          // Trigger independent 9-frame slash/shield sheet on impacted targets
+          if (!event.isHeal || isEnemyTargetWithLifesteal) {
+            final String slashSheet = (impactSkillName.contains('Aegis') ||
+                    impactSkillName.contains('Shield') ||
+                    impactSkillName.contains('Phalanx') ||
+                    impactSkillName.contains('Bulwark') ||
+                    impactSkillName.contains('Block'))
+                ? 'assets/animations/vfx/fire_shield_sheet.png'
+                : 'assets/animations/vfx/crimson_slash_sheet.png';
+            final Set<String> slashIds = {event.targetId, ...event.secondaryTargetHits.keys};
+            for (final sid in slashIds) {
+              _activeImpactSlashUnits[sid] = slashSheet;
+            }
+            final tSlashClear = Timer(Duration(milliseconds: _scaledMs(520)), () {
+              if (mounted) {
+                setState(() {
+                  for (final sid in slashIds) {
+                    if (_activeImpactSlashUnits[sid] == slashSheet) {
+                      _activeImpactSlashUnits.remove(sid);
+                    }
+                  }
+                });
+              }
+            });
+            _animTimers.add(tSlashClear);
+          }
+
+          // Construct distinct styled floating pop
+          String popText;
+          Color popColor;
+          Color popBorder;
+          double popSize = 11.5;
+          bool isCrit = event.isCrit || (target?.isStaggered == true);
+
+          if (event.isHeal && !isEnemyTargetWithLifesteal) {
+            if (event.skillName == 'Phalanx Intercept' || event.skillName == 'Unbreakable Phalanx') {
+              popText = '+60 🛡️ AEGIS';
+              popColor = const Color(0xFF80D8FF);
+              popBorder = const Color(0xFF00E5FF);
+            } else if (event.skillName == 'Stoke the Embers') {
+              popText = '+15 🔥 CINDERS';
+              popColor = const Color(0xFFFFD54F);
+              popBorder = const Color(0xFFFFC107);
+            } else {
+              final int shownHeal = event.healAmount > 0 ? event.healAmount : event.damage;
+              popText = '+${shownHeal > 0 ? shownHeal : "HEAL"} 💚';
+              popColor = const Color(0xFF69F0AE);
+              popBorder = const Color(0xFF00E676);
+            }
+          } else {
+            if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova')) {
+              popText = '🩸 -${event.damage} BLOODNOVA!';
+              popColor = const Color(0xFFFF1744);
+              popBorder = const Color(0xFF880E4F);
+              popSize = 13.5;
+            } else if (event.skillName.contains('Sanguine Siphon') || event.skillName.contains('Siphon Rend')) {
+              popText = '🩸 -${event.damage}';
+              popColor = const Color(0xFFFF5252);
+              popBorder = const Color(0xFFB71C1C);
+              popSize = 12.5;
+            } else if (isCrit) {
+              popText = (target?.isStaggered == true) ? '⚡ -${event.damage} CORE CRIT!' : '💥 -${event.damage} CRIT!';
+              popColor = const Color(0xFFFFD54F);
+              popBorder = const Color(0xFFFF9100);
+              popSize = 15.5;
+            } else if (event.bleedStacks > 0) {
+              popText = '🩸 -${event.damage} BLEED';
+              popColor = const Color(0xFFFF3D00);
+              popBorder = const Color(0xFFDD2C00);
+              popSize = 12.0;
+            } else {
+              popText = '-${event.damage}';
+              popColor = const Color(0xFFFF8A80);
+              popBorder = const Color(0xFFD50000);
+            }
+          }
+
+          _unitFloatingPops[event.targetId] = popText;
+
+          // Allow natural stacking by not wiping existing active pops immediately
+          final int existingCount = _floatingPops.where((p) => p.unitId == event.targetId && !p.isExpired).length;
+          final double drift = (existingCount % 2 == 1 ? -1.0 : 1.0) * (existingCount * 8.0);
+
+          _floatingPops.add(_FloatingCombatText(
+            id: 'pop_${event.id}_$popNowMs',
+            unitId: event.targetId,
+            text: popText,
+            color: popColor,
+            borderColor: popBorder,
+            fontSize: popSize,
+            isCrit: isCrit,
+            createdMs: popNowMs,
+            durationMs: isCrit ? 2200 : 1750,
+            horizontalDrift: drift,
+          ));
+
+          // Spawn a separate green heal pop & rising pulse over the actual healed unit!
+          if (effectiveHeal > 0) {
+            final String healedUnitId = event.healTargetId ?? event.attackerId;
+            final healedUnit = liveUnits.where((u) => u.id == healedUnitId).firstOrNull;
+            if (healedUnit != null) {
+              final healVfxId = 'heal_${event.id}_$popNowMs';
+              impactCreatedVfxIds.add(healVfxId);
+              _activeVfx.add(_CombatVfx(
+                id: healVfxId,
+                startOffset: _getUnitCenterIsometricOffset(healedUnit),
+                targetOffset: _getUnitCenterIsometricOffset(healedUnit),
+                sourceUnitId: healedUnitId,
+                targetUnitId: healedUnitId,
+                primaryColor: const Color(0xFF69F0AE),
+                secondaryColor: const Color(0xFFFFD54F),
+                type: 'heal_pulse',
+                durationMs: _scaledMs(650),
+                createdMs: popNowMs,
+              ));
+            }
+            _floatingPops.add(_FloatingCombatText(
+              id: 'pop_heal_${event.id}_$popNowMs',
+              unitId: healedUnitId,
+              text: '+$effectiveHeal 💚',
+              color: const Color(0xFF69F0AE),
+              borderColor: const Color(0xFF00E676),
+              fontSize: 12.0,
+              isCrit: false,
+              createdMs: popNowMs,
+              durationMs: 1750,
+              horizontalDrift: -10.0,
             ));
           }
-          _floatingPops.add(_FloatingCombatText(
-            id: 'pop_heal_${event.id}_$impactNowMs',
-            unitId: healedUnitId,
-            text: '+$effectiveHeal 💚',
-            color: const Color(0xFF69F0AE),
-            borderColor: const Color(0xFF00E676),
-            fontSize: 12.0,
-            isCrit: false,
-            createdMs: impactNowMs,
-            durationMs: 1750,
-            horizontalDrift: -10.0,
-          ));
-        }
 
-        // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
-        if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
-          final graftText = '🧬 ${event.graftedTraitProc ?? ''}';
-          _unitFloatingPops[event.attackerId] = graftText;
-          _floatingPops.add(_FloatingCombatText(
-            id: 'pop_graft_${event.id}_$impactNowMs',
-            unitId: event.attackerId,
-            text: graftText,
-            color: const Color(0xFFEA80FC),
-            borderColor: const Color(0xFFD500F9),
-            fontSize: 10.5,
-            isCrit: false,
-            createdMs: impactNowMs,
-            durationMs: 1900,
-            horizontalDrift: 12.0,
-          ));
-        }
-
-        // Push floating popups for all secondary targets hit by multi-target / AOE spells
-        if (event.secondaryTargetHits.isNotEmpty) {
-          event.secondaryTargetHits.forEach((secId, secDmg) {
-            final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
-            final secText = secDmg > 0
-                ? (isSecBlood ? '🩸 -$secDmg' : '-$secDmg')
-                : (isSecBlood ? '🩸 - SPLASH' : '- CLEAVE');
-            _unitFloatingPops[secId] = secText;
-            final int existingSecCount = _floatingPops.where((p) => p.unitId == secId && !p.isExpired).length;
-            final double secDrift = (existingSecCount % 2 == 1 ? -1.0 : 1.0) * (10.0 + existingSecCount * 9.0);
+          // If attacker procced a Crucible Grafted Trait, display a glowing purple/gold floating proc callout on the attacker!
+          if (event.graftedTraitProc != null && event.attackerId != event.targetId) {
+            final graftText = '🧬 ${event.graftedTraitProc ?? ''}';
+            _unitFloatingPops[event.attackerId] = graftText;
             _floatingPops.add(_FloatingCombatText(
-              id: 'pop_${event.id}_${secId}_$impactNowMs',
-              unitId: secId,
-              text: secText,
-              color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
-              borderColor: isSecBlood ? const Color(0xFF880E4F) : const Color(0xFFD50000),
-              fontSize: 11.5,
+              id: 'pop_graft_${event.id}_$popNowMs',
+              unitId: event.attackerId,
+              text: graftText,
+              color: const Color(0xFFEA80FC),
+              borderColor: const Color(0xFFD500F9),
+              fontSize: 10.5,
               isCrit: false,
-              createdMs: impactNowMs,
-              durationMs: 1800,
-              horizontalDrift: secDrift,
+              createdMs: popNowMs,
+              durationMs: 1900,
+              horizontalDrift: 12.0,
             ));
+          }
+
+          // Push floating popups for all secondary targets hit by multi-target / AOE spells
+          if (event.secondaryTargetHits.isNotEmpty) {
+            event.secondaryTargetHits.forEach((secId, secDmg) {
+              final isSecBlood = event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova');
+              final secText = secDmg > 0
+                  ? (isSecBlood ? '🩸 -$secDmg' : '-$secDmg')
+                  : (isSecBlood ? '🩸 - SPLASH' : '- CLEAVE');
+              _unitFloatingPops[secId] = secText;
+              final int existingSecCount = _floatingPops.where((p) => p.unitId == secId && !p.isExpired).length;
+              final double secDrift = (existingSecCount % 2 == 1 ? -1.0 : 1.0) * (10.0 + existingSecCount * 9.0);
+              _floatingPops.add(_FloatingCombatText(
+                id: 'pop_${event.id}_${secId}_$popNowMs',
+                unitId: secId,
+                text: secText,
+                color: isSecBlood ? const Color(0xFFFF5252) : const Color(0xFFFF8A80),
+                borderColor: isSecBlood ? const Color(0xFF880E4F) : const Color(0xFFD50000),
+                fontSize: 11.5,
+                isCrit: false,
+                createdMs: popNowMs,
+                durationMs: 1800,
+                horizontalDrift: secDrift,
+              ));
+            });
+          }
+        });
+
+        // Reveal Victory / Defeat banner only after the lethal strike & death burst register
+        if (_holdEndOfBattleOverlay && (_engine.isVictory || _engine.isDefeat)) {
+          final tEndReveal = Timer(Duration(milliseconds: _scaledMs(isLethalFinisher ? 800 : 500)), () {
+            if (mounted) {
+              setState(() {
+                _holdEndOfBattleOverlay = false;
+              });
+            }
           });
+          _animTimers.add(tEndReveal);
         }
+
+        // Fast visceral hit-flash reset (110ms normal, 150ms crit) so character art stays crisp
+        final tFlash = Timer(Duration(milliseconds: _scaledMs(event.isCrit ? 150 : 110)), () {
+          if (mounted && _activeAttackSequenceId == seqId) {
+            setState(() {
+              _damagedUnitId = null;
+              _damagedUnitIds.clear();
+            });
+          }
+        });
+        _animTimers.add(tFlash);
       });
+      _animTimers.add(tImpact);
 
       // Clean up VFX after its duration
-      final tVfx = Timer(Duration(milliseconds: durationMs + 50), () {
+      final tVfx = Timer(Duration(milliseconds: impactDelayMs + scaledVfxDurationMs + 100), () {
         if (mounted) {
           setState(() {
-            _activeVfx.removeWhere((v) => v.id == newVfx.id || secondaryVfxList.any((s) => s.id == v.id));
+            _activeVfx.removeWhere((v) =>
+                v.id == newVfx.id ||
+                secondaryVfxList.any((s) => s.id == v.id) ||
+                impactCreatedVfxIds.contains(v.id));
             _floatingPops.removeWhere((p) => p.isExpired);
             _groundRipples.removeWhere((r) => r.isExpired);
           });
@@ -1074,22 +1345,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       });
       _animTimers.add(tVfx);
 
-      // Fast visceral hit-flash reset (100ms normal, 150ms crit) so character art stays crisp
-      final tFlash = Timer(Duration(milliseconds: event.isCrit ? 150 : 100), () {
-        if (mounted) {
-          setState(() {
-            _damagedUnitId = null;
-            _damagedUnitIds.clear();
-          });
-        }
-      });
-      _animTimers.add(tFlash);
-
-      // Reset visual lunge & unit banner pop quickly so the next turn feels responsive
-      final t1 = Timer(Duration(milliseconds: _scaledMs(650)), () {
-        if (mounted) {
+      // Reset visual lunge & unit banner pop after full attack sprite-sheet playback
+      final t1 = Timer(Duration(milliseconds: _scaledMs(1150)), () {
+        if (mounted && _activeAttackSequenceId == seqId) {
           setState(() {
             _attackingUnitId = null;
+            _attackingSkillName = null;
             _unitFloatingPops.remove(event.targetId);
             if (event.secondaryTargetHits.isNotEmpty) {
               for (final sId in event.secondaryTargetHits.keys) {
@@ -1103,7 +1364,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
       // Conclude action sequence and advance to next event (floating numbers continue fading asynchronously)
       final int animRestMs = _scaledMs(
-        (isUltimate || isSignature) ? 650 : (event.isAssistStrike || event.isKnockback ? 420 : 480),
+        (isUltimate || isSignature) ? 900 : (event.isAssistStrike || event.isKnockback ? 740 : 800),
       );
       final t2 = Timer(Duration(milliseconds: animRestMs), () {
         if (mounted) {
@@ -1143,6 +1404,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           id: 'vfx_${event.id}_rune_$nowMs',
           startOffset: casterOffset,
           targetOffset: casterOffset,
+          sourceUnitId: event.attackerId,
+          targetUnitId: event.attackerId,
           primaryColor: const Color(0xFFFFD54F),
           secondaryColor: const Color(0xFF00E5FF),
           type: 'rune_invocation',
@@ -1301,8 +1564,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     _cameraZoomRemainingSec = 0.0;
     _battlefieldCameraZoom = 1.0;
     _attackingUnitId = null;
+    _attackingSkillName = null;
     _damagedUnitId = null;
     _activeSkillName = null;
+    _activeAttackSequenceId++;
+    _activeImpactSlashUnits.clear();
+    _visualUnitHp.clear();
+    _lastCommittedUnitHp.clear();
+    _visualAliveOverrideIds.clear();
+    _holdEndOfBattleOverlay = false;
+    _lastKnown2DUnitOffsets.clear();
     _hasBossEnraged = false;
     _wasBossStaggered = false;
 
@@ -1324,6 +1595,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       spindleTier: widget.spindleTier,
     );
     _engine.isActionPauseEnabled = true;
+    for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
+      _visualUnitHp[u.id] = u.hp;
+      _lastCommittedUnitHp[u.id] = u.hp;
+    }
     _engine.addListener(_onEngineUpdate);
     setState(() {});
   }
@@ -1487,67 +1762,71 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               PlatformFullscreen.toggleFullscreen();
             },
           ),
-          // Subtle Dev / Debug Menu (tucks away T135 & Step Tick to reduce visual noise)
+          // Subtle Dev / Debug Menu (Restart always available; Step/T135/Trial Switchers behind kDebugMode)
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white38, size: 18),
             padding: EdgeInsets.zero,
             tooltip: 'Combat Diagnostics',
             color: const Color(0xFF161622),
             onSelected: (val) {
-              if (val == 'step') {
+              if (val == 'step' && kDebugMode) {
                 if (_engine.isPreBattlePhase) _engine.isPreBattlePhase = false;
                 _engine.stepTick();
-              } else if (val == 't135') {
+              } else if (val == 't135' && kDebugMode) {
                 if (_engine.isPreBattlePhase) _engine.isPreBattlePhase = false;
-                while (_engine.currentTick < 135) {
+                final bool prevActionPause = _engine.isActionPauseEnabled;
+                _engine.isActionPauseEnabled = false;
+                _engine.clearActiveAction();
+                int guard = 0;
+                while (_engine.currentTick < 135 && guard < 300 && !_engine.isVictory && !_engine.isDefeat) {
                   _engine.stepTick();
+                  guard++;
                 }
+                _engine.isActionPauseEnabled = prevActionPause;
               } else if (val == 'restart') {
                 _restartCombatEncounter();
-              } else if (val == 'boss_gorgoroth') {
+              } else if (val == 'boss_gorgoroth' && kDebugMode) {
                 _playSfx('sfx_slash.wav');
                 setState(() {
                   _engine.switchBossTrial('gorgoroth');
                 });
-              } else if (val == 'boss_malakor') {
+              } else if (val == 'boss_malakor' && kDebugMode) {
                 _playSfx('sfx_block.wav');
                 setState(() {
                   _engine.switchBossTrial('malakor');
                 });
-              } else if (val == 'boss_morvath') {
+              } else if (val == 'boss_morvath' && kDebugMode) {
                 _playSfx('sfx_spell.wav');
                 setState(() {
                   _engine.switchBossTrial('morvath');
                 });
-              } else if (val == 'plinth_sculptory') {
-                if (widget.onOpenPlinthSculptory != null) {
-                  widget.onOpenPlinthSculptory!();
-                }
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'step',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.skip_next, size: 16, color: Colors.white70),
-                    SizedBox(width: 8),
-                    Text('Step 1 Tick', style: TextStyle(fontSize: 12, color: Colors.white)),
-                  ],
+              if (kDebugMode) ...[
+                const PopupMenuItem(
+                  value: 'step',
+                  height: 32,
+                  child: Row(
+                    children: [
+                      Icon(Icons.skip_next, size: 16, color: Colors.white70),
+                      SizedBox(width: 8),
+                      Text('Step 1 Tick', style: TextStyle(fontSize: 12, color: Colors.white)),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 't135',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.fast_forward, size: 16, color: Color(0xFFFFD54F)),
-                    SizedBox(width: 8),
-                    Text('Fast-Forward T135', style: TextStyle(fontSize: 12, color: Color(0xFFFFD54F))),
-                  ],
+                const PopupMenuItem(
+                  value: 't135',
+                  height: 32,
+                  child: Row(
+                    children: [
+                      Icon(Icons.fast_forward, size: 16, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 8),
+                      Text('Fast-Forward T135', style: TextStyle(fontSize: 12, color: Color(0xFFFFD54F))),
+                    ],
+                  ),
                 ),
-              ),
+              ],
               const PopupMenuItem(
                 value: 'restart',
                 height: 32,
@@ -1559,52 +1838,42 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ],
                 ),
               ),
-              const PopupMenuDivider(height: 1),
-              const PopupMenuItem(
-                value: 'boss_gorgoroth',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.shield, size: 16, color: Color(0xFF00E5FF)),
-                    SizedBox(width: 8),
-                    Text('Trial: Gorgoroth the Flayed', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
-                  ],
+              if (kDebugMode) ...[
+                const PopupMenuDivider(height: 1),
+                const PopupMenuItem(
+                  value: 'boss_gorgoroth',
+                  height: 32,
+                  child: Row(
+                    children: [
+                      Icon(Icons.shield, size: 16, color: Color(0xFF00E5FF)),
+                      SizedBox(width: 8),
+                      Text('Trial: Gorgoroth the Flayed', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'boss_malakor',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.electric_bolt, size: 16, color: Color(0xFFFFD54F)),
-                    SizedBox(width: 8),
-                    Text('Trial: Malakor the Unbroken', style: TextStyle(fontSize: 12, color: Color(0xFFFFE082))),
-                  ],
+                const PopupMenuItem(
+                  value: 'boss_malakor',
+                  height: 32,
+                  child: Row(
+                    children: [
+                      Icon(Icons.electric_bolt, size: 16, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 8),
+                      Text('Trial: Malakor the Unbroken', style: TextStyle(fontSize: 12, color: Color(0xFFFFE082))),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'boss_morvath',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.coronavirus, size: 16, color: Color(0xFF69F0AE)),
-                    SizedBox(width: 8),
-                    Text('Trial: Morvath the Defiler', style: TextStyle(fontSize: 12, color: Color(0xFFA7FFEB))),
-                  ],
+                const PopupMenuItem(
+                  value: 'boss_morvath',
+                  height: 32,
+                  child: Row(
+                    children: [
+                      Icon(Icons.coronavirus, size: 16, color: Color(0xFF69F0AE)),
+                      SizedBox(width: 8),
+                      Text('Trial: Morvath the Defiler', style: TextStyle(fontSize: 12, color: Color(0xFFA7FFEB))),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuDivider(height: 1),
-              const PopupMenuItem(
-                value: 'plinth_sculptory',
-                height: 32,
-                child: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, size: 16, color: Color(0xFF00E5FF)),
-                    SizedBox(width: 8),
-                    Text('Titan Core Altar', style: TextStyle(fontSize: 12, color: Color(0xFF80D8FF))),
-                  ],
-                ),
-              ),
+              ],
             ],
           ),
           const SizedBox(width: 4),
@@ -1789,7 +2058,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     selectedEnemyUnitId: _selectedEnemyUnitId,
                                     secondaryTargetEnemyIds: _computeProjectedSecondaryTargetEnemyIds(),
                                     draggedUnitId: _draggedUnitId,
-                                    selectedCardId: _selectedCardId,
+                                    selectedCardId: null,
                                     draggedUltimateUnitId: _draggedUltimateUnitId,
                                     selectedUltimateUnitId: _selectedUltimateUnitId,
                                     hoveredTileCol: _hoveredTileCol,
@@ -1800,15 +2069,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     onSelectPlayerUnit: (id) {
                                       setState(() {
                                         _selectedUnitId = (_selectedUnitId == id) ? null : id;
-                                        _selectedEnemyUnitId = null;
-                                        _selectedCardId = null;
                                       });
                                     },
                                     onSelectEnemyUnit: (id) {
                                       setState(() {
                                         _selectedEnemyUnitId = (_selectedEnemyUnitId == id) ? null : id;
+                                        _engine.focusedEnemyUnitId = _selectedEnemyUnitId;
                                         _selectedUnitId = null;
-                                        _selectedCardId = null;
+                                      });
+                                    },
+                                    onDragStartUnit: (id) {
+                                      setState(() {
+                                        _draggedUnitId = id;
+                                      });
+                                    },
+                                    onDragEndUnit: () {
+                                      setState(() {
+                                        _draggedUnitId = null;
+                                        _hoveredTileCol = null;
+                                        _hovered2DRow = null;
+                                        _isHovered2DPlayerSide = null;
                                       });
                                     },
                                     onMovePlayerUnit: (id, col, row) {
@@ -1824,8 +2104,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     onCastCard: (cardId, {targetUnit, targetCol, targetRow}) {
                                       _engine.castCard(cardId, targetUnit: targetUnit, targetCol: targetCol, targetRow: targetRow);
                                       setState(() {
-                                        _draggedCard = null;
-                                        _selectedCardId = null;
                                         _hoveredTileCol = null;
                                         _hovered2DRow = null;
                                         _isHovered2DPlayerSide = null;
@@ -1867,6 +2145,78 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         isSelected: isSelected,
                                       );
                                     },
+                                    visualAliveOverrideIds: _visualAliveOverrideIds,
+                                    buildVfxOverlay: (resolveUnitCenter2D) {
+                                      for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
+                                        _lastKnown2DUnitOffsets[u.id] = resolveUnitCenter2D(u);
+                                      }
+                                      return RepaintBoundary(
+                                        child: ValueListenableBuilder<int>(
+                                          valueListenable: _visualFrameTick,
+                                          builder: (context, _, __) {
+                                            if (_activeVfx.isEmpty && _groundRipples.isEmpty) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final int nowMs = DateTime.now().millisecondsSinceEpoch;
+                                            final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
+                                            final List<_CombatVfx> vfx2D = [];
+                                            for (final vfx in _activeVfx) {
+                                              Offset? resolveById(String? unitId) {
+                                                if (unitId == null) return null;
+                                                final u = allUnits.where((x) => x.id == unitId).firstOrNull;
+                                                if (u != null) {
+                                                  final pt = resolveUnitCenter2D(u);
+                                                  _lastKnown2DUnitOffsets[u.id] = pt;
+                                                  return pt;
+                                                }
+                                                return _lastKnown2DUnitOffsets[unitId];
+                                              }
+                                              final startPt = resolveById(vfx.sourceUnitId);
+                                              final targetPt = resolveById(vfx.targetUnitId);
+                                              if (startPt == null && targetPt == null) continue;
+                                              final Offset effectiveStart = startPt ?? Offset(targetPt!.dx, targetPt.dy + 40);
+                                              final Offset effectiveTarget = targetPt ?? effectiveStart;
+                                              vfx2D.add(vfx.copyWithOffsets(effectiveStart, effectiveTarget));
+                                            }
+                                            final List<_GroundShockwaveRipple> ripples2D = [];
+                                            for (final r in _groundRipples) {
+                                              Offset? originPt;
+                                              if (r.targetUnitId != null) {
+                                                final u = allUnits.where((x) => x.id == r.targetUnitId).firstOrNull;
+                                                originPt = u != null
+                                                    ? resolveUnitCenter2D(u)
+                                                    : _lastKnown2DUnitOffsets[r.targetUnitId!];
+                                              }
+                                              if (originPt == null) continue;
+                                              ripples2D.add(r.copyWithOrigin(originPt));
+                                            }
+                                            return Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                if (ripples2D.isNotEmpty)
+                                                  Positioned.fill(
+                                                    child: CustomPaint(
+                                                      painter: _GroundShockwaveRipplePainter(
+                                                        ripples: ripples2D,
+                                                        currentTimestampMs: nowMs,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (vfx2D.isNotEmpty)
+                                                  Positioned.fill(
+                                                    child: CustomPaint(
+                                                      painter: _CombatVfxOverlayPainter(
+                                                        effects: vfx2D,
+                                                        currentTimestampMs: nowMs,
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      );
+                                    },
                                   )
                                 : _buildUnifiedIsometricBattlefield(
                                     tileWidth: tileWidth,
@@ -1878,12 +2228,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     },
                   ),
 
-                  // AoE Fire Barrage: 3 staggered, compact 3x4 Meteor Sprite-Sheet bursts over enemy formation
+                  // AoE Fire Barrage: Per-target compact 3x4 Meteor Sprite-Sheet bursts over each hit enemy
                   if (_activeFireBarrageMs != null)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: _StaggeredMeteorBarrage(
                           key: ValueKey('fire_barrage_$_activeFireBarrageMs'),
+                          targetAlignments: _fireBarrageTargetAlignments,
                         ),
                       ),
                     ),
@@ -1895,7 +2246,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   if (!_isZenMode && !isLandscapeMobile &&
                       (_engine.lastBannerMessage != null ||
                           _draggedUnitId != null ||
-                          _selectedCardId != null ||
                           _selectedUnitId != null ||
                           _selectedEnemyUnitId != null ||
                           _engine.isPreBattlePhase))
@@ -1904,7 +2254,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       left: 12,
                       right: 12,
                       child: IgnorePointer(
-                        ignoring: _selectedCardId == null && _selectedUnitId == null && _selectedEnemyUnitId == null,
+                        ignoring: _selectedUnitId == null && _selectedEnemyUnitId == null,
                         child: Center(
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 680),
@@ -1977,10 +2327,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   if (_activeSignatureUnit != null && _activeUltimateUnit == null)
                     _buildSignatureSkillCinematicBanner(_activeSignatureUnit!, _activeSkillName ?? _activeSignatureUnit!.signatureSkillName),
 
-                  // Pulled-Up Spell Card Inspector & Cast HUD (Floating just above the dock)
-                  if (_selectedCardId != null || _hoveredCardId != null)
-                    _buildPulledUpCardOverlay(isLandscapeMobile: isLandscapeMobile),
-
                   // Slow-Motion Lethal Finisher Crimson Vignette Filter
                   if (_isSlowMoFinisher)
                     Positioned.fill(
@@ -2018,7 +2364,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     ),
 
                   // Victory / Defeat Tactical Overlay Banner
-                  if (_engine.isVictory || _engine.isDefeat)
+                  if ((_engine.isVictory || _engine.isDefeat) && !_holdEndOfBattleOverlay)
                     Positioned.fill(
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.85),
@@ -2119,39 +2465,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         alignment: WrapAlignment.center,
                                         crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
-                                          // Unbound Ash
+                                          // Gold
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(Icons.blur_on, color: Color(0xFFB0BEC5), size: 14),
+                                              const Icon(Icons.monetization_on, color: Color(0xFFFFD54F), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardUnboundAsh} Crucible Ash',
-                                                style: const TextStyle(color: Color(0xFFECEFF1), fontSize: 10, fontWeight: FontWeight.bold),
+                                                '+${_engine.rewardUnboundAsh} Gold',
+                                                style: const TextStyle(color: Color(0xFFFFE082), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           ),
-                                          // Distilled Vitae
+                                          // Cursed Ore
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              const Icon(Icons.opacity, color: Color(0xFFE53935), size: 14),
+                                              const Icon(Icons.diamond_outlined, color: Color(0xFF26A69A), size: 14),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '+${_engine.rewardDistilledVitae} Alchemical Vitae',
-                                                style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 10, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                          // Titan Shards
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.auto_awesome, color: Color(0xFF00E5FF), size: 14),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '+${_engine.rewardPetrifiedPlinths} Titan Shards',
-                                                style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 10, fontWeight: FontWeight.bold),
+                                                '+${max(5, _engine.rewardDistilledVitae ~/ 4)} Ore',
+                                                style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10, fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           ),
@@ -2267,7 +2601,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                                     const Text('SYNERGIES & BREAKS', style: TextStyle(color: Colors.white54, fontSize: 7.5, fontWeight: FontWeight.bold)),
                                                     const SizedBox(height: 1),
                                                     Text(
-                                                      '🩸  • 🔥  • 🛑  • 🎳  • ⚔️ ',
+                                                      '🩸 ${_engine.bleedDetonationsCount} • 🔥 ${_engine.solarIgnitionsCount} • 🛑 ${_engine.interruptsCount} • 🎳 ${_engine.collisionsCount + _engine.wallSplatsCount} • ⚔️ ${_engine.chainAssistsCount}',
                                                       style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 9.5, fontWeight: FontWeight.w900),
                                                     ),
                                                   ],
@@ -2328,11 +2662,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       _buildGothicActionButton(
                                         icon: Icons.refresh,
                                         label: 'REPLAY',
-                                        onPressed: () {
-                                          setState(() {
-                                            _engine.setupSunderAtAshenGate();
-                                          });
-                                        },
+                                        onPressed: _restartCombatEncounter,
                                         gradientColors: const [Color(0xFF262C38), Color(0xFF181C24)],
                                         borderColor: const Color(0xFFFFD54F).withValues(alpha: 0.7),
                                         textColor: const Color(0xFFFFE082),
@@ -2843,8 +3173,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   }
 
   Widget _buildTopStatusRibbon(CombatUnitState? boss, {bool isLandscapeMobile = false}) {
-    final double focusProgress = ((_engine.currentTick % 40) / 40.0).clamp(0.0, 1.0);
-
     // Collect next impending turns sorted by closeness to 10,000 AP threshold
     final allLivingUnits = [..._engine.playerUnits, ..._engine.enemyUnits].where((u) => u.isAlive).toList();
     allLivingUnits.sort((a, b) {
@@ -3074,41 +3402,42 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 const SizedBox(width: 8),
 
                 // 6. Crucible Dev Sandbox Button
-                GestureDetector(
-                  onTap: () {
-                    CrucibleDebugSandboxDialog.show(
-                      context,
-                      engine: _engine,
-                      onStateChanged: () => setState(() {}),
-                      onUnlockAllUnits: _debugUnlockAllRetinueUnits,
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2C2410), Color(0xFF1B1608)],
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.8), width: 1.0),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.build_circle, color: Color(0xFFFFD54F), size: 13),
-                        SizedBox(width: 4),
-                        Text(
-                          'DEV TOOLS',
-                          style: TextStyle(
-                            color: Color(0xFFFFD54F),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 8.5,
-                            letterSpacing: 0.5,
-                          ),
+                if (kDebugMode)
+                  GestureDetector(
+                    onTap: () {
+                      CrucibleDebugSandboxDialog.show(
+                        context,
+                        engine: _engine,
+                        onStateChanged: () => setState(() {}),
+                        onUnlockAllUnits: _debugUnlockAllRetinueUnits,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2C2410), Color(0xFF1B1608)],
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.8), width: 1.0),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.build_circle, color: Color(0xFFFFD54F), size: 13),
+                          SizedBox(width: 4),
+                          Text(
+                            'DEV TOOLS',
+                            style: TextStyle(
+                              color: Color(0xFFFFD54F),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 8.5,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
                 // 2d. Ashen Reckoning Soft Enrage Status (GDD §6.3)
                 if (_engine.isAshenReckoning) ...[
                   const SizedBox(width: 8),
@@ -3171,7 +3500,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
           const SizedBox(height: 4),
 
-          if (boss != null && boss.isAlive && boss.hasBreakBar) ...[
+          if (boss != null && boss.isAlive && (boss.hasBreakBar || boss.hasKineticBastion || boss.isNecroticMireActive)) ...[
             const SizedBox(height: 4),
             _buildBossBreakBarHud(boss, isLandscapeMobile: isLandscapeMobile),
           ],
@@ -3800,7 +4129,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       final cardId = data.replaceFirst('card:', '');
                       _engine.castCard(cardId, targetCol: cell.col, targetRow: 0);
                       setState(() {
-                        _draggedCard = null;
                         _hoveredTileGRow = null;
                         _hoveredTileCol = null;
                       });
@@ -3883,7 +4211,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     final cardId = data.replaceFirst('card:', '');
                     _engine.castCard(cardId, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
                     setState(() {
-                      _draggedCard = null;
                       _hoveredTileGRow = null;
                       _hoveredTileCol = null;
                     });
@@ -3927,40 +4254,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        if (_draggedCard != null) {
-                          _engine.castCard(_draggedCard!.id, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
-                          setState(() => _draggedCard = null);
-                        } else if (_selectedCardId != null) {
-                          final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                          if (card != null) {
-                            if (card.id == 'phalanx_intercept' && !multiUnit.isPlayer) {
-                              setState(() => _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!');
-                              return;
-                            }
-                            if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && multiUnit.isPlayer) {
-                              setState(() => _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!');
-                              return;
-                            }
-                            _playSfx('sfx_card.wav');
-                            _engine.castCard(card.id, targetUnit: multiUnit, targetCol: targetAnchor.column, targetRow: targetAnchor.row);
-                            setState(() {
-                              _selectedCardId = null;
-                              _hoveredTileGRow = null;
-                              _hoveredTileCol = null;
-                            });
+                        setState(() {
+                          if (multiUnit.isPlayer) {
+                            _selectedUnitId = (_selectedUnitId == multiUnit.id) ? null : multiUnit.id;
+                            _selectedEnemyUnitId = null;
+                          } else {
+                            _selectedEnemyUnitId = (_selectedEnemyUnitId == multiUnit.id) ? null : multiUnit.id;
+                            _selectedUnitId = null;
                           }
-                        } else {
-                          setState(() {
-                            if (multiUnit.isPlayer) {
-                              _selectedUnitId = (_selectedUnitId == multiUnit.id) ? null : multiUnit.id;
-                              _selectedEnemyUnitId = null;
-                            } else {
-                              _selectedEnemyUnitId = (_selectedEnemyUnitId == multiUnit.id) ? null : multiUnit.id;
-                              _selectedUnitId = null;
-                            }
-                            _selectedCardId = null;
-                          });
-                        }
+                        });
                       },
                       child: Center(
                         child: multiUnit.isPlayer
@@ -3972,7 +4274,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     _draggedUnitId = multiUnit.id;
                                     _selectedUnitId = multiUnit.id;
                                     _selectedEnemyUnitId = null;
-                                    _selectedCardId = null;
                                   });
                                   if (!_engine.isPreBattlePhase) {
                                     _engine.setBulletTime(true);
@@ -4116,67 +4417,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
-  /// Calculates all global row and col coordinates affected by a spell card when hovered over targetGRow, targetCol
-  List<({int gRow, int col})> _getSpellAffectedGridCells(SpatialCombatCard card, int targetGRow, int targetCol) {
-    final List<({int gRow, int col})> cells = [];
-
-    if (card.id == 'phalanx_intercept') {
-      // Single ally target
-      cells.add((gRow: targetGRow, col: targetCol));
-    } else if (card.id == 'smite_the_calcified') {
-      // Single enemy focus blast (hits anchor and colossus footprint)
-      cells.add((gRow: targetGRow, col: targetCol));
-      // If targeting Gorgoroth, cover his entire 2x2 footprint
-      final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull;
-      if (boss != null) {
-        // Enemy rows: gRow 0 = Row 2, gRow 1 = Row 1, gRow 2 = Row 0
-        final int localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
-        if (targetGRow < 3 && boss.occupies(targetCol, localRow)) {
-          // Add Gorgoroth's entire footprint in global coordinates
-          // Gorgoroth occupies: col 1,2 and row 0,1 -> gRow 1,2 and col 1,2
-          for (int gr = 1; gr <= 2; gr++) {
-            for (int gc = 1; gc <= 2; gc++) {
-              if (!cells.any((c) => c.gRow == gr && c.col == gc)) {
-                cells.add((gRow: gr, col: gc));
-              }
-            }
-          }
-        }
-      }
-    } else if (card.id == 'searing_brand' || card.pattern == TargetPattern.stAshlarCross) {
-      // Cross pattern: center + top, bottom, left, right adjacent tiles
-      cells.add((gRow: targetGRow, col: targetCol));
-      // Cardinal neighbors
-      const deltas = [(0, 1), (0, -1), (1, 0), (-1, 0)];
-      for (final (dRow, dCol) in deltas) {
-        final nr = targetGRow + dRow;
-        final nc = targetCol + dCol;
-        if (nr >= 0 && nr < 7 && nc >= 0 && nc < 5) {
-          cells.add((gRow: nr, col: nc));
-        }
-      }
-    } else if (card.id == 'sun_ashlar_wrath') {
-      // Full radiant barrage across all enemy tiles (gRow 0, 1, 2)
-      for (int gr = 0; gr <= 2; gr++) {
-        for (int gc = 0; gc < 5; gc++) {
-          cells.add((gRow: gr, col: gc));
-        }
-      }
-    } else if (card.id == 'stoke_the_embers') {
-      // Buffs team focus; illuminates player side (gRow 4, 5, 6)
-      for (int gr = 4; gr <= 6; gr++) {
-        for (int gc = 0; gc < 5; gc++) {
-          cells.add((gRow: gr, col: gc));
-        }
-      }
-    } else {
-      // Default single target
-      cells.add((gRow: targetGRow, col: targetCol));
-    }
-
-    return cells;
-  }
-
   /// Calculates affected global grid cells when an Ultimate mini-slate is dragged over targetGRow, targetCol
   List<({int gRow, int col})> _getUltimateAffectedGridCells(String unitId, int targetGRow, int targetCol) {
     final List<({int gRow, int col})> cells = [];
@@ -4266,66 +4506,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       }
     }
     return 'Basic Strike';
-  }
-
-  /// Calculates predicted phantom damage or effect for a unit given the hovered spell
-  String? _getPhantomUnitEffect(CombatUnitState unit, SpatialCombatCard card, int targetGRow, int targetCol) {
-    if (!unit.isAlive) return null;
-
-    if (card.id == 'phalanx_intercept') {
-      if (unit.isPlayer) {
-        final localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
-        if (targetGRow > 3 && unit.occupies(targetCol, localRow)) {
-          return '+35 🛡️ ARMOR';
-        }
-      }
-      return null;
-    }
-
-    if (card.id == 'stoke_the_embers') {
-      if (unit.isPlayer && unit.id == 'lady_valeria') {
-        return '+2 ⚡ FOCUS';
-      }
-      return null;
-    }
-
-    // Offensive cards targeting enemies:
-    if (unit.isPlayer) return null;
-
-    final affected = _getSpellAffectedGridCells(card, targetGRow, targetCol);
-    // Check if any occupied node of this unit matches an affected cell
-    bool isUnitHit = false;
-    for (final node in unit.occupiedNodes) {
-      // Enemy unit row 0 = gRow 2, row 1 = gRow 1, row 2 = gRow 0
-      final int unitGRow = 2 - node.row;
-      if (affected.any((c) => c.gRow == unitGRow && c.col == node.column)) {
-        isUnitHit = true;
-        break;
-      }
-    }
-
-    if (!isUnitHit) return null;
-
-    if (card.id == 'smite_the_calcified') {
-      final rawDmg = (74 * 2.5).round(); // 185 damage
-      final projectedDmg = (rawDmg * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
-      if (unit.isSlagCarapaceActive) {
-        return '💥 -$projectedDmg (SHATTER!)';
-      }
-      return '💥 -$projectedDmg CRIT';
-    } else if (card.id == 'searing_brand') {
-      // Direct target takes 105, splash takes 45
-      final localRow = targetGRow > 3 ? (targetGRow - 4) : (2 - targetGRow);
-      final bool isDirectTarget = unit.occupies(targetCol, localRow);
-      final rawDmg = isDirectTarget ? 105 : 45;
-      final projectedDmg = (rawDmg * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
-      return isDirectTarget ? '🔥 -$projectedDmg DMG' : '⚡ -$projectedDmg SPLASH';
-    } else if (card.id == 'sun_ashlar_wrath') {
-      final projectedDmg = (110 * (1.0 - (unit.armor / 100).clamp(0.0, 0.75))).round();
-      return '☀️ -$projectedDmg RADIANT';
-    }
-
-    return null;
   }
 
   /// Calculates predicted phantom damage or buff for a unit given the hovered Ultimate
@@ -4435,33 +4615,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     final bool isSelected = (isPlayerSquad && _selectedUnitId != null && occupant?.id == _selectedUnitId) ||
         (!isPlayerSquad && _selectedEnemyUnitId != null && occupant?.id == _selectedEnemyUnitId);
 
-    // Tactical Spell & Ultimate AOE Highlight Overlay calculation:
-    final activeCard = _draggedCard ??
-        (_hoveredCardId != null ? _engine.hand.where((c) => c.id == _hoveredCardId).firstOrNull : null) ??
-        (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
+    // Tactical Ultimate AOE Highlight Overlay calculation:
     final activeUltimateUnitId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
     bool isSpellAoeAffected = false;
     if (activeUltimateUnitId != null && _hoveredTileGRow != null && _hoveredTileCol != null) {
       final affectedList = _getUltimateAffectedGridCells(activeUltimateUnitId, _hoveredTileGRow!, _hoveredTileCol!);
       isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
-    } else if (activeCard != null) {
-      if (_hoveredTileGRow != null && _hoveredTileCol != null) {
-        final affectedList = _getSpellAffectedGridCells(activeCard, _hoveredTileGRow!, _hoveredTileCol!);
-        isSpellAoeAffected = affectedList.any((c) => c.gRow == gRow && c.col == col);
-      } else if (_selectedCardId != null || _hoveredCardId != null) {
-        // If card is hovered or selected by click, preview AOE / valid target tiles
-        if (activeCard.id == 'sun_ashlar_wrath') {
-          isSpellAoeAffected = !isPlayerSquad;
-        } else if (activeCard.id == 'stoke_the_embers') {
-          isSpellAoeAffected = isPlayerSquad;
-        } else if (activeCard.id == 'phalanx_intercept') {
-          isSpellAoeAffected = isPlayerSquad && occupant != null;
-        } else if (activeCard.id == 'searing_brand' || activeCard.pattern != TargetPattern.singleTarget) {
-          isSpellAoeAffected = !isPlayerSquad; // Can target any tile on enemy squad, empty or occupied
-        } else {
-          isSpellAoeAffected = !isPlayerSquad && occupant != null;
-        }
-      }
     }
 
     // Ghost / X-Ray Mode:
@@ -4565,7 +4724,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           final cardId = data.replaceFirst('card:', '');
           _engine.castCard(cardId, targetUnit: occupant, targetCol: col, targetRow: row);
           setState(() {
-            _draggedCard = null;
             _hoveredTileGRow = null;
             _hoveredTileCol = null;
           });
@@ -4682,17 +4840,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     ),
                   ),
                 ],
-                // Glowing Arcane Spell Magic Circle Projection (when targeted by Card or Ultimate AOE)
+                // Glowing Arcane Spell Magic Circle Projection (when targeted by Ultimate AOE)
                 if (isSpellAoeAffected)
                   Center(
                     child: Opacity(
                       opacity: 0.65,
                       child: Image.asset(
-                        activeCard != null && (activeCard.id == 'phalanx_intercept' || activeCard.id == 'stoke_the_embers')
-                            ? 'assets/images/Spells/Support_spell_magic_circle.png'
-                            : (activeCard != null && activeCard.id == 'revive_vitae'
-                                ? 'assets/images/Spells/Heal_spell_magic_circle.png'
-                                : 'assets/images/Spells/Attack_spell_magic_circle.png'),
+                        'assets/images/Spells/Attack_spell_magic_circle.png',
                         width: tileWidth * 0.90,
                         height: tileHeight * 0.90,
                         fit: BoxFit.contain,
@@ -4844,27 +4998,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTap: () {
-                        if (_selectedCardId != null) {
-                          final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                          if (card != null) {
-                            if (card.id == 'phalanx_intercept' && !isPlayerSquad) {
-                              setState(() => _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!');
-                              return;
-                            }
-                            if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && isPlayerSquad) {
-                              setState(() => _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!');
-                              return;
-                            }
-                            _playSfx('sfx_card.wav');
-                            _engine.castCard(card.id, targetUnit: occupant, targetCol: col, targetRow: row);
-                            setState(() {
-                              _selectedCardId = null;
-                              _hoveredTileGRow = null;
-                              _hoveredTileCol = null;
-                            });
-                            return;
-                          }
-                        }
                         setState(() {
                           if (isPlayerSquad) {
                             _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
@@ -4873,7 +5006,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                             _selectedEnemyUnitId = (_selectedEnemyUnitId == occupant.id) ? null : occupant.id;
                             _selectedUnitId = null;
                           }
-                          _selectedCardId = null;
                         });
                       },
                     ),
@@ -4895,23 +5027,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                               _engine.lastBannerMessage =
                                   '⚠️ ${selectedUnit.name} can only move ${selectedUnit.moveRange} tile(s)!';
                             });
-                          }
-                        } else if (_selectedCardId != null) {
-                          // Cast clicked card on target tile if applicable
-                          final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                          if (card != null) {
-                            if (card.id == 'stoke_the_embers') {
-                              _engine.castCard(card.id, targetCol: col, targetRow: row);
-                              setState(() => _selectedCardId = null);
-                            } else if (!isPlayerSquad) {
-                              // Offensive or ground splash spells (Searing Brand, Wrath of Ashlar, Sun-King Cataclysm)
-                              _engine.castCard(card.id, targetCol: col, targetRow: row);
-                              setState(() => _selectedCardId = null);
-                            } else {
-                              setState(() {
-                                _engine.lastBannerMessage = '⚠️ ${card.name} must target enemy ground or units!';
-                              });
-                            }
                           }
                         }
                       },
@@ -4938,13 +5053,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 if (occupant != null && isAnchorCell && occupant.occupiedNodes.length <= 1 && occupant.footprint == UnitFootprint.single1x1)
                   Builder(
                     builder: (context) {
-                      final activeCard = _draggedCard ?? (_selectedCardId != null ? _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull : null);
                       final activeUltId = _draggedUltimateUnitId ?? _selectedUltimateUnitId;
                       String? phantomEffect;
                       if (activeUltId != null && (_hoveredTileGRow != null || _selectedUltimateUnitId != null)) {
                         phantomEffect = _getPhantomUltimateEffect(occupant, activeUltId, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col);
-                      } else if (activeCard != null && (_hoveredTileGRow != null || _selectedCardId != null)) {
-                        phantomEffect = _getPhantomUnitEffect(occupant, activeCard, _hoveredTileGRow ?? gRow, _hoveredTileCol ?? col);
                       }
 
                       return Center(
@@ -4954,51 +5066,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () {
-                              if (_selectedCardId != null) {
-                                // Cast currently selected card onto clicked unit!
-                                final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-                                if (card != null) {
-                                  if (card.id == 'phalanx_intercept' && !isPlayerSquad) {
-                                    setState(() {
-                                      _engine.lastBannerMessage = '⚠️ Phalanx Intercept only targets allies!';
-                                    });
-                                    return;
-                                  }
-                                  if (card.id != 'phalanx_intercept' && card.id != 'stoke_the_embers' && isPlayerSquad) {
-                                    setState(() {
-                                      _engine.lastBannerMessage = '⚠️ ${card.name} only targets enemies!';
-                                    });
-                                    return;
-                                  }
-                                  _playSfx('sfx_card.wav');
-                                  _engine.castCard(card.id, targetUnit: occupant, targetCol: col, targetRow: row);
-                                  setState(() {
-                                    _selectedCardId = null;
-                                    _hoveredTileGRow = null;
-                                    _hoveredTileCol = null;
-                                  });
-                                  return;
-                                }
-                              }
-
                               if (isPlayerSquad) {
                                 setState(() {
                                   _selectedUnitId = (_selectedUnitId == occupant.id) ? null : occupant.id;
                                   _selectedEnemyUnitId = null;
-                                  _selectedCardId = null; // deselect card
                                 });
                               } else {
-                                // Clicked enemy unit: Cast dragged card OR inspect enemy trajectory
-                                if (_draggedCard != null) {
-                                  _engine.castCard(_draggedCard!.id, targetUnit: occupant);
-                                  setState(() => _draggedCard = null);
-                                } else {
-                                  setState(() {
-                                    _selectedEnemyUnitId = (_selectedEnemyUnitId == occupant.id) ? null : occupant.id;
-                                    _selectedUnitId = null;
-                                    _selectedCardId = null;
-                                  });
-                                }
+                                setState(() {
+                                  _selectedEnemyUnitId = (_selectedEnemyUnitId == occupant.id) ? null : occupant.id;
+                                  _selectedUnitId = null;
+                                });
                               }
                             },
                             child: isPlayerSquad
@@ -5010,7 +5087,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         _draggedUnitId = occupant.id;
                                         _selectedUnitId = occupant.id;
                                         _selectedEnemyUnitId = null;
-                                        _selectedCardId = null;
                                       });
                                       if (!_engine.isPreBattlePhase) {
                                         _engine.setBulletTime(true);
@@ -5241,13 +5317,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         themeColor = const Color(0xFFFFD54F);
         icon = Icons.bolt;
       }
-    } else if (_selectedCardId != null) {
-      final card = _engine.hand.where((c) => c.id == _selectedCardId).firstOrNull;
-      if (card != null) {
-        message = '✨ ${card.name.toUpperCase()} ARMED: Click a target node or enemy on the grid to cast!';
-        themeColor = const Color(0xFF00E5FF);
-        icon = Icons.auto_awesome;
-      }
     } else if (_draggedUnitId != null) {
       final unit = _engine.playerUnits.where((u) => u.id == _draggedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
@@ -5301,13 +5370,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
         final apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
-        final posture = unit.postureLabel;
         if (unit.canAffordMovement) {
-          message = '⚔️ ${unit.name.toUpperCase()} [$posture] (AP: $apPct%): Click glowing [MOVE] or [⇄ SWAP] tile (Costs 50% AP)!';
+          message = '⚔️ ${unit.name.toUpperCase()} (AP: $apPct%): Drag to an open tile or tap [SHIFT] to reposition (Costs 50% AP).';
           themeColor = const Color(0xFF00E676);
           icon = Icons.directions_run;
         } else {
-          message = '⚠️ ${unit.name.toUpperCase()} [$posture] (AP: $apPct%): Needs 50% AP to reposition!';
+          message = '⚠️ ${unit.name.toUpperCase()} (AP: $apPct%): Needs 50% AP to reposition!';
           themeColor = const Color(0xFFFF9100);
           icon = Icons.hourglass_top;
         }
@@ -5379,11 +5447,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (_selectedCardId != null || _selectedUnitId != null || _selectedEnemyUnitId != null)
+          if (_selectedUnitId != null || _selectedEnemyUnitId != null)
             GestureDetector(
               onTap: () {
                 setState(() {
-                  _selectedCardId = null;
                   _selectedUnitId = null;
                   _selectedEnemyUnitId = null;
                 });
@@ -5394,419 +5461,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  /// Compact 3-Part Unit Combat Triad Inspector Strip (Basic Action & Posture • Stance Mastery • Ultimate Burst)
-  Widget _buildUnitCombatTriadStrip() {
-    final String? allyId = _draggedUnitId ?? _selectedUnitId;
-    final CombatUnitState? unit = allyId != null
-        ? _engine.playerUnits.where((u) => u.id == allyId && u.isAlive).firstOrNull
-        : (_selectedEnemyUnitId != null
-            ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
-            : null);
-
-    if (unit == null || unit.occupiedNodes.isEmpty) return const SizedBox.shrink();
-
-    // Simulated row/col if currently dragging a player unit over a player tile
-    final bool isHoveringPlayerCell = (unit.isPlayer &&
-        _draggedUnitId == unit.id &&
-        _hoveredTileCol != null &&
-        _hoveredTileGRow != null &&
-        _hoveredTileGRow! > 3);
-
-    final int simCol = isHoveringPlayerCell ? _hoveredTileCol! : unit.occupiedNodes.first.column;
-    final int simRow = isHoveringPlayerCell ? (_hoveredTileGRow! - 4) : unit.occupiedNodes.first.row;
-
-    final String basicDesc = _getUnitBasicAttackDescription(unit, simCol, simRow);
-    final String rowLabel = simRow == 0 ? 'FRONT ROW' : (simRow == 1 ? 'MID ROW' : 'BACK ROW');
-
-    String stanceTitle = 'Inherent Trait';
-    String stanceDetail = 'Standard combat readiness';
-    Color stanceColor = const Color(0xFF80D8FF);
-
-    switch (unit.activeStance) {
-      case StanceType.holdTheLine:
-        stanceTitle = 'Hold the Line';
-        stanceDetail = unit.hasStanceBonusReady
-            ? '⚡ READY: +30% Armor, Cleave & -1500 AP!'
-            : (simRow == 0
-                ? 'Frontline (${unit.consecutiveTurnsStationary}/2 turns to Cleave)'
-                : 'Move to Frontline to charge');
-        stanceColor = const Color(0xFFFFD54F);
-        break;
-      case StanceType.flankingMomentum:
-        stanceTitle = 'Flanking Momentum';
-        stanceDetail = unit.hasStanceBonusReady
-            ? '⚡ READY: +40% Crit, +4 Bleed & +3000 AP!'
-            : 'Reposition or hit Bleeding foe for Crit + AP refund';
-        stanceColor = const Color(0xFFFF5252);
-        break;
-      case StanceType.aethericAlignment:
-        stanceTitle = 'Aetheric Alignment';
-        stanceDetail = simRow == 2
-            ? '⚡ ACTIVE: Column Pierce & +1 Focus on cast!'
-            : '⚠️ Stand in Back Row for Column Pierce';
-        stanceColor = const Color(0xFF00E5FF);
-        break;
-      case StanceType.sanctifiedHearth:
-        stanceTitle = 'Sanctified Hearth';
-        stanceDetail = 'Adjacent allies regen 3% HP/s & cleanse';
-        stanceColor = const Color(0xFF00E676);
-        break;
-      case StanceType.none:
-        stanceTitle = unit.isPlayer ? 'Combat Posture' : 'Hostile Construct';
-        stanceDetail = unit.pendingIntent != null
-            ? 'Winding up ${unit.pendingIntent!.skillName}!'
-            : 'HP ${unit.hp}/${unit.maxHp} • Armor ${unit.armor}';
-        stanceColor = const Color(0xFFFF8A80);
-        break;
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141522).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: unit.isPlayer ? const Color(0xFF00E5FF).withValues(alpha: 0.45) : const Color(0xFFFF5252).withValues(alpha: 0.45),
-          width: 1.0,
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            // Unit Name & Row Depth Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: unit.isPlayer ? const Color(0xFF1A2938) : const Color(0xFF381A1E),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: unit.isPlayer ? const Color(0xFF00E5FF) : const Color(0xFFFF5252),
-                  width: 0.8,
-                ),
-              ),
-              child: Text(
-                '${unit.name.toUpperCase()} • $rowLabel (COL ${simCol + 1})',
-                style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w900,
-                  color: unit.isPlayer ? const Color(0xFF80D8FF) : const Color(0xFFFF8A80),
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-
-            // Character Sheet Inspect Quick Action Button
-            GestureDetector(
-              onTap: () {
-                _openUnitInspectorDialog(unit);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4E342E), Color(0xFF2E1C14)],
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFFFD54F), width: 1.0),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x55FFD54F), blurRadius: 4),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('📜', style: TextStyle(fontSize: 9.5)),
-                    SizedBox(width: 3),
-                    Text(
-                      'SHEET',
-                      style: TextStyle(
-                        fontSize: 8.0,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFFFD54F),
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 1. Basic Attack Action Badge / RPG Button
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0D2538), Color(0xFF143750)],
-                ),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x3300E5FF), blurRadius: 4, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.sports_mma, size: 12, color: Color(0xFF80D8FF)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'BASIC ATTACK: $basicDesc',
-                    style: const TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 1b. Distinct Signature Skill Attack Button / Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: unit.isSignatureReady
-                      ? [const Color(0xFF381C08), const Color(0xFF6B3B0A)]
-                      : [const Color(0xFF221A16), const Color(0xFF30241E)],
-                ),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFF6E5630),
-                  width: unit.isSignatureReady ? 1.2 : 0.8,
-                ),
-                boxShadow: unit.isSignatureReady
-                    ? const [
-                        BoxShadow(color: Color(0x66FFD54F), blurRadius: 6, spreadRadius: 0.5),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.auto_awesome,
-                    size: 12,
-                    color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    unit.isSignatureReady
-                        ? '★ SKILL READY: ${unit.signatureSkillName.toUpperCase()}'
-                        : 'SKILL: ${unit.signatureSkillName.toUpperCase()} (${unit.signatureCooldown} turns)',
-                    style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      color: unit.isSignatureReady ? const Color(0xFFFFD54F) : const Color(0xFFFFCC80),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // 1c. Crucible Grafted Trait Badge (if present)
-            if (unit.graftedTraitDisplayName != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF311B92).withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: const Color(0xFFEA80FC), width: 0.8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.biotech, size: 11, color: Color(0xFFEA80FC)),
-                    const SizedBox(width: 3),
-                    Text(
-                      'GRAFT: ${unit.graftedTraitDisplayName}',
-                      style: const TextStyle(
-                        fontSize: 8.0,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFF3E5F5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-
-            // 2. Stance Mastery (Passive Positional Trait)
-            Icon(Icons.shield_moon, size: 12, color: stanceColor),
-            const SizedBox(width: 4),
-            Text(
-              '$stanceTitle: $stanceDetail',
-              style: TextStyle(
-                fontSize: 8.5,
-                fontWeight: FontWeight.bold,
-                color: stanceColor,
-              ),
-            ),
-
-            // 3. Ultimate Burst (Manual)
-            if (unit.isPlayer) ...[
-              const SizedBox(width: 12),
-              const Icon(Icons.bolt, size: 13, color: Color(0xFFFFD54F)),
-              const SizedBox(width: 3),
-              Text(
-                'ULT: ${unit.ultimateTitle} (${unit.ultimateGauge}%)',
-                style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w900,
-                  color: unit.isUltimateReady ? const Color(0xFFFFD54F) : Colors.white70,
-                ),
-              ),
-              if (unit.isUltimateReady && !_engine.isPreBattlePhase) ...[
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () {
-                    _engine.castUltimate(unit.id);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD54F),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: const Text(
-                      '⚡ UNLEASH',
-                      style: TextStyle(
-                        fontSize: 7.5,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-
-            // 4. Tactical Synergy Indicator
-            Builder(
-              builder: (context) {
-                final enemies = _engine.enemyUnits.where((u) => u.isAlive);
-                final anyBleeding = enemies.any((u) => u.hasBleed);
-                final totalBleed = enemies.fold<int>(0, (sum, u) => sum + u.bleedStacks);
-
-                if (_selectedCardId == 'vitae_eruption' && anyBleeding) {
-                  return Container(
-                    margin: const EdgeInsets.only(left: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A000E),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.water_drop, size: 10, color: Color(0xFFFF1744)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '🩸 BLOODNOVA SYNERGY: +${totalBleed * 20} DETONATION DMG ($totalBleed BLEED STACKS)',
-                          style: const TextStyle(
-                            fontSize: 8.0,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFFF8A80),
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (_selectedCardId == 'sanguine_siphon' && unit.hasBleed) {
-                  return Container(
-                    margin: const EdgeInsets.only(left: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF381016),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFF5252), width: 1.0),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.healing, size: 10, color: Color(0xFFFF5252)),
-                        SizedBox(width: 3),
-                        Text(
-                          '🩸 LEECH SYNERGY: STACKS VULNERABILITY & RESTORES HP',
-                          style: TextStyle(
-                            fontSize: 8.0,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFFFF8A80),
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (unit.hasBleed && unit.isPlayer == false) {
-                  return Container(
-                    margin: const EdgeInsets.only(left: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF261014),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
-                    ),
-                    child: Text(
-                      '🩸 VULNERABLE: ${unit.bleedStacks} BLEED STACKS',
-                      style: const TextStyle(
-                        fontSize: 8.0,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFFF8A80),
-                      ),
-                    ),
-                  );
-                } else if (unit.isPlayer && unit.isAlive) {
-                  final isUnderTelegraph = _engine.activeTelegraphedNodes.any((n) => unit.occupies(n.column, n.row));
-                  if (isUnderTelegraph) {
-                    return Container(
-                      margin: const EdgeInsets.only(left: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A000E),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFF1744), width: 1.0),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.warning_amber_rounded, size: 10, color: Color(0xFFFF1744)),
-                          SizedBox(width: 3),
-                          Text(
-                            '⚠️ DANGER: IN STRIKE ZONE! REPOSITION OR INTERRUPT',
-                            style: TextStyle(
-                              fontSize: 8.0,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFFF8A80),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -6585,7 +6239,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           TextSpan(
             text: '⚔️ INCOMING SKILL: ${unit.pendingIntent!.skillName.toUpperCase()}\n'
                 '   Striking in ${((unit.pendingIntent!.triggerTick - _engine.currentTick).clamp(0, 9999) / 30.0).toStringAsFixed(1)}s '
-                '(${unit.pendingIntent!.targetSummary ?? "targeted zone"})\n',
+                '(${unit.pendingIntent!.targetSummary})\n',
             style: const TextStyle(
               color: Color(0xFFFF8A80),
               fontWeight: FontWeight.bold,
@@ -6693,30 +6347,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     required double tileWidth,
     required bool isSelected,
   }) {
-    final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
+    final int displayHp = _visualUnitHp[unit.id] ?? unit.hp;
+    final bool visuallyPetrified = unit.isPetrifiedPlinth && !_visualAliveOverrideIds.contains(unit.id);
+    final bool visuallyDowned = unit.isDowned && !_visualAliveOverrideIds.contains(unit.id);
+    final double hpRatio = unit.maxHp > 0 ? (displayHp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
     final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
     final double barWidth = isBoss ? 144.0 : (tileWidth * 1.05).clamp(96.0, 122.0);
     final bool isEnemy = !unit.isPlayer;
     final bool isReadyToAct = apRatio >= 1.0;
 
     String hpLabel;
-    if (unit.isPetrifiedPlinth) {
+    if (visuallyPetrified) {
       hpLabel = '🪨 ${unit.plinthDurability}/3';
-    } else if (unit.isDowned) {
+    } else if (visuallyDowned) {
       hpLabel = '💀 DOWNED';
     } else if (isEnemy) {
       final String shieldTag = unit.aegisShield > 0 ? ' +${unit.aegisShield}🛡️' : '';
       if (unit.armor > 0) {
-        hpLabel = '🎯 ${unit.hp}$shieldTag [🛡️${unit.armor}]';
+        hpLabel = '🎯 $displayHp$shieldTag [🛡️${unit.armor}]';
       } else {
-        hpLabel = '🎯 ${unit.hp}/${unit.maxHp}$shieldTag';
+        hpLabel = '🎯 $displayHp/${unit.maxHp}$shieldTag';
       }
     } else {
       final String shieldTag = unit.aegisShield > 0 ? ' +${unit.aegisShield}🛡️' : '';
       if (unit.armor > 0) {
-        hpLabel = '💚 ${unit.hp}$shieldTag [🛡️${unit.armor}]';
+        hpLabel = '💚 $displayHp$shieldTag [🛡️${unit.armor}]';
       } else {
-        hpLabel = '💚 ${unit.hp}/${unit.maxHp}$shieldTag';
+        hpLabel = '💚 $displayHp/${unit.maxHp}$shieldTag';
       }
     }
 
@@ -7027,144 +6684,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
-  Widget _buildSelectedPlayerInspectionBanner(CombatUnitState unit) {
-    final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
-    final int apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round().clamp(0, 100);
-    final badges = _getUnitStatusBadges(unit);
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0C1612).withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.85), width: 1.2),
-        boxShadow: const [
-          BoxShadow(color: Color(0x3300E676), blurRadius: 8),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.shield, color: Color(0xFF00E676), size: 16),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ALLY: ${unit.name.toUpperCase()}',
-                style: const TextStyle(
-                  color: Color(0xFFB9F6CA),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 11.0,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Text(
-                '${unit.postureLabel} • ${unit.effectiveSpeed} SPD ($apPct% TM)',
-                style: const TextStyle(
-                  color: Color(0xFFB0BEC5),
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF092015),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFF00E676).withValues(alpha: 0.4), width: 0.8),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '💚 ${unit.hp} / ${unit.maxHp} HP',
-                        style: const TextStyle(
-                          color: Color(0xFF69F0AE),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10.0,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      Text(
-                        '🛡️ ${unit.armor} ARMOR${unit.aegisShield > 0 ? " • 🛡️ ${unit.aegisShield} AEGIS" : ""}',
-                        style: const TextStyle(
-                          color: Color(0xFF81D4FA),
-                          fontSize: 9.0,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: Container(
-                      height: 5,
-                      color: Colors.black45,
-                      child: Stack(
-                        children: [
-                          FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: hpRatio,
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [Color(0xFF00C853), Color(0xFF69F0AE)],
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (unit.armor > 0)
-                            FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: (unit.armor / max(1, unit.maxHp)).clamp(0.0, 1.0),
-                              child: Container(
-                                color: Colors.white70,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          if (badges.isNotEmpty) ...[
-            _buildOverheadStatusBadgesRow(badges),
-            const SizedBox(width: 8),
-          ],
-
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedUnitId = null;
-              });
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(Icons.close, color: Colors.white70, size: 16),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildUnitMiniatureWidget(
     CombatUnitState unit, {
     required double tileWidth,
@@ -7175,8 +6694,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     String? phantomEffect,
   }) {
     final bool isBoss = unit.occupiedNodes.length > 1 || unit.footprint != UnitFootprint.single1x1;
-    final double hpRatio = unit.maxHp > 0 ? (unit.hp / unit.maxHp).clamp(0.0, 1.0) : 0.0;
-    final double apRatio = (unit.currentAp / SpatialCombatEngine.tickThreshold).clamp(0.0, 1.0);
+    final bool visuallyDowned = unit.isDowned && !_visualAliveOverrideIds.contains(unit.id);
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
 
     final bool isAttacking = _attackingUnitId == unit.id;
@@ -7337,13 +6855,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
             // 2. Character Model Miniature Cutout (Stands proudly upright on diamond plinth)
             Positioned(
-              bottom: unit.isDowned ? 2 : 6,
+              bottom: visuallyDowned ? 2 : 6,
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
-                opacity: unit.isDowned ? 0.68 : 1.0,
+                opacity: visuallyDowned ? 0.68 : 1.0,
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 180),
-                  scale: unit.isDowned ? 0.94 : 1.0,
+                  scale: visuallyDowned ? 0.94 : 1.0,
                   curve: Curves.easeOutBack,
                   child: SizedBox(
                     width: modelWidth,
@@ -7355,7 +6873,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         // Main Character Sprite (with Stone Petrification / Hit-Flash color filter)
                         Positioned.fill(
                           child: ColorFiltered(
-                          colorFilter: unit.isDowned
+                          colorFilter: visuallyDowned
                               ? const ColorFilter.matrix(<double>[
                                   0.2126, 0.7152, 0.0722, 0, 10,
                                   0.2126, 0.7152, 0.0722, 0, 10,
@@ -7371,47 +6889,81 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     )
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                           child: (isAttacking && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
-                              ? (_activeSkillName == 'Obsidian Bastion'
-                                  ? SpriteSheetAnimation(
-                                      assetPath: 'assets/animations/ash_sculptor_defend_sheet.png',
-                                      columns: 3,
-                                      rows: 2,
-                                      totalFrames: 6,
-                                      duration: const Duration(milliseconds: 850),
-                                      loop: false,
-                                      fit: BoxFit.contain,
-                                      fallback: Image.asset(
-                                        'assets/images/ash_sculptor_shield_burst.png',
-                                        fit: BoxFit.contain,
-                                        alignment: Alignment.bottomCenter,
-                                      ),
-                                    )
-                                  : OverflowBox(
+                              ? (_engine.skillTreeState.activeClass == SculptorClassArchetype.ironcladWarden
+                                  ? OverflowBox(
                                       maxWidth: modelHeight * 1.5,
                                       maxHeight: modelHeight,
                                       alignment: Alignment.bottomCenter,
                                       child: SpriteSheetAnimation(
-                                        assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
-                                        columns: 3,
+                                        assetPath: 'assets/images/Ash sculpter/ironclad warden attack.png',
+                                        columns: 4,
                                         rows: 2,
-                                        totalFrames: 6,
-                                        duration: const Duration(milliseconds: 900),
+                                        totalFrames: 8,
+                                        duration: Duration(milliseconds: _scaledMs(950)),
                                         loop: false,
                                         fit: BoxFit.contain,
-                                        fallback: Image.asset(
-                                          unit.assetPath,
-                                          fit: BoxFit.contain,
-                                          alignment: Alignment.bottomCenter,
-                                        ),
+                                        fallback: Image.asset(unit.assetPath, fit: BoxFit.contain, alignment: Alignment.bottomCenter),
                                       ),
-                                    ))
-                              : (isDamaged && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
+                                    )
+                                  : (_engine.skillTreeState.activeClass == SculptorClassArchetype.bloodAlchemist
+                                      ? OverflowBox(
+                                          maxWidth: modelHeight * 1.5,
+                                          maxHeight: modelHeight,
+                                          alignment: Alignment.bottomCenter,
+                                          child: SpriteSheetAnimation(
+                                            assetPath: 'assets/images/Ash sculpter/blood alchemist attack animation.png',
+                                            columns: 4,
+                                            rows: 3,
+                                            totalFrames: 12,
+                                            duration: Duration(milliseconds: _scaledMs(1050)),
+                                            loop: false,
+                                            fit: BoxFit.contain,
+                                            fallback: Image.asset(unit.assetPath, fit: BoxFit.contain, alignment: Alignment.bottomCenter),
+                                          ),
+                                        )
+                                      : (_attackingSkillName == 'Obsidian Bastion'
+                                          ? SpriteSheetAnimation(
+                                              assetPath: 'assets/animations/ash_sculptor_defend_sheet.png',
+                                              columns: 3,
+                                              rows: 2,
+                                              totalFrames: 6,
+                                              duration: Duration(milliseconds: _scaledMs(850)),
+                                              loop: false,
+                                              fit: BoxFit.contain,
+                                              fallback: Image.asset(
+                                                'assets/images/ash_sculptor_shield_burst.png',
+                                                fit: BoxFit.contain,
+                                                alignment: Alignment.bottomCenter,
+                                              ),
+                                            )
+                                          : OverflowBox(
+                                              maxWidth: modelHeight * 1.5,
+                                              maxHeight: modelHeight,
+                                              alignment: Alignment.bottomCenter,
+                                              child: SpriteSheetAnimation(
+                                                assetPath: 'assets/animations/ash_sculptor_attack_sheet.png',
+                                                columns: 3,
+                                                rows: 2,
+                                                totalFrames: 6,
+                                                duration: Duration(milliseconds: _scaledMs(900)),
+                                                loop: false,
+                                                fit: BoxFit.contain,
+                                                fallback: Image.asset(
+                                                  unit.assetPath,
+                                                  fit: BoxFit.contain,
+                                                  alignment: Alignment.bottomCenter,
+                                                ),
+                                              ),
+                                            ))))
+                              : (isDamaged &&
+                                      _engine.skillTreeState.activeClass == SculptorClassArchetype.forgeBerserker &&
+                                      (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
                                   ? SpriteSheetAnimation(
                                       assetPath: 'assets/animations/ash_sculptor_defend_sheet.png',
                                       columns: 3,
                                       rows: 2,
                                       totalFrames: 6,
-                                      duration: const Duration(milliseconds: 650),
+                                      duration: Duration(milliseconds: _scaledMs(650)),
                                       loop: false,
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
@@ -7420,13 +6972,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         alignment: Alignment.bottomCenter,
                                       ),
                                     )
-                              : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
+                                  : (isAttacking && (unit.id == 'lady_valeria' || unit.assetPath.toLowerCase().contains('valeria')))
                                   ? SpriteSheetAnimation(
                                       assetPath: 'assets/animations/valeria_slash_sheet.png',
                                       columns: 3,
                                       rows: 2,
                                       totalFrames: 6,
-                                      duration: const Duration(milliseconds: 1400),
+                                      duration: Duration(milliseconds: _scaledMs(1050)),
                                       loop: false,
                                       fit: BoxFit.contain,
                                       fallback: Image.asset(
@@ -7436,7 +6988,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       ),
                                     )
                               : (unit.isPlayer &&
-                                      !unit.isDowned &&
+                                      !visuallyDowned &&
                                       (unit.isAshSculptor ||
                                           unit.id == 'ash_sculptor' ||
                                           unit.templateId == 'ash_sculptor' ||
@@ -7444,21 +6996,51 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                           unit.name.contains('Sculptor') ||
                                           unit.assetPath.toLowerCase().contains('ash_sculptor') ||
                                           unit.assetPath.toLowerCase().contains('sculptor')))
-                                  ? SpriteSheetAnimation(
-                                      assetPath: 'assets/animations/ash_sculptor_idle_sheet.png',
-                                      columns: 3,
-                                      rows: 2,
-                                      totalFrames: 6,
-                                      duration: const Duration(milliseconds: 2400),
-                                      loop: true,
-                                      fit: BoxFit.contain,
-                                      fallback: Image.asset(
-                                        'assets/images/ash_sculptor_idle.png',
-                                        fit: BoxFit.contain,
-                                        alignment: Alignment.bottomCenter,
-                                      ),
-                                    )
-                              : (!unit.isDowned &&
+                                  ? (_engine.skillTreeState.activeClass == SculptorClassArchetype.ironcladWarden
+                                      ? SpriteSheetAnimation(
+                                          assetPath: 'assets/images/Ash sculpter/ironclad warden idle.png',
+                                          columns: 3,
+                                          rows: 2,
+                                          totalFrames: 6,
+                                          duration: const Duration(milliseconds: 2400),
+                                          loop: true,
+                                          fit: BoxFit.contain,
+                                          fallback: Image.asset(
+                                            'assets/images/ash_sculptor_idle.png',
+                                            fit: BoxFit.contain,
+                                            alignment: Alignment.bottomCenter,
+                                          ),
+                                        )
+                                      : (_engine.skillTreeState.activeClass == SculptorClassArchetype.bloodAlchemist
+                                          ? SpriteSheetAnimation(
+                                              assetPath: 'assets/images/Ash sculpter/blood alchemist idle.png',
+                                              columns: 3,
+                                              rows: 2,
+                                              totalFrames: 6,
+                                              duration: const Duration(milliseconds: 2400),
+                                              loop: true,
+                                              fit: BoxFit.contain,
+                                              fallback: Image.asset(
+                                                'assets/images/ash_sculptor_idle.png',
+                                                fit: BoxFit.contain,
+                                                alignment: Alignment.bottomCenter,
+                                              ),
+                                            )
+                                          : SpriteSheetAnimation(
+                                              assetPath: 'assets/animations/ash_sculptor_idle_sheet.png',
+                                              columns: 3,
+                                              rows: 2,
+                                              totalFrames: 6,
+                                              duration: const Duration(milliseconds: 2400),
+                                              loop: true,
+                                              fit: BoxFit.contain,
+                                              fallback: Image.asset(
+                                                'assets/images/ash_sculptor_idle.png',
+                                                fit: BoxFit.contain,
+                                                alignment: Alignment.bottomCenter,
+                                              ),
+                                            )))
+                              : (!visuallyDowned &&
                                       (unit.id.contains('scribe') ||
                                           unit.templateId.contains('scribe') ||
                                           unit.assetPath.toLowerCase().contains('scribe')))
@@ -7477,7 +7059,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       ),
                                     )
                               : (unit.isPlayer &&
-                                      !unit.isDowned &&
+                                      !visuallyDowned &&
                                       (unit.id.contains('footman') ||
                                           unit.id.contains('tombstone_sentinel') ||
                                           unit.templateId.contains('footman') ||
@@ -7510,6 +7092,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                   ),
                           ),
                         ),
+
+                        // Hit Impact Highlight Glow so players immediately see who took each damage number
+                        if (isDamaged)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [
+                                      const Color(0xFFFF5252).withValues(alpha: 0.45),
+                                      const Color(0xFFFF9100).withValues(alpha: 0.22),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.55, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
 
                         // Ash Dissolve Floating Embers for Downed / Inert Vessels
                         if (unit.isDowned)
@@ -7592,13 +7194,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     setState(() {
                       _selectedUnitId = (_selectedUnitId == unit.id) ? null : unit.id;
                       _selectedEnemyUnitId = null;
-                      _selectedCardId = null;
                     });
                   } else {
                     setState(() {
                       _selectedEnemyUnitId = (_selectedEnemyUnitId == unit.id) ? null : unit.id;
                       _selectedUnitId = null;
-                      _selectedCardId = null;
                     });
                   }
                 },
@@ -7809,7 +7409,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
               ),
 
-            if (isDamaged && (floatingPop == null || !floatingPop.contains('+')))
+            if (_activeImpactSlashUnits.containsKey(unit.id))
               Positioned.fill(
                 child: IgnorePointer(
                   child: Center(
@@ -7817,15 +7417,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       width: isBoss ? bossSpanWidth * 1.8 : tileWidth * 2.3,
                       height: isBoss ? (tileHeight * 3.4) : (tileHeight * 2.9),
                       child: SpriteSheetAnimation(
-                        assetPath: (_activeSkillName != null && (_activeSkillName!.contains('Slash') || _activeSkillName!.contains('Lacerat') || _activeSkillName!.contains('Flayer') || _activeSkillName!.contains('Cleave') || _activeSkillName!.contains('Blade') || _activeSkillName!.contains('Crit') || _activeSkillName!.contains('Bleed')))
-                            ? 'assets/animations/vfx/crimson_slash_sheet.png'
-                            : ((_activeSkillName != null && (_activeSkillName!.contains('Aegis') || _activeSkillName!.contains('Shield') || _activeSkillName!.contains('Phalanx') || _activeSkillName!.contains('Bulwark') || _activeSkillName!.contains('Block')))
-                                ? 'assets/animations/vfx/fire_shield_sheet.png'
-                                : 'assets/animations/vfx/crimson_slash_sheet.png'),
+                        assetPath: _activeImpactSlashUnits[unit.id]!,
                         columns: 3,
                         rows: 3,
                         totalFrames: 9,
-                        duration: const Duration(milliseconds: 650),
+                        duration: Duration(milliseconds: _scaledMs(520)),
                         loop: false,
                         fit: BoxFit.contain,
                       ),
@@ -7865,8 +7461,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
                           return Positioned(
                             bottom: modelHeight + 38 + riseY,
-                            left: driftX != 0 ? driftX : null,
-                            child: Opacity(
+                            child: Transform.translate(
+                              offset: Offset(driftX, 0),
+                              child: Opacity(
                               opacity: opacity,
                               child: Transform.scale(
                                 scale: scale,
@@ -7913,6 +7510,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                 ),
                               ),
                             ),
+                            ),
                           );
                         }),
                         if (activePops.isEmpty && floatingPop != null)
@@ -7958,26 +7556,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
-  /// Pre-Battle Staging Reserve Dock:
-  /// Displays units ready for placement with portraits, roles, stats, and drag-and-drop handles.
-  
-  Color _getRosterArchetypeColor(Archetype arc) {
-    switch (arc) {
-      case Archetype.juggernaut:
-        return const Color(0xFFC62828);
-      case Archetype.assassin:
-        return const Color(0xFF6A1B9A);
-      case Archetype.marksman:
-        return const Color(0xFF2E7D32);
-      case Archetype.skirmisher:
-        return const Color(0xFFE65100);
-      case Archetype.support:
-        return const Color(0xFF00838F);
-      case Archetype.occultist:
-        return const Color(0xFF4527A0);
-    }
-  }
-
   void _debugUnlockAllRetinueUnits() {
     final activeSpecies = _currentSquadUnits.map((u) => u.speciesId).toSet();
     final reserveSpecies = _reserveUnits.map((u) => u.speciesId).toSet();
@@ -8019,337 +7597,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
       },
     );
-    return;
-    if (_reserveUnits.isEmpty) return;
-    Archetype? filterArchetype;
-    bool filterCommandersOnly = false;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF101016),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        side: BorderSide(color: Color(0xFFE5A93C), width: 1.2),
-      ),
-      builder: (sheetCtx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final activeIds = _engine.playerUnits.map((u) => u.id).toSet();
-            final availableCandidates = _reserveUnits.where((u) => !activeIds.contains(u.id)).toList();
-
-            final filteredReserves = availableCandidates.where((u) {
-              if (filterCommandersOnly && !u.isCommander) return false;
-              if (filterArchetype != null && u.archetype != filterArchetype) return false;
-              return true;
-            }).toList();
-
-            final String headerTitle = targetUnit != null
-                ? 'SWAP OUT: ${targetUnit.name.toUpperCase()}'
-                : (_engine.playerUnits.length < 5
-                    ? 'DEPLOY REINFORCEMENT (${_engine.playerUnits.length}/5 IN SQUAD)'
-                    : 'SELECT RESERVE CHAMPION TO SWAP');
-
-            return SafeArea(
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.65,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Bar
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.swap_horiz, color: Color(0xFFFFD54F), size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              headerTitle,
-                              style: const TextStyle(
-                                color: Color(0xFFFFD54F),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                          onPressed: () => Navigator.pop(sheetCtx),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Filter Role Chips
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildRosterFilterChip('👑 COMMANDERS', filterCommandersOnly, () {
-                            setSheetState(() {
-                              filterCommandersOnly = !filterCommandersOnly;
-                            });
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('ALL ROLES', filterArchetype == null && !filterCommandersOnly, () {
-                            setSheetState(() {
-                              filterArchetype = null;
-                              filterCommandersOnly = false;
-                            });
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('JUGGERNAUT', filterArchetype == Archetype.juggernaut, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.juggernaut ? null : Archetype.juggernaut);
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('ASSASSIN', filterArchetype == Archetype.assassin, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.assassin ? null : Archetype.assassin);
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('MARKSMAN', filterArchetype == Archetype.marksman, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.marksman ? null : Archetype.marksman);
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('SKIRMISHER', filterArchetype == Archetype.skirmisher, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.skirmisher ? null : Archetype.skirmisher);
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('SUPPORT', filterArchetype == Archetype.support, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.support ? null : Archetype.support);
-                          }),
-                          const SizedBox(width: 4),
-                          _buildRosterFilterChip('OCCULTIST', filterArchetype == Archetype.occultist, () {
-                            setSheetState(() => filterArchetype = filterArchetype == Archetype.occultist ? null : Archetype.occultist);
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // List of Available Reserve Champions
-                    Expanded(
-                      child: filteredReserves.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'NO RESERVE CHAMPIONS MATCH CRITERIA',
-                                style: TextStyle(color: Color(0xFF8E8EA0), fontSize: 11),
-                              ),
-                            )
-                          : ListView.separated(
-                              itemCount: filteredReserves.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 6),
-                              itemBuilder: (ctx, idx) {
-                                final candidate = filteredReserves[idx];
-                                final arcColor = _getRosterArchetypeColor(candidate.archetype);
-
-                                return Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF14141E),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: arcColor.withValues(alpha: 0.5), width: 0.8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: Image.asset(
-                                          candidate.effectiveAvatarAsset,
-                                          width: 38,
-                                          height: 38,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Colors.white38),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  candidate.name,
-                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11.5),
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFE5A93C).withValues(alpha: 0.2),
-                                                    borderRadius: BorderRadius.circular(3),
-                                                  ),
-                                                  child: Text(
-                                                    'G${candidate.generation}',
-                                                    style: const TextStyle(color: Color(0xFFE5A93C), fontSize: 8.0, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                  decoration: BoxDecoration(
-                                                    color: arcColor.withValues(alpha: 0.25),
-                                                    borderRadius: BorderRadius.circular(3),
-                                                  ),
-                                                  child: Text(
-                                                    candidate.archetype.name.substring(0, 3).toUpperCase(),
-                                                    style: TextStyle(color: arcColor, fontSize: 8.0, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'HP ' + candidate.maxHp.toString() + ' • ATK ' + candidate.attack.toString() + ' • DEF ' + candidate.defense.toString() + ' • SPD ' + candidate.speed.toString(),
-                                              style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 8.5),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFF1E2638),
-                                                borderRadius: BorderRadius.circular(3),
-                                                border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.4), width: 0.6),
-                                              ),
-                                              child: Text(
-                                                candidate.speciesId.contains('footman')
-                                                    ? '🛡️ Bulwark: +25 Armor & -15% Dmg Taken'
-                                                    : (candidate.speciesId.contains('duelist')
-                                                        ? '🗡️ Stalker Edge: +15% Crit & +4 Cinders'
-                                                        : (candidate.speciesId.contains('reaver')
-                                                            ? '🔥 Reaver Ferocity: +20% ATK & +8 Cinders on Kill'
-                                                            : (candidate.speciesId.contains('sentinel')
-                                                                ? '🪨 Grave Carapace: +35% Barrier & Stagger Immune'
-                                                                : (candidate.speciesId.contains('scribe')
-                                                                    ? '🩸 Vitae Bond: +18% Lifesteal & +2 Cinders'
-                                                                    : (candidate.speciesId.contains('chanter')
-                                                                        ? '⏳ Temporal Weft: -20% CDR & +2,000 AP'
-                                                                        : (candidate.speciesId.contains('medicus')
-                                                                            ? '✨ Aura of Vitality: +25% Heals & +3% Regen'
-                                                                            : (candidate.speciesId.contains('arbalest')
-                                                                                ? '🎯 Siege Resonator: +25% AoE & +1 Splash'
-                                                                                : '⚔️ Companion Retinue Synergy'))))))),
-                                                style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 7.5, fontWeight: FontWeight.bold),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: (targetUnit == null && _engine.playerUnits.length < 5)
-                                              ? const Color(0xFF00E5FF)
-                                              : const Color(0xFFB3261E),
-                                          foregroundColor: (targetUnit == null && _engine.playerUnits.length < 5)
-                                              ? Colors.black
-                                              : Colors.white,
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          minimumSize: Size.zero,
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(sheetCtx);
-                                          _executeUnitSubstitution(targetUnit, candidate);
-                                        },
-                                        child: Text(
-                                          (targetUnit == null && _engine.playerUnits.length < 5) ? '+ ADD UNIT' : 'SWAP',
-                                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildRosterFilterChip(String label, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF1E1E28),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: isSelected ? const Color(0xFFE5A93C) : const Color(0xFF333344), width: 0.8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.black : Colors.white70,
-            fontSize: 8.5,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _executeUnitSubstitution(CombatUnitState? outgoingUnit, UnitEntity incomingUnit) {
-    // If outgoingUnit is null AND we have open squad slots (under max 5), ADD the unit to the squad
-    if (outgoingUnit == null && _engine.playerUnits.length < 5) {
-      if (_engine.playerUnits.any((u) => u.id == incomingUnit.id)) return;
-
-      _currentSquadUnits.add(incomingUnit);
-      _reserveUnits.removeWhere((u) => u.id == incomingUnit.id);
-
-      final success = _engine.addPlayerUnitFromReserve(incomingUnit, relicService: widget.relicService);
-      if (success) {
-        _playSfx('sfx_summon.wav');
-        widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
-        setState(() {
-          _selectedUnitId = incomingUnit.id;
-        });
-      }
-      return;
-    }
-
-    final outgoingId = outgoingUnit?.id ?? _engine.playerUnits.firstOrNull?.id;
-    if (outgoingId == null) return;
-
-    // 1. Locate replaced entity in _currentSquadUnits (if present)
-    final squadIdx = _currentSquadUnits.indexWhere((u) => u.id == outgoingId);
-    UnitEntity? replacedEntity;
-    if (squadIdx != -1) {
-      replacedEntity = _currentSquadUnits[squadIdx];
-      _currentSquadUnits[squadIdx] = incomingUnit;
-    } else {
-      _currentSquadUnits.add(incomingUnit);
-    }
-
-    // 2. Update reserve list
-    _reserveUnits.removeWhere((u) => u.id == incomingUnit.id);
-    if (replacedEntity != null && !_reserveUnits.any((u) => u.id == replacedEntity!.id)) {
-      _reserveUnits.add(replacedEntity);
-    }
-
-    // 3. Update engine playerUnits
-    final success = _engine.swapPlayerUnit(outgoingId, incomingUnit, relicService: widget.relicService);
-    if (success) {
-      _playSfx('sfx_summon.wav');
-      // 4. Notify parent shell to persist updated squad
-      widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
-      setState(() {
-        _selectedUnitId = incomingUnit.id;
-      });
-    }
   }
 
   Widget _buildPresetChip({
@@ -8641,45 +7888,47 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () {
-                      _playSfx('sfx_card.wav');
-                      CrucibleDebugSandboxDialog.show(
-                        context,
-                        engine: _engine,
-                        onStateChanged: () => setState(() {}),
-                        onUnlockAllUnits: _debugUnlockAllRetinueUnits,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF261D12),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
-                          width: 0.8,
+                  if (kDebugMode) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: () {
+                        _playSfx('sfx_card.wav');
+                        CrucibleDebugSandboxDialog.show(
+                          context,
+                          engine: _engine,
+                          onStateChanged: () => setState(() {}),
+                          onUnlockAllUnits: _debugUnlockAllRetinueUnits,
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF261D12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.build_circle, size: 11, color: Color(0xFFFFD54F)),
+                            SizedBox(width: 3),
+                            Text(
+                              'DEV SANDBOX',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Color(0xFFFFD54F),
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.build_circle, size: 11, color: Color(0xFFFFD54F)),
-                          SizedBox(width: 3),
-                          Text(
-                            'DEV SANDBOX',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Color(0xFFFFD54F),
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -9137,7 +8386,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           _draggedUnitId = unit.id;
           _selectedUnitId = unit.id;
           _selectedEnemyUnitId = null;
-          _selectedCardId = null;
         });
       },
       onDragEnd: (_) {
@@ -9166,777 +8414,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           setState(() {
             _selectedUnitId = (_selectedUnitId == unit.id) ? null : unit.id;
             _selectedEnemyUnitId = null;
-            _selectedCardId = null;
           });
         },
         onLongPress: () {
           _openUnitInspectorDialog(unit);
         },
         child: cardWidget,
-      ),
-    );
-  }
-
-  Widget _buildTacticalHandDock({bool isLandscapeMobile = false}) {
-    final double dockHeight = isLandscapeMobile ? 54.0 : 78.0;
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: isLandscapeMobile ? 3 : 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFF14141E),
-        border: Border(top: BorderSide(color: Color(0xFF282838), width: 1.5)),
-      ),
-      child: Row(
-        children: [
-          // Dynamic Burn Pit: Drag or Tap card here to exhaust for +1 Focus
-          DragTarget<String>(
-            onWillAcceptWithDetails: (details) => details.data.startsWith('card:'),
-            onAcceptWithDetails: (details) {
-              final cardId = details.data.replaceFirst('card:', '');
-              _engine.burnCard(cardId);
-            },
-            builder: (context, candidateData, rejectedData) {
-              final isHovered = candidateData.isNotEmpty;
-              return GestureDetector(
-                onTap: () {
-                  if (_engine.hand.isNotEmpty) {
-                    _engine.burnCard(_engine.hand.first.id);
-                  }
-                },
-                child: Container(
-                  width: isLandscapeMobile ? 58 : 72,
-                  height: dockHeight,
-                  decoration: BoxDecoration(
-                    color: isHovered ? const Color(0xFFFF5252).withValues(alpha: 0.35) : const Color(0xFF221115),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isHovered ? const Color(0xFFFF5252) : const Color(0xFFB3261E),
-                      width: isHovered ? 2.0 : 1.2,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.local_fire_department,
-                        color: isHovered ? const Color(0xFFFF5252) : const Color(0xFFB3261E),
-                        size: isLandscapeMobile ? 18 : 24,
-                      ),
-                      if (!isLandscapeMobile) const SizedBox(height: 2),
-                      Text(
-                        'BURN PIT',
-                        style: TextStyle(
-                          fontSize: isLandscapeMobile ? 7.5 : 8.5,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFFFF8A80),
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                      Text(
-                        '+1 FOCUS',
-                        style: TextStyle(fontSize: isLandscapeMobile ? 6.5 : 7.5, color: const Color(0xFFFFD54F)),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 6),
-
-          // Grimoire Redraw Button (1 Focus cost to cycle hand)
-          GestureDetector(
-            onTap: () {
-              if (_engine.isPreBattlePhase) {
-                setState(() {
-                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle first!';
-                });
-                return;
-              }
-              if (_engine.focus < 1) {
-                setState(() {
-                  _engine.lastBannerMessage = '⚠️ NEED 1 FOCUS TO REDRAW GRIMOIRE!';
-                });
-                return;
-              }
-              _playSfx('sfx_card.wav');
-              _engine.redrawHand();
-              setState(() {
-                _selectedCardId = null;
-                _hoveredCardId = null;
-              });
-            },
-            child: Container(
-              width: isLandscapeMobile ? 54 : 66,
-              height: dockHeight,
-              decoration: BoxDecoration(
-                color: _engine.focus >= 1 ? const Color(0xFF142434) : const Color(0xFF181C22),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: _engine.focus >= 1 ? const Color(0xFF00E5FF) : Colors.white24,
-                  width: _engine.focus >= 1 ? 1.2 : 0.8,
-                ),
-                boxShadow: _engine.focus >= 1
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                          blurRadius: 6,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.autorenew_rounded,
-                    color: _engine.focus >= 1 ? const Color(0xFF00E5FF) : Colors.white38,
-                    size: isLandscapeMobile ? 18 : 22,
-                  ),
-                  if (!isLandscapeMobile) const SizedBox(height: 2),
-                  Text(
-                    'REDRAW',
-                    style: TextStyle(
-                      fontSize: isLandscapeMobile ? 7.5 : 8.5,
-                      fontWeight: FontWeight.w900,
-                      color: _engine.focus >= 1 ? const Color(0xFF80D8FF) : Colors.white38,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  Text(
-                    '1 FOCUS',
-                    style: TextStyle(
-                      fontSize: isLandscapeMobile ? 6.5 : 7.0,
-                      fontWeight: FontWeight.bold,
-                      color: _engine.focus >= 1 ? const Color(0xFFFFD54F) : Colors.white38,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Cards in Hand
-          Expanded(
-            child: SizedBox(
-              height: dockHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _engine.hand.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 6),
-                itemBuilder: (context, idx) {
-                  final card = _engine.hand[idx];
-                  final canAfford = _engine.focus >= card.focusCost;
-
-                    final isCardSelected = _selectedCardId == card.id;
-
-                    return MouseRegion(
-                      onEnter: (_) {
-                        setState(() {
-                          _hoveredCardId = card.id;
-                        });
-                      },
-                      onExit: (_) {
-                        setState(() {
-                          if (_hoveredCardId == card.id) {
-                            _hoveredCardId = null;
-                          }
-                        });
-                      },
-                      child: Draggable<String>(
-                        data: 'card:${card.id}',
-                        onDragStarted: () {
-                          setState(() {
-                            _draggedCard = card;
-                            _selectedCardId = null;
-                            _hoveredCardId = null;
-                          });
-                          _engine.setBulletTime(true);
-                        },
-                        onDragEnd: (_) {
-                          setState(() {
-                            _draggedCard = null;
-                            _hoveredTileGRow = null;
-                            _hoveredTileCol = null;
-                          });
-                          _engine.setBulletTime(false);
-                        },
-                        feedback: Material(
-                          color: Colors.transparent,
-                          child: _buildCardTile(card, canAfford, isFeedback: true, isLandscapeMobile: isLandscapeMobile),
-                        ),
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            if (!canAfford) {
-                              setState(() {
-                                _engine.lastBannerMessage =
-                                    '⚠️ NEED ${card.focusCost} FOCUS (HAVE ${_engine.focus})';
-                              });
-                              return;
-                            }
-
-                            // If card is non-targeted (Stoke the Embers or Wrath of Ashlar), cast immediately!
-                            if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
-                              if (_engine.isPreBattlePhase) {
-                                setState(() {
-                                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before casting spells!';
-                                });
-                                return;
-                              }
-                              _playSfx('sfx_card.wav');
-                              _engine.castCard(card.id);
-                              setState(() {
-                                _selectedCardId = null;
-                              });
-                              return;
-                            }
-
-                            // If unit is already selected, cast immediately on it!
-                            if (card.id == 'phalanx_intercept') {
-                              if (_engine.isPreBattlePhase) {
-                                setState(() {
-                                  _engine.lastBannerMessage = '⚠️ DEPLOYMENT PHASE: Initiate battle before casting spells!';
-                                });
-                                return;
-                              }
-                              final targetAlly = _selectedUnitId != null
-                                  ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
-                                  : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
-                              if (targetAlly != null) {
-                                _playSfx('sfx_card.wav');
-                                _engine.castCard(card.id, targetUnit: targetAlly);
-                                setState(() {
-                                  _selectedCardId = null;
-                                });
-                                return;
-                              }
-                            }
-
-                            // Otherwise, toggle card selection for pull-up inspection & click-to-target
-                            setState(() {
-                              if (_selectedCardId == card.id) {
-                                // Double tap on armed card auto-targets primary enemy / Gorgoroth!
-                                if (!_engine.isPreBattlePhase) {
-                                  final boss = _engine.enemyUnits.where((u) => u.id == 'gorgoroth_boss' && u.isAlive).firstOrNull ??
-                                      _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
-                                  if (boss != null) {
-                                    _playSfx('sfx_card.wav');
-                                    _engine.castCard(card.id, targetUnit: boss);
-                                    _selectedCardId = null;
-                                    return;
-                                  }
-                                }
-                                _selectedCardId = null;
-                              } else {
-                                _playSfx('sfx_card.wav');
-                                _selectedCardId = card.id;
-                                if (_engine.isPreBattlePhase) {
-                                  _engine.lastBannerMessage = '🔍 ${card.name.toUpperCase()} (PULLED UP): Reviewing spell details. Start battle to cast!';
-                                } else {
-                                  _engine.lastBannerMessage = '✨ ${card.name.toUpperCase()} ARMED: Tap an enemy node or tap CAST SPELL!';
-                                }
-                              }
-                            });
-                          },
-                          child: _buildCardTile(
-                            card,
-                            canAfford,
-                            isSelected: isCardSelected,
-                            isHovered: _hoveredCardId == card.id,
-                            isLandscapeMobile: isLandscapeMobile,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget _buildCardTile(
-      SpatialCombatCard card,
-      bool canAfford, {
-      bool isFeedback = false,
-      bool isSelected = false,
-      bool isHovered = false,
-      bool isPulledUp = false,
-      bool isLandscapeMobile = false,
-    }) {
-      final double cardW = isPulledUp
-          ? (isLandscapeMobile ? 120.0 : 155.0)
-          : (isFeedback ? 85.0 : (isLandscapeMobile ? 68.0 : 78.0));
-      final double cardH = isPulledUp
-          ? (isLandscapeMobile ? 165.0 : 215.0)
-          : (isFeedback ? 120.0 : (isLandscapeMobile ? 62.0 : 76.0));
-
-      final Color borderColor = isSelected || isPulledUp
-          ? const Color(0xFFFFD54F)
-          : (isHovered
-              ? const Color(0xFF00E5FF)
-              : (canAfford ? const Color(0xFFD4AF37) : const Color(0xFF383848)));
-
-      return Container(
-        width: cardW,
-        height: cardH,
-        decoration: BoxDecoration(
-          color: const Color(0xFF101016),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: borderColor,
-            width: isSelected || isFeedback ? 2.0 : 1.0,
-          ),
-          boxShadow: isFeedback || isSelected
-              ? [
-                  BoxShadow(
-                    color: (isSelected ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.6),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : [
-                  const BoxShadow(
-                    color: Colors.black54,
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            // 1. Dark backing fill
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFF0D0D14),
-              ),
-            ),
-
-            // 2. Wargaming Physical Dark-Iron Riveted Frame
-            Positioned.fill(
-              child: Image.asset(
-                'assets/images/Spells/wargaming_card_frame.png',
-                fit: BoxFit.fill,
-                errorBuilder: (_, __, ___) => Image.asset(
-                  'assets/images/Spells/Spell frame template.jpg',
-                  fit: BoxFit.fill,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-
-            // 3. Central Spell Artwork with BlendMode.multiply to knockout white backgrounds seamlessly!
-            Positioned(
-              left: cardW * 0.190,
-              top: cardH * 0.20,
-              width: cardW * 0.620,
-              height: cardH * 0.35,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF14141E),
-                  borderRadius: BorderRadius.circular(2),
-                  border: Border.all(color: const Color(0xFF282838), width: 0.8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: Image.asset(
-                    card.assetPath,
-                    fit: BoxFit.cover,
-                    color: const Color(0xFF202028),
-                    colorBlendMode: BlendMode.multiply, // Eliminates white JPG backing!
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFF161622),
-                      child: const Center(
-                        child: Icon(Icons.auto_awesome, size: 16, color: Color(0xFFFFD54F)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // 4. Circular Metallic Focus Socket (top-left)
-            Positioned(
-              top: cardH * 0.04,
-              left: cardW * 0.06,
-              child: Container(
-                width: cardW * 0.22,
-                height: cardW * 0.22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: canAfford
-                        ? const [Color(0xFFFFD54F), Color(0xFFE65100)]
-                        : const [Color(0xFF37474F), Color(0xFF1A2327)],
-                  ),
-                  border: Border.all(
-                    color: canAfford ? const Color(0xFFFFE082) : const Color(0xFF546E7A),
-                    width: 0.8,
-                  ),
-                  boxShadow: canAfford
-                      ? const [BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4)]
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    '${card.focusCost}',
-                    style: TextStyle(
-                      color: canAfford ? Colors.black : Colors.white70,
-                      fontSize: cardW * 0.12,
-                      fontWeight: FontWeight.w900,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // 5. Header Plaque: Spell Name
-            Positioned(
-              top: cardH * 0.05,
-              left: cardW * 0.28,
-              right: cardW * 0.10,
-              height: cardH * 0.12,
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    card.name.toUpperCase(),
-                    style: const TextStyle(
-                      color: Color(0xFFFFE082),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
-                      shadows: [
-                        Shadow(color: Colors.black, blurRadius: 2, offset: Offset(0.5, 0.5)),
-                      ],
-                    ),
-                    maxLines: 1,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-
-            // 6. Recessed Stone Plaque: Rules Description
-            Positioned(
-              left: cardW * 0.10,
-              right: cardW * 0.10,
-              top: cardH * 0.58,
-              bottom: cardH * 0.08,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                  child: Text(
-                    card.description,
-                    style: TextStyle(
-                      color: const Color(0xFFF0F0F5),
-                      fontSize: isPulledUp ? (isLandscapeMobile ? 9.5 : 11.5) : (cardW * 0.09).clamp(6.0, 9.0),
-                      height: 1.15,
-                      fontWeight: FontWeight.w700,
-                      shadows: const [
-                        Shadow(color: Colors.black, blurRadius: 2.0, offset: Offset(0.5, 0.5)),
-                      ],
-                    ),
-                    maxLines: isPulledUp ? 5 : 3,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-  Widget _buildPulledUpCardOverlay({bool isLandscapeMobile = false}) {
-    final activeId = _selectedCardId ?? _hoveredCardId;
-    if (activeId == null) return const SizedBox.shrink();
-
-    final card = _engine.hand.where((c) => c.id == activeId).firstOrNull;
-    if (card == null) return const SizedBox.shrink();
-
-    final canAfford = _engine.focus >= card.focusCost;
-    final isArmed = _selectedCardId == card.id;
-
-    // Pattern label helper
-    String patternLabel;
-    IconData patternIcon;
-    switch (card.pattern) {
-      case TargetPattern.singleTarget:
-        patternLabel = 'SINGLE TARGET';
-        patternIcon = Icons.adjust;
-        break;
-      case TargetPattern.stAshlarCross:
-        patternLabel = 'CROSS SPLASH (1 TILE)';
-        patternIcon = Icons.flare;
-        break;
-      case TargetPattern.piercingColumnSkewer:
-        patternLabel = 'COLUMN PIERCING';
-        patternIcon = Icons.view_column;
-        break;
-      case TargetPattern.horizontalRowScythe:
-        patternLabel = 'ENTIRE ROW';
-        patternIcon = Icons.table_rows;
-        break;
-      case TargetPattern.tShapedCleave:
-        patternLabel = 'T-SHAPED CLEAVE';
-        patternIcon = Icons.call_split;
-        break;
-      case TargetPattern.reachMidToFront:
-        patternLabel = 'REACH ATTACK';
-        patternIcon = Icons.arrow_upward;
-        break;
-      case TargetPattern.flankShadowLeap:
-        patternLabel = 'FLANK SHADOW LEAP';
-        patternIcon = Icons.flight_takeoff;
-        break;
-    }
-
-    return Positioned(
-      bottom: isLandscapeMobile ? 12 : 18,
-      right: isLandscapeMobile ? 12 : 24,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: isLandscapeMobile ? 320 : 380,
-          ),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF101018).withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)).withValues(alpha: 0.35),
-                blurRadius: 16,
-                spreadRadius: 2,
-              ),
-              const BoxShadow(
-                color: Colors.black87,
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Row: Card Title & Dismiss Icon
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(patternIcon, size: 14, color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF)),
-                      const SizedBox(width: 6),
-                      Text(
-                        isArmed ? 'SPELL ARMED & PULLED UP' : 'SPELL DETAILS',
-                        style: TextStyle(
-                          color: isArmed ? const Color(0xFFFFD54F) : const Color(0xFF00E5FF),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedCardId = null;
-                        _hoveredCardId = null;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: const Padding(
-                      padding: EdgeInsets.all(2.0),
-                      child: Icon(Icons.close, size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Body: Enlarged Card Art + Descriptive Meta
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Enlarged Card Tile (Pulled-up wargaming frame)
-                  _buildCardTile(
-                    card,
-                    canAfford,
-                    isSelected: isArmed,
-                    isPulledUp: true,
-                    isLandscapeMobile: isLandscapeMobile,
-                  ),
-                  const SizedBox(width: 10),
-
-                  // Metadata Column
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          card.name.toUpperCase(),
-                          style: const TextStyle(
-                            color: Color(0xFFFFE082),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1C1D2A),
-                            borderRadius: BorderRadius.circular(3),
-                            border: Border.all(color: Colors.white24, width: 0.6),
-                          ),
-                          child: Text(
-                            patternLabel,
-                            style: const TextStyle(
-                              color: Color(0xFF80D8FF),
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          card.description,
-                          style: const TextStyle(
-                            color: Color(0xFFECEFF1),
-                            fontSize: 10.5,
-                            height: 1.25,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.bolt, color: Color(0xFFFFD54F), size: 14),
-                            const SizedBox(width: 3),
-                            Text(
-                              'COST: ${card.focusCost} FOCUS',
-                              style: TextStyle(
-                                color: canAfford ? const Color(0xFFFFD54F) : const Color(0xFFFF5252),
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              // Action Bar
-              if (_engine.isPreBattlePhase)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2B1D0E),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFFB300).withValues(alpha: 0.5)),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '⚠️ DEPLOYMENT: Initiate battle to unleash spells',
-                      style: TextStyle(
-                        color: Color(0xFFFFD54F),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.auto_awesome, size: 14),
-                        label: Text(
-                          canAfford ? 'CAST SPELL' : 'NEED ${card.focusCost} FOCUS',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: canAfford ? const Color(0xFFB8860B) : Colors.white10,
-                          foregroundColor: canAfford ? Colors.black : Colors.white38,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                        ),
-                        onPressed: canAfford
-                            ? () {
-                                _playSfx('sfx_card.wav');
-                                if (card.id == 'stoke_the_embers' || card.id == 'sun_ashlar_wrath') {
-                                  _engine.castCard(card.id);
-                                  setState(() {
-                                    _selectedCardId = null;
-                                  });
-                                  return;
-                                }
-                                if (card.id == 'phalanx_intercept') {
-                                  final targetAlly = _selectedUnitId != null
-                                      ? _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull
-                                      : _engine.playerUnits.where((u) => u.isAlive).firstOrNull;
-                                  if (targetAlly != null) {
-                                    _engine.castCard(card.id, targetUnit: targetAlly);
-                                    setState(() {
-                                      _selectedCardId = null;
-                                    });
-                                    return;
-                                  }
-                                }
-                                final targetEnemy = _engine.enemyUnits.where((u) => u.isAlive).firstOrNull;
-                                if (targetEnemy != null) {
-                                  _engine.castCard(card.id, targetUnit: targetEnemy);
-                                  setState(() {
-                                    _selectedCardId = null;
-                                  });
-                                }
-                              }
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _selectedCardId = null;
-                          _hoveredCardId = null;
-                        });
-                      },
-                      child: const Text('DISMISS', style: TextStyle(fontSize: 9.5)),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -9965,6 +8448,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     if (_selectedEnemyUnitId == null) {
       setState(() {
         _selectedEnemyUnitId = livingEnemies.first.id;
+        _engine.focusedEnemyUnitId = _selectedEnemyUnitId;
       });
       return;
     }
@@ -9973,10 +8457,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     final nextIndex = (currentIndex + 1) % livingEnemies.length;
     setState(() {
       _selectedEnemyUnitId = livingEnemies[nextIndex].id;
+      _engine.focusedEnemyUnitId = _selectedEnemyUnitId;
     });
   }
 
   void _executeHotkeyedAction(String actionType) {
+    if (_engine.isPreBattlePhase || _engine.isVictory || _engine.isDefeat || _isForgeStrikeActive) {
+      return;
+    }
     final unit = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ??
         _engine.activeActingUnit;
     if (unit == null || !unit.isAlive) return;
@@ -10003,7 +8491,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           return;
         }
         if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
-          _startForgeStrikeFinisher(unit, explicitTarget);
+          _startForgeStrikeFinisher(unit, explicitTarget, actionType: skill.actionType);
         } else {
           setState(() {
             _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: skill.actionType);
@@ -10018,7 +8506,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         final bool isGenerator = skill.cinderCost == 0;
         if (!isGenerator && unit.crucibleCinders < skill.cinderCost) return;
         if (skill.cinderCost >= 80 || skill.actionType.contains('cataclysmic') || skill.actionType.contains('pyre') || skill.actionType.contains('wrath') || skill.actionType.contains('exsanguination') || skill.actionType.contains('spore')) {
-          _startForgeStrikeFinisher(unit, explicitTarget);
+          _startForgeStrikeFinisher(unit, explicitTarget, actionType: skill.actionType);
         } else {
           setState(() {
             _engine.executeUnitAction(unit, isReposition: false, explicitTarget: explicitTarget, actionType: skill.actionType);
@@ -10959,7 +9447,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                               const SizedBox(width: 2),
                                             ],
                                             Text(
-                                              isSigReady ? 'ORDER' : '${comp.signatureCooldown}s CD',
+                                              isSigReady ? 'ORDER' : '${comp.signatureCooldown}T CD',
                                               style: TextStyle(
                                                 fontSize: 7.5,
                                                 fontWeight: FontWeight.w900,
@@ -11074,7 +9562,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       tooltipMessage: '${skill.name} (Rank ${skill.rank}/${skill.maxRank}): ${skill.currentRankDescription}',
                       onPressed: () {
                         if (isFinisher) {
-                          _startForgeStrikeFinisher(unit, explicitTarget);
+                          _startForgeStrikeFinisher(unit, explicitTarget, actionType: skill.actionType);
                         } else {
                           setState(() {
                             _engine.executeUnitAction(
@@ -11092,631 +9580,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTurnActionDecisionTray(CombatUnitState unit, {bool isLandscapeMobile = false}) {
-    final sculptor = _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ?? unit;
-    return _buildSculptorCommanderTray(sculptor, isLandscapeMobile: isLandscapeMobile);
-  }
-
-  // Legacy manual unit tray (retired in Crucible Commander mode)
-  Widget _buildLegacyUnitTurnTrayUnused(CombatUnitState unit, {bool isLandscapeMobile = false}) {
-
-    final int curCol = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.column : 0;
-    final int curRow = unit.occupiedNodes.isNotEmpty ? unit.occupiedNodes.first.row : 0;
-    final explicitTarget = _selectedEnemyUnitId != null
-        ? _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull
-        : _getSmartDefaultTarget();
-
-    // Helper: Action 1 - Basic Attack
-    Widget buildBasicButton({required bool isNarrow}) {
-      return Tooltip(
-        preferBelow: false,
-        verticalOffset: 28,
-        waitDuration: Duration.zero,
-        showDuration: const Duration(seconds: 4),
-        triggerMode: TooltipTriggerMode.tap,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1014),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFFF5252), width: 1.2),
-          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-        ),
-        richMessage: TextSpan(
-          children: [
-            const TextSpan(
-              text: '⚔️ BASIC ATTACK\n',
-              style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF8A80), fontSize: 11),
-            ),
-            TextSpan(
-              text: 'Deals 100% Attack (${unit.effectiveAttack} DMG) to frontline/column target.\nCharges +15% Ultimate Gauge.',
-              style: const TextStyle(color: Colors.white70, fontSize: 10),
-            ),
-          ],
-        ),
-        child: SizedBox(
-          height: isNarrow ? 40 : null,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFB3261E),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-                side: const BorderSide(color: Color(0xFFFF8A80), width: 1.2),
-              ),
-            ),
-            onPressed: () {
-              setState(() {
-                _engine.executeUnitAction(
-                  unit,
-                  isReposition: false,
-                  explicitTarget: explicitTarget,
-                  actionType: 'basic',
-                );
-              });
-            },
-            child: isNarrow
-                ? const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sports_mma, size: 11, color: Colors.white),
-                          SizedBox(width: 2),
-                          Text(
-                            'BASIC',
-                            style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 1),
-                      Text(
-                        '100% TM',
-                        style: TextStyle(fontSize: 6.5, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.sports_mma, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        '⚔️ [1] BASIC ATTACK\n(STRIKE)',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, height: 1.15),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-      );
-    }
-
-    // Helper: Action 2 - Signature Skill
-    Widget buildSignatureButton({required bool isNarrow}) {
-      return Tooltip(
-        preferBelow: false,
-        verticalOffset: 28,
-        waitDuration: Duration.zero,
-        showDuration: const Duration(seconds: 4),
-        triggerMode: TooltipTriggerMode.tap,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1026),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFEA80FC), width: 1.2),
-          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-        ),
-        richMessage: TextSpan(
-          children: [
-            TextSpan(
-              text: '★ [2] ${unit.signatureSkillName.toUpperCase()}\n',
-              style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEA80FC), fontSize: 11),
-            ),
-            TextSpan(
-              text: '${unit.signatureSkillDescription}\nCooldown: 2 Turns (Charges +25% Ultimate Gauge)',
-              style: const TextStyle(color: Colors.white70, fontSize: 10),
-            ),
-          ],
-        ),
-        child: SizedBox(
-          height: isNarrow ? 40 : null,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: unit.isSignatureReady ? const Color(0xFF7B1FA2) : const Color(0xFF2C253B),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-                side: BorderSide(
-                  color: unit.isSignatureReady ? const Color(0xFFEA80FC) : Colors.white24,
-                  width: 1.2,
-                ),
-              ),
-            ),
-            onPressed: unit.isSignatureReady
-                ? () {
-                    setState(() {
-                      _engine.executeUnitAction(
-                        unit,
-                        isReposition: false,
-                        explicitTarget: explicitTarget,
-                        actionType: 'signature',
-                      );
-                    });
-                  }
-                : null,
-            child: isNarrow
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 11, color: Colors.white),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: Text(
-                              unit.signatureSkillName.toUpperCase(),
-                              style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Colors.white),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        unit.isSignatureReady ? 'READY' : '${unit.signatureCooldown}T CD',
-                        style: TextStyle(
-                          fontSize: 6.5,
-                          color: unit.isSignatureReady ? const Color(0xFFE1BEE7) : Colors.white38,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(unit.isSignatureReady ? Icons.auto_awesome : Icons.timer, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        unit.isSignatureReady
-                            ? '★ ${unit.signatureSkillName.toUpperCase()}\n(READY!)'
-                            : '★ ${unit.signatureSkillName.toUpperCase()}\n(${unit.signatureCooldown} Turns CD)',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                          color: unit.isSignatureReady ? Colors.white : Colors.white54,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-      );
-    }
-
-    // Helper: Action 3 - Ultimate Ability
-    Widget buildUltimateButton({required bool isNarrow}) {
-      return Tooltip(
-        preferBelow: false,
-        verticalOffset: 28,
-        waitDuration: Duration.zero,
-        showDuration: const Duration(seconds: 4),
-        triggerMode: TooltipTriggerMode.tap,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF262010),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
-          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 10)],
-        ),
-        richMessage: TextSpan(
-          children: [
-            TextSpan(
-              text: '⚡ ${unit.ultimateTitle.toUpperCase()}\n',
-              style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), fontSize: 11),
-            ),
-            TextSpan(
-              text: '${unit.ultimateDescription}\nCooldown: 3 Turns (Skill-based cooldown, ready at battle opening)',
-              style: const TextStyle(color: Colors.white70, fontSize: 10),
-            ),
-          ],
-        ),
-        child: SizedBox(
-          height: isNarrow ? 40 : null,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: unit.isUltimateReady ? const Color(0xFFFFD54F) : const Color(0xFF262C38),
-              foregroundColor: unit.isUltimateReady ? Colors.black : Colors.white54,
-              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 6, vertical: isNarrow ? 2 : 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
-                side: BorderSide(
-                  color: unit.isUltimateReady ? const Color(0xFFFFE082) : Colors.white24,
-                  width: 1.2,
-                ),
-              ),
-            ),
-            onPressed: unit.isUltimateReady
-                ? () {
-                    setState(() {
-                      _engine.executeUnitAction(
-                        unit,
-                        isReposition: false,
-                        explicitTarget: explicitTarget,
-                        actionType: 'ultimate',
-                      );
-                    });
-                  }
-                : null,
-            child: isNarrow
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top,
-                              size: 11, color: unit.isUltimateReady ? Colors.black : Colors.white38),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: Text(
-                              unit.ultimateTitle.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 8.0,
-                                fontWeight: FontWeight.w900,
-                                color: unit.isUltimateReady ? Colors.black : Colors.white54,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        unit.isUltimateReady ? 'READY' : '${unit.ultimateCooldown}T CD',
-                        style: TextStyle(
-                          fontSize: 6.5,
-                          color: unit.isUltimateReady ? const Color(0xFF3E2723) : Colors.white38,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(unit.isUltimateReady ? Icons.bolt : Icons.hourglass_top, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        unit.isUltimateReady
-                            ? '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(READY!)'
-                            : '⚡ [3] ${unit.ultimateTitle.toUpperCase()}\n(${unit.ultimateCooldown} Turns CD)',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                          color: unit.isUltimateReady ? const Color(0xFF212121) : Colors.white54,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-      );
-    }
-
-    // Helper: Action 4 - Shift / Reposition
-    Widget buildShiftButton({required bool isNarrow}) {
-      return PopupMenuButton<String>(
-        tooltip: 'Shift 1 tile along rank or column',
-        color: const Color(0xFF1E1E2C),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(6),
-          side: const BorderSide(color: Color(0xFF00E5FF), width: 1.2),
-        ),
-        onSelected: (dir) {
-          int targetCol = curCol;
-          int targetRow = curRow;
-          if (dir == 'front' && curRow > 0) targetRow--;
-          if (dir == 'back' && curRow < 2) targetRow++;
-          if (dir == 'left' && curCol > 0) targetCol--;
-          if (dir == 'right' && curCol < 4) targetCol++;
-
-          setState(() {
-            _engine.executeUnitAction(
-              unit,
-              isReposition: true,
-              shiftCol: targetCol,
-              shiftRow: targetRow,
-            );
-          });
-        },
-        itemBuilder: (context) => [
-          if (curRow > 0)
-            const PopupMenuItem(
-              value: 'front',
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_upward, color: Color(0xFF00E5FF), size: 14),
-                  SizedBox(width: 8),
-                  Text('Advance to Frontline', style: TextStyle(color: Colors.white, fontSize: 11)),
-                ],
-              ),
-            ),
-          if (curRow < 2)
-            const PopupMenuItem(
-              value: 'back',
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_downward, color: Color(0xFF00E5FF), size: 14),
-                  SizedBox(width: 8),
-                  Text('Fall Back 1 Rank', style: TextStyle(color: Colors.white, fontSize: 11)),
-                ],
-              ),
-            ),
-          if (curCol > 0)
-            const PopupMenuItem(
-              value: 'left',
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_back, color: Color(0xFF00E5FF), size: 14),
-                  SizedBox(width: 8),
-                  Text('Shift Left (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
-                ],
-              ),
-            ),
-          if (curCol < 4)
-            const PopupMenuItem(
-              value: 'right',
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_forward, color: Color(0xFF00E5FF), size: 14),
-                  SizedBox(width: 8),
-                  Text('Shift Right (Col)', style: TextStyle(color: Colors.white, fontSize: 11)),
-                ],
-              ),
-            ),
-        ],
-        child: Container(
-          height: isNarrow ? 40 : null,
-          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 2 : 4, vertical: isNarrow ? 2 : 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF006064),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFF00E5FF), width: 1.2),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.swap_horiz, color: Color(0xFFE0F7FA), size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    'SHIFT',
-                    style: TextStyle(fontSize: isNarrow ? 8.5 : 9.5, fontWeight: FontWeight.w900, color: const Color(0xFFE0F7FA)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 1),
-              Text(
-                '25% TM',
-                style: TextStyle(fontSize: isNarrow ? 6.5 : 7.5, color: const Color(0xFF80DEEA), fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isNarrow = constraints.maxWidth < 650;
-
-        return Container(
-          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 10, vertical: isNarrow ? 5 : 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1B1926),
-            border: Border(
-              top: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
-              bottom: BorderSide(color: Colors.black.withValues(alpha: 0.6), width: 1.0),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFD54F).withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: isNarrow
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Tier 1: Hero Header & Target Bar (Ultra-clean, 20px)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.asset(
-                              unit.assetPath,
-                              width: 20,
-                              height: 20,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 16),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFD54F),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: const Text(
-                              'TURN READY',
-                              style: TextStyle(fontSize: 7.0, color: Colors.black, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              unit.name.toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontSize: 10.0, fontWeight: FontWeight.w900),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (explicitTarget != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF3E1E24),
-                                borderRadius: BorderRadius.circular(2),
-                                border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.gps_fixed, size: 8, color: Color(0xFFFF8A80)),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    explicitTarget.name,
-                                    style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 7.5, fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-
-                    // Tier 2: 4 Action Buttons spanning the full width
-                    Row(
-                      children: [
-                        Expanded(child: buildBasicButton(isNarrow: true)),
-                        const SizedBox(width: 4),
-                        Expanded(child: buildSignatureButton(isNarrow: true)),
-                        const SizedBox(width: 4),
-                        Expanded(child: buildUltimateButton(isNarrow: true)),
-                        const SizedBox(width: 4),
-                        Expanded(child: buildShiftButton(isNarrow: true)),
-                      ],
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    // Unit Avatar & Turn Ready Indicator (Desktop)
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F1A),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFFFD54F), width: 1.2),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.asset(
-                              unit.assetPath,
-                              width: isLandscapeMobile ? 28 : 38,
-                              height: isLandscapeMobile ? 28 : 38,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFFFFD54F), size: 24),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFD54F),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                    child: const Text(
-                                      'TURN READY (10,000 TM)',
-                                      style: TextStyle(fontSize: 6.5, color: Colors.black, fontWeight: FontWeight.w900),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF37474F),
-                                      borderRadius: BorderRadius.circular(2),
-                                      border: Border.all(color: const Color(0xFF90A4AE), width: 0.5),
-                                    ),
-                                    child: Text(
-                                      unit.archetype.name.toUpperCase(),
-                                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFECEFF1), fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                unit.name.toUpperCase(),
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-                              ),
-                              Text(
-                                'Col ${curCol + 1}, Row ${curRow == 0 ? "Front" : (curRow == 1 ? "Mid" : "Back")}',
-                                style: const TextStyle(color: Colors.white54, fontSize: 8.5),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    Expanded(child: buildBasicButton(isNarrow: false)),
-                    const SizedBox(width: 6),
-                    Expanded(child: buildSignatureButton(isNarrow: false)),
-                    const SizedBox(width: 6),
-                    Expanded(child: buildUltimateButton(isNarrow: false)),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: isLandscapeMobile ? 86 : 96,
-                      child: buildShiftButton(isNarrow: false),
-                    ),
-                  ],
-                ),
         );
       },
     );
@@ -11995,32 +9858,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
-  Widget _buildCombatLogConsole() {
-    return Container(
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: const Color(0xFF0A0A10),
-      child: ListView.builder(
-        itemCount: _engine.combatLogs.length,
-        itemBuilder: (context, idx) {
-          final log = _engine.combatLogs[idx];
-          final isCrit = log.contains('CRITICAL') || log.contains('SHATTERS');
-          final isTelegraph = log.contains('TELEGRAPH') || log.contains('⚠️');
-
-          return Text(
-            log,
-            style: TextStyle(
-              fontSize: 8.5,
-              color: isCrit
-                  ? const Color(0xFFFFD54F)
-                  : (isTelegraph ? const Color(0xFFFF5252) : Colors.white60),
-              fontFamily: 'monospace',
-            ),
-          );
-        },
-      ),
-    );
-  }
   Widget _buildAshenReckoningPill() {
     final phase = _engine.currentPhase;
     Color badgeColor = const Color(0xFF80D8FF);
@@ -12098,18 +9935,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   // OPTION 3: INTERACTIVE FORGE STRIKE TACTILE FINISHER
   // =========================================================================
 
-  void _startForgeStrikeFinisher(CombatUnitState unit, CombatUnitState? explicitTarget) {
+  void _startForgeStrikeFinisher(CombatUnitState unit, CombatUnitState? explicitTarget, {String actionType = 'cataclysmic_pyre'}) {
     if (_engine.isAutoBattleMode) {
       _engine.executeUnitAction(
         unit,
         isReposition: false,
         explicitTarget: explicitTarget,
-        actionType: 'cataclysmic_pyre_crit',
+        actionType: '${actionType}_crit',
       );
       return;
     }
 
     setState(() {
+      _forgeStrikeActionType = actionType;
+      _wasRunningBeforeForgeStrike = _engine.isRunning;
+      _engine.isRunning = false;
       _isForgeStrikeActive = true;
       _forgeStrikeProgress = 0.0;
       _forgeStrikeHit = false;
@@ -12165,13 +10005,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       if (!mounted) return;
       setState(() {
         _isForgeStrikeActive = false;
+        _engine.isRunning = _wasRunningBeforeForgeStrike;
       });
       if (_forgeStrikeUnit != null) {
         _engine.executeUnitAction(
           _forgeStrikeUnit!,
           isReposition: false,
           explicitTarget: _forgeStrikeTarget,
-          actionType: isPerfect ? 'cataclysmic_pyre_crit' : 'cataclysmic_pyre',
+          actionType: isPerfect ? '${_forgeStrikeActionType}_crit' : _forgeStrikeActionType,
         );
       }
     });
@@ -12373,1591 +10214,4 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
-}
-
-class IsometricDiamondTilePainter extends CustomPainter {
-  final Color fillColor;
-  final Color borderColor;
-  final double borderWidth;
-  final bool hasGlow;
-  final Color glowColor;
-
-  const IsometricDiamondTilePainter({
-    required this.fillColor,
-    required this.borderColor,
-    this.borderWidth = 1.2,
-    this.hasGlow = false,
-    this.glowColor = const Color(0xFFFF1744),
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-
-    // Main 2:1 Isometric Diamond Face
-    final diamondPath = Path()
-      ..moveTo(w * 0.5, 0)
-      ..lineTo(w, h * 0.5)
-      ..lineTo(w * 0.5, h)
-      ..lineTo(0, h * 0.5)
-      ..close();
-
-    // Glow effect (telegraphed zones, selected, or reachable moves)
-    if (hasGlow) {
-      final glowPaint = Paint()
-        ..color = glowColor.withValues(alpha: 0.45)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
-      canvas.drawPath(diamondPath, glowPaint);
-    }
-
-    // Translucent face fill preserving underlying scene
-    final fillPaint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(diamondPath, fillPaint);
-
-    // Inner bevel highlight on upper edges
-    final innerBevelPath = Path()
-      ..moveTo(0, h * 0.5)
-      ..lineTo(w * 0.5, 0)
-      ..lineTo(w, h * 0.5);
-    final bevelPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.12)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(innerBevelPath, bevelPaint);
-
-    // Diamond Perimeter Border
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..strokeWidth = borderWidth
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(diamondPath, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant IsometricDiamondTilePainter oldDelegate) {
-    return oldDelegate.fillColor != fillColor ||
-        oldDelegate.borderColor != borderColor ||
-        oldDelegate.borderWidth != borderWidth ||
-        oldDelegate.hasGlow != hasGlow ||
-        oldDelegate.glowColor != glowColor;
-  }
-}
-
-/// 2.5D Multi-Node Behemoth Double-Diamond Ground Plinth Painter
-/// Draws a continuous combined perimeter footprint across Col 1 & Col 2 (1x2 unit)
-class IsometricDoubleDiamondPainter extends CustomPainter {
-  final Color fillColor;
-  final Color borderColor;
-  final double borderWidth;
-  final bool hasGlow;
-  final Color glowColor;
-
-  const IsometricDoubleDiamondPainter({
-    required this.fillColor,
-    required this.borderColor,
-    this.borderWidth = 1.5,
-    this.hasGlow = false,
-    this.glowColor = const Color(0xFFFF1744),
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-
-    // Contact drop shadow below double-diamond footprint
-    final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.6)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
-    final shadowPath = Path()
-      ..moveTo(w * 0.25, h * 0.08)
-      ..lineTo(w * 0.75, h * 0.08)
-      ..lineTo(w * 0.98, h * 0.54)
-      ..lineTo(w * 0.75, h)
-      ..lineTo(w * 0.25, h)
-      ..lineTo(w * 0.02, h * 0.54)
-      ..close();
-    canvas.drawPath(shadowPath, shadowPaint);
-
-    if (hasGlow) {
-      final glowPaint = Paint()
-        ..color = glowColor.withValues(alpha: 0.4)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
-      canvas.drawPath(shadowPath, glowPaint);
-    }
-
-    // Combined 1x2 hexagonal / double-diamond perimeter footprint
-    final footPath = Path()
-      ..moveTo(w * 0.25, 0)
-      ..lineTo(w * 0.75, 0)
-      ..lineTo(w, h * 0.5)
-      ..lineTo(w * 0.75, h)
-      ..lineTo(w * 0.25, h)
-      ..lineTo(0, h * 0.5)
-      ..close();
-
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          fillColor.withValues(alpha: 0.85),
-          fillColor.withValues(alpha: 0.40),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, w, h))
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(footPath, fillPaint);
-
-    // Bevel top highlights
-    final bevelPath = Path()
-      ..moveTo(0, h * 0.5)
-      ..lineTo(w * 0.25, 0)
-      ..lineTo(w * 0.75, 0)
-      ..lineTo(w, h * 0.5);
-    final bevelPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.22)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(bevelPath, bevelPaint);
-
-    // Center internal junction dashed hint between the 2 tiles
-    final junctionPaint = Paint()
-      ..color = borderColor.withValues(alpha: 0.35)
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(w * 0.5, 0), Offset(w * 0.5, h), junctionPaint);
-
-    // Footprint perimeter outline
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..strokeWidth = borderWidth
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(footPath, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant IsometricDoubleDiamondPainter oldDelegate) {
-    return oldDelegate.fillColor != fillColor ||
-        oldDelegate.borderColor != borderColor ||
-        oldDelegate.borderWidth != borderWidth ||
-        oldDelegate.hasGlow != hasGlow ||
-        oldDelegate.glowColor != glowColor;
-  }
-}
-
-class _IsometricCellData {
-  final int gRow;
-  final int col;
-  final int localRow;
-  final bool isClashLine;
-  final bool isPlayerSquad;
-  final int depth;
-  final double screenX;
-  final double screenY;
-
-  const _IsometricCellData({
-    required this.gRow,
-    required this.col,
-    required this.localRow,
-    required this.isClashLine,
-    required this.isPlayerSquad,
-    required this.depth,
-    required this.screenX,
-    required this.screenY,
-  });
-}
-
-/// Dynamic kinetic VFX effect rendered over the battlefield
-class _CombatVfx {
-  final String id;
-  final Offset startOffset;
-  final Offset targetOffset;
-  final Color primaryColor;
-  final Color secondaryColor;
-  final String type; // 'slash', 'beam', 'shockwave', 'shatter'
-  final int durationMs;
-  final int createdMs;
-
-  const _CombatVfx({
-    required this.id,
-    required this.startOffset,
-    required this.targetOffset,
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.type,
-    required this.durationMs,
-    required this.createdMs,
-  });
-}
-
-/// Custom painter for directional strike beams, slashes, and impact shockwaves
-class _CombatVfxOverlayPainter extends CustomPainter {
-  final List<_CombatVfx> effects;
-  final int currentTimestampMs;
-
-  const _CombatVfxOverlayPainter({
-    required this.effects,
-    required this.currentTimestampMs,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final vfx in effects) {
-      final elapsed = currentTimestampMs - vfx.createdMs;
-      if (elapsed < 0 || elapsed > vfx.durationMs) continue;
-      final progress = (elapsed / vfx.durationMs).clamp(0.0, 1.0);
-
-      switch (vfx.type) {
-        case 'slash':
-          _drawSlash(canvas, vfx, progress);
-          break;
-        case 'beam':
-          _drawBeam(canvas, vfx, progress);
-          break;
-        case 'arrow':
-          _drawProjectile(canvas, vfx, progress, isArrow: true);
-          break;
-        case 'firebolt':
-          _drawProjectile(canvas, vfx, progress, isArrow: false);
-          break;
-        case 'shockwave':
-        case 'shatter':
-          _drawShockwave(canvas, vfx, progress);
-          break;
-        case 'heavy_slam':
-          _drawHeavySlam(canvas, vfx, progress);
-          break;
-        case 'heal_pulse':
-          _drawHealPulse(canvas, vfx, progress);
-          break;
-        case 'bloodnova':
-          _drawBloodnova(canvas, vfx, progress);
-          break;
-        case 'bloodsiphon':
-          _drawBloodsiphon(canvas, vfx, progress);
-          break;
-        case 'rune_invocation':
-          _drawRuneInvocation(canvas, vfx, progress);
-          break;
-        case 'death_bleed':
-        case 'death_solar':
-        case 'death_kinetic':
-        case 'death_boss':
-          _drawDeathBurst(canvas, vfx, progress);
-          break;
-      }
-    }
-  }
-
-  void _drawBloodnova(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.targetOffset;
-    final maxRadius = 85.0;
-    final currentRadius = maxRadius * progress;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-
-    // Expanding blood mist wave
-    final mistPaint = Paint()
-      ..color = const Color(0xFFFF1744).withAlpha((alpha * 0.45).round())
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, currentRadius * 0.7, mistPaint);
-
-    // Jagged crimson detonation ring
-    final ringPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (4.5 * (1.0 - progress)).clamp(1.0, 5.0);
-    canvas.drawCircle(center, currentRadius, ringPaint);
-
-    // Detonating blood spikes radiating outwards
-    final spikePaint = Paint()
-      ..color = const Color(0xFFFF5252).withAlpha(alpha)
-      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(1.0, 3.5)
-      ..strokeCap = StrokeCap.round;
-    const int numSpikes = 8;
-    for (int i = 0; i < numSpikes; i++) {
-      final angle = (i * 3.14159 * 2) / numSpikes + (progress * 0.4);
-      final rInner = currentRadius * 0.5;
-      final rOuter = currentRadius * (1.1 + (i % 2 == 0 ? 0.2 : 0.05));
-      final p1 = Offset(center.dx + cos(angle) * rInner, center.dy + sin(angle) * rInner);
-      final p2 = Offset(center.dx + cos(angle) * rOuter, center.dy + sin(angle) * rOuter);
-      canvas.drawLine(p1, p2, spikePaint);
-    }
-  }
-
-  void _drawBloodsiphon(Canvas canvas, _CombatVfx vfx, double progress) {
-    final start = vfx.startOffset; // Caster or ally receiving heal
-    final target = vfx.targetOffset; // Bleeding enemy being siphoned
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-
-    // Spiral / curved crimson tendril siphoning from target to caster
-    final path = Path();
-    path.moveTo(target.dx, target.dy);
-    final midX = (target.dx + start.dx) * 0.5 + sin(progress * 3.14159 * 2) * 35.0;
-    final midY = (target.dy + start.dy) * 0.5 - 25.0;
-    path.quadraticBezierTo(midX, midY, start.dx, start.dy);
-
-    final tendrilPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(1.2, 4.0)
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, tendrilPaint);
-
-    // Inner bright leech core
-    final corePaint = Paint()
-      ..color = Colors.white.withAlpha((alpha * 0.75).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5 * (1.0 - progress)
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, corePaint);
-
-    // Impact blood droplet burst on target
-    final burstRadius = 16.0 * progress;
-    final burstPaint = Paint()
-      ..color = const Color(0xFFD50000).withAlpha((alpha * 0.8).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawCircle(target, burstRadius, burstPaint);
-  }
-
-  void _drawSlash(Canvas canvas, _CombatVfx vfx, double progress) {
-    final target = vfx.targetOffset;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final slashLen = 62.0 + progress * 28.0;
-
-    // 1. Wide curved crescent slash arc with outer glow + white-hot core
-    final arcPath = Path();
-    final p1 = Offset(target.dx - slashLen * 0.55, target.dy - slashLen * 0.42);
-    final p2 = Offset(target.dx + slashLen * 0.55, target.dy + slashLen * 0.42);
-    final ctrl = Offset(target.dx + slashLen * 0.25, target.dy - slashLen * 0.35);
-    arcPath.moveTo(p1.dx, p1.dy);
-    arcPath.quadraticBezierTo(ctrl.dx, ctrl.dy, p2.dx, p2.dy);
-
-    final glowPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha((alpha * 0.65).round())
-      ..strokeWidth = (11.0 * (1.0 - progress)).clamp(2.0, 11.0)
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(arcPath, glowPaint);
-
-    final corePaint = Paint()
-      ..color = Colors.white.withAlpha(alpha)
-      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(0.8, 3.5)
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawPath(arcPath, corePaint);
-
-    // 2. Cross-slash spark & radiating impact sparks
-    final crossPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha((alpha * 0.85).round())
-      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(0.8, 3.0)
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(target.dx + slashLen * 0.38, target.dy - slashLen * 0.38),
-      Offset(target.dx - slashLen * 0.38, target.dy + slashLen * 0.38),
-      crossPaint,
-    );
-
-    final sparkPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha(alpha)
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-    for (int i = 0; i < 6; i++) {
-      final angle = (i * 3.14159 * 2) / 6 + 0.35;
-      final r1 = 12.0 + progress * 24.0;
-      final r2 = r1 + (14.0 * (1.0 - progress));
-      canvas.drawLine(
-        Offset(target.dx + cos(angle) * r1, target.dy + sin(angle) * r1),
-        Offset(target.dx + cos(angle) * r2, target.dy + sin(angle) * r2),
-        sparkPaint,
-      );
-    }
-
-    // 3. Initial crisp impact flash
-    if (progress < 0.35) {
-      final t = progress / 0.35;
-      final flashPaint = Paint()
-        ..color = Colors.white.withAlpha(((1.0 - t) * 230).round())
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(target, 18.0 * t, flashPaint);
-    }
-  }
-
-  void _drawHeavySlam(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.targetOffset;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final radius = 16.0 + progress * 68.0;
-
-    // Ground impact ellipse shockwave
-    final rect = Rect.fromCenter(center: Offset(center.dx, center.dy + 12), width: radius * 2.1, height: radius * 0.9);
-    final ringPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (5.5 * (1.0 - progress)).clamp(1.2, 5.5);
-    canvas.drawOval(rect, ringPaint);
-
-    // Radiating stone/kinetic shatter shards
-    final shardPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha(alpha)
-      ..strokeWidth = (3.2 * (1.0 - progress)).clamp(1.0, 3.2)
-      ..strokeCap = StrokeCap.round;
-    for (int i = 0; i < 8; i++) {
-      final angle = (i * 3.14159 * 2) / 8;
-      final rIn = radius * 0.35;
-      final rOut = radius * 0.95;
-      canvas.drawLine(
-        Offset(center.dx + cos(angle) * rIn, center.dy + sin(angle) * rIn * 0.55 + 8),
-        Offset(center.dx + cos(angle) * rOut, center.dy + sin(angle) * rOut * 0.55 + 8),
-        shardPaint,
-      );
-    }
-
-    if (progress < 0.3) {
-      final flashPaint = Paint()
-        ..color = Colors.white.withAlpha(((1.0 - progress / 0.3) * 220).round())
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(center, 22.0 * (progress / 0.3), flashPaint);
-    }
-  }
-
-  void _drawHealPulse(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.targetOffset;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final rise = progress * 38.0;
-
-    // Rising restorative emerald/gold ring
-    final ringPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (3.0 * (1.0 - progress)).clamp(1.0, 3.0);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(center.dx, center.dy + 10 - rise), width: 46.0 + progress * 16.0, height: 18.0),
-      ringPaint,
-    );
-
-    // Rising light motes
-    final motePaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.fill;
-    for (int i = 0; i < 5; i++) {
-      final dx = (i - 2) * 11.0;
-      final dy = 12.0 - rise * (0.7 + (i % 2) * 0.45);
-      canvas.drawCircle(Offset(center.dx + dx, center.dy + dy), 2.5 * (1.0 - progress * 0.5), motePaint);
-    }
-  }
-
-  void _drawProjectile(Canvas canvas, _CombatVfx vfx, double progress, {required bool isArrow}) {
-    final start = vfx.startOffset;
-    final target = vfx.targetOffset;
-
-    // Ballistic / direct projectile flight interpolation
-    final double flightT = (progress / 0.82).clamp(0.0, 1.0);
-    // Slight parabolic arc
-    final double arcHeight = isArrow ? -28.0 : -18.0;
-    final double currentX = start.dx + (target.dx - start.dx) * flightT;
-    final double currentY = start.dy + (target.dy - start.dy) * flightT + sin(flightT * 3.14159) * arcHeight;
-    final currentPos = Offset(currentX, currentY);
-
-    // Calculate heading angle
-    final double dx = target.dx - start.dx;
-    final double dy = target.dy - start.dy + (cos(flightT * 3.14159) * arcHeight);
-    final double angle = atan2(dy, dx);
-
-    final int alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-
-    if (flightT < 1.0) {
-      if (isArrow) {
-        // High-velocity arrow / bolt with tracer tail
-        final double tailLength = 22.0;
-        final tailPos = Offset(currentX - cos(angle) * tailLength, currentY - sin(angle) * tailLength);
-
-        // Motion trail
-        final trailPaint = Paint()
-          ..color = vfx.primaryColor.withAlpha((alpha * 0.45).round())
-          ..strokeWidth = 2.5
-          ..strokeCap = StrokeCap.round;
-        canvas.drawLine(tailPos, currentPos, trailPaint);
-
-        // Arrow shaft & glowing tip
-        final arrowPaint = Paint()
-          ..color = Colors.white.withAlpha(alpha)
-          ..strokeWidth = 1.8
-          ..strokeCap = StrokeCap.round;
-        canvas.drawLine(tailPos, currentPos, arrowPaint);
-
-        // Arrow head spark
-        final headPaint = Paint()
-          ..color = vfx.primaryColor.withAlpha(alpha)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(currentPos, 3.2, headPaint);
-      } else {
-        // Glowing magic firebolt / orb with smoke embers
-        final orbRadius = 6.5;
-        // Outer fiery halo
-        final haloPaint = Paint()
-          ..color = vfx.primaryColor.withAlpha((alpha * 0.55).round())
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
-        canvas.drawCircle(currentPos, orbRadius * 1.6, haloPaint);
-
-        // Core bolt
-        final corePaint = Paint()
-          ..color = vfx.secondaryColor.withAlpha(alpha)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(currentPos, orbRadius, corePaint);
-
-        // Center white-hot spark
-        canvas.drawCircle(currentPos, orbRadius * 0.45, Paint()..color = Colors.white.withAlpha(alpha));
-
-        // Trailing particles
-        final trailOffset = Offset(currentX - cos(angle) * 14.0, currentY - sin(angle) * 14.0);
-        canvas.drawCircle(trailOffset, orbRadius * 0.5, Paint()..color = vfx.primaryColor.withAlpha((alpha * 0.4).round()));
-      }
-    } else {
-      // Impact burst at target location when projectile lands!
-      final burstP = ((progress - 0.82) / 0.18).clamp(0.0, 1.0);
-      final burstRadius = (isArrow ? 18.0 : 28.0) * burstP;
-      final burstAlpha = ((1.0 - burstP) * 240).round().clamp(0, 255);
-
-      final burstPaint = Paint()
-        ..color = vfx.primaryColor.withAlpha(burstAlpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = (3.0 * (1.0 - burstP)).clamp(1.0, 3.5);
-      canvas.drawCircle(target, burstRadius, burstPaint);
-
-      // Core flash
-      if (burstP < 0.5) {
-        final coreFlashPaint = Paint()
-          ..color = Colors.white.withAlpha(((1.0 - burstP / 0.5) * 220).round())
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(target, burstRadius * 0.6, coreFlashPaint);
-      }
-    }
-  }
-
-  void _drawBeam(Canvas canvas, _CombatVfx vfx, double progress) {
-    final start = vfx.startOffset;
-    final target = vfx.targetOffset;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-
-    // Primary energy tracer beam
-    final beamPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..strokeWidth = (5.0 * (1.0 - progress * 0.7)).clamp(1.5, 6.0)
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(start, target, beamPaint);
-
-    // Bright core line
-    final corePaint = Paint()
-      ..color = Colors.white.withAlpha(alpha)
-      ..strokeWidth = 2.0 * (1.0 - progress)
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(start, target, corePaint);
-
-    // Target burst
-    final burstRadius = 18.0 * progress;
-    final burstPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha((alpha * 0.7).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawCircle(target, burstRadius, burstPaint);
-  }
-
-  void _drawShockwave(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.targetOffset;
-    final maxRadius = vfx.type == 'shatter' ? 65.0 : 45.0;
-    final currentRadius = maxRadius * progress;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-
-    // Outer shock ring
-    final ringPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha(alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (3.5 * (1.0 - progress)).clamp(0.8, 4.0);
-    canvas.drawCircle(center, currentRadius, ringPaint);
-
-    // Inner bright harmonic wave
-    if (progress > 0.2) {
-      final innerProgress = (progress - 0.2) / 0.8;
-      final innerAlpha = ((1.0 - innerProgress) * 200).round().clamp(0, 255);
-      final innerPaint = Paint()
-        ..color = vfx.secondaryColor.withAlpha(innerAlpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(center, currentRadius * 0.65, innerPaint);
-    }
-
-    // Shatter shards for critical armor crack
-    if (vfx.type == 'shatter') {
-      final shardPaint = Paint()
-        ..color = const Color(0xFFFFD54F).withAlpha(alpha)
-        ..strokeWidth = 2.0
-        ..strokeCap = StrokeCap.round;
-      for (int i = 0; i < 6; i++) {
-        final angle = (i * 3.14159 * 2) / 6;
-        final d1 = currentRadius * 0.7;
-        final d2 = currentRadius * 1.15;
-        final p1 = Offset(center.dx + cos(angle) * d1, center.dy + sin(angle) * d1);
-        final p2 = Offset(center.dx + cos(angle) * d2, center.dy + sin(angle) * d2);
-        canvas.drawLine(p1, p2, shardPaint);
-      }
-    }
-  }
-
-  void _drawRuneInvocation(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.startOffset; // Centered at caster plinth
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final currentRadius = 28.0 + (progress * 18.0);
-
-    // 1. Concentric rotating invocation runic circle
-    final outerRing = Paint()
-      ..color = vfx.primaryColor.withAlpha((alpha * 0.85).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6 * (1.0 - progress * 0.5);
-    canvas.drawCircle(center, currentRadius, outerRing);
-
-    final innerRing = Paint()
-      ..color = vfx.secondaryColor.withAlpha((alpha * 0.65).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawCircle(center, currentRadius * 0.65, innerRing);
-
-    // 2. Rotating runic rays
-    final rayPaint = Paint()
-      ..color = vfx.secondaryColor.withAlpha((alpha * 0.75).round())
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round;
-    const int rayCount = 6;
-    final double spinAngle = progress * 3.14159;
-    for (int i = 0; i < rayCount; i++) {
-      final angle = (i * 3.14159 * 2) / rayCount + spinAngle;
-      final p1 = Offset(center.dx + cos(angle) * (currentRadius * 0.65), center.dy + sin(angle) * (currentRadius * 0.65));
-      final p2 = Offset(center.dx + cos(angle) * (currentRadius * 1.15), center.dy + sin(angle) * (currentRadius * 1.15));
-      canvas.drawLine(p1, p2, rayPaint);
-    }
-
-    // 3. Central incantation flare burst
-    if (progress < 0.45) {
-      final burstT = progress / 0.45;
-      final flarePaint = Paint()
-        ..color = Colors.white.withAlpha(((1.0 - burstT) * 220).round())
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(center, 12.0 * burstT, flarePaint);
-    }
-  }
-
-  void _drawDeathBurst(Canvas canvas, _CombatVfx vfx, double progress) {
-    final center = vfx.targetOffset;
-    final alpha = ((1.0 - progress) * 255).round().clamp(0, 255);
-    final count = vfx.type == 'death_boss' ? 24 : 14;
-    final maxDist = vfx.type == 'death_boss' ? 85.0 : 55.0;
-
-    // Expanding shock perimeter
-    final shockPaint = Paint()
-      ..color = vfx.primaryColor.withAlpha((alpha * 0.7).round())
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = (1.0 - progress) * 3.5;
-    canvas.drawCircle(center, maxDist * progress, shockPaint);
-
-    // Radiating ember/splatter particles
-    for (int i = 0; i < count; i++) {
-      final angle = (i * (2 * 3.14159 / count)) + (progress * 0.8);
-      final dist = (maxDist * 0.3) + (maxDist * 0.7 * progress);
-      final px = center.dx + (cos(angle) * dist);
-      final py = center.dy + (sin(angle) * dist * 0.55); // Isometric squash
-      final pRadius = (vfx.type == 'death_boss' ? 5.5 : 3.5) * (1.0 - progress);
-
-      final pPaint = Paint()
-        ..color = (i % 2 == 0 ? vfx.primaryColor : vfx.secondaryColor).withAlpha(alpha)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(px, py), max(0.8, pRadius), pPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _CombatVfxOverlayPainter oldDelegate) {
-    return true;
-  }
-}
-
-class _TrajectoryData {
-  final Offset sourceOffset;
-  final Offset targetOffset;
-  final String skillName;
-  final String targetName;
-  final Color color;
-  final bool isSecondary;
-  final bool showLabel;
-  final bool isArcPath;
-  final String? labelPrefix;
-  final bool isCoverCord;
-
-  const _TrajectoryData({
-    required this.sourceOffset,
-    required this.targetOffset,
-    required this.skillName,
-    required this.targetName,
-    required this.color,
-    this.isSecondary = false,
-    this.showLabel = true,
-    this.isArcPath = false,
-    this.labelPrefix,
-    this.isCoverCord = false,
-  });
-}
-
-class _AttackTrajectoryOverlayPainter extends CustomPainter {
-  final List<_TrajectoryData> trajectories;
-  final double dashPhase;
-
-  const _AttackTrajectoryOverlayPainter({
-    required this.trajectories,
-    this.dashPhase = 0.0,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final traj in trajectories) {
-      _paintSingleTrajectory(canvas, traj);
-    }
-  }
-
-  void _paintSingleTrajectory(Canvas canvas, _TrajectoryData traj) {
-    final sourceOffset = traj.sourceOffset;
-    final targetOffset = traj.targetOffset;
-    final trajectoryColor = traj.color;
-    final isSecondary = traj.isSecondary;
-
-    final dx = targetOffset.dx - sourceOffset.dx;
-    final dy = targetOffset.dy - sourceOffset.dy;
-    final distance = sqrt(dx * dx + dy * dy);
-    if (distance <= 0) return;
-
-    // Slight upward isometric curve
-    final controlPoint = Offset(
-      (sourceOffset.dx + targetOffset.dx) * 0.5,
-      (sourceOffset.dy + targetOffset.dy) * 0.5 - min(30.0, distance * 0.12),
-    );
-
-    if (traj.isCoverCord) {
-      // Defensive Vanguard Cover Cord: Glowing cyan tether connecting Frontline Vanguard to Covered Ally
-      final glowPaint = Paint()
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.35)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5.0
-        ..strokeCap = StrokeCap.round;
-
-      final corePaint = Paint()
-        ..color = const Color(0xFF80D8FF).withValues(alpha: 0.85)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..strokeCap = StrokeCap.round;
-
-      final brightCorePaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.9)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.9
-        ..strokeCap = StrokeCap.round;
-
-      const int numSegments = 20;
-      for (int i = 0; i < numSegments; i += 2) {
-        final rawT1 = (i / numSegments + dashPhase) % 1.0;
-        final rawT2 = rawT1 + (1.0 / numSegments);
-        final t1 = rawT1.clamp(0.0, 1.0);
-        final t2 = rawT2.clamp(0.0, 1.0);
-        if (t2 <= t1) continue;
-
-        final p1 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t1);
-        final p2 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t2);
-
-        canvas.drawLine(p1, p2, glowPaint);
-        canvas.drawLine(p1, p2, corePaint);
-        canvas.drawLine(p1, p2, brightCorePaint);
-      }
-
-      final anchorPaint = Paint()
-        ..color = const Color(0xFF00E5FF).withValues(alpha: 0.8)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(sourceOffset, 6.0, anchorPaint);
-      canvas.drawCircle(targetOffset, 6.0, anchorPaint);
-
-      final midPoint = _evaluateBezier(sourceOffset, controlPoint, targetOffset, 0.5);
-      final textSpan = const TextSpan(
-        text: '🛡️ COVER (-25%)',
-        style: TextStyle(
-          color: Color(0xFF80D8FF),
-          fontSize: 7.5,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-        ),
-      );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final pillRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: midPoint,
-          width: textPainter.width + 10.0,
-          height: 15.0,
-        ),
-        const Radius.circular(3.0),
-      );
-
-      canvas.drawRRect(pillRect, Paint()..color = const Color(0xEE0B1A24));
-      canvas.drawRRect(
-        pillRect,
-        Paint()
-          ..color = const Color(0xFF00E5FF).withValues(alpha: 0.7)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.9,
-      );
-
-      textPainter.paint(
-        canvas,
-        Offset(midPoint.dx - textPainter.width * 0.5, midPoint.dy - textPainter.height * 0.5),
-      );
-      return;
-    }
-
-    final double alphaScale = isSecondary ? 0.65 : 1.0;
-
-    // 1. Source node ring
-    if (!isSecondary) {
-      final sourcePaint = Paint()
-        ..color = trajectoryColor.withValues(alpha: 0.6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(sourceOffset, 10.0, sourcePaint);
-      canvas.drawCircle(sourceOffset, 3.5, Paint()..color = trajectoryColor.withValues(alpha: 0.9));
-    }
-
-    // 2. Translucent dashed trajectory path with animated dashPhase
-    final glowPaint = Paint()
-      ..color = trajectoryColor.withValues(alpha: 0.25 * alphaScale)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSecondary ? 4.0 : 6.0
-      ..strokeCap = StrokeCap.round;
-
-    final corePaint = Paint()
-      ..color = trajectoryColor.withValues(alpha: 0.85 * alphaScale)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSecondary ? 1.5 : 2.2
-      ..strokeCap = StrokeCap.round;
-
-    final brightCorePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.8 * alphaScale)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSecondary ? 0.7 : 1.0
-      ..strokeCap = StrokeCap.round;
-
-    // Sample quadratic bezier path points for animated dashes
-    const int numSegments = 24;
-    for (int i = 0; i < numSegments; i += 2) {
-      final rawT1 = (i / numSegments + dashPhase) % 1.0;
-      final rawT2 = rawT1 + (1.0 / numSegments);
-      final t1 = rawT1.clamp(0.0, 1.0);
-      final t2 = rawT2.clamp(0.0, 1.0);
-      if (t2 <= t1) continue;
-
-      final p1 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t1);
-      final p2 = _evaluateBezier(sourceOffset, controlPoint, targetOffset, t2);
-
-      canvas.drawLine(p1, p2, glowPaint);
-      canvas.drawLine(p1, p2, corePaint);
-      canvas.drawLine(p1, p2, brightCorePaint);
-    }
-
-    // 3. Arrowhead at target
-    const double tPrev = 0.90;
-    final pPrev = _evaluateBezier(sourceOffset, controlPoint, targetOffset, tPrev);
-    final angle = atan2(targetOffset.dy - pPrev.dy, targetOffset.dx - pPrev.dx);
-    final arrowLen = isSecondary ? 9.0 : 12.0;
-    const arrowAngle = pi / 5; // 36 deg
-
-    final arrowLeft = Offset(
-      targetOffset.dx - arrowLen * cos(angle - arrowAngle),
-      targetOffset.dy - arrowLen * sin(angle - arrowAngle),
-    );
-    final arrowRight = Offset(
-      targetOffset.dx - arrowLen * cos(angle + arrowAngle),
-      targetOffset.dy - arrowLen * sin(angle + arrowAngle),
-    );
-
-    final arrowPath = Path()
-      ..moveTo(arrowLeft.dx, arrowLeft.dy)
-      ..lineTo(targetOffset.dx, targetOffset.dy)
-      ..lineTo(arrowRight.dx, arrowRight.dy);
-
-    canvas.drawPath(arrowPath, glowPaint);
-    canvas.drawPath(arrowPath, corePaint);
-
-    // 4. Target reticle diamond and crosshairs
-    final double r = isSecondary ? 12.0 : 16.0;
-    final reticlePath = Path()
-      ..moveTo(targetOffset.dx, targetOffset.dy - r)
-      ..lineTo(targetOffset.dx + r * 1.5, targetOffset.dy)
-      ..lineTo(targetOffset.dx, targetOffset.dy + r)
-      ..lineTo(targetOffset.dx - r * 1.5, targetOffset.dy)
-      ..close();
-
-    final reticleGlow = Paint()
-      ..color = trajectoryColor.withValues(alpha: 0.28 * alphaScale)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSecondary ? 3.5 : 5.0;
-    final reticleCore = Paint()
-      ..color = trajectoryColor.withValues(alpha: 0.95 * alphaScale)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isSecondary ? 1.3 : 1.8;
-
-    canvas.drawPath(reticlePath, reticleGlow);
-    canvas.drawPath(reticlePath, reticleCore);
-
-    // Crosshairs
-    final chPaint = Paint()
-      ..color = trajectoryColor.withValues(alpha: 0.9 * alphaScale)
-      ..strokeWidth = isSecondary ? 1.1 : 1.5;
-    canvas.drawLine(Offset(targetOffset.dx - r * 1.8, targetOffset.dy), Offset(targetOffset.dx - r * 1.2, targetOffset.dy), chPaint);
-    canvas.drawLine(Offset(targetOffset.dx + r * 1.2, targetOffset.dy), Offset(targetOffset.dx + r * 1.8, targetOffset.dy), chPaint);
-    canvas.drawLine(Offset(targetOffset.dx, targetOffset.dy - r * 1.4), Offset(targetOffset.dx, targetOffset.dy - r * 0.9), chPaint);
-    canvas.drawLine(Offset(targetOffset.dx, targetOffset.dy + r * 0.9), Offset(targetOffset.dx, targetOffset.dy + r * 1.4), chPaint);
-
-    // 5. Tactical Trajectory Label Pill (drawn above the target if enabled)
-    if (traj.showLabel) {
-      final labelCenter = Offset(
-        targetOffset.dx,
-        targetOffset.dy - r - 14.0,
-      );
-
-      final String prefix = traj.labelPrefix ?? '⚔️';
-      final String labelText = traj.isArcPath
-          ? '$prefix ${traj.skillName} • ${traj.targetName}'
-          : '$prefix ${traj.skillName} • TARGET: ${traj.targetName}';
-
-      final textSpan = TextSpan(
-        text: labelText,
-        style: TextStyle(
-          color: trajectoryColor,
-          fontSize: 8.5,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.6,
-        ),
-      );
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final pillRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: labelCenter,
-          width: textPainter.width + 14.0,
-          height: 18.0,
-        ),
-        const Radius.circular(4.0),
-      );
-
-      // Pill background & border
-      canvas.drawRRect(pillRect, Paint()..color = const Color(0xEE0B0F19));
-      canvas.drawRRect(
-        pillRect,
-        Paint()
-          ..color = trajectoryColor.withValues(alpha: 0.8)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2,
-      );
-
-      textPainter.paint(
-        canvas,
-        Offset(labelCenter.dx - textPainter.width * 0.5, labelCenter.dy - textPainter.height * 0.5),
-      );
-    }
-  }
-
-  static Offset _evaluateBezier(Offset p0, Offset p1, Offset p2, double t) {
-    final double u = 1.0 - t;
-    final double tt = t * t;
-    final double uu = u * u;
-    final double ut2 = 2.0 * u * t;
-
-    return Offset(
-      uu * p0.dx + ut2 * p1.dx + tt * p2.dx,
-      uu * p0.dy + ut2 * p1.dy + tt * p2.dy,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _AttackTrajectoryOverlayPainter oldDelegate) {
-    return oldDelegate.dashPhase != dashPhase ||
-        oldDelegate.trajectories.length != trajectories.length ||
-        true;
-  }
-}
-
-/// Floating combat text with typography, color coding, and float animation
-class _FloatingCombatText {
-  final String id;
-  final String unitId;
-  final String text;
-  final Color color;
-  final Color borderColor;
-  final double fontSize;
-  final bool isCrit;
-  final int createdMs;
-  final int durationMs;
-  final double horizontalDrift;
-
-  const _FloatingCombatText({
-    required this.id,
-    required this.unitId,
-    required this.text,
-    required this.color,
-    required this.borderColor,
-    this.fontSize = 11.0,
-    this.isCrit = false,
-    required this.createdMs,
-    this.durationMs = 1750,
-    this.horizontalDrift = 0.0,
-  });
-
-  double get progress {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final elapsed = now - createdMs;
-    return (elapsed / durationMs).clamp(0.0, 1.0);
-  }
-
-  bool get isExpired => progress >= 1.0;
-}
-
-/// Dynamic ground ripple shockwave originating from high-impact strikes
-class _ActiveCombatSpriteVfx {
-  final String id;
-  final Offset position;
-  final String assetPath;
-  final int columns;
-  final int rows;
-  final int totalFrames;
-  final int durationMs;
-  final double width;
-  final double height;
-  final BlendMode? blendMode;
-
-  const _ActiveCombatSpriteVfx({
-    required this.id,
-    required this.position,
-    required this.assetPath,
-    required this.columns,
-    required this.rows,
-    required this.totalFrames,
-    required this.durationMs,
-    required this.width,
-    required this.height,
-    this.blendMode,
-  });
-}
-
-class _GroundShockwaveRipple {
-  final String id;
-  final Offset origin;
-  final Color color;
-  final double maxRadius;
-  final int createdMs;
-  final int durationMs;
-
-  const _GroundShockwaveRipple({
-    required this.id,
-    required this.origin,
-    required this.color,
-    this.maxRadius = 120.0,
-    required this.createdMs,
-    this.durationMs = 600,
-  });
-
-  double get progress {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final elapsed = now - createdMs;
-    return (elapsed / durationMs).clamp(0.0, 1.0);
-  }
-
-  bool get isExpired => progress >= 1.0;
-}
-
-/// Painter for 2.5D concentric ground shockwave ripples on the isometric grid
-class _GroundShockwaveRipplePainter extends CustomPainter {
-  final List<_GroundShockwaveRipple> ripples;
-  final int currentTimestampMs;
-
-  const _GroundShockwaveRipplePainter({
-    required this.ripples,
-    required this.currentTimestampMs,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final ripple in ripples) {
-      final elapsed = currentTimestampMs - ripple.createdMs;
-      if (elapsed < 0 || elapsed > ripple.durationMs) continue;
-
-      final double p = (elapsed / ripple.durationMs).clamp(0.0, 1.0);
-      final double radiusX = ripple.maxRadius * p;
-      final double radiusY = radiusX * 0.50; // 2:1 isometric ground perspective flattening
-      final int alpha = ((1.0 - p) * 230).round().clamp(0, 255);
-
-      // Primary expanding ground shock ellipse
-      final ellipseRect = Rect.fromCenter(
-        center: ripple.origin,
-        width: radiusX * 2,
-        height: radiusY * 2,
-      );
-
-      final shockPaint = Paint()
-        ..color = ripple.color.withAlpha(alpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = (3.5 * (1.0 - p)).clamp(1.0, 4.0);
-      canvas.drawOval(ellipseRect, shockPaint);
-
-      // Inner high-energy accent ring
-      if (p > 0.15) {
-        final double innerP = (p - 0.15) / 0.85;
-        final double innerRadiusX = ripple.maxRadius * innerP * 0.70;
-        final double innerRadiusY = innerRadiusX * 0.50;
-        final int innerAlpha = ((1.0 - innerP) * 180).round().clamp(0, 255);
-
-        final innerRect = Rect.fromCenter(
-          center: ripple.origin,
-          width: innerRadiusX * 2,
-          height: innerRadiusY * 2,
-        );
-        final innerPaint = Paint()
-          ..color = Colors.white.withAlpha(innerAlpha)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5;
-        canvas.drawOval(innerRect, innerPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _GroundShockwaveRipplePainter oldDelegate) {
-    return true;
-  }
-
-}
-
-/// Custom painter rendering drifting, smoldering ash embers over downed units
-class _AshEmbersDissolvePainter extends CustomPainter {
-  final int timestampMs;
-
-  const _AshEmbersDissolvePainter({
-    required this.timestampMs,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-
-    // Fixed pseudo-random ember particle seeds
-    const int particleCount = 10;
-    for (int i = 0; i < particleCount; i++) {
-      // Individual cyclic phase offset (cycle = 1800ms)
-      final double seed = (i * 137.5) % 1.0;
-      final double cyclePhase = ((timestampMs + (i * 220)) % 1800) / 1800.0;
-
-      // Particle rises upward from base to top
-      final double x = (w * 0.15) + (w * 0.70 * ((seed + cyclePhase * 0.2) % 1.0)) + (sin(cyclePhase * 3.14159 * 2 + i) * 6.0);
-      final double y = h * (1.0 - cyclePhase * 0.95);
-
-      // Fade in at bottom, fade out near top
-      final double opacity = cyclePhase < 0.2
-          ? (cyclePhase / 0.2)
-          : (cyclePhase > 0.7 ? (1.0 - (cyclePhase - 0.7) / 0.3) : 1.0);
-      final int alpha = (opacity * 210).round().clamp(0, 255);
-
-      final double radius = 1.0 + (i % 3) * 0.7;
-
-      // Smoldering embers gradient (radiant ash gold & crimson)
-      final Color emberColor = (i % 2 == 0) ? const Color(0xFFFF9100) : const Color(0xFFFF5252);
-      final paint = Paint()
-        ..color = emberColor.withAlpha(alpha)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(x, y), radius, paint);
-
-      // Core ember spark glow
-      if (radius > 1.5) {
-        final corePaint = Paint()
-          ..color = const Color(0xFFFFE082).withAlpha((alpha * 0.85).round())
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset(x, y), radius * 0.5, corePaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AshEmbersDissolvePainter oldDelegate) {
-    return true;
-  }
-}
-
-/// Global arena ambient ash flakes and glowing ember particle painter
-class _AtmosphericBattlefieldEmbersPainter extends CustomPainter {
-  final int timestampMs;
-  final bool isEnraged;
-
-  const _AtmosphericBattlefieldEmbersPainter({
-    required this.timestampMs,
-    this.isEnraged = false,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    if (w <= 0 || h <= 0) return;
-
-    final int count = isEnraged ? 44 : 28;
-    for (int i = 0; i < count; i++) {
-      final double seedX = ((i * 137.508) % 1.0);
-      final double seedSpeed = 0.65 + (i % 5) * 0.20;
-      final int cycleDuration = (5500 / seedSpeed).round();
-
-      final double phase = ((timestampMs + (i * 260)) % cycleDuration) / cycleDuration.toDouble();
-
-      final double x = (w * seedX) + (sin(phase * 3.14159 * 2 + i) * 32.0) + (phase * w * 0.12);
-      final double y = h * (1.05 - phase * 1.1);
-
-      final double opacity = phase < 0.15
-          ? (phase / 0.15)
-          : (phase > 0.82 ? (1.0 - (phase - 0.82) / 0.18) : 1.0);
-
-      final double radius = 0.9 + (i % 4) * 0.65;
-
-      Color color;
-      if (isEnraged) {
-        color = (i % 3 == 0)
-            ? const Color(0xFFFF1744)
-            : ((i % 3 == 1) ? const Color(0xFFFF5252) : const Color(0xFFFF9100));
-      } else {
-        color = (i % 3 == 0)
-            ? const Color(0xFFFF9100)
-            : ((i % 3 == 1) ? const Color(0xFFFFD54F) : const Color(0xFFFF5722));
-      }
-
-      final paint = Paint()
-        ..color = color.withValues(alpha: opacity * (isEnraged ? 0.75 : 0.50))
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(x % (w + 40) - 20, y), radius, paint);
-
-      if (radius > 1.8) {
-        final glowPaint = Paint()
-          ..color = const Color(0xFFFFF9C4).withValues(alpha: opacity * 0.35)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(Offset(x % (w + 40) - 20, y), radius * 0.45, glowPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AtmosphericBattlefieldEmbersPainter oldDelegate) {
-    return true;
-  }
-}
-
-
-class UnitStatusBadgeData {
-  final String id;
-  final String name;
-  final String icon;
-  final String summary;
-  final String detail;
-  final Color color;
-  final Color bg;
-  final bool isBuff;
-
-  const UnitStatusBadgeData({
-    required this.id,
-    required this.name,
-    required this.icon,
-    required this.summary,
-    required this.detail,
-    required this.color,
-    required this.bg,
-    required this.isBuff,
-  });
-}
-
-class SculptorDisciplineVisuals {
-  final String title;
-  final Color primaryColor;
-  final String s1Title;
-  final String s1Sub;
-  final IconData s1Icon;
-  final Color s1Color;
-  final Color s1Border;
-  final String s1Action;
-  final String s1Tooltip;
-
-  final String s2Title;
-  final String s2Sub;
-  final IconData s2Icon;
-  final Color s2Color;
-  final Color s2Border;
-  final String s2Action;
-  final String s2Tooltip;
-
-  final String s3Title;
-  final String s3Sub;
-  final IconData s3Icon;
-  final Color s3Color;
-  final Color s3Border;
-  final String s3Action;
-  final String s3Tooltip;
-
-  final String s4Title;
-  final String s4Sub;
-  final IconData s4Icon;
-  final Color s4Color;
-  final Color s4Border;
-  final String s4Action;
-  final String s4Tooltip;
-
-  const SculptorDisciplineVisuals({
-    required this.title,
-    required this.primaryColor,
-    required this.s1Title,
-    required this.s1Sub,
-    required this.s1Icon,
-    required this.s1Color,
-    required this.s1Border,
-    required this.s1Action,
-    required this.s1Tooltip,
-    required this.s2Title,
-    required this.s2Sub,
-    required this.s2Icon,
-    required this.s2Color,
-    required this.s2Border,
-    required this.s2Action,
-    required this.s2Tooltip,
-    required this.s3Title,
-    required this.s3Sub,
-    required this.s3Icon,
-    required this.s3Color,
-    required this.s3Border,
-    required this.s3Action,
-    required this.s3Tooltip,
-    required this.s4Title,
-    required this.s4Sub,
-    required this.s4Icon,
-    required this.s4Color,
-    required this.s4Border,
-    required this.s4Action,
-    required this.s4Tooltip,
-  });
-
-  factory SculptorDisciplineVisuals.forGeneral(GeneralType general) {
-    switch (general) {
-      case GeneralType.valeria:
-        return const SculptorDisciplineVisuals(
-          title: 'THE ASH SCULPTOR',
-          primaryColor: Color(0xFFFFD54F),
-          s1Title: 'IRON SLAM',
-          s1Sub: '+18 Cinders',
-          s1Icon: Icons.shield,
-          s1Color: Color(0xFF5D4037),
-          s1Border: Color(0xFFFFD54F),
-          s1Action: 'cold_iron_slam',
-          s1Tooltip: 'Cold Iron Slam: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, shreds 20 Armor, staggers -1,500 AP.',
-          s2Title: 'JUDGMENT',
-          s2Sub: '30 Cinders',
-          s2Icon: Icons.wb_sunny,
-          s2Color: Color(0xFFF57F17),
-          s2Border: Color(0xFFFFD54F),
-          s2Action: 'sundering_judgment',
-          s2Tooltip: 'Sundering Judgment: Consumes 30 Cinders. 180% Holy DMG, shreds 30% Armor & inflicts 3s Vulnerable.',
-          s3Title: 'BULWARK',
-          s3Sub: '25 Cinders',
-          s3Icon: Icons.security,
-          s3Color: Color(0xFF37474F),
-          s3Border: Color(0xFF81D4FA),
-          s3Action: 'iron_bulwark',
-          s3Tooltip: 'Iron Bulwark: Consumes 25 Cinders. +35 Armor & cleanses all debuffs across squad.',
-          s4Title: 'WRATH APEX',
-          s4Sub: '80 Cinders',
-          s4Icon: Icons.flash_on,
-          s4Color: Color(0xFFFFB300),
-          s4Border: Color(0xFFFFF176),
-          s4Action: 'wrath_of_the_dawnbound',
-          s4Tooltip: 'Wrath of the Dawnbound: APEX! 280% (380% Perfect Forge Crit) Radiant Nova across all foes!',
-        );
-      case GeneralType.vladislav:
-        return const SculptorDisciplineVisuals(
-          title: 'THE ASH SCULPTOR',
-          primaryColor: Color(0xFFFF1744),
-          s1Title: 'SIPHON REND',
-          s1Sub: '+18 Cinders',
-          s1Icon: Icons.bloodtype,
-          s1Color: Color(0xFF880E4F),
-          s1Border: Color(0xFFFF5252),
-          s1Action: 'siphon_rend',
-          s1Tooltip: 'Siphon Rend: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 135% ATK, leeches 40% DMG dealt as HP.',
-          s2Title: 'CRIMSON BRAND',
-          s2Sub: '30 Cinders',
-          s2Icon: Icons.whatshot,
-          s2Color: Color(0xFFC2185B),
-          s2Border: Color(0xFFFF4081),
-          s2Action: 'crimson_brand',
-          s2Tooltip: 'Crimson Brand: Consumes 30 Cinders. 165% ATK + 3 Bleeds, detonates active bleeds for 2x DMG.',
-          s3Title: 'VEIN TETHER',
-          s3Sub: '25 Cinders',
-          s3Icon: Icons.all_inclusive,
-          s3Color: Color(0xFF4A148C),
-          s3Border: Color(0xFFEA80FC),
-          s3Action: 'vein_tether',
-          s3Tooltip: 'Vein Tether: Consumes 25 Cinders. +2,500 AP haste & +25 Aegis to all allies.',
-          s4Title: 'EXSANGUINATION',
-          s4Sub: '80 Cinders',
-          s4Icon: Icons.storm,
-          s4Color: Color(0xFFB71C1C),
-          s4Border: Color(0xFFFF1744),
-          s4Action: 'exsanguination_apex',
-          s4Tooltip: 'Exsanguination Apex: APEX! 260% (360% Forge Crit) Blood Tempest, executes targets below 25% HP!',
-        );
-      case GeneralType.morrigan:
-        return const SculptorDisciplineVisuals(
-          title: 'THE ASH SCULPTOR',
-          primaryColor: Color(0xFF00E676),
-          s1Title: 'CORROSIVE TOUCH',
-          s1Sub: '+18 Cinders',
-          s1Icon: Icons.coronavirus,
-          s1Color: Color(0xFF1B5E20),
-          s1Border: Color(0xFF69F0AE),
-          s1Action: 'corrosive_touch',
-          s1Tooltip: 'Corrosive Touch: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 130% ATK, 2 Poison, -1,000 AP stagger.',
-          s2Title: 'MIASMIC BRAND',
-          s2Sub: '30 Cinders',
-          s2Icon: Icons.bubble_chart,
-          s2Color: Color(0xFF2E7D32),
-          s2Border: Color(0xFF00E676),
-          s2Action: 'miasmic_brand',
-          s2Tooltip: 'Miasmic Brand: Consumes 30 Cinders. 160% ATK, plagues target column with 3 Poison & Vulnerable.',
-          s3Title: 'BONE WARD',
-          s3Sub: '25 Cinders',
-          s3Icon: Icons.healing,
-          s3Color: Color(0xFF004D40),
-          s3Border: Color(0xFF64FFDA),
-          s3Action: 'bone_ward',
-          s3Tooltip: 'Bone Ward: Consumes 25 Cinders. 30% max HP ossuary shields to all living allies.',
-          s4Title: 'SPORE APEX',
-          s4Sub: '80 Cinders',
-          s4Icon: Icons.eco,
-          s4Color: Color(0xFF00C853),
-          s4Border: Color(0xFFB9F6CA),
-          s4Action: 'cataclysmic_spore',
-          s4Tooltip: 'Cataclysmic Spore: APEX! 240% (340% Forge Crit) Nature eruption, deals bonus damage to poisoned foes!',
-        );
-      case GeneralType.malakor:
-        return const SculptorDisciplineVisuals(
-          title: 'THE ASH SCULPTOR',
-          primaryColor: Color(0xFFFF6D00),
-          s1Title: 'CLEAVE',
-          s1Sub: '+18 Cinders',
-          s1Icon: Icons.sports_mma,
-          s1Color: Color(0xFFB3261E),
-          s1Border: Color(0xFFFF8A80),
-          s1Action: 'forge_cleave',
-          s1Tooltip: 'Forge Cleave: Main Cinder Generator (0 Cinders, 6.0s CD). Generates +18 Cinders, 140% ATK heavy strike (+1 Bleed).',
-          s2Title: 'BRAND',
-          s2Sub: '30 Cinders',
-          s2Icon: Icons.local_fire_department,
-          s2Color: Color(0xFFC2185B),
-          s2Border: Color(0xFFFF4081),
-          s2Action: 'sundering_brand',
-          s2Tooltip: 'Sundering Brand: Consumes 30 Cinders. 175% ATK, shatters 50% Armor & triggers Crypt Stalker ambush!',
-          s3Title: 'BASTION',
-          s3Sub: '25 Cinders',
-          s3Icon: Icons.shield,
-          s3Color: Color(0xFF00695C),
-          s3Border: Color(0xFF00BFA5),
-          s3Action: 'obsidian_bastion',
-          s3Tooltip: 'Obsidian Bastion: Consumes 25 Cinders. Shields Sculptor and retinue with Aegis barriers.',
-          s4Title: 'PYRE APEX',
-          s4Sub: '80 Cinders',
-          s4Icon: Icons.bolt,
-          s4Color: Color(0xFFFF6D00),
-          s4Border: Color(0xFFFFD54F),
-          s4Action: 'cataclysmic_pyre',
-          s4Tooltip: 'Cataclysmic Pyre: APEX! 250% (350% Perfect Forge Crit) Fire Nova across all enemy ranks!',
-        );
-    }
-  }
-}
-
-class _StaggeredMeteorBarrage extends StatefulWidget {
-  const _StaggeredMeteorBarrage({super.key});
-
-  @override
-  State<_StaggeredMeteorBarrage> createState() => _StaggeredMeteorBarrageState();
-}
-
-class _StaggeredMeteorBarrageState extends State<_StaggeredMeteorBarrage> {
-  static const List<({int delayMs, Alignment alignment, double width, double height})> _bursts = [
-    (delayMs: 0, alignment: Alignment(0.24, -0.14), width: 270, height: 205),
-    (delayMs: 260, alignment: Alignment(0.56, 0.02), width: 290, height: 220),
-    (delayMs: 520, alignment: Alignment(0.36, 0.22), width: 265, height: 200),
-  ];
-
-  final List<bool> _active = [true, false, false];
-  final List<Timer> _timers = [];
-
-  @override
-  void initState() {
-    super.initState();
-    for (int i = 1; i < _bursts.length; i++) {
-      _timers.add(Timer(Duration(milliseconds: _bursts[i].delayMs), () {
-        if (mounted) {
-          setState(() => _active[i] = true);
-        }
-      }));
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final timer in _timers) {
-      timer.cancel();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        for (int i = 0; i < _bursts.length; i++)
-          if (_active[i])
-            Align(
-              alignment: _bursts[i].alignment,
-              child: SizedBox(
-                width: _bursts[i].width,
-                height: _bursts[i].height,
-                child: SpriteSheetAnimation(
-                  key: ValueKey('meteor_burst_$i'),
-                  assetPath: 'assets/images/Spells/meteor storm.png',
-                  columns: 3,
-                  rows: 4,
-                  totalFrames: 12,
-                  duration: const Duration(milliseconds: 950),
-                  loop: false,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-      ],
-    );
-  }
 }

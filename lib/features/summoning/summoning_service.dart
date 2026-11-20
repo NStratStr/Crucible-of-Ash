@@ -65,8 +65,8 @@ class SummoningService {
       loreDescription:
           'Infuse concentrated Gold into brittle chalk husks recovered from the perimeter roads. Shatter the calcified crust to awaken viable frontline thralls.',
       currencyName: 'Gold',
-      singleCost: 100,
-      multiCost: 900, // 10 pulls for 900 (10% discount)
+      singleCost: 250,
+      multiCost: 2250, // 10 pulls for 2250 (10% discount)
       usesSigils: false,
       gen1Rate: 0.82,
       gen2Rate: 0.15,
@@ -97,8 +97,8 @@ class SummoningService {
       loreDescription:
           'Mine the ancient subterranean catacombs to unearth bone archers, spectral stalkers, and calcified blight spellweavers with heightened affinity.',
       currencyName: 'Gold',
-      singleCost: 120,
-      multiCost: 1000,
+      singleCost: 300,
+      multiCost: 2700,
       usesSigils: false,
       gen1Rate: 0.75,
       gen2Rate: 0.20,
@@ -140,6 +140,27 @@ class SummoningService {
     ),
   };
 
+  static int reserveCapacityForHospiceTier(int hospiceTier) {
+    if (hospiceTier >= 4) return 60;
+    if (hospiceTier == 3) return 40;
+    if (hospiceTier == 2) return 25;
+    return 15;
+  }
+
+  static ({double gen1, double gen2, double gen3}) effectiveRatesForBanner(
+    BannerConfig banner, {
+    int hospiceTier = 1,
+  }) {
+    if (hospiceTier <= 1) {
+      return (gen1: banner.gen1Rate, gen2: banner.gen2Rate, gen3: banner.gen3Rate);
+    }
+    final double g2 = banner.gen2Rate * 1.15;
+    final double g3 = banner.gen3Rate * 1.15 + (hospiceTier >= 4 ? 0.05 : 0.0);
+    final double g1 = (1.0 - g2 - g3).clamp(0.05, 1.0);
+    final double total = g1 + g2 + g3;
+    return (gen1: g1 / total, gen2: g2 / total, gen3: g3 / total);
+  }
+
   /// Performs a single (1x) or multi (10x) summon based on count and selected banner.
   /// Deducts currency from totalIchor/bloodlineSigils and returns a SummonResult.
   static SummonResult performSummon({
@@ -148,6 +169,7 @@ class SummoningService {
     required int currentIchor,
     required int currentSigils,
     bool guaranteeStarterVanguard = false,
+    int hospiceTier = 1,
     Random? rng,
   }) {
     final banner = banners[bannerType]!;
@@ -189,8 +211,22 @@ class SummoningService {
           lineageAncestors: const [],
         ));
       } else {
-        summoned.add(_rollSingleUnit(banner, random, i));
+        summoned.add(_rollSingleUnit(banner, random, i, hospiceTier: hospiceTier));
       }
+    }
+
+    // Hospice Gates Tier 3+: Guarantee at least one Gen 3 / 3-Star Veteran per 10x Convocation
+    if (hospiceTier >= 3 && count >= 10 && !summoned.any((u) => u.generation >= 3)) {
+      final guaranteed = _rollSingleUnit(
+        banner,
+        random,
+        count,
+        hospiceTier: hospiceTier,
+        forcedGeneration: 3,
+      );
+      summoned[summoned.length - 1] = guaranteed.rarity.index < UnitRarity.rare.index
+          ? guaranteed.copyWith(rarity: UnitRarity.rare)
+          : guaranteed;
     }
 
     return SummonResult(
@@ -201,30 +237,57 @@ class SummoningService {
     );
   }
 
-  static UnitEntity _rollSingleUnit(BannerConfig banner, Random rng, int indexOffset) {
-    final roll = rng.nextDouble();
-    int generation;
-    if (roll < banner.gen3Rate) {
-      generation = 3;
-    } else if (roll < banner.gen3Rate + banner.gen2Rate) {
-      generation = 2;
+  static UnitEntity _rollSingleUnit(
+    BannerConfig banner,
+    Random rng,
+    int indexOffset, {
+    int hospiceTier = 1,
+    int? forcedGeneration,
+  }) {
+    final int generation;
+    if (forcedGeneration != null) {
+      generation = forcedGeneration;
     } else {
-      generation = 1;
+      final rates = effectiveRatesForBanner(banner, hospiceTier: hospiceTier);
+      final roll = rng.nextDouble();
+      if (roll < rates.gen3) {
+        generation = 3;
+      } else if (roll < rates.gen3 + rates.gen2) {
+        generation = 2;
+      } else {
+        generation = 1;
+      }
     }
 
     final archetypeIndex = rng.nextInt(6);
     final archetype = Archetype.values[archetypeIndex];
     final timestamp = DateTime.now().microsecondsSinceEpoch + indexOffset;
 
+    UnitEntity unit;
     if (banner.type == SummonBannerType.commanderCovenant) {
-      return _generateCommanderOrArchon(generation, archetype, timestamp, rng);
+      unit = _generateCommanderOrArchon(
+        generation,
+        archetype,
+        timestamp,
+        rng,
+        commanderRate: hospiceTier >= 4 ? 0.75 : 0.60,
+      );
     } else if (banner.type == SummonBannerType.voidCovenant) {
-      return _generateVoidCultSpecialist(generation, archetype, timestamp, rng);
+      unit = _generateVoidCultSpecialist(generation, archetype, timestamp, rng);
     } else if (banner.type == SummonBannerType.cryptCovenant) {
-      return _generateCryptSpecialist(generation, archetype, timestamp, rng);
+      unit = _generateCryptSpecialist(generation, archetype, timestamp, rng);
     } else {
-      return _generateAshOrStandardThrall(generation, archetype, timestamp, rng);
+      unit = _generateAshOrStandardThrall(generation, archetype, timestamp, rng);
     }
+
+    // Hospice Gates Tier 4: Legendary Pilgrims chance on Gen 3 non-commander pulls
+    if (hospiceTier >= 4 &&
+        unit.generation >= 3 &&
+        banner.type != SummonBannerType.commanderCovenant &&
+        rng.nextDouble() < 0.25) {
+      unit = unit.copyWith(rarity: UnitRarity.legendary);
+    }
+    return unit;
   }
 
   static UnitEntity _generateAshOrStandardThrall(
@@ -368,10 +431,11 @@ class SummoningService {
     int generation,
     Archetype archetype,
     int timestamp,
-    Random rng,
-  ) {
-    // 60% chance to pull one of the four legendary commanders directly
-    final isCommanderPull = rng.nextDouble() < 0.60;
+    Random rng, {
+    double commanderRate = 0.60,
+  }) {
+    // 60% base (75% at Hospice Tier 4) chance to pull one of the four legendary commanders directly
+    final isCommanderPull = rng.nextDouble() < commanderRate;
     if (isCommanderPull) {
       final cmdRoll = rng.nextInt(4);
       final statMult = 1.0 + (generation - 1) * 0.40;

@@ -65,6 +65,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/icons/skills/
+    - assets/images/Ash sculpter/
     - assets/images/Ash Legion/lady_valeria_g1.png
     - assets/images/Ash Legion/lady_valeria_g3.png
     - assets/images/Ash Legion/lady_valeria_g6.png

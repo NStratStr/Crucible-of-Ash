@@ -83,7 +83,7 @@ class DelveService extends ChangeNotifier {
       description: 'Restless husks crawl from shallow grave trenches.',
       rewardIchor: (45 * rewardScale).round(),
       rewardOre: (12 * rewardScale).round(),
-      rewardSigils: (2 * rewardScale).round(),
+      rewardSigils: 0,
       rewardPlinthShards: 1,
       isAvailable: true,
     );
@@ -97,7 +97,7 @@ class DelveService extends ChangeNotifier {
       description: 'Chilled water drips upon calcified skeletons awaiting intruder blood.',
       rewardIchor: (50 * rewardScale).round(),
       rewardOre: (14 * rewardScale).round(),
-      rewardSigils: (2 * rewardScale).round(),
+      rewardSigils: 0,
       rewardPlinthShards: 1,
       isAvailable: true,
     );
@@ -116,7 +116,7 @@ class DelveService extends ChangeNotifier {
       description: 'Corrupted blood-rats and gargoyles prowl the stone ledges.',
       rewardIchor: (60 * rewardScale).round(),
       rewardOre: (16 * rewardScale).round(),
-      rewardSigils: (3 * rewardScale).round(),
+      rewardSigils: 0,
       rewardPlinthShards: 1,
     );
     final r1b = DelveRoom(
@@ -149,7 +149,7 @@ class DelveService extends ChangeNotifier {
       description: 'A colossal bone-golem enshrouded in lethal elite sorcery.',
       rewardIchor: (110 * rewardScale).round(),
       rewardOre: (32 * rewardScale).round(),
-      rewardSigils: (6 * rewardScale).round(),
+      rewardSigils: 1,
       rewardPlinthShards: isGloomActive ? 4 : 2,
       eliteAffix: affix1,
     );
@@ -163,7 +163,7 @@ class DelveService extends ChangeNotifier {
       description: 'Reinforced iron sarcophagus sealed with heavy runic padlocks.',
       rewardIchor: (80 * rewardScale).round(),
       rewardOre: (25 * rewardScale).round(),
-      rewardSigils: (5 * rewardScale).round(),
+      rewardSigils: 1,
       rewardPlinthShards: 2,
     );
     final r2c = DelveRoom(
@@ -176,7 +176,7 @@ class DelveService extends ChangeNotifier {
       description: 'Narrow corridor crowded with thralls eager to drag trespassers under.',
       rewardIchor: (65 * rewardScale).round(),
       rewardOre: (18 * rewardScale).round(),
-      rewardSigils: (3 * rewardScale).round(),
+      rewardSigils: 0,
       rewardPlinthShards: 1,
     );
     rooms[r2a.id] = r2a;
@@ -210,7 +210,7 @@ class DelveService extends ChangeNotifier {
       description: 'A dual-scythe executioner guarding the threshold of the deep stairwell.',
       rewardIchor: (125 * rewardScale).round(),
       rewardOre: (36 * rewardScale).round(),
-      rewardSigils: (7 * rewardScale).round(),
+      rewardSigils: 1,
       rewardPlinthShards: isGloomActive ? 4 : 2,
       eliteAffix: affix2,
     );
@@ -237,7 +237,7 @@ class DelveService extends ChangeNotifier {
           : 'A shimmering azure runestone offering safe extraction to the Citadel or descent deeper.',
       rewardIchor: ((isBossFloor ? 250 : 80) * rewardScale).round(),
       rewardOre: ((isBossFloor ? 60 : 20) * rewardScale).round(),
-      rewardSigils: isBossFloor ? (2 + (floor ~/ 5)) : (5 * rewardScale).round(),
+      rewardSigils: isBossFloor ? (2 + (floor ~/ 5)) : 1,
       rewardPlinthShards: isBossFloor ? 6 : 3,
     );
     rooms[r4.id] = r4;

@@ -139,7 +139,7 @@ class DelveRoom {
     required this.type,
     required this.title,
     required this.description,
-    this.connectedRoomIds = const [],
+    List<String>? connectedRoomIds,
     this.rewardIchor = 0,
     this.rewardOre = 0,
     this.rewardSigils = 0,
@@ -147,7 +147,7 @@ class DelveRoom {
     this.eliteAffix,
     this.isCleared = false,
     this.isAvailable = false,
-  });
+  }) : connectedRoomIds = connectedRoomIds != null ? List<String>.from(connectedRoomIds) : [];
 
   IconData get icon {
     switch (type) {

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'settings_service.dart';
 
 class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({super.key});
+  final VoidCallback? onResetSave;
 
-  static Future<void> show(BuildContext context) {
+  const SettingsDialog({super.key, this.onResetSave});
+
+  static Future<void> show(BuildContext context, {VoidCallback? onResetSave}) {
     return showDialog(
       context: context,
-      builder: (_) => const SettingsDialog(),
+      builder: (_) => SettingsDialog(onResetSave: onResetSave),
     );
   }
 
@@ -306,6 +308,63 @@ class _SettingsDialogState extends State<SettingsDialog> with SingleTickerProvid
           activeColor: const Color(0xFF00E5FF),
           onChanged: (val) => _settings.setAnalyticsTelemetry(val),
         ),
+        if (widget.onResetSave != null) ...[
+          const Divider(color: Color(0xFF262636)),
+          _buildSectionHeader('SAVE DATA MANAGEMENT'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.restart_alt, size: 16, color: Color(0xFFFF5252)),
+              label: const Text(
+                'RESET CAMPAIGN & START NEW PROLOGUE',
+                style: TextStyle(color: Color(0xFFFF5252), fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.6),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFB3261E), width: 1.2),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (confirmCtx) => AlertDialog(
+                    backgroundColor: const Color(0xFF14141E),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFFB3261E), width: 1.4),
+                    ),
+                    title: const Text(
+                      'RESET CAMPAIGN PROGRESS?',
+                      style: TextStyle(color: Color(0xFFFF5252), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                    ),
+                    content: const Text(
+                      'This erases your current squad, relics, currencies, and chapter unlocks on this device and starts a fresh Prologue.',
+                      style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.4),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(confirmCtx).pop(false),
+                        child: const Text('CANCEL', style: TextStyle(color: Colors.white60)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFB3261E),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.of(confirmCtx).pop(true),
+                        child: const Text('CONFIRM RESET', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && mounted) {
+                  Navigator.of(context).pop();
+                  widget.onResetSave!();
+                }
+              },
+            ),
+          ),
+        ],
       ],
     );
   }

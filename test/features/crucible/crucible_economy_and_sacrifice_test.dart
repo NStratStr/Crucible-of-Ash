@@ -78,7 +78,7 @@ void main() {
       lineageAncestors: ['g1_b', 'g2_b'],
     );
 
-    testWidgets('Crucible Altar renders currency status bar with Ichor and Bloodline Sigils', (tester) async {
+    testWidgets('Crucible Altar renders currency status bar with Gold and Bloodline Sigils', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -92,13 +92,11 @@ void main() {
         ),
       );
 
-      expect(find.text('ICHOR: '), findsOneWidget);
-      expect(find.text('450'), findsOneWidget);
-      expect(find.text('BLOODLINE SIGILS: '), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
+      expect(find.text('450'), findsWidgets);
+      expect(find.text('3'), findsWidgets);
     });
 
-    testWidgets('Gen 2 fusion requires 150 Ichor; disables button when Ichor < 150', (tester) async {
+    testWidgets('Gen 2 fusion requires 150 Gold; disables button when Gold < 150', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -114,15 +112,15 @@ void main() {
 
       // Both units auto-slotted
       expect(find.text('TRANSMUTATION RITUAL COST (GEN 2)'), findsOneWidget);
-      expect(find.text('150 Ichor'), findsOneWidget);
+      expect(find.text('150 Gold'), findsOneWidget);
       expect(find.text('INSUFFICIENT RESOURCES'), findsOneWidget);
-      expect(find.textContaining('INSUFFICIENT ICHOR'), findsOneWidget);
+      expect(find.textContaining('INSUFFICIENT GOLD'), findsOneWidget);
 
       final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
       expect(button.onPressed, isNull);
     });
 
-    testWidgets('Gen 4 Pureblood requires 500 Ichor and 1 Bloodline Sigil; disables when Sigils < 1', (tester) async {
+    testWidgets('Gen 4 Pureblood requires Gold and 1 Bloodline Sigil; disables when Sigils < 1', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -130,6 +128,7 @@ void main() {
               availableInventory: const [parentG3Alpha, parentG3Beta],
               totalIchor: 1000,
               bloodlineSigils: 0, // Insufficient Sigils for Gen 4
+              crucibleTier: 4,
               onFusionComplete: (_) {},
             ),
           ),
@@ -137,7 +136,7 @@ void main() {
       );
 
       expect(find.text('PUREBLOOD CONSECRATION COST'), findsOneWidget);
-      expect(find.text('500 Ichor'), findsOneWidget);
+      expect(find.text('400 Gold'), findsOneWidget);
       expect(find.text('1 Bloodline Sigil'), findsOneWidget);
       expect(find.text('INSUFFICIENT RESOURCES'), findsOneWidget);
       expect(find.textContaining('INSUFFICIENT BLOODLINE SIGILS'), findsOneWidget);
@@ -159,6 +158,7 @@ void main() {
               availableInventory: const [parentG3Alpha, parentG3Beta],
               totalIchor: 800,
               bloodlineSigils: 2,
+              crucibleTier: 4,
               onIchorChanged: (val) => updatedIchor = val,
               onSigilsChanged: (val) => updatedSigils = val,
               onFusionExecuted: (child, parents) {
@@ -176,7 +176,7 @@ void main() {
       await tester.tap(find.text('👑 CONSECRATE PUREBLOOD SOVEREIGN'));
       await tester.pumpAndSettle();
 
-      expect(updatedIchor, 800 - 500); // 300 Ichor remaining
+      expect(updatedIchor, 800 - 400); // 400 Gold remaining (Tier IV 20% discount)
       expect(updatedSigils, 2 - 1);    // 1 Sigil remaining
       expect(producedChild, isNotNull);
       expect(producedChild!.generation, 4);

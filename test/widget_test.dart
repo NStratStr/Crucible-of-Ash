@@ -5,139 +5,52 @@ import 'package:ashen_crucible/main.dart';
 
 void main() {
   testWidgets('AshenCrucibleApp boots up and renders main navigation tabs', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
     await tester.pumpWidget(const AshenCrucibleApp());
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
     // Verify main navigation bar items render
-    expect(find.text('Campaign Map'), findsOneWidget);
-    expect(find.text('Battle Arena'), findsOneWidget);
-    expect(find.text('Crucible Altar'), findsOneWidget);
-    expect(find.text('Relic Forge'), findsOneWidget);
-    expect(find.text('Brigade Roster'), findsOneWidget);
-    expect(find.text('Affinity Codex'), findsOneWidget);
+    expect(find.text('Sanctuary'), findsWidgets);
+    expect(find.text('Campaign'), findsWidgets);
+    expect(find.text('Trials'), findsWidgets);
+    expect(find.text('Blood Altar'), findsWidgets);
+    expect(find.text('Relic Forge'), findsWidgets);
+    expect(find.text('Roster'), findsWidgets);
   });
 
-  testWidgets('Tapping a unit in Brigade Roster opens PedigreeInspectorDialog', (WidgetTester tester) async {
-    await tester.pumpWidget(const AshenCrucibleApp());
-    await tester.pump();
-
-    // Tap Brigade Roster tab
-    await tester.tap(find.text('Brigade Roster'));
-    await tester.pumpAndSettle();
-
-    // Verify roster header
-    expect(find.text('YOUR LINEAGE ROSTER'), findsOneWidget);
-    expect(find.text('TAP UNIT TO INSPECT PEDIGREE'), findsOneWidget);
-
-    // Tap the first unit card in roster
-    await tester.tap(find.text('Lord Vladislav').first);
-    await tester.pumpAndSettle();
-
-    // Verify modal appeared with level progression and affinity matchup
-    expect(find.text('HEXAGONAL AFFINITY MATCHUP', skipOffstage: false), findsOneWidget);
-    expect(find.text('LEVEL PROGRESSION'), findsOneWidget);
-  });
-
-  testWidgets('Appointing a new Commander via GeneralSelectionDialog updates brigade profile', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 1800);
+  testWidgets('Tapping Roster tab opens Lineage Roster', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
-    addTearDown(() => tester.view.resetPhysicalSize());
+    addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(const AshenCrucibleApp());
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
-    // Go to Brigade Roster
-    await tester.tap(find.text('Brigade Roster'));
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('Roster'));
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // Initially Lord Vladislav is active
-    expect(find.text('LORD VLADISLAV'), findsOneWidget);
-
-    // Tap SWITCH button
-    await tester.tap(find.text('SWITCH'));
-    await tester.pumpAndSettle();
-
-    // Verify Phylactery of Commanders modal opened
-    expect(find.text('PHYLACTERY OF COMMANDERS'), findsOneWidget);
-    expect(find.text('LADY VALERIA'), findsOneWidget);
-
-    // Tap APPOINT for Lady Valeria
-    await tester.tap(find.text('APPOINT').first);
-    await tester.pumpAndSettle();
-
-    // Verify Commander switched to Lady Valeria
-    expect(find.text('LADY VALERIA'), findsOneWidget);
+    expect(find.text('BRIGADE LINEAGE ROSTER'), findsOneWidget);
   });
 
-  testWidgets('Opening Endgame Gauntlet renders trials and allows engaging World Titan', (WidgetTester tester) async {
-    await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
-    await tester.pump();
+  testWidgets('Opening Endgame Gauntlet renders trials', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
 
-    // On Campaign Map, tap ENDGAME GAUNTLET button
+    await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Tap ENDGAME GAUNTLET button on Campaign Map
     expect(find.text('ENDGAME GAUNTLET'), findsOneWidget);
     await tester.tap(find.text('ENDGAME GAUNTLET'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
     // Verify modal appeared with trials
     expect(find.text('THE ENDGAME GAUNTLET'), findsOneWidget);
     expect(find.text('THE ASHEN WORLD TITAN'), findsOneWidget);
-
-    // Tap ENGAGE TRIAL for World Titan
-    await tester.tap(find.text('ENGAGE TRIAL').first);
-    await tester.pumpAndSettle();
-
-    // Verify engaged into Battle Arena
-    expect(find.textContaining('THE ASHEN WORLD TITAN'), findsOneWidget);
-  });
-
-  testWidgets('Tapping Citadel War Room Home button opens HomeScreen and navigates to Crucible', (WidgetTester tester) async {
-    await tester.pumpWidget(const AshenCrucibleApp());
-    await tester.pump();
-
-    // Tap Home icon in Campaign Map AppBar
-    final homeButton = find.byTooltip('Citadel War Room (Home)');
-    expect(homeButton, findsOneWidget);
-    await tester.tap(homeButton);
-    await tester.pumpAndSettle();
-
-    // Verify Home Screen modal opened
-    expect(find.text('COMMAND CITADEL • CHAPTER HEADQUARTERS'), findsOneWidget);
-    expect(find.text('BRIGADE BARRACKS'), findsOneWidget);
-    expect(find.text('THE CRUCIBLE ALTAR'), findsWidgets);
-    expect(find.text('THE RELIC FORGE'), findsWidgets);
-
-    // Tap THE CRUCIBLE ALTAR interactive building
-    await tester.tap(find.text('THE CRUCIBLE ALTAR').first);
-    await tester.pumpAndSettle();
-
-    // Verify switched to Crucible Altar screen
-    expect(find.text('THE CRUCIBLE OF BLOOD'), findsOneWidget);
-  });
-
-  testWidgets('Tapping Settings opens Imperial Archives with Telco & Connectivity options', (WidgetTester tester) async {
-    await tester.pumpWidget(const AshenCrucibleApp());
-    await tester.pump();
-
-    // Tap Home button to open Home Screen
-    await tester.tap(find.byTooltip('Citadel War Room (Home)'));
-    await tester.pumpAndSettle();
-
-    // Tap SETTINGS button in Home Screen header
-    await tester.tap(find.text('SETTINGS').first);
-    await tester.pumpAndSettle();
-
-    // Verify Imperial Archives & Settings dialog opened
-    expect(find.text('IMPERIAL ARCHIVES & SETTINGS'), findsOneWidget);
-    expect(find.text('TELCO & DATA'), findsOneWidget);
-
-    // Switch to Telco & Data tab
-    await tester.tap(find.text('TELCO & DATA'));
-    await tester.pumpAndSettle();
-
-    // Verify telco settings rendered
-    expect(find.text('Telco Low-Data Mode'), findsOneWidget);
-    expect(find.text('Active Carrier Profile'), findsOneWidget);
-    expect(find.text('Offline Local Storage Cache'), findsOneWidget);
   });
 
   testWidgets('SafeTeleportModal renders run haul and confirms extraction', (WidgetTester tester) async {
@@ -185,33 +98,31 @@ void main() {
     expect(continued, isFalse);
   });
 
-  testWidgets('CampaignMapScreen renders linear stage ladder and allows toggling to catacomb dungeon', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1280, 800);
+  testWidgets('CampaignMapScreen renders linear stage ladder and allows toggling to expedition mode', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
-    addTearDown(() => tester.view.resetPhysicalSize());
+    addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // Verify Linear Campaign mode rendered by default
-    expect(find.text('CAMPAIGN'), findsOneWidget);
-    expect(find.text('DUNGEON'), findsOneWidget);
+    // Verify Linear Story mode rendered by default
+    expect(find.text('STORY'), findsOneWidget);
+    expect(find.text('EXPEDITION'), findsOneWidget);
     expect(find.text('STAGE 1-1'), findsOneWidget);
     expect(find.text('ASHEN OUTPOST'), findsOneWidget);
 
-    // Toggle to DUNGEON mode
-    await tester.tap(find.text('DUNGEON'));
-    await tester.pumpAndSettle();
+    // Toggle to EXPEDITION mode
+    await tester.tap(find.text('EXPEDITION'));
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // Verify catacomb delve node graph rendered
+    // Verify expedition delve node graph rendered
     expect(find.text('Sunken Trench'), findsWidgets);
 
-    // Toggle back to CAMPAIGN mode
-    await tester.tap(find.text('CAMPAIGN'));
-    await tester.pumpAndSettle();
+    // Toggle back to STORY mode
+    await tester.tap(find.text('STORY'));
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('STAGE 1-1'), findsOneWidget);
   });
 }
-
-

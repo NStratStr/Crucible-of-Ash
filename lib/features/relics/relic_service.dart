@@ -55,6 +55,25 @@ class RelicService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears all relics safely without mutating the unmodifiable view.
+  void clearAllRelics() {
+    _relics.clear();
+    notifyListeners();
+  }
+
+  /// Updates equippedUnitId references when a unit's ID is migrated.
+  void migrateEquippedUnitId(String oldUnitId, String newUnitId) {
+    if (oldUnitId == newUnitId) return;
+    bool changed = false;
+    for (int i = 0; i < _relics.length; i++) {
+      if (_relics[i].equippedUnitId == oldUnitId) {
+        _relics[i] = _relics[i].copyWith(equippedUnitId: newUnitId);
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
   List<RelicEntity> get unequippedRelics =>
       _relics.where((r) => r.equippedUnitId == null).toList();
 
@@ -507,31 +526,6 @@ class RelicService extends ChangeNotifier {
           RelicSubStat(type: RelicSubStatType.hp, value: 80.0),
         ],
         description: 'Embossed insignia of the Iron Justiciar.',
-      ),
-      const RelicEntity(
-        id: 'starter_relic_05',
-        name: 'Zephyr Kinetic Gyro',
-        slot: RelicSlot.boots,
-        rarity: RelicRarity.rare,
-        setType: RelicSetType.tempest,
-        bonusSpeed: 10,
-        bonusHp: 100,
-        subStats: [
-          RelicSubStat(type: RelicSubStatType.critDamage, value: 0.12),
-        ],
-        description: 'Feathered sabatons pulsing with gale winds.',
-      ),
-      const RelicEntity(
-        id: 'starter_relic_06',
-        name: 'Aegis of the Justiciar',
-        slot: RelicSlot.offhand,
-        rarity: RelicRarity.rare,
-        setType: RelicSetType.ironclad,
-        bonusDefense: 30,
-        subStats: [
-          RelicSubStat(type: RelicSubStatType.defense, value: 15.0),
-        ],
-        description: 'Hardened pavise shield engraved with protective hymns.',
       ),
     ];
   }

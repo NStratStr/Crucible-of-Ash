@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/audio/global_audio_service.dart';
 import '../../shared/models/relic_entity.dart';
 import '../../shared/models/unit_entity.dart';
 import '../../shared/widgets/gothic_header_bar.dart';
@@ -103,6 +104,31 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.brigadeUnits.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF111114),
+        appBar: GothicHeaderBar(
+          title: 'Relic Forge & Armory',
+          categoryTag: 'Armory',
+          totalIchor: widget.totalIchor,
+          cursedOre: widget.cursedOre,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.help_outline, color: Color(0xFFFFD54F), size: 20),
+              tooltip: 'Relic & Set Guide',
+              onPressed: () => RelicSetCodexDialog.show(context, currentChapter: widget.currentChapter),
+            ),
+          ],
+        ),
+        body: const Center(
+          child: Text(
+            'Recruit at least one unit to equip or refine Relics.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ),
+      );
+    }
+
     final selectedUnit = widget.brigadeUnits.firstWhere(
       (u) => u.id == _selectedUnitId,
       orElse: () => widget.brigadeUnits.first,
@@ -111,6 +137,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
     final equippedRelics = widget.relicService.getRelicsForUnit(selectedUnit.id);
     final bonuses = widget.relicService.calculateBonuses(selectedUnit.id);
     final unequipped = widget.relicService.unequippedRelics.where((r) {
+      if (!RelicSlotArmature.activeSlots.contains(r.slot)) return false;
       if (_slotFilter != null && r.slot != _slotFilter) return false;
       if (_setTypeFilter != null && r.setType != _setTypeFilter) return false;
       return true;
@@ -193,7 +220,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                 ElevatedButton.icon(
                   onPressed: _forgeNewRelic,
                   icon: const Icon(Icons.fireplace, size: 16),
-                  label: const Text('FORGE (100 / 25)', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                  label: Text('FORGE ($_forgeIchorCost G / $_forgeOreCost O)', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFB3261E),
                     foregroundColor: Colors.white,
@@ -641,7 +668,10 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                           style: TextStyle(color: Color(0xFFE5A93C), fontSize: 7.5, fontWeight: FontWeight.bold)),
                     ),
                   GestureDetector(
-                    onTap: () => widget.relicService.unequipRelic(relic.id),
+                    onTap: () {
+        GlobalAudioService().playSfx('sfx_equip', volumeMultiplier: 0.55);
+        widget.relicService.unequipRelic(relic.id);
+      },
                     child: const Text('REMOVE',
                         style: TextStyle(color: Color(0xFFEF5350), fontSize: 7.5, fontWeight: FontWeight.bold)),
                   ),
@@ -658,24 +688,26 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
   Widget _buildFilterChip(String label, RelicSlot? slot) {
     final bool isSelected = _slotFilter == slot;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _slotFilter = slot),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFB3261E) : const Color(0xFF1E1E26),
-            borderRadius: BorderRadius.circular(4),
+    return GestureDetector(
+      onTap: () => setState(() => _slotFilter = slot),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFB3261E) : const Color(0xFF1E1E26),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFFF5252) : const Color(0xFF2B2B36),
+            width: 1,
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white60,
-                fontSize: 8.5,
-                fontWeight: FontWeight.bold,
-              ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white60,
+              fontSize: 8.5,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -829,7 +861,8 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  widget.relicService.equipRelic(relicId: relic.id, unitId: targetUnitId);
+                  GlobalAudioService().playSfx('sfx_equip', volumeMultiplier: 0.55);
+        widget.relicService.equipRelic(relicId: relic.id, unitId: targetUnitId);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2B2B36),
@@ -864,7 +897,7 @@ class _RelicForgeScreenState extends State<RelicForgeScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                   child: Text(
-                    'REFINE (${relic.upgradeCostIchor}I / ${_refineOreCost(relic)}O)',
+                    'REFINE (${relic.upgradeCostIchor}G / ${_refineOreCost(relic)}O)',
                     style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold),
                   ),
                 ),

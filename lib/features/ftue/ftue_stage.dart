@@ -49,13 +49,13 @@ extension FtueStageMeta on FtueStage {
       case FtueStage.awakening:
         return 'Choose your Ash Sculptor Crucible Discipline';
       case FtueStage.encounter1:
-        return 'Clear Ashen Outpost solo to rescue your Vanguard Husk & earn +1★ Skill Point';
+        return 'Clear Ashen Outpost solo to earn +1 Sigil (Summon) & +1★ Skill Point';
       case FtueStage.encounter2:
-        return 'Unlock Slot 2 in the Skill Tree and defeat the Sunken Trench pack';
+        return 'Summon your 1st Companion, unlock Slot 2 Skill, and clear Sunken Trench';
       case FtueStage.crucibleFusion:
-        return 'Conquer Siphon Threshold to recruit your 2nd Retinue companion';
+        return 'Conquer Stage 1-3: Siphon Threshold to push toward the Elite Trial';
       case FtueStage.encounter3:
-        return 'Challenge the Abyssal Juggernaut Elite with your 3-unit squad';
+        return 'Challenge the Abyssal Juggernaut Elite with your expanded squad';
       case FtueStage.completed:
         return 'Conquer Chapter 1, forge Relics, and unlock Apex Crucible skills';
     }
@@ -66,15 +66,15 @@ extension FtueStageMeta on FtueStage {
       case FtueStage.awakening:
         return 'Your Discipline sets your starting Slot 1 Cinder generator. You will unlock Slots 2–5 and higher ranks by earning Skill Points from campaign victories.';
       case FtueStage.encounter1:
-        return 'Drag your Ash Sculptor between Frontline, Midline, and Backline lanes to intercept or flank. Winning 1-1 rescues a Vanguard Husk and grants +1★ Skill Point.';
+        return 'Drag your Ash Sculptor between Frontline, Midline, and Backline lanes to intercept or flank. Winning 1-1 awards +1 Sigil to Summon an ally & +1★ Skill Point.';
       case FtueStage.encounter2:
-        return 'Open the Crucible Skill Tree (top HUD or Citadel Home) to spend your ★ Skill Point on a Slot 2 Cinder spender, then deploy your Vanguard Husk in front.';
+        return 'Use your Sigil at the Summoning Altar to summon a companion, then unlock a Slot 2 skill in the Crucible Skill Tree and clear Stage 1-2.';
       case FtueStage.crucibleFusion:
-        return 'Use Cinders from basic strikes to unleash heavy skills and stagger armored foes. Clearing 1-3 recruits a Grave Duelist into your 3rd squad slot.';
+        return 'Use Cinders from basic strikes to unleash heavy skills, stagger armored foes, and clear Stage 1-3.';
       case FtueStage.encounter3:
-        return 'With a 3-unit squad and 3+ Skill Points invested, exploit flanking trajectories and Retinue passives to break the Abyssal Juggernaut and claim your first Rare Relic.';
+        return 'Upgrade Hospice Gates Tier II to field a 3-unit squad, then exploit flanking trajectories and passives to break the Abyssal Juggernaut and claim a Rare Relic.';
       case FtueStage.completed:
-        return 'Expand your roster in the Retinue Squad & Crucible Altar, equip Relics from the Forge, and push toward the Chapter 1 Boss.';
+        return 'Expand your roster at the Summoning Altar & Blood Altar, equip Relics from the Forge, and push toward the Chapter 1 Boss.';
     }
   }
 

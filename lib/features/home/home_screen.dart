@@ -635,7 +635,7 @@ class _HomeScreenState extends State<HomeScreen> {
               left: w * 0.05,
               child: _buildSanctuaryBuildingNode(
                 id: 'crucible',
-                title: 'THE CRUCIBLE ALTAR',
+                title: 'THE BLOOD ALTAR',
                 subtitle: 'Genetic Fusion & Transmutation',
                 imageAsset: 'assets/images/UI/building_crucible_furnace.png',
                 glowColor: const Color(0xFFFF7043),
@@ -786,11 +786,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Center(
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 620),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xDD0D0D14),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.5), width: 1.2),
+                    color: const Color(0xEB12121A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF282836), width: 1.2),
                     boxShadow: const [
                       BoxShadow(color: Colors.black87, blurRadius: 16, spreadRadius: 2),
                     ],
@@ -802,13 +802,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
                         child: Opacity(
                           opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
-                          child: _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFE5A93C), widget.onOpenCampaign),
+                          child: _buildQuickActionBtn('CAMPAIGN', Icons.map_outlined, const Color(0xFFFFD54F), widget.onOpenCampaign),
                         ),
                       ),
                       Container(
                         decoration: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial)
                             ? BoxDecoration(
-                                color: const Color(0xFF00E5FF).withValues(alpha: 0.16),
+                                color: const Color(0xFF69F0AE).withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: const Color(0xFF69F0AE), width: 1.6),
                                 boxShadow: [
@@ -823,7 +823,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: _buildQuickActionBtn(
                           widget.unspentSkillPoints > 0 ? 'SKILLS (${widget.unspentSkillPoints}★)' : 'SKILLS',
                           Icons.auto_fix_high,
-                          (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? const Color(0xFF69F0AE) : const Color(0xFF00E5FF),
+                          (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? const Color(0xFF69F0AE) : const Color(0xFFFFD54F),
                           widget.onOpenSkillTree ?? widget.onOpenBrigadeRoster,
                         ),
                       ),
@@ -834,7 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: _buildQuickActionBtn(
                             'RETINUE',
                             Icons.groups_outlined,
-                            const Color(0xFFAB47BC),
+                            const Color(0xFFE0E0E8),
                             widget.onOpenRetinueSquad ?? widget.onOpenBrigadeRoster,
                           ),
                         ),
@@ -843,14 +843,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
                         child: Opacity(
                           opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
-                          child: _buildQuickActionBtn('CRUCIBLE', Icons.bloodtype_outlined, const Color(0xFFFF7043), widget.onOpenCrucible),
+                          child: _buildQuickActionBtn('BLOOD ALTAR', Icons.bloodtype_outlined, const Color(0xFFFF5252), widget.onOpenCrucible),
                         ),
                       ),
                       IgnorePointer(
                         ignoring: widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial,
                         child: Opacity(
                           opacity: (widget.guideFirstSkillUpgrade && !_dismissedSkillTutorial) ? 0.35 : 1.0,
-                          child: _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFF42A5F5), widget.onOpenRelicForge),
+                          child: _buildQuickActionBtn('FORGE', Icons.build_outlined, const Color(0xFFE0E0E8), widget.onOpenRelicForge),
                         ),
                       ),
                       IgnorePointer(
@@ -932,11 +932,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xF00D0D16),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xF012121A),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isHovered ? const Color(0xFFFFD54F) : glowColor.withValues(alpha: 0.65),
-                      width: isHovered ? 1.6 : 1.0,
+                      color: isHovered ? const Color(0xFFFFD54F) : const Color(0xFF282836),
+                      width: isHovered ? 1.5 : 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -1195,7 +1195,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildCommanderBanner(context, profile, isCompact),
           const SizedBox(height: 18),
-          _buildSectionTitle('WAR ROOM & GAME MODES', 'CHOOSE EXPEDITION, CRUCIBLE, OR ARENA'),
+          _buildSectionTitle('WAR ROOM & GAME MODES', 'CHOOSE EXPEDITION, ALTAR, OR TRIALS'),
           const SizedBox(height: 12),
           _buildModesGrid(context, isCompact),
           const SizedBox(height: 20),
@@ -1439,22 +1439,13 @@ class _HomeScreenState extends State<HomeScreen> {
       },
 
       {
-        'title': 'THE CRUCIBLE ALTAR',
+        'title': 'THE BLOOD ALTAR',
         'subtitle': 'Bloodline infusion, progenitor fusion & 6-gen pedigree',
         'badge': 'GENETIC EVOLUTION',
         'badgeColor': const Color(0xFFFF7043),
         'iconAsset': 'assets/images/UI/Flame Shield icon Transparent.png',
         'action': widget.onOpenCrucible,
         'borderColor': const Color(0xFFFF7043),
-      },
-      {
-        'title': 'TITAN CORE ALTAR',
-        'subtitle': 'Socket harvested Titan Cores & Runic Shards',
-        'badge': 'TITAN CORES',
-        'badgeColor': const Color(0xFF00E5FF),
-        'iconAsset': 'assets/images/UI/Crossed Sword Shield Icon Transparent.png',
-        'action': widget.onOpenPlinthSculptory ?? () {},
-        'borderColor': const Color(0xFF00E5FF),
       },
       {
         'title': 'ASHEN TOWER',

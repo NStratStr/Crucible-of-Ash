@@ -1095,7 +1095,7 @@ class StarterBrigades {
     if (chapter == 1) {
       switch (stageNumber) {
         // Stage 1-1: Ashen Outpost (Ashen Trail Desolation)
-        // Solo Commander opening skirmish: Captive Rotting Husk + Outpost Ash-Hound
+        // Solo Commander opening tutorial skirmish: 1 Captive Rotting Husk to teach basic attacks & skills
         case 1:
           return [
             const UnitEntity(
@@ -1115,24 +1115,6 @@ class StarterBrigades {
               nativeTraitId: 'iron_bastion',
               lineageAncestors: [],
               customAvatarAsset: 'assets/images/rotting_husk_g1.png',
-            ),
-            const UnitEntity(
-              id: 's1_hound_01',
-              speciesId: 'feral_warhound',
-              name: 'Outpost Ash-Hound',
-              generation: 1,
-              archetype: Archetype.skirmisher,
-              slot: FormationSlot.front2,
-              level: 1,
-              maxLevel: 10,
-              currentHp: 420,
-              maxHp: 420,
-              attack: 75,
-              defense: 35,
-              speed: 110,
-              nativeTraitId: 'claw_slash',
-              lineageAncestors: [],
-              customAvatarAsset: 'assets/images/feral_warhound.png',
             ),
           ];
 

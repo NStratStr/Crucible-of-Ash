@@ -31,7 +31,11 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   final Function(int col, int row, bool isPlayer) onTileHover;
   final VoidCallback onClearHover;
   final Function(CombatUnitState unit)? onLongPressUnit;
+  final Function(String unitId)? onDragStartUnit;
+  final VoidCallback? onDragEndUnit;
   final Widget Function(CombatUnitState unit, {required double tileWidth, required double tileHeight, required double colGap, bool isSelected}) buildUnitMiniature;
+  final Set<String> visualAliveOverrideIds;
+  final Widget Function(Offset Function(CombatUnitState unit) resolveUnitCenter2D)? buildVfxOverlay;
 
   const RankAndRite2DBattlefield({
     super.key,
@@ -56,14 +60,41 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     required this.onTileHover,
     required this.onClearHover,
     this.onLongPressUnit,
+    this.onDragStartUnit,
+    this.onDragEndUnit,
     required this.buildUnitMiniature,
+    this.visualAliveOverrideIds = const {},
+    this.buildVfxOverlay,
   });
+
+  Offset _resolveUnitCenter2D(CombatUnitState unit, double clashWidth) {
+    final double torsoLiftY = -tileHeight * 0.14;
+    if (unit.occupiedNodes.isEmpty) {
+      final double fallbackX = unit.isPlayer
+          ? (tileWidth * 1.5)
+          : ((3 * tileWidth) + clashWidth + tileWidth * 1.5);
+      final double fallbackY = (tileHeight * 1.5) + torsoLiftY;
+      return Offset(fallbackX, fallbackY);
+    }
+    double sumX = 0.0;
+    double sumY = 0.0;
+    for (final node in unit.occupiedNodes) {
+      final double y = node.column * tileHeight + (tileHeight * 0.5);
+      final double x = unit.isPlayer
+          ? ((2 - node.row).clamp(0, 2) * tileWidth + (tileWidth * 0.5))
+          : ((3 * tileWidth) + clashWidth + (node.row.clamp(0, 2) * tileWidth) + (tileWidth * 0.5));
+      sumX += x;
+      sumY += y;
+    }
+    return Offset(
+      sumX / unit.occupiedNodes.length,
+      (sumY / unit.occupiedNodes.length) + torsoLiftY,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double colWidth = tileWidth;
-    final double rowHeight = tileHeight;
-    final double clashDividerWidth = (tileWidth * 0.22).clamp(20.0, 36.0);
+    final double clashWidth = (tileWidth * 0.38).clamp(32.0, 68.0);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -83,7 +114,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               _buildSquadTerritory(isPlayer: true, rankOrder: const [2, 1, 0]),
 
               // Center: Intimate clash spacing (armies face off in close tactical confrontation)
-              SizedBox(width: (tileWidth * 0.38).clamp(32.0, 68.0)),
+              SizedBox(width: clashWidth),
 
               // Right: Enemy Squad (Frontline Row 0 -> Midline Row 1 -> Backline Row 2)
               _buildSquadTerritory(isPlayer: false, rankOrder: const [0, 1, 2]),
@@ -98,7 +129,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                   engine: engine,
                   tileWidth: tileWidth,
                   tileHeight: tileHeight,
-                  clashWidth: (tileWidth * 0.38).clamp(32.0, 68.0),
+                  clashWidth: clashWidth,
                   selectedEnemyUnitId: selectedEnemyUnitId,
                   selectedUnitId: selectedUnitId,
                   draggedUnitId: draggedUnitId,
@@ -109,6 +140,13 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               ),
             ),
           ),
+
+          if (buildVfxOverlay != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: buildVfxOverlay!((unit) => _resolveUnitCenter2D(unit, clashWidth)),
+              ),
+            ),
         ],
       ),
     );
@@ -208,7 +246,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     // Slight rank-to-rank horizontal overlap so formations look tight and compact and cohesive
     final double overlapStep = (tileWidth * 0.16).clamp(8.0, 24.0);
     final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
-    final multiUnits = units.where((u) => u.isAlive && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1)).toList();
+    final multiUnits = units.where((u) => (u.isAlive || visualAliveOverrideIds.contains(u.id)) && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1)).toList();
 
     return Stack(
       clipBehavior: Clip.none,
@@ -827,7 +865,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 ),
 
               // 4. Petrified Stone Plinth Indicator (Rank & Rite Spec Sec 5)
-              if (occupant != null && occupant.isPetrifiedPlinth)
+              if (occupant != null && occupant.isPetrifiedPlinth && !visualAliveOverrideIds.contains(occupant.id))
                 Positioned(
                   bottom: 2,
                   left: 4,
@@ -874,33 +912,65 @@ class RankAndRite2DBattlefield extends StatelessWidget {
               // render ONE unified giant miniature centered across their multi-node footprint in _buildSquadTerritory!
               if (occupant != null && !isMultiNodeBoss)
                 Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      if (isPlayer) {
-                        if (engine.isPreBattlePhase && selectedAlly != null && selectedAlly.id != occupant.id) {
-                          // In pre-battle deployment, tapping another friendly ally swaps grid positions!
-                          onMovePlayerUnit(selectedAlly.id, col, row);
-                        } else {
-                          onSelectPlayerUnit(occupant.id);
-                        }
-                      } else {
-                        onSelectEnemyUnit(occupant.id);
+                  child: Builder(
+                    builder: (context) {
+                      final Widget unitWidget = GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          if (isPlayer) {
+                            if (selectedAlly != null && selectedAlly.id != occupant.id && occupant.isAlive) {
+                              // Tapping another friendly ally swaps grid positions!
+                              onMovePlayerUnit(selectedAlly.id, col, row);
+                            } else {
+                              onSelectPlayerUnit(occupant.id);
+                            }
+                          } else {
+                            onSelectEnemyUnit(occupant.id);
+                          }
+                        },
+                        onDoubleTap: () {
+                          onLongPressUnit?.call(occupant);
+                        },
+                        onLongPress: () {
+                          onLongPressUnit?.call(occupant);
+                        },
+                        child: buildUnitMiniature(
+                          occupant,
+                          tileWidth: tileWidth,
+                          tileHeight: tileHeight,
+                          colGap: 0,
+                          isSelected: isSelected,
+                        ),
+                      );
+                      if (isPlayer && occupant.isAlive && !occupant.isDisplacementImmune) {
+                        return Draggable<String>(
+                          data: 'unit:${occupant.id}',
+                          onDragStarted: () => onDragStartUnit?.call(occupant.id),
+                          onDragEnd: (_) => onDragEndUnit?.call(),
+                          onDraggableCanceled: (_, __) => onDragEndUnit?.call(),
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: Opacity(
+                              opacity: 0.85,
+                              child: SizedBox(
+                                width: tileWidth,
+                                height: tileHeight,
+                                child: buildUnitMiniature(
+                                  occupant,
+                                  tileWidth: tileWidth,
+                                  tileHeight: tileHeight,
+                                  colGap: 0,
+                                  isSelected: true,
+                                ),
+                              ),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(opacity: 0.3, child: unitWidget),
+                          child: unitWidget,
+                        );
                       }
+                      return unitWidget;
                     },
-                    onDoubleTap: () {
-                      onLongPressUnit?.call(occupant);
-                    },
-                    onLongPress: () {
-                      onLongPressUnit?.call(occupant);
-                    },
-                    child: buildUnitMiniature(
-                      occupant,
-                      tileWidth: tileWidth,
-                      tileHeight: tileHeight,
-                      colGap: 0,
-                      isSelected: isSelected,
-                    ),
                   ),
                 )
               else if (isMultiNodeBoss)
@@ -1095,14 +1165,15 @@ class _2DTacticalIntentVectorPainter extends CustomPainter {
       if (enemy.occupiedNodes.isEmpty) continue;
       final intent = enemy.pendingIntent!;
       final from = _getGridNodeCenter(enemy.occupiedNodes.first.column, enemy.occupiedNodes.first.row, false);
-      for (final tNode in intent.targetNodes) {
+      for (final entry in intent.targetNodes.asMap().entries) {
+        final tNode = entry.value;
         final to = _getGridNodeCenter(tNode.column, tNode.row, true);
         _drawVector(
           canvas,
           from: from,
           to: to,
           color: const Color(0xFFFF1744),
-          label: intent.skillName.toUpperCase(),
+          label: entry.key == 0 ? intent.skillName.toUpperCase() : null,
         );
       }
     }

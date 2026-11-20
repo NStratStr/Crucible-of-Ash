@@ -694,11 +694,11 @@ class _SanctuaryFacilityUpgradeDialogState
                             Row(
                               children: [
                                 _buildCostItem(
-                                  label: 'Crucible Gold',
+                                  label: 'Gold',
                                   cost: nextIchorCost,
                                   stock: _ichor,
-                                  icon: Icons.bloodtype,
-                                  color: const Color(0xFFFF5252),
+                                  icon: Icons.monetization_on,
+                                  color: const Color(0xFFFFD54F),
                                 ),
                                 const SizedBox(width: 10),
                                 _buildCostItem(
@@ -706,7 +706,7 @@ class _SanctuaryFacilityUpgradeDialogState
                                   cost: nextOreCost,
                                   stock: _ore,
                                   icon: Icons.diamond_outlined,
-                                  color: const Color(0xFF42A5F5),
+                                  color: const Color(0xFF26A69A),
                                 ),
                                 const SizedBox(width: 10),
                                 _buildCostItem(
@@ -838,8 +838,8 @@ class _SanctuaryFacilityUpgradeDialogState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildReagentBadge('Gold', _ichor, Icons.bloodtype, const Color(0xFFFF5252)),
-          _buildReagentBadge('Ore', _ore, Icons.diamond_outlined, const Color(0xFF42A5F5)),
+          _buildReagentBadge('Gold', _ichor, Icons.monetization_on, const Color(0xFFFFD54F)),
+          _buildReagentBadge('Ore', _ore, Icons.diamond_outlined, const Color(0xFF26A69A)),
           _buildReagentBadge('Sigils', _sigils, Icons.military_tech, const Color(0xFFFFD54F)),
           _buildReagentBadge('Brim-Slag', _brimSlag, Icons.whatshot, const Color(0xFFFF9100)),
           _buildReagentBadge('Solar-Iron', _solarIron, Icons.shield_outlined, const Color(0xFF80D8FF)),

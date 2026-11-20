@@ -1209,7 +1209,7 @@ class CrucibleSkillTreeState {
   }
 
   int get totalPointsSpent {
-    return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + vitaePointsSpent + calamityPointsSpent;
+    return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + vitaePointsSpent + calamityPointsSpent + apexPointsSpent;
   }
 
   int _r(String id) => allSkills[id]?.rank ?? 0;
@@ -1339,12 +1339,24 @@ class CrucibleSkillTreeState {
     return isSkillPrerequisiteMet(skillId);
   }
 
+  bool isFreeStarterSkill(String skillId) {
+    switch (activeClass) {
+      case SculptorClassArchetype.ironcladWarden:
+        return skillId == 'iron_slam';
+      case SculptorClassArchetype.bloodAlchemist:
+        return skillId == 'sanguine_rend';
+      case SculptorClassArchetype.forgeBerserker:
+        return skillId == 'ash_cleave';
+    }
+  }
+
   void respecAllPoints() {
     int refunded = 0;
     for (final skill in allSkills.values) {
-      if (skill.rank > 1) {
-        refunded += (skill.rank - 1);
-        skill.rank = 1;
+      final int baseRank = isFreeStarterSkill(skill.id) ? 1 : 0;
+      if (skill.rank > baseRank) {
+        refunded += (skill.rank - baseRank);
+        skill.rank = baseRank;
       }
     }
     availableSkillPoints += refunded;
@@ -1370,8 +1382,11 @@ class CrucibleSkillTreeState {
   int getPointsSpentInBranch(CrucibleSkillBranch branch) {
     int total = 0;
     for (final skill in allSkills.values) {
-      if (skill.branch == branch && skill.rank > 1) {
-        total += (skill.rank - 1);
+      if (skill.branch == branch) {
+        final int baseRank = isFreeStarterSkill(skill.id) ? 1 : 0;
+        if (skill.rank > baseRank) {
+          total += (skill.rank - baseRank);
+        }
       }
     }
     return total;
@@ -1382,6 +1397,7 @@ class CrucibleSkillTreeState {
   int get resonancePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.resonance);
   int get vitaePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.vitae);
   int get calamityPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.calamity);
+  int get apexPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.apex);
 
   bool get isMoltenOverdriveActive => wrathPointsSpent >= 3;
   bool get isSlagFortressActive => bastionPointsSpent >= 3;
@@ -1465,5 +1481,58 @@ class CrucibleSkillTreeState {
       return getSkillInSlot(0);
     }
     return null;
+  }
+
+  Map<String, dynamic> toJson() {
+    final Map<String, int> ranks = {};
+    for (final entry in allSkills.entries) {
+      if (entry.value.rank > 0) {
+        ranks[entry.key] = entry.value.rank;
+      }
+    }
+    return {
+      'activeClass': activeClass.name,
+      'sculptorLevel': sculptorLevel,
+      'sculptorXp': sculptorXp,
+      'availableSkillPoints': availableSkillPoints,
+      'castleCrucibleTier': castleCrucibleTier,
+      'equippedSkillIds': List<String>.from(equippedSkillIds),
+      'skillRanks': ranks,
+    };
+  }
+
+  void loadFromJson(Map<String, dynamic> json) {
+    final classStr = json['activeClass'] as String?;
+    final matchedClass = SculptorClassArchetype.values
+        .where((c) => c.name == classStr)
+        .firstOrNull;
+    if (matchedClass != null) {
+      activeClass = matchedClass;
+    }
+
+    sculptorLevel = (json['sculptorLevel'] as num?)?.toInt() ?? 1;
+    sculptorXp = (json['sculptorXp'] as num?)?.toInt() ?? 0;
+    availableSkillPoints = (json['availableSkillPoints'] as num?)?.toInt() ?? 0;
+    castleCrucibleTier = (json['castleCrucibleTier'] as num?)?.toInt() ?? 1;
+
+    final rawEquipped = json['equippedSkillIds'] as List<dynamic>?;
+    if (rawEquipped != null) {
+      for (int i = 0; i < equippedSkillIds.length; i++) {
+        equippedSkillIds[i] = i < rawEquipped.length ? rawEquipped[i].toString() : '';
+      }
+    }
+
+    final rawRanks = json['skillRanks'] as Map<String, dynamic>?;
+    if (rawRanks != null) {
+      for (final skill in allSkills.values) {
+        skill.rank = 0;
+      }
+      rawRanks.forEach((id, val) {
+        final node = allSkills[id];
+        if (node != null && val is num) {
+          node.rank = val.toInt().clamp(0, node.maxRank);
+        }
+      });
+    }
   }
 }

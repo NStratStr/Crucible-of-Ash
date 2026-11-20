@@ -22,6 +22,10 @@ class GlobalAudioService {
   String? _currentBgmAsset;
   bool _isInitialized = false;
 
+  /// Standard ambient BGM tracks verified in assets/audio/
+  static const String bgmSanctuary = 'audio/AMBUndr_CaveDesign01_InMotionAudio_CaveDesign.wav';
+  static const String bgmCombat = 'audio/combat_bgm_ambient.mp3';
+
   /// Resolves generic/arcade SFX identifiers to visceral acoustic dark fantasy assets
   static String resolveSfxAsset(String sfxName) {
     switch (sfxName) {
@@ -43,11 +47,29 @@ class GlobalAudioService {
         return 'GORESplt_Gore Splatter 01_JSE_GMP.wav';
       case 'sfx_smite.wav':
       case 'sfx_hammer.wav':
+      case 'sfx_upgrade':
         return 'Bluezone_BC0297_stone_impact_hammer_015.wav';
       case 'sfx_shatter.wav':
         return 'WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav';
       case 'sfx_enrage.wav':
         return 'Dinosaur Growl 3_Mono.wav';
+      case 'sfx_ui_click':
+        return 'Bluezone_BC0297_stone_impact_015.wav';
+      case 'sfx_ui_tab':
+        return 'WHSH_Whoosh Short 06_JSE_TW1.wav';
+      case 'sfx_forge':
+        return 'METLImpt_Metal Impact-03_MWSFX_TM.wav';
+      case 'sfx_equip':
+        return 'WEAPSwrd_Weapon 03 Slow Scrapes_JSE_MW.wav';
+      case 'sfx_ritual':
+      case 'sfx_fusion':
+        return 'MagicPack2_ElectricitySpells_Spell2-002.wav';
+      case 'sfx_summon_pull':
+        return 'GLASMisc_Reverse Glass Effect_04_MWSFX_GL.wav';
+      case 'sfx_victory':
+        return 'sfx_victory.wav';
+      case 'sfx_defeat':
+        return 'THUN_InsJ_Thunder_Distant_01_EQ.wav';
       default:
         return sfxName;
     }
