@@ -248,18 +248,11 @@ class _CrucibleScreenState extends State<CrucibleScreen>
         ? 'cerberus_hound'
         : _progenitorA!.speciesId;
 
-    final UnitEntity child = CrucibleService.fuseUnits(
-      parentA: _progenitorA!,
-      parentB: _progenitorB!,
-      childSpeciesId: childSpeciesId,
-      childName: childName,
-      childArchetype: _progenitorA!.archetype,
-      assignedSlot: _progenitorA!.slot,
-      speciesBaseHp: 800,
-      speciesBaseAtk: 150,
-      speciesBaseDef: 100,
-      speciesBaseSpd: 100,
-      childNativeTraitId: _progenitorA!.nativeTraitId,
+    // Ascend Progenitor A in-place by distilling Progenitor B:
+    // Keeps Progenitor A's ID, level, name, and equipped relics while promoting Generation & grafting trait.
+    final UnitEntity child = CrucibleService.ascendInPlace(
+      primary: _progenitorA!,
+      sacrifice: _progenitorB!,
       selectedGraftTraitId: _selectedGraftTraitId!,
       crucibleTier: widget.crucibleTier,
     );

@@ -358,14 +358,18 @@ class GothicCardFrameWidget extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Lv. ${unit.level}/${unit.maxLevel}',
-                          style: const TextStyle(
-                            color: Color(0xFFE5A93C),
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w600,
+                        Flexible(
+                          child: Text(
+                            'Lv. ${unit.level}/${unit.maxLevel}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFE5A93C),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 4),
                         Text(
                           unit.isVanguard ? 'VANGUARD' : 'ARCANUM',
                           style: const TextStyle(

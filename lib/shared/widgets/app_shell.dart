@@ -18,6 +18,7 @@ import '../../features/combat/initiative_tick_manager.dart';
 import '../../features/combat_spatial/spatial_battle_screen.dart';
 import '../../features/combat_spatial/spatial_combat_engine.dart';
 import '../../features/combat_spatial/crucible_skill_tree_dialog.dart';
+import '../../features/crucible/crucible_service.dart';
 import '../../features/combat_spatial/crucible_retinue_squad_dialog.dart';
 import '../../features/combat_spatial/models/crucible_skill_tree_models.dart';
 import '../../features/crucible/crucible_screen.dart';
@@ -300,6 +301,81 @@ class _AppShellState extends State<AppShell> {
         children: [
           Text('$label ', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
           Text(value, style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
+        ],
+      ),
+    );
+  }
+
+  void _showDistillThrallDialog(UnitEntity unit) {
+    final reward = CrucibleService.previewDistill(unit);
+    final sigilText = reward.bloodlineSigils > 0 ? '  •  +${reward.bloodlineSigils} Sigils' : '';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF16131F),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFAB47BC), width: 1.3),
+        ),
+        title: Text(
+          'DISTILL ${unit.name.toUpperCase()}?',
+          style: const TextStyle(color: Color(0xFFE1BEE7), fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Break down this Gen ${unit.generation} Lv.${unit.level} vessel into raw Crucible resources to power up your active squad:',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0E0C15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Text(
+                '+${reward.gold} Gold  •  +${reward.cursedOre} Cursed Ore$sigilText',
+                style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7B1FA2), foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              GlobalAudioService().playSfx('sfx_shatter.wav', volumeMultiplier: 0.65);
+              // Unequip any relics attached to this distilled vessel
+              for (final r in _relicService.getRelicsForUnit(unit.id)) {
+                _relicService.unequipRelic(r.id);
+              }
+              setState(() {
+                _inventory = _inventory.where((u) => u.id != unit.id).toList();
+                _totalIchor += reward.gold;
+                _cursedOre += reward.cursedOre;
+                _bloodlineSigils += reward.bloodlineSigils;
+              });
+              _saveCurrentState();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Distilled ${unit.name}: +${reward.gold} Gold, +${reward.cursedOre} Cursed Ore$sigilText'),
+                    backgroundColor: const Color(0xFF4A148C),
+                  ),
+                );
+              }
+            },
+            child: const Text('DISTILL VESSEL'),
+          ),
         ],
       ),
     );
@@ -3313,7 +3389,20 @@ class _AppShellState extends State<AppShell> {
                               ),
                               const SizedBox(width: 6),
                             ],
-                            if (!inActiveSquad)
+                            if (!inActiveSquad) ...[
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF231828),
+                                  foregroundColor: const Color(0xFFCE93D8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  side: const BorderSide(color: Color(0xFFAB47BC), width: 0.9),
+                                ),
+                                onPressed: () => _showDistillThrallDialog(unit),
+                                child: const Text('DISTILL', style: TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 6),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFB3261E),
@@ -3324,8 +3413,8 @@ class _AppShellState extends State<AppShell> {
                                 ),
                                 onPressed: () => _showDeployThrallDialog(unit),
                                 child: const Text('DEPLOY', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold)),
-                              )
-                            else
+                              ),
+                            ] else
                               const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
                           ],
                         ),

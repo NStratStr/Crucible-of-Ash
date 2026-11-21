@@ -2,7 +2,85 @@ import 'dart:math';
 import '../../core/combat_math.dart';
 import '../../shared/models/unit_entity.dart';
 
+class DistillReward {
+  final int gold;
+  final int cursedOre;
+  final int bloodlineSigils;
+
+  const DistillReward({
+    required this.gold,
+    required this.cursedOre,
+    required this.bloodlineSigils,
+  });
+}
+
 class CrucibleService {
+  /// Calculates the resource yield when distilling (breaking down) an unwanted reserve unit.
+  static DistillReward previewDistill(UnitEntity unit) {
+    final int levelBonusGold = max(0, unit.level - 1) * 15;
+    switch (unit.generation) {
+      case 1:
+        return DistillReward(gold: 60 + levelBonusGold, cursedOre: 15, bloodlineSigils: 0);
+      case 2:
+        return DistillReward(gold: 140 + levelBonusGold, cursedOre: 35, bloodlineSigils: 0);
+      case 3:
+        return DistillReward(gold: 260 + levelBonusGold, cursedOre: 65, bloodlineSigils: 1);
+      default:
+        return DistillReward(gold: 400 + levelBonusGold, cursedOre: 100, bloodlineSigils: 2);
+    }
+  }
+
+  /// Ascends [primary] in-place by consuming [sacrifice], keeping [primary]'s ID, level, and equipped relics
+  /// while promoting its Generation, raising its Level Cap, boosting stats, and grafting a trait.
+  static UnitEntity ascendInPlace({
+    required UnitEntity primary,
+    required UnitEntity sacrifice,
+    required String selectedGraftTraitId,
+    int crucibleTier = 1,
+  }) {
+    final int nextGeneration = (max(primary.generation, sacrifice.generation) + 1).clamp(1, 6);
+    final double sacrificeShare = (crucibleTier >= 4 || sacrifice.level >= sacrifice.maxLevel) ? 0.12 : 0.08;
+    final double tierMult = crucibleTier >= 4 ? 1.05 : 1.0;
+    final double purebloodMult = nextGeneration >= 4 ? (1.12 + ((nextGeneration - 4) * 0.08)) : 1.0;
+
+    int boostStat(int primaryStat, int sacrificeStat) {
+      final promoted = (primaryStat * 1.12) + (sacrificeStat * sacrificeShare);
+      return (promoted * tierMult * purebloodMult).round();
+    }
+
+    final int newMaxHp = boostStat(primary.maxHp, sacrifice.maxHp);
+    final int newAtk = boostStat(primary.attack, sacrifice.attack);
+    final int newDef = boostStat(primary.defense, sacrifice.defense);
+    final int newSpd = boostStat(primary.speed, sacrifice.speed);
+    final int newMaxLevel = max(primary.maxLevel, nextGeneration * 10);
+
+    final List<String> updatedPedigree = {
+      ...primary.lineageAncestors,
+      ...sacrifice.lineageAncestors,
+      sacrifice.speciesId,
+      sacrifice.id,
+    }.toList();
+
+    return UnitEntity(
+      id: primary.id,
+      speciesId: primary.speciesId,
+      name: primary.name,
+      generation: nextGeneration,
+      archetype: primary.archetype,
+      slot: primary.slot,
+      level: primary.level,
+      maxLevel: newMaxLevel,
+      currentHp: newMaxHp,
+      maxHp: newMaxHp,
+      attack: newAtk,
+      defense: newDef,
+      speed: newSpd,
+      nativeTraitId: primary.nativeTraitId,
+      graftedTraitId: selectedGraftTraitId.isNotEmpty ? selectedGraftTraitId : primary.graftedTraitId,
+      lineageAncestors: updatedPedigree,
+      rarity: primary.rarity,
+    );
+  }
   /// Resolves the creation of a descendant from two maxed or unmaxed progenitors.
   static UnitEntity fuseUnits({
     required UnitEntity parentA,
