@@ -84,7 +84,7 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
     if (_selectedCompanionSlot < 1) return;
 
     // Check if minion is already deployed in this slot
-    if (_selectedCompanionSlot < _squad.length && _squad[_selectedCompanionSlot].speciesId == incomingMinion.speciesId) {
+    if (_selectedCompanionSlot < _squad.length && _squad[_selectedCompanionSlot].id == incomingMinion.id) {
       return;
     }
 
@@ -98,11 +98,11 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
         _squad.add(incomingMinion);
       }
 
-      // Remove incoming minion from reserves
-      _reserves.removeWhere((u) => u.speciesId == incomingMinion.speciesId || u.id == incomingMinion.id);
+      // Remove incoming minion from reserves by unique id
+      _reserves.removeWhere((u) => u.id == incomingMinion.id);
 
       // Add outgoing minion back to reserves if not already there
-      if (outgoingEntity != null && !_reserves.any((u) => u.speciesId == outgoingEntity!.speciesId)) {
+      if (outgoingEntity != null && !_reserves.any((u) => u.id == outgoingEntity!.id)) {
         _reserves.add(outgoingEntity);
       }
 
@@ -119,16 +119,16 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isLandscapeMobile = screenHeight < 550;
 
-    // Gather owned minion candidates (combining reserves + active squad)
+    // Gather all owned minion instances by unique id (combining reserves + active squad)
     final Map<String, UnitEntity> allMinionCatalog = {};
     for (final u in _reserves) {
       if (!u.id.contains('sculptor') && !u.speciesId.contains('sculptor')) {
-        allMinionCatalog[u.speciesId] = u;
+        allMinionCatalog[u.id] = u;
       }
     }
     for (final u in _squad) {
       if (!u.id.contains('sculptor') && !u.speciesId.contains('sculptor')) {
-        allMinionCatalog[u.speciesId] = u;
+        allMinionCatalog[u.id] = u;
       }
     }
 
@@ -439,8 +439,8 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
               itemCount: minions.length,
               itemBuilder: (context, idx) {
                 final minion = minions[idx];
-                final bool isDeployedInSlot1 = _squad.length > 1 && _squad[1].speciesId == minion.speciesId;
-                final bool isDeployedInSlot2 = _squad.length > 2 && _squad[2].speciesId == minion.speciesId;
+                final bool isDeployedInSlot1 = _squad.length > 1 && _squad[1].id == minion.id;
+                final bool isDeployedInSlot2 = _squad.length > 2 && _squad[2].id == minion.id;
                 final bool isDeployed = isDeployedInSlot1 || isDeployedInSlot2;
 
                 return InkWell(

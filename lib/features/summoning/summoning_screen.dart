@@ -221,7 +221,10 @@ class _SummoningScreenState extends State<SummoningScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: SummonBannerType.values.map((type) {
+        children: const [
+          SummonBannerType.ashenBloodline,
+          SummonBannerType.commanderCovenant,
+        ].map((type) {
           final banner = SummoningService.banners[type]!;
           final isSelected = _selectedBannerType == type;
           final accentColor = type == SummonBannerType.commanderCovenant

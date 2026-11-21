@@ -196,6 +196,7 @@ class CampaignMapScreen extends StatefulWidget {
   final VoidCallback? onLaunchGorgorothBoss;
   final VoidCallback? onOpenHome;
   final VoidCallback? onOpenSummoning;
+  final VoidCallback? onOpenSculptorStatus;
   final VoidCallback? onOpenSettings;
   final int currentChapter;
   final int maxUnlockedChapter;
@@ -221,6 +222,7 @@ class CampaignMapScreen extends StatefulWidget {
     this.onLaunchGorgorothBoss,
     this.onOpenHome,
     this.onOpenSummoning,
+    this.onOpenSculptorStatus,
     this.onOpenSettings,
     this.currentChapter = 1,
     this.maxUnlockedChapter = 1,
@@ -818,6 +820,44 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                             fontFamily: 'monospace',
                           ),
                         ),
+                        if (widget.onOpenSculptorStatus != null) ...[
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Ash Sculptor Stats, Skills & Equipped Relics',
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onOpenSculptorStatus,
+                              icon: const Icon(Icons.shield_moon, size: 13),
+                              label: const Text('SCULPTOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2B1B12),
+                                foregroundColor: const Color(0xFFFFB74D),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                side: const BorderSide(color: Color(0xFFFFB74D), width: 1.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (widget.onOpenSummoning != null) ...[
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Hospice Summoning Gates — Recruit Companions',
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onOpenSummoning,
+                              icon: const Icon(Icons.auto_awesome, size: 13),
+                              label: const Text('SUMMON', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E1418),
+                                foregroundColor: const Color(0xFFFF8A80),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                side: const BorderSide(color: Color(0xFFE53935), width: 1.0),
+                              ),
+                            ),
+                          ),
+                        ],
                         if (widget.onOpenCatacombDelves != null) ...[
                           const SizedBox(width: 8),
                           Tooltip(

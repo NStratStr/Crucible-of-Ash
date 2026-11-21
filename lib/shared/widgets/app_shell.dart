@@ -157,6 +157,154 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  void _showSculptorStatusDialog() {
+    final UnitEntity? sculptor = _tickManager.allies.where((u) => u.speciesId == 'ash_sculptor' || u.id == 'ash_sculptor').firstOrNull ??
+        (_tickManager.allies.isNotEmpty ? _tickManager.allies.first : null);
+    final equippedRelics = sculptor != null ? _relicService.getRelicsForUnit(sculptor.id) : <RelicEntity>[];
+    final investedPoints = _crucibleSkillTreeState.allSkills.values.fold<int>(0, (sum, n) => sum + n.rank);
+    final equippedSkillIds = _crucibleSkillTreeState.equippedSkillIds;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF14121C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFFFB74D), width: 1.4),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.shield_moon, color: Color(0xFFFFB74D), size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'THE ASH SCULPTOR • LV.${_crucibleSkillTreeState.sculptorLevel}',
+                          style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'XP: ${_crucibleSkillTreeState.sculptorXp} / ${_crucibleSkillTreeState.xpToNextLevel}  •  Crucible Tier $_crucibleTier',
+                    style: const TextStyle(color: Colors.white54, fontSize: 10.5),
+                  ),
+                  const Divider(color: Colors.white12, height: 18),
+                  if (sculptor != null) ...[
+                    const Text('CORE ATTRIBUTES', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildSculptorStatChip('MAX HP', '${sculptor.maxHp}', const Color(0xFF69F0AE)),
+                        _buildSculptorStatChip('ATK', '${sculptor.attack}', const Color(0xFFFF8A80)),
+                        _buildSculptorStatChip('DEF', '${sculptor.defense}', const Color(0xFF80D8FF)),
+                        _buildSculptorStatChip('SPD', '${sculptor.speed}', const Color(0xFFFFD54F)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  const Text('CRUCIBLE SKILL TREE', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Available Skill Points: ${_crucibleSkillTreeState.availableSkillPoints} SP  •  Total Invested: $investedPoints pts',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (int idx = 0; idx < equippedSkillIds.length; idx++)
+                        Builder(builder: (_) {
+                          final skillId = equippedSkillIds[idx];
+                          final node = skillId.isNotEmpty ? _crucibleSkillTreeState.allSkills[skillId] : null;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1F1C2A),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: node != null ? const Color(0xFFFFB74D).withValues(alpha: 0.5) : Colors.white12),
+                            ),
+                            child: Text(
+                              node != null ? '[${idx + 1}] ${node.name} (R${node.rank})' : '[${idx + 1}] Empty',
+                              style: TextStyle(color: node != null ? Colors.white : Colors.white38, fontSize: 10, fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('EQUIPPED RELICS', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 6),
+                  if (equippedRelics.isEmpty)
+                    const Text('No relics equipped yet — visit the Relic Forge tab.', style: TextStyle(color: Colors.white38, fontSize: 11))
+                  else
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: equippedRelics
+                          .map((r) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A2428),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.5)),
+                                ),
+                                child: Text('${r.name} (${r.rarity.name.toUpperCase()})', style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 10, fontWeight: FontWeight.bold)),
+                              ))
+                          .toList(),
+                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('CLOSE', style: TextStyle(color: Colors.white60)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSculptorStatChip(String label, String value, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1826),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$label ', style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
+        ],
+      ),
+    );
+  }
+
   void _onRelicServiceChanged() {
     if (_isRestoringState || !mounted) return;
     _saveCurrentState();
@@ -2388,6 +2536,7 @@ class _AppShellState extends State<AppShell> {
                     },
                     onOpenHome: () => _showHomeModal(),
                     onOpenSummoning: () => _handleOpenSummoning(),
+                    onOpenSculptorStatus: _showSculptorStatusDialog,
                     onOpenSettings: () => SettingsDialog.show(context, onResetSave: _resetToFreshPrologue),
                     onChapterChanged: (ch) {
                       setState(() {

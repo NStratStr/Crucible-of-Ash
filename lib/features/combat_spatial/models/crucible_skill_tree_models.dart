@@ -441,7 +441,7 @@ class CrucibleSkillTreeState {
     allSkills['sanguine_brand'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'passive_res_leech',
+      prerequisiteSkillId: 'ash_cleave',
       id: 'sanguine_brand',
       name: 'Crimson Brand',
       discipline: CrucibleSkillDiscipline.sanguine,

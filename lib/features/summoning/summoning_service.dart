@@ -111,7 +111,7 @@ class SummoningService {
       title: 'PROGENITOR AWAKENING RITE',
       subtitle: 'Sovereign Faction Progenitor Calling',
       loreDescription:
-          'Inject primordial Vitae into noble imperial relics to awaken high faction progenitors: Lord Vladislav, Lady Valeria, High Inquisitor Malakor, or Mother Morrigan.',
+          'Channel Bloodline Sigils into noble imperial relics to awaken high faction progenitors: Lord Vladislav, Lady Valeria, High Inquisitor Malakor, or Mother Morrigan.',
       currencyName: 'Bloodline Sigils',
       singleCost: 2,
       multiCost: 18,
