@@ -1531,11 +1531,13 @@ class SculptorDisciplineVisuals {
 
 class _StaggeredMeteorBarrage extends StatefulWidget {
   final List<Alignment> targetAlignments;
+  final List<Offset>? targetOffsets;
   final String assetPath;
 
   const _StaggeredMeteorBarrage({
     super.key,
-    required this.targetAlignments,
+    this.targetAlignments = const [],
+    this.targetOffsets,
     this.assetPath = 'assets/images/Spells/meteor storm.png',
   });
 
@@ -1550,7 +1552,7 @@ class _StaggeredMeteorBarrageState extends State<_StaggeredMeteorBarrage> {
   @override
   void initState() {
     super.initState();
-    final count = widget.targetAlignments.length;
+    final count = widget.targetOffsets?.length ?? widget.targetAlignments.length;
     _active = List<bool>.generate(count, (i) => i == 0);
     for (int i = 1; i < count; i++) {
       _timers.add(Timer(Duration(milliseconds: i * 140), () {
@@ -1571,10 +1573,36 @@ class _StaggeredMeteorBarrageState extends State<_StaggeredMeteorBarrage> {
 
   @override
   Widget build(BuildContext context) {
+    final offsets = widget.targetOffsets;
+    if (offsets != null && offsets.isNotEmpty) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (int i = 0; i < offsets.length; i++)
+            if (i < _active.length && _active[i])
+              Positioned(
+                left: offsets[i].dx - 92.5,
+                top: offsets[i].dy - 82.0,
+                width: 185,
+                height: 150,
+                child: SpriteSheetAnimation(
+                  key: ValueKey('meteor_burst_2d_${widget.assetPath}_$i'),
+                  assetPath: widget.assetPath,
+                  columns: 3,
+                  rows: 4,
+                  totalFrames: 12,
+                  duration: const Duration(milliseconds: 900),
+                  loop: false,
+                  fit: BoxFit.contain,
+                ),
+              ),
+        ],
+      );
+    }
     return Stack(
       children: [
         for (int i = 0; i < widget.targetAlignments.length; i++)
-          if (_active[i])
+          if (i < _active.length && _active[i])
             Align(
               alignment: widget.targetAlignments[i],
               child: SizedBox(

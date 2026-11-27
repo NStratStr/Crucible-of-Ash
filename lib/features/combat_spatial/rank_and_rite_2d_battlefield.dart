@@ -68,7 +68,9 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   });
 
   Offset _resolveUnitCenter2D(CombatUnitState unit, double clashWidth) {
-    final double torsoLiftY = -tileHeight * 0.14;
+    // Standing models are ~1.62 * tileHeight tall anchored at bottom: 6,
+    // so the unit's torso / spell-origin center sits at -0.28 * tileHeight above tile midpoint.
+    final double torsoLiftY = -tileHeight * 0.28;
     if (unit.occupiedNodes.isEmpty) {
       final double fallbackX = unit.isPlayer
           ? (tileWidth * 1.5)
@@ -95,16 +97,21 @@ class RankAndRite2DBattlefield extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double clashWidth = (tileWidth * 0.38).clamp(32.0, 68.0);
+    final double boardWidth = (6 * tileWidth) + clashWidth;
+    final double boardHeight = 3 * tileHeight;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: const BoxDecoration(
         color: Colors.transparent,
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
+      child: SizedBox(
+        width: boardWidth,
+        height: boardHeight,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
           Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -147,7 +154,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                 child: buildVfxOverlay!((unit) => _resolveUnitCenter2D(unit, clashWidth)),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

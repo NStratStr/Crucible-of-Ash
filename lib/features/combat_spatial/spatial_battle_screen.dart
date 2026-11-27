@@ -267,6 +267,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   int? _activeFireBarrageMs;
   String _fireBarrageAssetPath = 'assets/images/Spells/meteor storm.png';
   List<Alignment> _fireBarrageTargetAlignments = [];
+  List<String> _fireBarrageTargetIds = [];
   bool? _timelineExpandedOverride;
   CrucibleSkillNode? _hoveredSkillNode;
   String? _activeSynergyBannerText;
@@ -815,6 +816,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         _fireBarrageAssetPath = useMoltenVortex
             ? 'assets/images/Spells/vortex of molten.png'
             : 'assets/images/Spells/meteor storm.png';
+        _fireBarrageTargetIds = hitIds.toList();
         _fireBarrageTargetAlignments = alignments.isNotEmpty
             ? alignments
             : const [Alignment(0.38, 0.05)];
@@ -824,6 +826,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           if (mounted && _activeFireBarrageMs == impactNowMs) {
             setState(() {
               _activeFireBarrageMs = null;
+              _fireBarrageTargetIds = [];
             });
           }
         });
@@ -1144,12 +1147,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           }
 
           // Trigger independent 9-frame slash/shield sheet on impacted targets
+          // Exclude offensive Shield Bash / Shield Slam strikes so stunned enemies show a hit slash, not a defensive shield!
           if (!event.isHeal || isEnemyTargetWithLifesteal) {
-            final String slashSheet = (impactSkillName.contains('Aegis') ||
-                    impactSkillName.contains('Shield') ||
+            final bool isDefensiveShieldSkill = !impactSkillName.contains('Bash') &&
+                !impactSkillName.contains('Slam') &&
+                (impactSkillName.contains('Aegis') ||
                     impactSkillName.contains('Phalanx') ||
                     impactSkillName.contains('Bulwark') ||
-                    impactSkillName.contains('Block'))
+                    impactSkillName.contains('Bastion') ||
+                    impactSkillName.contains('Block'));
+            final String slashSheet = isDefensiveShieldSkill
                 ? 'assets/animations/vfx/fire_shield_sheet.png'
                 : 'assets/animations/vfx/crimson_slash_sheet.png';
             final Set<String> slashIds = {event.targetId, ...event.secondaryTargetHits.keys};
@@ -2166,23 +2173,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         child: ValueListenableBuilder<int>(
                                           valueListenable: _visualFrameTick,
                                           builder: (context, _, __) {
-                                            if (_activeVfx.isEmpty && _groundRipples.isEmpty) {
+                                            if (_activeVfx.isEmpty && _groundRipples.isEmpty && _activeFireBarrageMs == null) {
                                               return const SizedBox.shrink();
                                             }
                                             final int nowMs = DateTime.now().millisecondsSinceEpoch;
                                             final allUnits = [..._engine.playerUnits, ..._engine.enemyUnits];
+                                            Offset? resolveById(String? unitId) {
+                                              if (unitId == null) return null;
+                                              final u = allUnits.where((x) => x.id == unitId).firstOrNull;
+                                              if (u != null) {
+                                                final pt = resolveUnitCenter2D(u);
+                                                _lastKnown2DUnitOffsets[u.id] = pt;
+                                                return pt;
+                                              }
+                                              return _lastKnown2DUnitOffsets[unitId];
+                                            }
                                             final List<_CombatVfx> vfx2D = [];
                                             for (final vfx in _activeVfx) {
-                                              Offset? resolveById(String? unitId) {
-                                                if (unitId == null) return null;
-                                                final u = allUnits.where((x) => x.id == unitId).firstOrNull;
-                                                if (u != null) {
-                                                  final pt = resolveUnitCenter2D(u);
-                                                  _lastKnown2DUnitOffsets[u.id] = pt;
-                                                  return pt;
-                                                }
-                                                return _lastKnown2DUnitOffsets[unitId];
-                                              }
                                               final startPt = resolveById(vfx.sourceUnitId);
                                               final targetPt = resolveById(vfx.targetUnitId);
                                               if (startPt == null && targetPt == null) continue;
@@ -2192,15 +2199,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                             }
                                             final List<_GroundShockwaveRipple> ripples2D = [];
                                             for (final r in _groundRipples) {
-                                              Offset? originPt;
-                                              if (r.targetUnitId != null) {
-                                                final u = allUnits.where((x) => x.id == r.targetUnitId).firstOrNull;
-                                                originPt = u != null
-                                                    ? resolveUnitCenter2D(u)
-                                                    : _lastKnown2DUnitOffsets[r.targetUnitId!];
-                                              }
+                                              final originPt = resolveById(r.targetUnitId);
                                               if (originPt == null) continue;
                                               ripples2D.add(r.copyWithOrigin(originPt));
+                                            }
+                                            final List<Offset> barrageOffsets2D = [];
+                                            if (_activeFireBarrageMs != null) {
+                                              for (final tid in _fireBarrageTargetIds) {
+                                                final pt = resolveById(tid);
+                                                if (pt != null) barrageOffsets2D.add(pt);
+                                              }
                                             }
                                             return Stack(
                                               clipBehavior: Clip.none,
@@ -2223,6 +2231,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                                       ),
                                                     ),
                                                   ),
+                                                if (_activeFireBarrageMs != null && barrageOffsets2D.isNotEmpty)
+                                                  Positioned.fill(
+                                                    child: _StaggeredMeteorBarrage(
+                                                      key: ValueKey('fire_barrage_2d_$_activeFireBarrageMs'),
+                                                      targetOffsets: barrageOffsets2D,
+                                                      assetPath: _fireBarrageAssetPath,
+                                                    ),
+                                                  ),
                                               ],
                                             );
                                           },
@@ -2240,8 +2256,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     },
                   ),
 
-                  // AoE Fire Barrage: Per-target compact 3x4 Meteor Sprite-Sheet bursts over each hit enemy
-                  if (_activeFireBarrageMs != null)
+                  // AoE Fire Barrage fallback for 2.5D Isometric mode (2D mode renders directly inside buildVfxOverlay at exact unit centers!)
+                  if (_activeFireBarrageMs != null && !_is2DGridView)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: _StaggeredMeteorBarrage(
@@ -7068,9 +7084,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       : (_engine.skillTreeState.activeClass == SculptorClassArchetype.bloodAlchemist
                                           ? SpriteSheetAnimation(
                                               assetPath: 'assets/images/Ash sculpter/blood alchemist idle.png',
-                                              columns: 3,
-                                              rows: 2,
-                                              totalFrames: 6,
+                                              columns: 4,
+                                              rows: 3,
+                                              totalFrames: 12,
                                               duration: const Duration(milliseconds: 2400),
                                               loop: true,
                                               fit: BoxFit.contain,
@@ -7434,10 +7450,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
             ),
 
-            // Aegis Shield Cast Burst (Brief 650ms impact pulse when barrier applied; never encases or hides unit!)
-            if (unit.aegisShield > 0)
+            // Aegis Shield Cast Burst (Centered directly on unit torso during live combat; suppressed in pre-battle)
+            if (!_engine.isPreBattlePhase && unit.aegisShield > 0)
               Positioned(
-                bottom: 4,
+                bottom: visuallyDowned ? 2 : 6,
+                width: modelWidth,
+                height: modelHeight,
                 child: IgnorePointer(
                   child: Builder(
                     builder: (context) {
@@ -7445,17 +7463,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       final isInitialCasting = unit.shieldAppliedMs > 0 && (nowMs - unit.shieldAppliedMs) < 700;
                       if (!isInitialCasting) return const SizedBox.shrink();
 
-                      return SizedBox(
-                        width: (modelWidth * 1.15).clamp(80.0, 180.0),
-                        height: (modelHeight * 1.15).clamp(80.0, 180.0),
-                        child: SpriteSheetAnimation(
-                          assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
-                          columns: 3,
-                          rows: 3,
-                          totalFrames: 9,
-                          duration: const Duration(milliseconds: 650),
-                          loop: false,
-                          fit: BoxFit.contain,
+                      final double shieldSize = (modelHeight * 0.95).clamp(72.0, 165.0);
+                      return Center(
+                        child: OverflowBox(
+                          maxWidth: shieldSize,
+                          maxHeight: shieldSize,
+                          child: SpriteSheetAnimation(
+                            assetPath: 'assets/animations/vfx/fire_shield_sheet.png',
+                            columns: 3,
+                            rows: 3,
+                            totalFrames: 9,
+                            duration: const Duration(milliseconds: 650),
+                            loop: false,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       );
                     },
@@ -7464,12 +7485,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
 
             if (_activeImpactSlashUnits.containsKey(unit.id))
-              Positioned.fill(
+              Positioned(
+                bottom: visuallyDowned ? 2 : 6,
+                width: modelWidth,
+                height: modelHeight,
                 child: IgnorePointer(
                   child: Center(
-                    child: SizedBox(
-                      width: isBoss ? bossSpanWidth * 1.8 : tileWidth * 2.3,
-                      height: isBoss ? (tileHeight * 3.4) : (tileHeight * 2.9),
+                    child: OverflowBox(
+                      maxWidth: isBoss ? bossSpanWidth * 1.35 : modelWidth * 1.45,
+                      maxHeight: isBoss ? modelHeight * 1.25 : modelHeight * 1.35,
                       child: SpriteSheetAnimation(
                         assetPath: _activeImpactSlashUnits[unit.id]!,
                         columns: 3,
