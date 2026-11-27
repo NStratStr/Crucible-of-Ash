@@ -265,7 +265,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   bool _holdEndOfBattleOverlay = false;
   final Map<String, Offset> _lastKnown2DUnitOffsets = {};
   int? _activeFireBarrageMs;
+  String _fireBarrageAssetPath = 'assets/images/Spells/meteor storm.png';
   List<Alignment> _fireBarrageTargetAlignments = [];
+  bool? _timelineExpandedOverride;
   CrucibleSkillNode? _hoveredSkillNode;
   String? _activeSynergyBannerText;
   Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
@@ -360,6 +362,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     SpriteSheetAnimation.precache('assets/animations/valeria_slash_sheet.png');
     SpriteSheetAnimation.precache('assets/animations/iron_footman_idle_sheet.png');
     SpriteSheetAnimation.precache('assets/images/Spells/meteor storm.png');
+    SpriteSheetAnimation.precache('assets/images/Spells/vortex of molten.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden idle.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden attack.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden skill.png');
@@ -779,9 +782,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         secondaryColor = const Color(0xFFFFD54F);
         durationMs = 650;
         _playSfx('Bluezone_BC0297_stone_impact_hammer_015.wav');
-      } else if (event.skillName.contains('Fire Barrage')) {
+      } else if (event.skillName.contains('Fire Barrage') ||
+          event.skillName.contains('Vortex') ||
+          event.skillName.contains('Maelstrom') ||
+          event.skillName.contains('Catacomb')) {
+        final bool useMoltenVortex = event.skillName.contains('Vortex') || event.skillName.contains('Maelstrom') || event.skillName.contains('Catacomb');
         vfxType = 'heavy_slam';
-        primaryColor = const Color(0xFFFF6D00);
+        primaryColor = useMoltenVortex ? const Color(0xFFFF3D00) : const Color(0xFFFF6D00);
         secondaryColor = const Color(0xFFFFD54F);
         durationMs = 700;
         _playSfx('Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav');
@@ -805,6 +812,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ));
           }
         }
+        _fireBarrageAssetPath = useMoltenVortex
+            ? 'assets/images/Spells/vortex of molten.png'
+            : 'assets/images/Spells/meteor storm.png';
         _fireBarrageTargetAlignments = alignments.isNotEmpty
             ? alignments
             : const [Alignment(0.38, 0.05)];
@@ -2237,6 +2247,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         child: _StaggeredMeteorBarrage(
                           key: ValueKey('fire_barrage_$_activeFireBarrageMs'),
                           targetAlignments: _fireBarrageTargetAlignments,
+                          assetPath: _fireBarrageAssetPath,
                         ),
                       ),
                     ),
@@ -3507,8 +3518,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             _buildBossBreakBarHud(boss, isLandscapeMobile: isLandscapeMobile),
           ],
 
-          // 4. Live Initiative Action Timeline (ATB Sequence Preview)
-          if (!isLandscapeMobile)
+          // 4. Live Initiative Action Timeline (Auto-collapsed on <550px mobile landscape, 1-tap expandable)
+          if (!(_timelineExpandedOverride ?? !isLandscapeMobile))
+            Align(
+              alignment: Alignment.centerLeft,
+              child: GestureDetector(
+                onTap: () => setState(() => _timelineExpandedOverride = true),
+                child: Container(
+                  margin: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF14121A),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 0.8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFFFD54F)),
+                      SizedBox(width: 4),
+                      Text('SHOW TIMELINE', style: TextStyle(fontSize: 7.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.w900)),
+                      SizedBox(width: 2),
+                      Icon(Icons.expand_more, size: 12, color: Color(0xFFFFD54F)),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
           Container(
             height: 34,
             margin: const EdgeInsets.only(top: 3),
@@ -3527,28 +3564,33 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1C1826),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 0.8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFFFD54F)),
-                      SizedBox(width: 4),
-                      Text(
-                        'TIMELINE',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          color: Color(0xFFFFD54F),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.0,
+                GestureDetector(
+                  onTap: () => setState(() => _timelineExpandedOverride = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1826),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 0.8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_top_rounded, size: 12, color: Color(0xFFFFD54F)),
+                        SizedBox(width: 4),
+                        Text(
+                          'TIMELINE',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            color: Color(0xFFFFD54F),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.0,
+                          ),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 2),
+                        Icon(Icons.expand_less, size: 12, color: Color(0xFFFFD54F)),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -7865,41 +7907,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () {
-                      CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
-                        setState(() {});
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2E241E),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: const Color(0xFFFFAB40).withValues(alpha: 0.8),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.auto_fix_high, size: 11, color: Color(0xFFFFAB40)),
-                          SizedBox(width: 3),
-                          Text(
-                            'UPGRADES',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Color(0xFFFFAB40),
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   if (kDebugMode) ...[
                     const SizedBox(width: 4),
                     InkWell(
@@ -8111,7 +8118,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 height: dockHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: livingAllies.length + ((livingAllies.length < 5 && _reserveUnits.isNotEmpty) ? 1 : 0),
+                  itemCount: livingAllies.length + ((livingAllies.length < _engine.maxDeployableUnits && _reserveUnits.isNotEmpty) ? 1 : 0),
                   separatorBuilder: (context, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     if (index < livingAllies.length) {
@@ -8174,7 +8181,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ),
             const SizedBox(height: 4),
             const Text(
-              '+ ADD HERO',
+              '+ ASSIGN ALLY',
               style: TextStyle(
                 fontSize: 8.5,
                 fontWeight: FontWeight.w900,
@@ -8184,7 +8191,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ),
             const SizedBox(height: 1),
             Text(
-              '${_engine.playerUnits.length}/5 DEPLOYED',
+              '${_engine.playerUnits.length}/${_engine.maxDeployableUnits} DEPLOYED',
               style: const TextStyle(
                 fontSize: 6.5,
                 color: Colors.white54,

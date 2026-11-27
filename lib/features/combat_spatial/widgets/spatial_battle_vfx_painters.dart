@@ -1531,10 +1531,12 @@ class SculptorDisciplineVisuals {
 
 class _StaggeredMeteorBarrage extends StatefulWidget {
   final List<Alignment> targetAlignments;
+  final String assetPath;
 
   const _StaggeredMeteorBarrage({
     super.key,
     required this.targetAlignments,
+    this.assetPath = 'assets/images/Spells/meteor storm.png',
   });
 
   @override
@@ -1579,8 +1581,8 @@ class _StaggeredMeteorBarrageState extends State<_StaggeredMeteorBarrage> {
                 width: 185,
                 height: 150,
                 child: SpriteSheetAnimation(
-                  key: ValueKey('meteor_burst_$i'),
-                  assetPath: 'assets/images/Spells/meteor storm.png',
+                  key: ValueKey('meteor_burst_${widget.assetPath}_$i'),
+                  assetPath: widget.assetPath,
                   columns: 3,
                   rows: 4,
                   totalFrames: 12,

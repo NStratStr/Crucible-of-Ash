@@ -591,8 +591,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
           plinthRimColor = const Color(0xFFFFD54F);
           plinthGlowColor = const Color(0xFFFFD54F).withValues(alpha: 0.35);
         } else if (isMoveReachable) {
-          plinthRimColor = const Color(0xFF81D4FA).withValues(alpha: 0.35);
-          plinthGlowColor = Colors.transparent;
+          plinthRimColor = const Color(0xFF00E676).withValues(alpha: 0.70);
+          plinthGlowColor = const Color(0xFF00E676).withValues(alpha: 0.25);
         } else if (occupant != null) {
           // Natural grounded weathered stone plinth for all active units — ZERO neon halos!
           plinthRimColor = isPlayer
@@ -618,7 +618,7 @@ class RankAndRite2DBattlefield extends StatelessWidget {
             children: [
               // 1. Natural Ground Plinth (Carved Weathered Slate Miniature Base)
               // Only render when a unit occupies this tile, or during pre-battle / active drag
-              if (!isMultiNodeBoss && (occupant != null || isDropCandidate || (engine.isPreBattlePhase && isPlayer)))
+              if (!isMultiNodeBoss && (occupant != null || isDropCandidate || isMoveReachable || (engine.isPreBattlePhase && isPlayer)))
                 Positioned(
                   bottom: 8,
                   child: Container(
@@ -1008,18 +1008,18 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                     },
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00E676).withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFF00E676), width: 1.0),
+                          color: const Color(0xFF00E676).withValues(alpha: 0.42),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF69F0AE), width: 1.2),
                           boxShadow: const [
-                            BoxShadow(color: Color(0x6600E676), blurRadius: 6),
+                            BoxShadow(color: Color(0x8800E676), blurRadius: 8),
                           ],
                         ),
                         child: const Text(
-                          'SHIFT',
-                          style: TextStyle(fontSize: 7.5, color: Color(0xFFE8F5E9), fontWeight: FontWeight.w900),
+                          '⇄ MOVE',
+                          style: TextStyle(fontSize: 9.0, color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                         ),
                       ),
                     ),

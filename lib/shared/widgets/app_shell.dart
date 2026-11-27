@@ -23,8 +23,6 @@ import '../../features/combat_spatial/crucible_retinue_squad_dialog.dart';
 import '../../features/combat_spatial/models/crucible_skill_tree_models.dart';
 import '../../features/crucible/crucible_screen.dart';
 import '../../features/generals/general_command_service.dart';
-import '../../features/generals/general_selection_dialog.dart';
-import '../../features/generals/grimoire_manager_dialog.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/summoning/summoning_screen.dart';
 import '../../features/settings/settings_dialog.dart';
@@ -1482,44 +1480,32 @@ class _AppShellState extends State<AppShell> {
           (_tickManager.allies.length + _inventory.length) <= 1 &&
           _bloodlineSigils >= 1;
 
-      if (mounted) {
-        final String spoilsText = completedDelveRoom != null
-            ? '⚔️ TOWER ROOM CLEARED: +${completedDelveRoom.rewardIchor} Gold • +${completedDelveRoom.rewardOre} Ore Added to Delve Sack'
-                '${completedDelveRoom.rewardSigils > 0 ? " • +${completedDelveRoom.rewardSigils} Sigil${completedDelveRoom.rewardSigils > 1 ? 's' : ''}" : ""}'
-                '${completedDelveRoom.type == DelveRoomType.catacombArchon ? " • +1 Quicksilver & +1 Sigil" : ""}'
-            : '⚔️ VICTORY: +$scaledAsh Gold • +$scaledOre Ore'
-                '${earnedSigils > 0 ? " • +$earnedSigils Sigil${earnedSigils > 1 ? 's' : ''}" : ""}'
-                '${earnedSkillPoints > 0 ? " • +$earnedSkillPoints★ Skill Point" : ""}'
-                '${relicDrop != null ? " • Relic: $relicDrop" : ""}'
-                '${purebloodDrop != null ? " • Recruited: ${purebloodDrop.name}" : ""}'
-                '${showFirstSummonNudge ? " • ✨ +1 Sigil! Summon your 1st Companion!" : ""}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              spoilsText,
-              style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            backgroundColor: const Color(0xFF14121B),
-            duration: Duration(seconds: showFirstSummonNudge ? 6 : 4),
-            behavior: SnackBarBehavior.floating,
-            action: showFirstSummonNudge
-                ? SnackBarAction(
-                    label: 'SUMMON ALLY',
-                    textColor: const Color(0xFF69F0AE),
-                    onPressed: () {
-                      if (mounted) _handleOpenSummoning();
-                    },
-                  )
-                : null,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
-            ),
-          ),
-        );
-      }
+      final String completedStageTitle = _activeNode?.name ?? 'Skirmish Encounter';
+      final int completedChapter = _currentChapter;
+
+      GlobalAudioService().playSfx('sfx_victory', volumeMultiplier: 0.70);
 
       if (completedDelveRoom != null) {
+        if (mounted) {
+          final String delveSpoilsText = '⚔️ TOWER ROOM CLEARED: +${completedDelveRoom.rewardIchor} Gold • +${completedDelveRoom.rewardOre} Ore Added to Delve Sack'
+              '${completedDelveRoom.rewardSigils > 0 ? " • +${completedDelveRoom.rewardSigils} Sigil${completedDelveRoom.rewardSigils > 1 ? 's' : ''}" : ""}'
+              '${completedDelveRoom.type == DelveRoomType.catacombArchon ? " • +1 Quicksilver & +1 Sigil" : ""}';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                delveSpoilsText,
+                style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              backgroundColor: const Color(0xFF14121B),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
+              ),
+            ),
+          );
+        }
         setState(() {
           _activeDelveRoom = null;
           _currentIndex = 0;
@@ -1529,6 +1515,7 @@ class _AppShellState extends State<AppShell> {
         });
         return;
       }
+
       if (isBossClear) {
         _showChapterAscensionDialog(nextCh);
       } else {
@@ -1536,12 +1523,255 @@ class _AppShellState extends State<AppShell> {
           _currentIndex = 0;
           _activeNode = null;
         });
-        if (!showFirstSummonNudge && isStage1_1 && earnedSkillPoints > 0) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _openOutOfBattleSkillTree();
-          });
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showVictorySpoilsModal(
+            stageTitle: completedStageTitle,
+            stars: currentStarRating,
+            isThreeStarBonus: isThreeStarRewardUnlocked,
+            goldEarned: scaledAsh,
+            oreEarned: scaledOre,
+            sigilsEarned: earnedSigils,
+            sculptorXpEarned: sculptorXpGain,
+            earnedSkillPoints: earnedSkillPoints,
+            levelUps: levelUps,
+            relicDrop: relicDrop,
+            recruitedUnitName: purebloodDrop?.name,
+            showFirstSummonNudge: showFirstSummonNudge,
+            nextLinearChapter: (isLinearStage && stageNum < 10) ? completedChapter : null,
+            nextLinearStageNum: (isLinearStage && stageNum < 10) ? (stageNum + 1) : null,
+          );
+        });
       }
+  }
+
+  void _showVictorySpoilsModal({
+    required String stageTitle,
+    required int stars,
+    required bool isThreeStarBonus,
+    required int goldEarned,
+    required int oreEarned,
+    required int sigilsEarned,
+    required int sculptorXpEarned,
+    required int earnedSkillPoints,
+    required List<String> levelUps,
+    String? relicDrop,
+    String? recruitedUnitName,
+    required bool showFirstSummonNudge,
+    int? nextLinearChapter,
+    int? nextLinearStageNum,
+  }) {
+    final double xpProgress = (_crucibleSkillTreeState.xpToNextLevel > 0)
+        ? (_crucibleSkillTreeState.sculptorXp / _crucibleSkillTreeState.xpToNextLevel).clamp(0.0, 1.0)
+        : 0.0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF14121C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFFFD54F), width: 1.5),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD54F), size: 24),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'VICTORY SPOILS CLAIMED',
+                              style: TextStyle(color: Color(0xFFFFD54F), fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                            ),
+                            Text(
+                              stageTitle.toUpperCase(),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          3,
+                          (i) => Icon(
+                            i < stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: i < stars ? const Color(0xFFFFD54F) : Colors.white24,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isThreeStarBonus) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E1B0E),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.7)),
+                      ),
+                      child: const Text(
+                        '★ FIRST 3-STAR MASTERY: +1 BONUS BLOODLINE SIGIL!',
+                        style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                      ),
+                    ),
+                  ],
+                  const Divider(color: Colors.white12, height: 20),
+                  const Text('SPOILS OF WAR', style: TextStyle(color: Colors.white54, fontSize: 9.5, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildSculptorStatChip('GOLD', '+$goldEarned', const Color(0xFFFFD54F)),
+                      _buildSculptorStatChip('CURSED ORE', '+$oreEarned', const Color(0xFF80CBC4)),
+                      if (sigilsEarned > 0)
+                        _buildSculptorStatChip('SIGILS', '+$sigilsEarned', const Color(0xFFFF80AB)),
+                      if (earnedSkillPoints > 0)
+                        _buildSculptorStatChip('SKILL PTS', '+$earnedSkillPoints★', const Color(0xFF69F0AE)),
+                    ],
+                  ),
+                  if (relicDrop != null || recruitedUnitName != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A2428),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.6)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (relicDrop != null)
+                            Text('✦ RELIC FORGED: $relicDrop', style: const TextStyle(color: Color(0xFF80CBC4), fontSize: 11, fontWeight: FontWeight.bold)),
+                          if (recruitedUnitName != null)
+                            Text('✦ VESSEL AWAKENED: $recruitedUnitName', style: const TextStyle(color: Color(0xFFFF80AB), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'SCULPTOR LV.${_crucibleSkillTreeState.sculptorLevel}  (+$sculptorXpEarned XP)',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${_crucibleSkillTreeState.sculptorXp} / ${_crucibleSkillTreeState.xpToNextLevel} XP',
+                        style: const TextStyle(color: Colors.white54, fontSize: 10, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: xpProgress,
+                      minHeight: 7,
+                      backgroundColor: Colors.white10,
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFB74D)),
+                    ),
+                  ),
+                  if (levelUps.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF13261C),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF69F0AE).withValues(alpha: 0.5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: levelUps
+                            .map((line) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 1.5),
+                                  child: Text('⬆ $line', style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 10.5, fontWeight: FontWeight.bold)),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('CAMPAIGN MAP', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 11)),
+                      ),
+                      if (showFirstSummonNudge)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E1418),
+                            foregroundColor: const Color(0xFFFF8A80),
+                            side: const BorderSide(color: Color(0xFFE53935)),
+                          ),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _handleOpenSummoning();
+                          },
+                          icon: const Icon(Icons.auto_awesome, size: 15),
+                          label: const Text('SUMMON 1ST ALLY', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                        )
+                      else if (earnedSkillPoints > 0)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF69F0AE),
+                            side: const BorderSide(color: Color(0xFF69F0AE)),
+                          ),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _openOutOfBattleSkillTree();
+                          },
+                          icon: const Icon(Icons.account_tree_rounded, size: 14),
+                          label: const Text('SKILL TREE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                        ),
+                      if (nextLinearChapter != null && nextLinearStageNum != null)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD54F),
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () {
+                            Navigator.of(ctx).pop();
+                            _launchLinearCampaignStage(nextLinearChapter, nextLinearStageNum);
+                          },
+                          icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                          label: Text(
+                            'NEXT STAGE ($nextLinearChapter-$nextLinearStageNum) →',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showChapterAscensionDialog(int nextChapter) {
@@ -2820,68 +3050,148 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  CrucibleSkillBranch _branchForGeneral(GeneralType type) {
-    switch (type) {
-      case GeneralType.vladislav:
-        return CrucibleSkillBranch.resonance;
-      case GeneralType.valeria:
-        return CrucibleSkillBranch.bastion;
-      case GeneralType.malakor:
-        return CrucibleSkillBranch.wrath;
-      case GeneralType.morrigan:
-        return CrucibleSkillBranch.resonance;
+  String _sculptorClassLabel(SculptorClassArchetype cls) {
+    switch (cls) {
+      case SculptorClassArchetype.forgeBerserker:
+        return 'Forge Berserker';
+      case SculptorClassArchetype.ironcladWarden:
+        return 'Ironclad Warden';
+      case SculptorClassArchetype.bloodAlchemist:
+        return 'Blood Alchemist';
     }
   }
 
-  Future<void> _showGeneralSelectionDialog() async {
-    final chosen = await GeneralSelectionDialog.show(
-      context,
-      currentGeneralType: _commandService.activeGeneralType,
-      commandService: _commandService,
-      bloodlineSigils: _bloodlineSigils,
-      onSigilsChanged: (val) {
-        setState(() => _bloodlineSigils = val);
-        _saveCurrentState();
-      },
-      onPhylacteryUpgraded: (genType, newRank) {
-        setState(() {
-          _phylacteryRanks[genType] = newRank;
-        });
-        _saveCurrentState();
-      },
-    );
-    if (!mounted || chosen == null) return;
+  void _showAscendSculptorDialog(UnitEntity sculptor) {
+    final int nextGen = (sculptor.generation + 1).clamp(1, 6);
+    final int sigilCost = nextGen >= 4 ? 2 : 1;
+    final int goldCost = sculptor.generation * 150;
+    final int newMaxLevel = max(sculptor.maxLevel, nextGen * 10);
+    final int newHp = (sculptor.maxHp * 1.15).round();
+    final int newAtk = (sculptor.attack * 1.15).round();
+    final int newDef = (sculptor.defense * 1.15).round();
+    final int newSpd = sculptor.speed + 8;
+    final bool canAfford = _bloodlineSigils >= sigilCost && _totalIchor >= goldCost;
 
-    setState(() {
-      _activeGeneralType = chosen;
-      _commandService.setActiveGeneral(chosen);
-      _phylacteryRanks = Map.of(_commandService.allPhylacteryRanks);
-      final int prevLevel = _crucibleSkillTreeState.sculptorLevel;
-      final int prevXp = _crucibleSkillTreeState.sculptorXp;
-      final int earnedPoints = _crucibleSkillTreeState.availableSkillPoints + _crucibleSkillTreeState.totalPointsSpent;
-      _crucibleSkillTreeState.configureStartingDiscipline(_branchForGeneral(chosen), startWithBasics: true);
-      _crucibleSkillTreeState.sculptorLevel = max(1, prevLevel);
-      _crucibleSkillTreeState.sculptorXp = prevXp;
-      _crucibleSkillTreeState.availableSkillPoints = earnedPoints;
-    });
-    _saveCurrentState();
-    final profile = _commandService.currentProfile;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${profile.name} took command of the Brigade!'),
-        backgroundColor: profile.themeColor,
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF16131F),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFFFD54F), width: 1.4),
+        ),
+        title: Text(
+          'ASCEND TO GENERATION $nextGen',
+          style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Temper The Ash Sculptor\'s Crucible core to break past Lv.${sculptor.maxLevel} and permanently amplify base attributes:',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0E0C15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• Level Cap: Lv.${sculptor.maxLevel} → Lv.$newMaxLevel', style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('• HP: ${sculptor.maxHp} → $newHp   • ATK: ${sculptor.attack} → $newAtk', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                  const SizedBox(height: 2),
+                  Text('• DEF: ${sculptor.defense} → $newDef   • SPD: ${sculptor.speed} → $newSpd', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Cost: $sigilCost Bloodline Sigil${sigilCost > 1 ? "s" : ""}  •  $goldCost Gold',
+              style: TextStyle(
+                color: canAfford ? const Color(0xFFFFD54F) : const Color(0xFFEF5350),
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: canAfford ? const Color(0xFFFFB300) : Colors.grey.shade800,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: !canAfford
+                ? null
+                : () {
+                    Navigator.of(ctx).pop();
+                    GlobalAudioService().playSfx('sfx_fusion', volumeMultiplier: 0.75);
+                    final promoted = UnitEntity(
+                      id: sculptor.id,
+                      speciesId: sculptor.speciesId,
+                      name: sculptor.name,
+                      generation: nextGen,
+                      archetype: sculptor.archetype,
+                      slot: sculptor.slot,
+                      level: sculptor.level,
+                      maxLevel: newMaxLevel,
+                      currentHp: newHp,
+                      maxHp: newHp,
+                      attack: newAtk,
+                      defense: newDef,
+                      speed: newSpd,
+                      nativeTraitId: sculptor.nativeTraitId,
+                      graftedTraitId: sculptor.graftedTraitId,
+                      lineageAncestors: sculptor.lineageAncestors,
+                      rarity: sculptor.rarity,
+                      customAvatarAsset: sculptor.customAvatarAsset,
+                    );
+                    setState(() {
+                      _bloodlineSigils -= sigilCost;
+                      _totalIchor -= goldCost;
+                      final updatedAllies = _tickManager.allies.map((u) => u.id == sculptor.id ? promoted : u).toList();
+                      _tickManager.updateSquads(allies: updatedAllies);
+                      _inventory = _inventory.map((u) => u.id == sculptor.id ? promoted : u).toList();
+                    });
+                    _saveCurrentState();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('The Ash Sculptor ascended to Generation $nextGen (Max Lv.$newMaxLevel)!'),
+                          backgroundColor: const Color(0xFFE65100),
+                        ),
+                      );
+                    }
+                  },
+            child: Text(canAfford ? 'ASCEND SCULPTOR' : 'NEED RESOURCES'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildRosterScreen(List<UnitEntity> allUnits) {
-    final profile = _commandService.currentProfile;
+    final classLabel = _sculptorClassLabel(_crucibleSkillTreeState.activeClass);
 
     return Scaffold(
       backgroundColor: const Color(0xFF111114),
       appBar: GothicHeaderBar(
         title: 'Brigade Lineage Roster',
         categoryTag: 'Lineage',
+        totalIchor: _totalIchor,
+        cursedOre: _cursedOre,
         bloodlineSigils: _bloodlineSigils,
         actions: [
           IconButton(
@@ -2899,68 +3209,6 @@ class _AppShellState extends State<AppShell> {
             tooltip: 'Retinue Squad (1+2)',
             icon: const Icon(Icons.groups, size: 20, color: Color(0xFF69F0AE)),
             onPressed: _openOutOfBattleRetinueSquad,
-          ),
-          IconButton(
-            tooltip: 'Grimoire Deck Archives',
-            icon: const Icon(Icons.auto_stories, size: 20, color: Color(0xFFBA68C8)),
-            onPressed: () {
-              GrimoireManagerDialog.show(
-                context,
-                commandService: _commandService,
-                bloodlineSigils: _bloodlineSigils,
-                onSigilsChanged: (val) {
-                  setState(() => _bloodlineSigils = val);
-                  _saveCurrentState();
-                },
-                onPhylacteryUpgraded: (genType, newRank) {
-                  setState(() {
-                    _phylacteryRanks[genType] = newRank;
-                  });
-                  _saveCurrentState();
-                },
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Deploy MVP Ash Legion (Lord Vladislav)',
-            icon: const Icon(Icons.refresh, size: 20, color: Color(0xFFE5A93C)),
-            onPressed: () async {
-              setState(() {
-                _activeGeneralType = GeneralType.vladislav;
-                _tickManager.dispose();
-                _commandService.dispose();
-                _tickManager = InitiativeTickManager(
-                  initialAllies: StarterBrigades.createAshLegionPlayerSquad(),
-                  initialEnemies: StarterBrigades.createCryptStalkersEnemySquad(),
-                  tickInterval: const Duration(milliseconds: 140),
-                  onTick: () => _commandService.onSimulationTick(),
-                );
-                _commandService = GeneralCommandService(
-                  tickManager: _tickManager,
-                  generalType: GeneralType.vladislav,
-                  initialFocus: 6,
-                  maxFocus: GeneralCommandService.grimoireMaxFocusCap,
-                  initialPhylacteryRanks: _phylacteryRanks,
-                );
-                _commandService.initializeGrimoire();
-                _combatService = CombatResolutionService(
-                  tickManager: _tickManager,
-                  commandService: _commandService,
-                  relicService: _relicService,
-                );
-                _tickManager.start();
-              });
-              await _saveCurrentState();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('MVP Ash Legion Deployed: Lord Vladislav leading on Frontline!'),
-                    backgroundColor: Color(0xFFB3261E),
-                    duration: Duration(seconds: 3),
-                  ),
-                );
-              }
-            },
           ),
           IconButton(
             tooltip: 'Save Lineage Progress',
@@ -2994,84 +3242,76 @@ class _AppShellState extends State<AppShell> {
           ),
           Column(
             children: [
-              // Commander Bar
-          Container(
-            margin: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: profile.themeColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: profile.themeColor, width: 1.5),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: profile.themeColor.withValues(alpha: 0.3),
-                  child: profile.type == GeneralType.vladislav
-                      ? ClipOval(
-                          child: Image.asset(
-                            'assets/images/Crypt Stalkers/lord_vladislav_g1.png',
-                            width: 36,
-                            height: 36,
-                            fit: BoxFit.cover,
-                            alignment: const Alignment(0, -0.6),
-                            errorBuilder: (_, __, ___) => Image.asset(
-                              'assets/images/lord_vladislav.png',
-                              width: 36,
-                              height: 36,
-                              fit: BoxFit.cover,
-                              alignment: const Alignment(0, -0.6),
-                              errorBuilder: (_, __, ___) => Icon(profile.icon, color: profile.themeColor, size: 20),
-                            ),
-                          ),
-                        )
-                      : Icon(profile.icon, color: profile.themeColor, size: 20),
+              // Sovereign Ash Sculptor Command Banner
+              Container(
+                margin: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF8F00).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.75), width: 1.3),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFF2B1B12),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/ash_sculptor_idle.png',
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          alignment: const Alignment(0, -0.5),
+                          errorBuilder: (_, __, ___) => const Icon(Icons.shield_moon, color: Color(0xFFFFB74D), size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            profile.name.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
+                          Row(
+                            children: [
+                              const Text(
+                                'THE ASH SCULPTOR',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.6),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '• $classLabel (Sculptor Lv.${_crucibleSkillTreeState.sculptorLevel})',
+                                style: const TextStyle(color: Color(0xFFFFB74D), fontSize: 9.5, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(height: 2),
                           Text(
-                            '• ${profile.title}',
-                            style: TextStyle(color: profile.themeColor, fontSize: 9.5),
+                            'Crucible XP: ${_crucibleSkillTreeState.sculptorXp}/${_crucibleSkillTreeState.xpToNextLevel}  •  Skill Points: ${_crucibleSkillTreeState.availableSkillPoints}★  •  Active Squad: ${_tickManager.allies.length}  •  Reserves: ${_inventory.length}',
+                            style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'AURA: ${profile.auraName} — ${profile.auraDescription}',
-                        style: const TextStyle(color: Color(0xFF8E8EA0), fontSize: 9.5),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _openOutOfBattleSkillTree,
+                      icon: const Icon(Icons.account_tree_rounded, size: 13, color: Color(0xFF69F0AE)),
+                      label: Text(
+                        _crucibleSkillTreeState.availableSkillPoints > 0
+                            ? 'SKILLS (${_crucibleSkillTreeState.availableSkillPoints}★)'
+                            : 'SKILLS',
+                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF69F0AE)),
                       ),
-                    ],
-                  ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF69F0AE)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                    ),
+                  ],
                 ),
-                OutlinedButton(
-                  onPressed: _showGeneralSelectionDialog,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: profile.themeColor),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  ),
-                  child: const Text('SWITCH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
+              ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
@@ -3354,6 +3594,24 @@ class _AppShellState extends State<AppShell> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if ((unit.speciesId == 'ash_sculptor' || unit.id == 'ash_sculptor') && unit.generation < 6) ...[
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2B1F0E),
+                                  foregroundColor: const Color(0xFFFFD54F),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  side: const BorderSide(color: Color(0xFFFFB300), width: 1.0),
+                                ),
+                                onPressed: () => _showAscendSculptorDialog(unit),
+                                child: Text(
+                                  '★ ASCEND G${unit.generation + 1}',
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
                             if (!unit.isMaxLevel || unit.canPromoteRarity) ...[
                               OutlinedButton(
                                 style: OutlinedButton.styleFrom(
