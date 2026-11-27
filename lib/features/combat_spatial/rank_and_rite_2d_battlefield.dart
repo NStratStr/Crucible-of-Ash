@@ -945,22 +945,26 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                       if (isPlayer && occupant.isAlive && !occupant.isDisplacementImmune) {
                         return Draggable<String>(
                           data: 'unit:${occupant.id}',
+                          maxSimultaneousDrags: 1,
+                          rootOverlay: false,
                           onDragStarted: () => onDragStartUnit?.call(occupant.id),
                           onDragEnd: (_) => onDragEndUnit?.call(),
                           onDraggableCanceled: (_, __) => onDragEndUnit?.call(),
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: Opacity(
-                              opacity: 0.85,
-                              child: SizedBox(
-                                width: tileWidth,
-                                height: tileHeight,
-                                child: buildUnitMiniature(
-                                  occupant,
-                                  tileWidth: tileWidth,
-                                  tileHeight: tileHeight,
-                                  colGap: 0,
-                                  isSelected: true,
+                          feedback: IgnorePointer(
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Opacity(
+                                opacity: 0.85,
+                                child: SizedBox(
+                                  width: tileWidth,
+                                  height: tileHeight,
+                                  child: buildUnitMiniature(
+                                    occupant,
+                                    tileWidth: tileWidth,
+                                    tileHeight: tileHeight,
+                                    colGap: 0,
+                                    isSelected: true,
+                                  ),
                                 ),
                               ),
                             ),

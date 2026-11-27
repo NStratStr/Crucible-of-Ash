@@ -362,8 +362,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     SpriteSheetAnimation.precache('assets/images/Spells/meteor storm.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden idle.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden attack.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/ironclad warden skill.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/blood alchemist idle.png');
     SpriteSheetAnimation.precache('assets/images/Ash sculpter/blood alchemist attack animation.png');
+    SpriteSheetAnimation.precache('assets/images/Ash sculpter/blood alchemist skill cast.png');
     final players = widget.initialPlayerUnits?.whereType<UnitEntity>().toList();
     final enemies = widget.initialEnemyUnits?.whereType<UnitEntity>().toList();
 
@@ -6895,11 +6897,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       maxHeight: modelHeight,
                                       alignment: Alignment.bottomCenter,
                                       child: SpriteSheetAnimation(
-                                        assetPath: 'assets/images/Ash sculpter/ironclad warden attack.png',
-                                        columns: 4,
+                                        assetPath: (_attackingSkillName != null &&
+                                                _attackingSkillName!.isNotEmpty &&
+                                                _attackingSkillName != 'Basic Attack' &&
+                                                _attackingSkillName != 'Attack')
+                                            ? 'assets/images/Ash sculpter/ironclad warden skill.png'
+                                            : 'assets/images/Ash sculpter/ironclad warden attack.png',
+                                        columns: 3,
                                         rows: 2,
-                                        totalFrames: 8,
-                                        duration: Duration(milliseconds: _scaledMs(950)),
+                                        totalFrames: 6,
+                                        duration: Duration(milliseconds: _scaledMs(750)),
                                         loop: false,
                                         fit: BoxFit.contain,
                                         fallback: Image.asset(unit.assetPath, fit: BoxFit.contain, alignment: Alignment.bottomCenter),
@@ -6911,7 +6918,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                           maxHeight: modelHeight,
                                           alignment: Alignment.bottomCenter,
                                           child: SpriteSheetAnimation(
-                                            assetPath: 'assets/images/Ash sculpter/blood alchemist attack animation.png',
+                                            assetPath: (_attackingSkillName != null &&
+                                                    _attackingSkillName!.isNotEmpty &&
+                                                    _attackingSkillName != 'Basic Attack' &&
+                                                    _attackingSkillName != 'Attack')
+                                                ? 'assets/images/Ash sculpter/blood alchemist skill cast.png'
+                                                : 'assets/images/Ash sculpter/blood alchemist attack animation.png',
                                             columns: 4,
                                             rows: 3,
                                             totalFrames: 12,
@@ -8381,6 +8393,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
     return Draggable<String>(
       data: 'unit:${unit.id}',
+      maxSimultaneousDrags: 1,
+      rootOverlay: false,
       onDragStarted: () {
         setState(() {
           _draggedUnitId = unit.id;
@@ -8389,20 +8403,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         });
       },
       onDragEnd: (_) {
+        if (!mounted) return;
         setState(() {
           _draggedUnitId = null;
           _hoveredTileGRow = null;
           _hoveredTileCol = null;
         });
       },
-      feedback: Material(
-        color: Colors.transparent,
-        child: _buildUnitMiniatureWidget(
-          unit,
-          tileWidth: 88,
-          tileHeight: 64,
-          colGap: 0,
-          isDragging: true,
+      onDraggableCanceled: (_, __) {
+        if (!mounted) return;
+        setState(() {
+          _draggedUnitId = null;
+          _hoveredTileGRow = null;
+          _hoveredTileCol = null;
+        });
+      },
+      feedback: IgnorePointer(
+        child: Material(
+          color: Colors.transparent,
+          child: _buildUnitMiniatureWidget(
+            unit,
+            tileWidth: 88,
+            tileHeight: 64,
+            colGap: 0,
+            isDragging: true,
+          ),
         ),
       ),
       childWhenDragging: Opacity(

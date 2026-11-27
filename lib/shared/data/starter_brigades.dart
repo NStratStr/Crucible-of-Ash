@@ -1276,7 +1276,7 @@ class StarterBrigades {
               speed: 105,
               nativeTraitId: 'piercing_arrow',
               lineageAncestors: [],
-              customAvatarAsset: 'assets/images/marksman_base.png',
+              customAvatarAsset: 'assets/images/pyre_sentry_arbalest.png',
             ),
             const UnitEntity(
               id: 's4_flayer_01',
@@ -1294,7 +1294,7 @@ class StarterBrigades {
               speed: 120,
               nativeTraitId: 'vicious_strike',
               lineageAncestors: [],
-              customAvatarAsset: 'assets/images/sanguine_flayer_g3.png',
+              customAvatarAsset: 'assets/images/ashfire_skirmisher.png',
             ),
           ];
 
