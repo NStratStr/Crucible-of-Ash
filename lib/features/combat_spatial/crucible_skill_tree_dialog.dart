@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'models/crucible_skill_tree_models.dart';
 import 'spatial_combat_engine.dart';
 import 'dialogs/crucible_debug_sandbox_dialog.dart';
-import '../generals/general_command_service.dart';
 
 class CrucibleSkillTreeDialog extends StatefulWidget {
   final SpatialCombatEngine engine;
@@ -62,7 +61,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       case CrucibleSkillBranch.bastion:
         return const Color(0xFF00E5FF); // Cyan / Cold Iron / Shield
       case CrucibleSkillBranch.resonance:
-        return const Color(0xFFE040FB); // Amethyst / Blood / Hybrid
+        return const Color(0xFFE040FB); // Amethyst / Sanguine Drain
+      case CrucibleSkillBranch.miasma:
+        return const Color(0xFF69F0AE); // Virulent Emerald / Plague AoE
       case CrucibleSkillBranch.vitae:
         return const Color(0xFF00E676); // Emerald / Life Vitae
       case CrucibleSkillBranch.calamity:
@@ -79,7 +80,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       case CrucibleSkillBranch.bastion:
         return 'BASTION (DEF)';
       case CrucibleSkillBranch.resonance:
-        return 'RESONANCE (HYB)';
+        return 'SANGUINE (DRAIN)';
+      case CrucibleSkillBranch.miasma:
+        return 'MIASMA (AOE)';
       case CrucibleSkillBranch.vitae:
         return 'VITAE (HEAL)';
       case CrucibleSkillBranch.calamity:
@@ -96,7 +99,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
       case CrucibleSkillBranch.bastion:
         return Icons.security;
       case CrucibleSkillBranch.resonance:
-        return Icons.all_inclusive;
+        return Icons.bloodtype;
+      case CrucibleSkillBranch.miasma:
+        return Icons.coronavirus;
       case CrucibleSkillBranch.vitae:
         return Icons.favorite;
       case CrucibleSkillBranch.calamity:
@@ -585,6 +590,17 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         color: const Color(0xFFE040FB),
         icon: Icons.all_inclusive,
         iconAsset: 'assets/images/icons/skills/icon_keystone_resonant_crucible.png',
+      );
+    } else if (_selectedBranch == CrucibleSkillBranch.miasma) {
+      final bool isActive = state.isPlagueContagionActive;
+      keystoneWidget = _buildKeystoneCard(
+        title: 'PLAGUE CONTAGION (KEYSTONE)',
+        summary: 'AoE & Blight skills inflict +1 extra Bleed & Poison on every hit enemy. Hitting 2+ foes on a single cast refunds +15 Cinders & heals 8% Max HP.',
+        pointsRequired: 3,
+        currentPoints: state.miasmaPointsSpent,
+        isActive: isActive,
+        color: const Color(0xFF69F0AE),
+        icon: Icons.coronavirus,
       );
     } else if (_selectedBranch == CrucibleSkillBranch.vitae) {
       final bool isActive = state.isFontOfRebirthActive;

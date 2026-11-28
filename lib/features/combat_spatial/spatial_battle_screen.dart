@@ -91,11 +91,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       }
       final act = hovered.actionType.toLowerCase();
       final bool isFullAoeSkill = hovered.branch == CrucibleSkillBranch.calamity ||
+          act.contains('plague_nova') ||
           act.contains('barrage') ||
           act.contains('whirlwind') ||
           act.contains('pyre') ||
           act.contains('nova') ||
           act.contains('vortex') ||
+          act.contains('retribution') ||
           act.contains('wrath') ||
           act.contains('cataclysm') ||
           act.contains('exsanguination') ||
@@ -1007,7 +1009,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         secondaryColor = const Color(0xFFFFD54F);
         durationMs = 580;
         _playSfx('WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav');
-      } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread')) {
+      } else if (event.skillName.contains('Vitae Plague Nova')) {
+        vfxType = 'bloodnova';
+        primaryColor = const Color(0xFF00E676);
+        secondaryColor = const Color(0xFFFF1744);
+        durationMs = 700;
+        _playSfx('sfx_blood.wav');
+      } else if (event.skillName.contains('Vitae Eruption') || event.skillName.contains('Bloodnova') || event.skillName.contains('Evisceration') || event.skillName.contains('Crimson Dread') || event.skillName.contains('Exsanguinating Lance')) {
         vfxType = 'bloodnova';
         primaryColor = const Color(0xFFFF1744);
         secondaryColor = const Color(0xFFD50000);

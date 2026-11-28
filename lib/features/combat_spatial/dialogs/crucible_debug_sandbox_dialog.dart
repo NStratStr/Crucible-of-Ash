@@ -271,7 +271,8 @@ class _CrucibleDebugSandboxDialogState extends State<CrucibleDebugSandboxDialog>
                     children: [
                       _buildArchetypeBtn('🔥 PURE WRATH (ATTACK)', const Color(0xFFE53935), CrucibleSkillBranch.wrath),
                       _buildArchetypeBtn('🛡️ PURE BASTION (DEFENSE)', const Color(0xFF00BFA5), CrucibleSkillBranch.bastion),
-                      _buildArchetypeBtn('🩸 PURE RESONANCE (HYBRID)', const Color(0xFFBA68C8), CrucibleSkillBranch.resonance),
+                      _buildArchetypeBtn('🩸 PURE SANGUINE (DRAIN)', const Color(0xFFBA68C8), CrucibleSkillBranch.resonance),
+                      _buildArchetypeBtn('☣️ PURE MIASMA (PLAGUE AOE)', const Color(0xFF69F0AE), CrucibleSkillBranch.miasma),
                       _buildArchetypeBtn('✨ PURE VITAE (HEALING)', const Color(0xFF69F0AE), CrucibleSkillBranch.vitae),
                       _buildArchetypeBtn('🌋 PURE CALAMITY (AOE)', const Color(0xFFFF9100), CrucibleSkillBranch.calamity),
                     ],

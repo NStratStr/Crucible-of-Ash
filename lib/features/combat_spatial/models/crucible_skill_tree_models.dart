@@ -11,7 +11,8 @@ enum CrucibleSkillDiscipline {
 enum CrucibleSkillBranch {
   wrath,      // Attack / Single-Target Execution (Crimson & Embers)
   bastion,    // Defense / Protection (Iron & Stone)
-  resonance,  // Hybrid / Retinue Synergy (Amethyst & Blood)
+  resonance,  // Sanguine / Single-Target Drain, Bleed Rupture & Retinue Tempo
+  miasma,     // Blood Alchemist AoE / Plague Novas, Blood Vortex & Column Contagion
   vitae,      // Healing / Restoration (Emerald & Life Vitae)
   calamity,   // AoE / Area Cleaves & Novas (Amber & Volcanic Storms)
   apex,       // Crown Finishers (White-Gold Overdrive)
@@ -20,7 +21,7 @@ enum CrucibleSkillBranch {
 enum SculptorClassArchetype {
   forgeBerserker, // Paths: Wrath (Armor Shred) & Calamity (AoE / Vortex) + Apex
   ironcladWarden, // Paths: Bastion (Armor / Stuns) & Vitae (Squad Healing) + Apex
-  bloodAlchemist, // Paths: Resonance (Sanguine Bleed & Mire Blight) + Apex
+  bloodAlchemist, // Paths: Resonance (Sanguine Drain/Rupture) & Miasma (Plague/Blood AoE) + Apex
 }
 
 class CrucibleSkillNode {
@@ -128,7 +129,7 @@ class CrucibleSkillTreeState {
       case SculptorClassArchetype.ironcladWarden:
         return [CrucibleSkillBranch.bastion, CrucibleSkillBranch.vitae, CrucibleSkillBranch.apex];
       case SculptorClassArchetype.bloodAlchemist:
-        return [CrucibleSkillBranch.resonance, CrucibleSkillBranch.apex];
+        return [CrucibleSkillBranch.resonance, CrucibleSkillBranch.miasma, CrucibleSkillBranch.apex];
     }
   }
 
@@ -441,11 +442,11 @@ class CrucibleSkillTreeState {
     allSkills['sanguine_brand'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'ash_cleave',
+      prerequisiteSkillId: 'sanguine_rend',
       id: 'sanguine_brand',
       name: 'Crimson Brand',
       discipline: CrucibleSkillDiscipline.sanguine,
-      branch: CrucibleSkillBranch.wrath,
+      branch: CrucibleSkillBranch.resonance,
       defaultSlot: 2,
       cinderCost: 30,
       cooldownSeconds: 6.0,
@@ -454,7 +455,7 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFFC2185B),
       borderColor: const Color(0xFFFF4081),
       actionType: 'crimson_brand',
-      summary: 'Deep laceration that instantly ruptures and detonates active bleed wounds.',
+      summary: 'Deep laceration that inflicts 3 Bleeds and instantly ruptures active bleed wounds for burst true damage.',
       baseMultiplier: 1.65,
       rankDescriptions: [
         'Rank 1: 165% ATK + 3 Bleeds, detonates active bleeds for 2x remaining ticks.',
@@ -488,14 +489,39 @@ class CrucibleSkillTreeState {
       ],
     );
 
+    allSkills['sanguine_lance'] = CrucibleSkillNode(
+      tier: 3,
+      requiredBranchPoints: 2,
+      prerequisiteSkillId: 'sanguine_brand',
+      id: 'sanguine_lance',
+      name: 'Exsanguinating Lance',
+      discipline: CrucibleSkillDiscipline.sanguine,
+      branch: CrucibleSkillBranch.resonance,
+      defaultSlot: 4,
+      cinderCost: 40,
+      cooldownSeconds: 9.0,
+      icon: Icons.colorize,
+      iconAsset: 'assets/images/icons/skills/icon_skill_soul_transfusion.png',
+      primaryColor: const Color(0xFF880E4F),
+      borderColor: const Color(0xFFFF80AB),
+      actionType: 'sanguine_lance',
+      summary: 'Impales target with a condensed crimson spear piercing 40% Armor, inflicting 3 Bleeds, and healing Sculptor & lowest ally.',
+      baseMultiplier: 2.25,
+      rankDescriptions: [
+        'Rank 1: 225% ATK (40% Armor Pierce) + 3 Bleeds; heals Sculptor & lowest ally for 50% DMG dealt.',
+        'Rank 2: 280% ATK (55% Armor Pierce) + 4 Bleeds; heals Sculptor & lowest ally for 65% DMG dealt.',
+        'Rank 3: 340% ATK (75% Armor Pierce) + 5 Bleeds; overheal converts to Aegis Barrier.',
+      ],
+    );
+
     allSkills['sanguine_vortex'] = CrucibleSkillNode(
       tier: 2,
       requiredBranchPoints: 1,
-      prerequisiteSkillId: 'passive_calamity_burn',
+      prerequisiteSkillId: 'miasma_plague_nova',
       id: 'sanguine_vortex',
       name: 'Blood Vortex',
       discipline: CrucibleSkillDiscipline.sanguine,
-      branch: CrucibleSkillBranch.calamity,
+      branch: CrucibleSkillBranch.miasma,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -504,12 +530,12 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFFAD1457),
       borderColor: const Color(0xFFFF4081),
       actionType: 'blood_vortex',
-      summary: 'Violent maelstrom that draws vitality from all bleeding enemies.',
+      summary: 'Violent AoE blood maelstrom tearing across ALL living enemies (+25% vs bleeding) and healing your squad for 20% Max HP.',
       baseMultiplier: 2.00,
       rankDescriptions: [
-        'Rank 1: 200% Blood Siphon across all bleeding foes + restores 20% Max HP to squad.',
-        'Rank 2: 250% Blood Siphon + pulls backline enemies into reach.',
-        'Rank 3: 310% Blood Siphon + detonates all bleeds for full remaining value.',
+        'Rank 1: 200% AoE Blood Siphon across all enemies (+25% vs bleeding) + 2 Bleeds + heals squad 20% Max HP.',
+        'Rank 2: 250% AoE Blood Siphon + 3 Bleeds + heals squad 25% Max HP.',
+        'Rank 3: 310% AoE Blood Siphon + detonates active bleeds across all foes.',
       ],
     );
 
@@ -537,16 +563,15 @@ class CrucibleSkillTreeState {
     );
 
     // ==========================================
-    // 4. MIRE & OCCULT DISCIPLINE (Morrigan)
+    // 4. MIRE & MIASMA AOE DISCIPLINE (Blood Alchemist Path 2)
     // ==========================================
     allSkills['mire_touch'] = CrucibleSkillNode(
-      tier: 2,
-      requiredBranchPoints: 1,
-      prerequisiteSkillId: 'sanguine_rend',
+      tier: 1,
+      requiredBranchPoints: 0,
       id: 'mire_touch',
       name: 'Corrosive Touch',
       discipline: CrucibleSkillDiscipline.mire,
-      branch: CrucibleSkillBranch.resonance,
+      branch: CrucibleSkillBranch.miasma,
       defaultSlot: 1,
       cinderCost: 0,
       cooldownSeconds: 6.0,
@@ -554,36 +579,59 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFF1B5E20),
       borderColor: const Color(0xFF69F0AE),
       actionType: 'corrosive_touch',
-      summary: 'Caustic fungal grasp consuming 0 Cinders. Generates +6 Cinders, poisons flesh, and slows reflexes.',
+      summary: 'Caustic fungal grasp consuming 0 Cinders. Generates +18 Cinders, poisons flesh, and staggers enemy turn order.',
       baseMultiplier: 1.30,
       rankDescriptions: [
-        'Rank 1: 130% ATK, 2 Poison stacks, -1,000 AP stagger. Generates +6 Cinders.',
-        'Rank 2: 165% ATK, 3 Poison stacks, -2,000 AP stagger + slows SPD. Generates +8 Cinders.',
-        'Rank 3: 200% ATK, 4 Poison stacks, -3,000 AP stagger + spreads. Generates +10 Cinders.',
+        'Rank 1: 130% ATK, 2 Poison stacks, -1,000 AP stagger. Generates +18 Cinders.',
+        'Rank 2: 165% ATK, 3 Poison stacks, -2,000 AP stagger + slows SPD. Generates +22 Cinders.',
+        'Rank 3: 200% ATK, 4 Poison stacks, -3,000 AP stagger + spreads. Generates +26 Cinders.',
+      ],
+    );
+
+    allSkills['miasma_plague_nova'] = CrucibleSkillNode(
+      tier: 1,
+      requiredBranchPoints: 0,
+      id: 'miasma_plague_nova',
+      name: 'Vitae Plague Nova',
+      discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.miasma,
+      defaultSlot: 2,
+      cinderCost: 30,
+      cooldownSeconds: 7.0,
+      icon: Icons.grain,
+      primaryColor: const Color(0xFF00695C),
+      borderColor: const Color(0xFF69F0AE),
+      actionType: 'miasma_plague_nova',
+      summary: 'Detonates a volatile alchemical blood-mist across ALL enemies, inflicting AoE Magic damage, 2 Bleeds, and 2 Poison stacks.',
+      baseMultiplier: 1.55,
+      rankDescriptions: [
+        'Rank 1: 155% AoE Magic DMG across all foes + 2 Bleed & 2 Poison stacks (30🔥 • 7.0s CD).',
+        'Rank 2: 195% AoE Magic DMG across all foes + 3 Bleed & 3 Poison stacks (6.3s CD).',
+        'Rank 3: 240% AoE Magic DMG across all foes + 4 Bleed, 4 Poison & Vulnerable (5.6s CD).',
       ],
     );
 
     allSkills['mire_brand'] = CrucibleSkillNode(
-      tier: 3,
-      requiredBranchPoints: 2,
-      prerequisiteSkillId: 'passive_res_dot',
+      tier: 2,
+      requiredBranchPoints: 1,
+      prerequisiteSkillId: 'mire_touch',
       id: 'mire_brand',
       name: 'Miasmic Brand',
       discipline: CrucibleSkillDiscipline.mire,
-      branch: CrucibleSkillBranch.resonance,
-      defaultSlot: 2,
+      branch: CrucibleSkillBranch.miasma,
+      defaultSlot: 3,
       cinderCost: 30,
       cooldownSeconds: 6.0,
       icon: Icons.bubble_chart,
       primaryColor: const Color(0xFF2E7D32),
       borderColor: const Color(0xFF00E676),
       actionType: 'miasmic_brand',
-      summary: 'Plagues target with virulent spore contagion that infects their entire column.',
+      summary: 'Plagues target column with virulent spore contagion, dealing AoE column damage and inflicting Poison & Vulnerable.',
       baseMultiplier: 1.60,
       rankDescriptions: [
-        'Rank 1: 160% ATK, plagues target column with 3 Poison & Vulnerable.',
-        'Rank 2: 205% ATK, plagues column with 5 Poison & Vulnerable + reduces healing by 50%.',
-        'Rank 3: 255% ATK, column contagion permanently disables target passives.',
+        'Rank 1: 160% AoE Column DMG + plagues target column with 3 Poison & Vulnerable.',
+        'Rank 2: 205% AoE Column DMG + 5 Poison & Vulnerable across column.',
+        'Rank 3: 255% AoE Column DMG + shreds 25% Armor across infected column.',
       ],
     );
 
@@ -618,7 +666,7 @@ class CrucibleSkillTreeState {
       id: 'mire_catacomb',
       name: 'Ossuary Catacomb',
       discipline: CrucibleSkillDiscipline.mire,
-      branch: CrucibleSkillBranch.calamity,
+      branch: CrucibleSkillBranch.miasma,
       defaultSlot: 4,
       cinderCost: 45,
       cooldownSeconds: 12.0,
@@ -626,12 +674,12 @@ class CrucibleSkillTreeState {
       primaryColor: const Color(0xFF00796B),
       borderColor: const Color(0xFF80CBC4),
       actionType: 'ossuary_catacomb',
-      summary: 'Erupts skeletal spikes across an entire enemy column, rooting and rotting all foes.',
+      summary: 'Erupts skeletal spikes across an entire enemy column, stunning all foes in the lane and shielding your squad.',
       baseMultiplier: 2.00,
       rankDescriptions: [
-        'Rank 1: 200% Blight Rupture + stuns target column for 1 turn + +40 Ossuary barrier.',
-        'Rank 2: 250% Blight Rupture + 2 turn stun + inflicts 4 Poison stacks.',
-        'Rank 3: 310% Blight Rupture + permanent -50% movement and action rate.',
+        'Rank 1: 200% AoE Column Rupture + stuns target column + 3 Poison + +40 Squad Barrier.',
+        'Rank 2: 250% AoE Column Rupture + stuns column + 4 Poison + +60 Squad Barrier.',
+        'Rank 3: 310% AoE Column Rupture + stuns column + 5 Poison + +85 Squad Barrier.',
       ],
     );
 
@@ -1023,6 +1071,58 @@ class CrucibleSkillTreeState {
       ],
     );
 
+    allSkills['passive_miasma_potency'] = CrucibleSkillNode(
+      id: 'passive_miasma_potency',
+      name: 'Alchemical Crucible',
+      discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.miasma,
+      tier: 1,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.science,
+      primaryColor: const Color(0xFF00695C),
+      borderColor: const Color(0xFF69F0AE),
+      actionType: 'passive',
+      summary: 'PASSIVE: Start each battle with +5 extra Cinders & +5% ATK per rank.',
+      baseMultiplier: 5.0,
+      rankDescriptions: [
+        'Rank 1: +5 Starting Cinders, +5% ATK.',
+        'Rank 2: +10 Starting Cinders, +10% ATK.',
+        'Rank 3: +15 Starting Cinders, +15% ATK.',
+        'Rank 4: +20 Starting Cinders, +20% ATK.',
+        'Rank 5: +25 Starting Cinders, +25% ATK.',
+      ],
+    );
+
+    allSkills['passive_miasma_haste'] = CrucibleSkillNode(
+      id: 'passive_miasma_haste',
+      name: 'Necrotic Vapors',
+      discipline: CrucibleSkillDiscipline.mire,
+      branch: CrucibleSkillBranch.miasma,
+      tier: 2,
+      defaultSlot: 1,
+      cinderCost: 0,
+      cooldownSeconds: 0.0,
+      maxRank: 5,
+      isPassive: true,
+      icon: Icons.air,
+      primaryColor: const Color(0xFF1B5E20),
+      borderColor: const Color(0xFFA5D6A7),
+      actionType: 'passive',
+      summary: 'PASSIVE: Permanently grants +6% Max HP & +4 Speed per rank.',
+      baseMultiplier: 0.06,
+      rankDescriptions: [
+        'Rank 1: +6% Max HP, +4 Speed.',
+        'Rank 2: +12% Max HP, +8 Speed.',
+        'Rank 3: +18% Max HP, +12 Speed.',
+        'Rank 4: +24% Max HP, +16 Speed.',
+        'Rank 5: +30% Max HP, +20 Speed.',
+      ],
+    );
+
     allSkills['passive_apex_mastery'] = CrucibleSkillNode(
       id: 'passive_apex_mastery',
       name: 'Eternal Crucible Mastery',
@@ -1061,6 +1161,7 @@ class CrucibleSkillTreeState {
         activeClass = SculptorClassArchetype.ironcladWarden;
         break;
       case CrucibleSkillBranch.resonance:
+      case CrucibleSkillBranch.miasma:
       case CrucibleSkillBranch.apex:
         activeClass = SculptorClassArchetype.bloodAlchemist;
         break;
@@ -1090,6 +1191,7 @@ class CrucibleSkillTreeState {
           allSkills['iron_slam']?.rank = 1;
           break;
         case CrucibleSkillBranch.resonance:
+        case CrucibleSkillBranch.miasma:
           equippedSkillIds[0] = 'sanguine_rend';
           allSkills['sanguine_rend']?.rank = 1;
           break;
@@ -1125,10 +1227,17 @@ class CrucibleSkillTreeState {
           break;
         case CrucibleSkillBranch.resonance:
           equippedSkillIds[0] = 'sanguine_rend';
-          equippedSkillIds[1] = 'sanguine_tether';
-          equippedSkillIds[2] = 'mire_touch';
-          equippedSkillIds[3] = 'sanguine_vortex';
+          equippedSkillIds[1] = 'sanguine_brand';
+          equippedSkillIds[2] = 'sanguine_tether';
+          equippedSkillIds[3] = 'sanguine_lance';
           equippedSkillIds[4] = 'sanguine_apex';
+          break;
+        case CrucibleSkillBranch.miasma:
+          equippedSkillIds[0] = 'mire_touch';
+          equippedSkillIds[1] = 'miasma_plague_nova';
+          equippedSkillIds[2] = 'mire_brand';
+          equippedSkillIds[3] = 'sanguine_vortex';
+          equippedSkillIds[4] = 'mire_apex';
           break;
         case CrucibleSkillBranch.vitae:
           equippedSkillIds[0] = 'vitae_mending';
@@ -1139,10 +1248,10 @@ class CrucibleSkillTreeState {
           break;
         case CrucibleSkillBranch.calamity:
           equippedSkillIds[0] = 'ash_whirlwind';
-          equippedSkillIds[1] = 'sanguine_vortex';
+          equippedSkillIds[1] = 'calamity_fire_barrage';
           equippedSkillIds[2] = 'calamity_nova';
-          equippedSkillIds[3] = 'mire_catacomb';
-          equippedSkillIds[4] = 'mire_apex';
+          equippedSkillIds[3] = 'ash_brand';
+          equippedSkillIds[4] = 'ash_pyre';
           break;
         case CrucibleSkillBranch.apex:
           equippedSkillIds[0] = 'ash_cleave';
@@ -1209,7 +1318,7 @@ class CrucibleSkillTreeState {
   }
 
   int get totalPointsSpent {
-    return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + vitaePointsSpent + calamityPointsSpent + apexPointsSpent;
+    return wrathPointsSpent + bastionPointsSpent + resonancePointsSpent + miasmaPointsSpent + vitaePointsSpent + calamityPointsSpent + apexPointsSpent;
   }
 
   int _r(String id) => allSkills[id]?.rank ?? 0;
@@ -1220,12 +1329,14 @@ class CrucibleSkillTreeState {
       (_r('passive_calamity_burn') * 0.05) +
       (_r('passive_bastion_aegis') * 0.04) +
       (_r('passive_res_leech') * 0.05) +
+      (_r('passive_miasma_potency') * 0.05) +
       (_r('passive_apex_mastery') * 0.08);
 
   double get passiveHpMultiplier =>
       1.0 +
       (_r('passive_bastion_armor') * 0.06) +
       (_r('passive_vitae_heal') * 0.07) +
+      (_r('passive_miasma_haste') * 0.06) +
       (_r('passive_apex_mastery') * 0.08);
 
   int get passiveBonusArmor =>
@@ -1237,9 +1348,11 @@ class CrucibleSkillTreeState {
       (_r('passive_calamity_burn') * 4) +
       (_r('passive_vitae_heal') * 4) +
       (_r('passive_res_dot') * 5) +
+      (_r('passive_miasma_haste') * 4) +
       (_r('passive_apex_mastery') * 5);
 
-  int get passiveStartingCinders => _r('passive_calamity_cinders') * 5;
+  int get passiveStartingCinders =>
+      (_r('passive_calamity_cinders') * 5) + (_r('passive_miasma_potency') * 5);
 
   double get passiveCritRateBonus =>
       (_r('passive_wrath_crit') * 0.05) + (_r('passive_res_dot') * 0.05);
@@ -1395,6 +1508,7 @@ class CrucibleSkillTreeState {
   int get wrathPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.wrath);
   int get bastionPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.bastion);
   int get resonancePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.resonance);
+  int get miasmaPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.miasma);
   int get vitaePointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.vitae);
   int get calamityPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.calamity);
   int get apexPointsSpent => getPointsSpentInBranch(CrucibleSkillBranch.apex);
@@ -1402,6 +1516,7 @@ class CrucibleSkillTreeState {
   bool get isMoltenOverdriveActive => wrathPointsSpent >= 3;
   bool get isSlagFortressActive => bastionPointsSpent >= 3;
   bool get isCrucibleSymbiosisActive => resonancePointsSpent >= 3;
+  bool get isPlagueContagionActive => miasmaPointsSpent >= 3;
   bool get isFontOfRebirthActive => vitaePointsSpent >= 3;
   bool get isSeismicCataclysmActive => calamityPointsSpent >= 3;
 

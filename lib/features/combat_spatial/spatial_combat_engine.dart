@@ -3388,24 +3388,47 @@ class SpatialCombatEngine extends ChangeNotifier {
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
       } else if (actionType == 'miasmic_brand' || (actionType == 'signature' && activeGen == GeneralType.morrigan)) {
-        // Miasmic Brand: 160% ATK, infects column with 3 Poison and Vulnerable
-        final rawDmg = (sculptor.effectiveAttack * 1.60).round();
-        final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
-        validTarget.poisonStacks += 3;
+        // Miasmic Brand: AoE Column Contagion hitting all foes in target column + Poison & Vulnerable
+        final brandNode = skillTreeState.allSkills['mire_brand'];
+        final double mult = brandNode?.effectiveMultiplier ?? 1.60;
+        final int rank = brandNode?.rank ?? 1;
+        final rawDmg = (sculptor.effectiveAttack * mult).round();
         final targetCol = validTarget.occupiedNodes.firstOrNull?.column ?? 0;
-        for (final enemy in opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol))) {
-          enemy.poisonStacks += 2;
-          enemy.vulnerableDuration = max(enemy.vulnerableDuration, 60);
+        final colEnemies = opposingSquad.where((u) => u.isAlive && u.occupiedNodes.any((n) => n.column == targetCol)).toList();
+        final targets = colEnemies.isNotEmpty ? colEnemies : [validTarget];
+        final primaryEnemy = targets.contains(validTarget) ? validTarget : targets.first;
+        int primaryDmg = 0;
+        final Map<String, int> secHits = {};
+        final int bonusStacks = skillTreeState.isPlagueContagionActive ? 1 : 0;
+        for (final enemy in targets) {
+          final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
+          enemy.poisonStacks += (rank >= 2 ? 5 : 3) + bonusStacks;
+          enemy.bleedStacks += bonusStacks;
+          enemy.vulnerableDuration = max(enemy.vulnerableDuration, 90);
+          if (rank >= 3) {
+            enemy.armor = (enemy.armor * 0.75).round();
+          }
+          if (enemy.id == primaryEnemy.id) {
+            primaryDmg = d;
+          } else {
+            secHits[enemy.id] = d;
+          }
         }
-        addLog('MIRE SCULPTOR: Miasmic Brand plagues Column ${targetCol + 1} (${validTarget.name} took $dmg DMG)!');
+        if (skillTreeState.isPlagueContagionActive && targets.length >= 2) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+          sculptor.hp = min(sculptor.maxHp, sculptor.hp + (sculptor.maxHp * 0.08).round());
+        }
+        addLog('MIASMA SCULPTOR: Miasmic Brand plagues Column ${targetCol + 1} (${targets.length} foes hit)! ');
         dispatchAction(SpatialActionEvent(
           id: 'miasmic_brand_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
           attackerName: sculptor.name,
           skillName: 'Miasmic Brand',
-          targetId: validTarget.id,
-          targetName: validTarget.name,
-          damage: dmg,
+          targetId: primaryEnemy.id,
+          targetName: 'Column ${targetCol + 1}',
+          damage: primaryDmg,
+          secondaryTargetHits: secHits,
+          isHolyOrMagic: true,
           isPlayerAttacker: true,
           pattern: TargetPattern.piercingColumnSkewer,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
@@ -3609,6 +3632,98 @@ class SpatialCombatEngine extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ));
 
+    } else if (actionType == 'miasma_plague_nova') {
+      // --- MIASMA TIER 1 AOE: 30 CINDERS (VITAE PLAGUE NOVA) ---
+      if (sculptor.crucibleCinders < 30) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
+      final novaNode = skillTreeState.allSkills['miasma_plague_nova'];
+      final double mult = novaNode?.effectiveMultiplier ?? 1.55;
+      final int rank = novaNode?.rank ?? 1;
+      final int baseStacks = rank >= 3 ? 4 : (rank == 2 ? 3 : 2);
+      final int bonusStacks = skillTreeState.isPlagueContagionActive ? 1 : 0;
+      final rawDmg = (sculptor.effectiveAttack * mult).round();
+
+      final livingEnemies = opposingSquad.where((u) => u.isAlive).toList();
+      final primaryEnemy = livingEnemies.contains(validTarget) ? validTarget : livingEnemies.first;
+      int primaryDmg = 0;
+      final Map<String, int> secHits = {};
+      for (final enemy in livingEnemies) {
+        final d = applyDamageToTarget(enemy, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
+        enemy.bleedStacks += baseStacks + bonusStacks;
+        enemy.poisonStacks += baseStacks + bonusStacks;
+        if (rank >= 3) {
+          enemy.vulnerableDuration = max(enemy.vulnerableDuration, 90);
+        }
+        if (enemy.id == primaryEnemy.id) {
+          primaryDmg = d;
+        } else {
+          secHits[enemy.id] = d;
+        }
+      }
+      if (skillTreeState.isPlagueContagionActive && livingEnemies.length >= 2) {
+        sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+        sculptor.hp = min(sculptor.maxHp, sculptor.hp + (sculptor.maxHp * 0.08).round());
+      }
+      final int totalDmg = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
+      addLog('BLOOD ALCHEMIST: Vitae Plague Nova engulfs ${livingEnemies.length} foes for $totalDmg DMG (+${baseStacks + bonusStacks} Bleed & Poison)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'plague_nova_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Vitae Plague Nova',
+        targetId: primaryEnemy.id,
+        targetName: 'All Enemies',
+        damage: primaryDmg,
+        secondaryTargetHits: secHits,
+        bleedStacks: baseStacks + bonusStacks,
+        isHolyOrMagic: true,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.horizontalRowScythe,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+    } else if (actionType == 'sanguine_lance') {
+      // --- SANGUINE TIER 3: 40 CINDERS (EXSANGUINATING LANCE) ---
+      if (sculptor.crucibleCinders < 40) return;
+      sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 40);
+      final lanceNode = skillTreeState.allSkills['sanguine_lance'];
+      final double mult = lanceNode?.effectiveMultiplier ?? 2.25;
+      final int rank = lanceNode?.rank ?? 1;
+      final double armorPen = rank >= 3 ? 0.75 : (rank == 2 ? 0.55 : 0.40);
+      final double leechRatio = rank >= 2 ? 0.65 : 0.50;
+      final int bleedAdd = rank >= 3 ? 5 : (rank == 2 ? 4 : 3);
+
+      final rawDmg = (sculptor.effectiveAttack * mult).round();
+      final double prevPen = sculptor.armorPenetrationBonus;
+      sculptor.armorPenetrationBonus = (prevPen + armorPen).clamp(0.0, 1.0);
+      final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, isPhysical: true);
+      sculptor.armorPenetrationBonus = prevPen;
+      validTarget.bleedStacks += bleedAdd;
+      final int healAmt = max(25, (dmg * leechRatio).round());
+      sculptor.hp = min(sculptor.maxHp, sculptor.hp + healAmt);
+      final woundedAllies = playerUnits.where((u) => u.isAlive && !u.isAshSculptor).toList()
+        ..sort((a, b) => (a.hp / max(1, a.maxHp)).compareTo(b.hp / max(1, b.maxHp)));
+      if (woundedAllies.isNotEmpty) {
+        woundedAllies.first.hp = min(woundedAllies.first.maxHp, woundedAllies.first.hp + healAmt);
+      }
+      addLog('SANGUINE SCULPTOR: Exsanguinating Lance impales ${validTarget.name} for $dmg DMG (+$bleedAdd Bleeds, +$healAmt HP leeched)!');
+      dispatchAction(SpatialActionEvent(
+        id: 'sanguine_lance_${currentTick}_${sculptor.id}',
+        attackerId: sculptor.id,
+        attackerName: sculptor.name,
+        skillName: 'Exsanguinating Lance',
+        targetId: validTarget.id,
+        targetName: validTarget.name,
+        damage: dmg,
+        bleedStacks: bleedAdd,
+        isHeal: true,
+        healAmount: healAmt,
+        healTargetId: sculptor.id,
+        isPlayerAttacker: true,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      ));
+
     } else if (actionType == 'calamity_nova') {
       if (sculptor.crucibleCinders < 30) return;
       sculptor.crucibleCinders = max(0, sculptor.crucibleCinders - 30);
@@ -3734,16 +3849,21 @@ class SpatialCombatEngine extends ChangeNotifier {
         ));
 
       } else if (actionType == 'dawn_retribution') {
-        // Dawn Retribution: 220% Holy Strike + staggers all targets by -2,500 AP + counter-reflect stance
+        // Dawn Retribution: 220% Holy Strike + 65% AoE shockwave across all enemies + staggers all targets by -2,500 AP
         final rawDmg = (sculptor.effectiveAttack * 2.20).round();
+        final splashRaw = (rawDmg * 0.65).round();
         final dmg = applyDamageToTarget(validTarget, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
+        final Map<String, int> secHits = {};
         for (final enemy in opposingSquad.where((u) => u.isAlive)) {
           enemy.currentAp = max(0, enemy.currentAp - 2500);
+          if (enemy.id != validTarget.id) {
+            secHits[enemy.id] = applyDamageToTarget(enemy, splashRaw, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
+          }
         }
         if (!sculptor.chiseledTraitIds.contains('iron_thorns')) {
           sculptor.chiseledTraitIds.add('iron_thorns');
         }
-        addLog('IRON SCULPTOR: Dawn Retribution smites ${validTarget.name} for $dmg DMG & delays all foes (-2,500 AP)!');
+        addLog('IRON SCULPTOR: Dawn Retribution smites ${validTarget.name} for $dmg DMG & shockwaves all foes (-2,500 AP)!');
         dispatchAction(SpatialActionEvent(
           id: 'retribution_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
@@ -3752,42 +3872,51 @@ class SpatialCombatEngine extends ChangeNotifier {
           targetId: validTarget.id,
           targetName: validTarget.name,
           damage: dmg,
+          secondaryTargetHits: secHits,
           isHolyOrMagic: true,
           isPlayerAttacker: true,
-          pattern: TargetPattern.singleTarget,
+          pattern: TargetPattern.horizontalRowScythe,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         ));
 
       } else if (actionType == 'blood_vortex') {
-        // Blood Vortex: 200% Blood Siphon across all bleeding foes + restores 20% Max HP to squad
-        final rawDmg = (sculptor.effectiveAttack * 2.00).round();
-        final bleedingFoes = opposingSquad.where((u) => u.isAlive && u.bleedStacks > 0).toList();
-        final targets = bleedingFoes.isNotEmpty ? bleedingFoes : [validTarget];
-        final primaryEnemy = targets.contains(validTarget) ? validTarget : targets.first;
+        // Blood Vortex: 200% AoE Blood Siphon across ALL living foes (+25% vs bleeding) + restores 20% Max HP to squad
+        final vortexNode = skillTreeState.allSkills['sanguine_vortex'];
+        final double mult = vortexNode?.effectiveMultiplier ?? 2.00;
+        final livingEnemies = opposingSquad.where((u) => u.isAlive).toList();
+        final primaryEnemy = livingEnemies.contains(validTarget) ? validTarget : livingEnemies.first;
         int primaryDmg = 0;
         final Map<String, int> secHits = {};
-        for (final t in targets) {
-          final d = applyDamageToTarget(t, rawDmg, attacker: sculptor, isPhysical: true);
-          t.bleedStacks += 2;
+        final int bonusStacks = skillTreeState.isPlagueContagionActive ? 1 : 0;
+        for (final t in livingEnemies) {
+          final double bleedBonus = t.bleedStacks > 0 ? 1.25 : 1.0;
+          final rawDmg = (sculptor.effectiveAttack * mult * bleedBonus).round();
+          final d = applyDamageToTarget(t, rawDmg, attacker: sculptor, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
+          t.bleedStacks += 2 + bonusStacks;
+          t.poisonStacks += bonusStacks;
           if (t.id == primaryEnemy.id) {
             primaryDmg = d;
           } else {
             secHits[t.id] = d;
           }
         }
+        if (skillTreeState.isPlagueContagionActive && livingEnemies.length >= 2) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 15);
+          sculptor.hp = min(sculptor.maxHp, sculptor.hp + (sculptor.maxHp * 0.08).round());
+        }
         final int totalLeeched = primaryDmg + secHits.values.fold<int>(0, (s, v) => s + v);
         final squadHeal = (sculptor.maxHp * 0.20).round();
         for (final ally in playerUnits.where((u) => u.isAlive)) {
           ally.hp = min(ally.maxHp, ally.hp + squadHeal);
         }
-        addLog('SANGUINE SCULPTOR: Blood Vortex harvests $totalLeeched DMG from bleeding foes & heals squad +$squadHeal HP!');
+        addLog('BLOOD ALCHEMIST: Blood Vortex harvests $totalLeeched AoE DMG across ${livingEnemies.length} foes & heals squad +$squadHeal HP!');
         dispatchAction(SpatialActionEvent(
           id: 'vortex_${currentTick}_${sculptor.id}',
           attackerId: sculptor.id,
           attackerName: sculptor.name,
           skillName: 'Blood Vortex',
           targetId: primaryEnemy.id,
-          targetName: 'Bleeding Enemies',
+          targetName: 'All Enemies',
           damage: primaryDmg,
           secondaryTargetHits: secHits,
           isHeal: true,

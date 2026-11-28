@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ashen_crucible/features/combat_spatial/models/crucible_skill_tree_models.dart';
 import 'package:ashen_crucible/features/combat_spatial/models/spatial_combat_models.dart';
 import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dart';
 import 'package:ashen_crucible/shared/models/unit_entity.dart';
@@ -311,6 +312,37 @@ void main() {
         engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss').assetPath,
         equals('assets/images/gorgoroth_the_flayed.png'),
       );
+    });
+
+    test('Blood Alchemist exposes both Sanguine (Resonance) and Miasma (AoE) paths and executes AoE Plague Nova', () {
+      final enemies = StarterBrigades.createEnemiesForStage(chapter: 1, stageNumber: 1);
+      final alchEngine = SpatialCombatEngine(
+        initialEnemyEntities: enemies,
+      );
+      alchEngine.isPreBattlePhase = false;
+      alchEngine.skillTreeState.configureStartingDiscipline(CrucibleSkillBranch.resonance);
+
+      expect(alchEngine.skillTreeState.activeClass, equals(SculptorClassArchetype.bloodAlchemist));
+      expect(
+        alchEngine.skillTreeState.visibleBranchesForActiveClass,
+        equals([CrucibleSkillBranch.resonance, CrucibleSkillBranch.miasma, CrucibleSkillBranch.apex]),
+      );
+
+      alchEngine.skillTreeState.sculptorLevel = 2;
+      alchEngine.skillTreeState.availableSkillPoints = 4;
+      expect(alchEngine.skillTreeState.canUpgradeSkill('miasma_plague_nova'), isTrue);
+      expect(alchEngine.skillTreeState.upgradeSkill('miasma_plague_nova'), isTrue);
+
+      final sculptor = alchEngine.playerUnits.firstWhere((u) => u.isAshSculptor);
+      sculptor.crucibleCinders = 60;
+      final beforeHps = alchEngine.enemyUnits.map((e) => e.hp).toList();
+
+      alchEngine.executeUnitAction(sculptor, actionType: 'miasma_plague_nova');
+      for (int i = 0; i < alchEngine.enemyUnits.length; i++) {
+        expect(alchEngine.enemyUnits[i].hp, lessThan(beforeHps[i]));
+        expect(alchEngine.enemyUnits[i].bleedStacks, greaterThanOrEqualTo(2));
+        expect(alchEngine.enemyUnits[i].poisonStacks, greaterThanOrEqualTo(2));
+      }
     });
   });
 }
