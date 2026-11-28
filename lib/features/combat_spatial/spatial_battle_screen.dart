@@ -541,27 +541,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     // Check if a new combat action event was dispatched
     final event = _engine.activeActionEvent;
     final bool isNewEvent = event != null && event.id != _lastHandledEventId;
-
-    final Set<String> deferredIds = {};
-    if (isNewEvent && !_isDotEvent(event)) {
-      deferredIds.add(event.targetId);
-      deferredIds.addAll(event.secondaryTargetHits.keys);
-      if (event.isHeal || event.healAmount > 0) {
-        deferredIds.add(event.healTargetId ?? event.attackerId);
-      }
-    }
+    final bool holdVisualStateForAnimation =
+        (isNewEvent && !_isDotEvent(event)) || _isActionSequenceRunning || _actionEventQueue.isNotEmpty;
 
     for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
       if (!_visualUnitHp.containsKey(u.id)) {
         _visualUnitHp[u.id] = u.hp;
         _lastCommittedUnitHp[u.id] = u.hp;
-      } else if (deferredIds.contains(u.id)) {
+      } else if (holdVisualStateForAnimation) {
         final int heldHp = _lastCommittedUnitHp[u.id] ?? u.hp;
         _visualUnitHp[u.id] = heldHp;
         if (heldHp > 0 && !u.isAlive) {
           _visualAliveOverrideIds.add(u.id);
         }
-      } else if (!_isActionSequenceRunning && _actionEventQueue.isEmpty && !isNewEvent) {
+      } else if (!_isSlowMoFinisher) {
         _visualUnitHp[u.id] = u.hp;
         _lastCommittedUnitHp[u.id] = u.hp;
         _visualAliveOverrideIds.remove(u.id);
@@ -693,6 +686,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/gorgoroth_idle_sheet.png',
         attackSheet: 'assets/animations/units/gorgoroth_attack_sheet.png',
         skillSheet: 'assets/animations/units/gorgoroth_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('ashen_huskarl') || key.contains('huskarl') || key.contains('rotting_husk')) {
@@ -700,6 +694,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/ashen_huskarl_idle_sheet.png',
         attackSheet: 'assets/animations/units/ashen_huskarl_attack_sheet.png',
         skillSheet: 'assets/animations/units/ashen_huskarl_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('ashfire_skirmisher') || key.contains('pyre_zealot')) {
@@ -707,6 +702,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/ashfire_skirmisher_idle_sheet.png',
         attackSheet: 'assets/animations/units/ashfire_skirmisher_attack_sheet.png',
         skillSheet: 'assets/animations/units/ashfire_skirmisher_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('pyre_sentry')) {
@@ -714,6 +710,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/pyre_sentry_idle_sheet.png',
         attackSheet: 'assets/animations/units/pyre_sentry_attack_sheet.png',
         skillSheet: 'assets/animations/units/pyre_sentry_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('blood_initiate') || key.contains('cinder_witch')) {
@@ -721,6 +718,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/blood_initiate_idle_sheet.png',
         attackSheet: 'assets/animations/units/blood_initiate_attack_sheet.png',
         skillSheet: 'assets/animations/units/blood_initiate_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('flayed_butcher')) {
@@ -728,6 +726,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/flayed_butcher_idle_sheet.png',
         attackSheet: 'assets/animations/units/flayed_butcher_attack_sheet.png',
         skillSheet: 'assets/animations/units/flayed_butcher_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('grave_ghoul') || key.contains('decayed_ghoul')) {
@@ -735,6 +734,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/grave_ghoul_idle_sheet.png',
         attackSheet: 'assets/animations/units/grave_ghoul_attack_sheet.png',
         skillSheet: 'assets/animations/units/grave_ghoul_skill_sheet.png',
+        isNativelyLeftFacing: true,
       );
     }
     if (key.contains('grave_duelist') || key.contains('duelist')) {
@@ -742,6 +742,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/grave_duelist_idle_sheet.png',
         attackSheet: 'assets/animations/units/grave_duelist_attack_sheet.png',
         skillSheet: 'assets/animations/units/grave_duelist_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     if (key.contains('marksman_base') || key.contains('iron_arbalest') || key.contains('arbalest')) {
@@ -749,6 +750,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/iron_arbalest_idle_sheet.png',
         attackSheet: 'assets/animations/units/iron_arbalest_attack_sheet.png',
         skillSheet: 'assets/animations/units/iron_arbalest_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     if (key.contains('sun_scorched_cleric') || key.contains('cleric') || key.contains('sun_smith')) {
@@ -756,6 +758,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/sun_scorched_cleric_idle_sheet.png',
         attackSheet: 'assets/animations/units/sun_scorched_cleric_attack_sheet.png',
         skillSheet: 'assets/animations/units/sun_scorched_cleric_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     if (key.contains('feral_warhound') || key.contains('warhound') || (key.contains('hound') && !key.contains('cerberus'))) {
@@ -763,6 +766,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/units/feral_warhound_idle_sheet.png',
         attackSheet: 'assets/animations/units/feral_warhound_attack_sheet.png',
         skillSheet: 'assets/animations/units/feral_warhound_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     if (unit.isPlayer && (key.contains('iron_footman') || key.contains('footman') || key.contains('tombstone_sentinel'))) {
@@ -770,6 +774,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/iron_footman_idle_sheet.png',
         attackSheet: 'assets/animations/units/iron_footman_attack_sheet.png',
         skillSheet: 'assets/animations/units/iron_footman_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     if (key.contains('blood_scribe') || (key.contains('scribe') && !key.contains('grave_ripper'))) {
@@ -777,6 +782,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         idleSheet: 'assets/animations/blood_scribe_idle_sheet.png',
         attackSheet: 'assets/animations/units/blood_scribe_attack_sheet.png',
         skillSheet: 'assets/animations/units/blood_scribe_skill_sheet.png',
+        isNativelyLeftFacing: false,
       );
     }
     return null;
@@ -793,6 +799,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         p.contains('gorgoroth_the_flayed') ||
         p.contains('sanguine_flayer') ||
         p.contains('tombstone sentinel') ||
+        p.contains('lord_justicar') ||
         p.contains('magma_golem') ||
         p.contains('gorgoroth');
   }
@@ -800,7 +807,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   bool _shouldMirrorUnitSprite(CombatUnitState unit) {
     // Ash Sculptor is always on the player side and natively faces right
     if (unit.isAshSculptor || unit.id == 'ash_sculptor') return false;
-    final bool nativelyLeft = _isNativelyLeftFacingSprite(unit.assetPath);
+    final animSet = _resolveUnitAnimSet(unit);
+    final bool nativelyLeft = animSet != null
+        ? animSet.isNativelyLeftFacing
+        : _isNativelyLeftFacingSprite(unit.assetPath);
     // Player units (left side) face right (+X); Enemy units (right side) face left (-X).
     return unit.isPlayer ? nativelyLeft : !nativelyLeft;
   }
@@ -1116,7 +1126,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final bool isSculptorStrike = event.attackerId == 'ash_sculptor' || event.skillName.contains('Cinder') || event.skillName.contains('Sundering') || event.skillName.contains('Bastion') || event.skillName.contains('Pyre') || event.skillName.contains('Cataclysmic');
       final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
       final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || hasNamedSkill || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
-      final int impactDelayMs = _scaledMs((isUltimate || isSignature) ? 380 : 320);
+      final bool isFireBarrageSpell = event.skillName.contains('Fire Barrage') ||
+          event.skillName.contains('Vortex') ||
+          event.skillName.contains('Maelstrom') ||
+          event.skillName.contains('Catacomb');
+      final int impactDelayMs = isFireBarrageSpell
+          ? _scaledMs(560)
+          : (isTravelVfx
+              ? max(_scaledMs(390), (scaledVfxDurationMs * 0.85).round())
+              : _scaledMs((isUltimate || isSignature) ? 480 : 410));
 
       // Compute directional lane angle so attacker steps naturally toward the target's row/lane
       double targetLaneDeltaY = -4.0;
@@ -1287,14 +1305,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
           }
 
-          // Commit deferred visual HP for primary target, secondary targets, and healed unit
+          // Commit deferred visual HP for primary target, secondary targets, and healed unit.
+          // Keep slain units visually bright during the hit-flash & impact slash, then fade/darken into stone after impact registers!
+          final Set<String> newlySlainIds = {};
           void commitUnitVisualHp(String uid) {
             final matched = liveUnits.where((u) => u.id == uid).firstOrNull;
             if (matched != null) {
               _visualUnitHp[uid] = matched.hp;
               _lastCommittedUnitHp[uid] = matched.hp;
+              if (!matched.isAlive) {
+                _visualAliveOverrideIds.add(uid);
+                newlySlainIds.add(uid);
+              } else {
+                _visualAliveOverrideIds.remove(uid);
+              }
+            } else {
+              _visualAliveOverrideIds.remove(uid);
             }
-            _visualAliveOverrideIds.remove(uid);
           }
 
           commitUnitVisualHp(event.targetId);
@@ -1306,6 +1333,24 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               : (isEnemyTargetWithLifesteal ? (event.damage * 0.4).round() : 0);
           if (event.isHeal || effectiveHeal > 0) {
             commitUnitVisualHp(event.healTargetId ?? event.attackerId);
+          }
+          // If no more action events remain queued, also commit any follow-up/passive HP changes
+          if (_actionEventQueue.isEmpty) {
+            for (final u in liveUnits) {
+              if (_lastCommittedUnitHp[u.id] != u.hp || (!u.isAlive && _visualAliveOverrideIds.contains(u.id))) {
+                commitUnitVisualHp(u.id);
+              }
+            }
+          }
+          if (newlySlainIds.isNotEmpty) {
+            final tDeathDarken = Timer(Duration(milliseconds: _scaledMs(200)), () {
+              if (mounted) {
+                setState(() {
+                  _visualAliveOverrideIds.removeAll(newlySlainIds);
+                });
+              }
+            });
+            _animTimers.add(tDeathDarken);
           }
 
           // Trigger independent 9-frame slash/shield sheet on impacted targets
@@ -1555,8 +1600,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       _animTimers.add(t1);
 
       // Conclude action sequence smoothly and advance to next event without dead air
-      final int animRestMs = _scaledMs(
-        (isUltimate || isSignature) ? 760 : (event.isAssistStrike || event.isKnockback ? 580 : 630),
+      final int animRestMs = max(
+        impactDelayMs + _scaledMs(280),
+        _scaledMs(
+          (isUltimate || isSignature) ? 800 : (event.isAssistStrike || event.isKnockback ? 640 : 690),
+        ),
       );
       final t2 = Timer(Duration(milliseconds: animRestMs), () {
         if (mounted) {
@@ -6862,7 +6910,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         gradient: RadialGradient(
                           center: const Alignment(0, -0.15),
                           radius: 0.9,
-                          colors: unit.isDowned
+                          colors: visuallyDowned
                               ? [
                                   const Color(0xFF546E7A).withValues(alpha: 0.50),
                                   const Color(0xFF263238),
@@ -6877,7 +6925,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                 ],
                         ),
                         border: Border.all(
-                          color: unit.isDowned
+                          color: visuallyDowned
                               ? const Color(0xFF90A4AE).withValues(alpha: 0.6)
                               : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
                                   ? const Color(0xFFFFD54F)
@@ -6891,7 +6939,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                             offset: const Offset(0, 3),
                           ),
                           BoxShadow(
-                            color: unit.isDowned
+                            color: visuallyDowned
                                 ? const Color(0xFF37474F).withValues(alpha: 0.4)
                                 : ((unit.isAshSculptor || unit.id == 'ash_sculptor')
                                     ? const Color(0xFFFFD54F).withValues(alpha: isSelected || isAttacking ? 0.65 : 0.35)
@@ -6951,20 +6999,20 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           child: Transform.flip(
                             flipX: _shouldMirrorUnitSprite(unit),
                             child: ColorFiltered(
-                          colorFilter: visuallyDowned
-                              ? const ColorFilter.matrix(<double>[
-                                  0.2126, 0.7152, 0.0722, 0, 10,
-                                  0.2126, 0.7152, 0.0722, 0, 10,
-                                  0.2126, 0.7152, 0.0722, 0, 14,
-                                  0,      0,      0,      0.82, 0,
-                                ]) // GDD §3.6 / §4.3: True petrified grey stone plinth
-                              : (isDamaged
-                                  ? ColorFilter.mode(
-                                      (floatingPop != null && floatingPop.contains('CRIT'))
-                                          ? const Color(0xEEFFFFFF) // Blinding white crit flash
-                                          : const Color(0xDDFF5722), // Fiery molten impact flash
-                                      BlendMode.srcATop,
-                                    )
+                          colorFilter: isDamaged
+                              ? ColorFilter.mode(
+                                  (floatingPop != null && floatingPop.contains('CRIT'))
+                                      ? const Color(0xEEFFFFFF) // Blinding white crit flash
+                                      : const Color(0xDDFF5722), // Fiery molten impact flash
+                                  BlendMode.srcATop,
+                                )
+                              : (visuallyDowned
+                                  ? const ColorFilter.matrix(<double>[
+                                      0.2126, 0.7152, 0.0722, 0, 10,
+                                      0.2126, 0.7152, 0.0722, 0, 10,
+                                      0.2126, 0.7152, 0.0722, 0, 14,
+                                      0,      0,      0,      0.82, 0,
+                                    ]) // GDD §3.6 / §4.3: True petrified grey stone plinth
                                   : const ColorFilter.mode(Colors.transparent, BlendMode.dst)),
                           child: (isAttacking && (unit.isAshSculptor || unit.id == 'ash_sculptor' || unit.assetPath.toLowerCase().contains('ash_sculptor')))
                               ? (_engine.skillTreeState.activeClass == SculptorClassArchetype.ironcladWarden
@@ -7163,7 +7211,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           ),
 
                         // Ash Dissolve Floating Embers for Downed / Inert Vessels
-                        if (unit.isDowned)
+                        if (visuallyDowned)
                           Positioned.fill(
                             child: IgnorePointer(
                               child: CustomPaint(
@@ -10235,8 +10283,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       ),
     );
 
-    final animSet = !visuallyDowned ? _resolveUnitAnimSet(unit) : null;
+    final animSet = _resolveUnitAnimSet(unit);
     if (animSet != null) {
+      if (visuallyDowned) {
+        return SpriteSheetAnimation(
+          key: ValueKey('unit_downed_${unit.id}_${animSet.idleSheet}'),
+          assetPath: animSet.idleSheet,
+          columns: animSet.columns,
+          rows: animSet.rows,
+          totalFrames: 1,
+          duration: const Duration(milliseconds: 100),
+          loop: false,
+          fit: BoxFit.contain,
+          fallback: fallbackImg,
+        );
+      }
       if (isAttacking) {
         final bool useSkill = _attackingIsSignatureSkill;
         final String sheetPath = useSkill ? animSet.skillSheet : animSet.attackSheet;
@@ -10298,6 +10359,7 @@ class _UnitAnimSet {
   final String idleSheet;
   final String attackSheet;
   final String skillSheet;
+  final bool isNativelyLeftFacing;
 
   int get columns => defaultColumns;
   int get rows => defaultRows;
@@ -10307,5 +10369,6 @@ class _UnitAnimSet {
     required this.idleSheet,
     required this.attackSheet,
     required this.skillSheet,
+    required this.isNativelyLeftFacing,
   });
 }

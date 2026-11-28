@@ -1270,7 +1270,7 @@ class StarterBrigades {
               speed: 98,
               nativeTraitId: 'plague_hex',
               lineageAncestors: [],
-              customAvatarAsset: 'assets/images/occultist_base.png',
+              customAvatarAsset: 'assets/images/blood_initiate.png',
             ),
           ];
 

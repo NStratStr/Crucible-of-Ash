@@ -490,8 +490,8 @@ class RankAndRite2DBattlefield extends StatelessWidget {
     required bool isPlayer,
   }) {
     final units = isPlayer ? engine.playerUnits : engine.enemyUnits;
-    final occupant = units.where((u) => (u.isAlive || u.isSolidObstacle) && u.occupies(col, row)).firstOrNull;
-    final bool isPartOfMultiNodeBoss = units.any((u) => (u.isAlive || u.isSolidObstacle) && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1) && u.occupies(col, row));
+    final occupant = units.where((u) => (u.isAlive || u.isSolidObstacle || visualAliveOverrideIds.contains(u.id)) && u.occupies(col, row)).firstOrNull;
+    final bool isPartOfMultiNodeBoss = units.any((u) => (u.isAlive || u.isSolidObstacle || visualAliveOverrideIds.contains(u.id)) && (u.occupiedNodes.length > 1 || u.footprint != UnitFootprint.single1x1) && u.occupies(col, row));
     final bool isMultiNodeBoss = isPartOfMultiNodeBoss;
     final bool isSelected = occupant != null && (isPlayer ? (selectedUnitId == occupant.id) : (selectedEnemyUnitId == occupant.id));
     final bool isHovered = hoveredTileCol == col && hoveredTileRow == row && isHoveredPlayerSide == isPlayer;
