@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../shared/models/unit_entity.dart';
+import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
 import '../../features/relics/relic_service.dart';
 
@@ -56,28 +57,32 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
     _reserves = List.from(widget.reserveUnits);
   }
 
-  String _getMinionPassiveTitle(String speciesId) {
-    if (speciesId.contains('footman')) return '🛡️ Bulwark Oath';
-    if (speciesId.contains('duelist')) return '🗡️ Stalker Edge';
-    if (speciesId.contains('reaver')) return '🔥 Reaver Ferocity';
-    if (speciesId.contains('sentinel')) return '🪨 Grave Carapace';
-    if (speciesId.contains('scribe')) return '🩸 Vitae Bond';
-    if (speciesId.contains('chanter')) return '⏳ Temporal Weft';
-    if (speciesId.contains('medicus')) return '✨ Aura of Vitality';
-    if (speciesId.contains('arbalest')) return '🎯 Siege Resonator';
-    return '⚔️ Retinue Synergy';
-  }
-
-  String _getMinionPassiveDescription(String speciesId) {
-    if (speciesId.contains('footman')) return 'Sculptor gains +25 Armor and takes 15% reduced damage from all sources.';
-    if (speciesId.contains('duelist')) return 'Sculptor gains +15% Critical Chance and channels +4 Cinders on crits.';
-    if (speciesId.contains('reaver')) return 'Sculptor gains +20% Attack and channels +8 Cinders on enemy takedowns.';
-    if (speciesId.contains('sentinel')) return 'Sculptor gains +35% Barrier Strength and Stagger Immunity.';
-    if (speciesId.contains('scribe')) return 'Sculptor gains +18% Lifesteal and channels +2 Cinders on bleed ticks.';
-    if (speciesId.contains('chanter')) return 'Sculptor gains -20% Skill Cooldowns and +2,000 AP tempo.';
-    if (speciesId.contains('medicus')) return 'Sculptor gains +25% Healing Power and +3% Max HP regen per tick.';
-    if (speciesId.contains('arbalest')) return 'Sculptor gains +25% AoE Damage and +1 AoE splash radius.';
-    return 'Synergy bond granted to the Ash Sculptor commander.';
+  CombatUnitState _previewUnitState(UnitEntity entity) {
+    final archName = entity.archetype.name.toLowerCase();
+    UnitArchetype mappedArch;
+    if (archName.contains('juggernaut') || archName.contains('vanguard')) {
+      mappedArch = UnitArchetype.vanguardMelee;
+    } else if (archName.contains('assassin') || archName.contains('marksman')) {
+      mappedArch = UnitArchetype.reachMidline;
+    } else {
+      mappedArch = UnitArchetype.backlineCaster;
+    }
+    return CombatUnitState(
+      id: entity.id,
+      templateId: entity.speciesId,
+      name: entity.name,
+      isPlayer: true,
+      archetype: mappedArch,
+      footprint: UnitFootprint.single1x1,
+      hp: entity.maxHp,
+      maxHp: entity.maxHp,
+      attack: entity.attack,
+      armor: entity.defense,
+      maxArmor: entity.defense,
+      speed: entity.speed,
+      occupiedNodes: [const GridNode(column: 0, row: 0)],
+      customAssetPath: entity.customAvatarAsset,
+    );
   }
 
   void _deployMinionIntoTargetSlot(UnitEntity incomingMinion) {
@@ -253,20 +258,25 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
 
           // Slot 1: Companion A
           Expanded(
-            child: _buildSlotCard(
-              title: 'SLOT 2 • RETINUE COMPANION A',
-              unitName: companion1?.name ?? 'EMPTY SLOT',
-              roleText: companion1 != null ? companion1.archetype.name.toUpperCase() : 'SELECT BELOW',
-              assetPath: companion1?.customAvatarAsset ?? 'assets/images/iron_footman_idle.png',
-              passiveText: companion1 != null
-                  ? _getMinionPassiveTitle(companion1.speciesId)
-                  : 'Tap below to assign a minion.',
-              isSelectedSlot: _selectedCompanionSlot == 1,
-              isCommander: false,
-              onTap: () {
-                setState(() {
-                  _selectedCompanionSlot = 1;
-                });
+            child: Builder(
+              builder: (_) {
+                final p1 = companion1 != null ? _previewUnitState(companion1) : null;
+                return _buildSlotCard(
+                  title: 'SLOT 2 • RETINUE COMPANION A',
+                  unitName: companion1?.name ?? 'EMPTY SLOT',
+                  roleText: p1 != null ? p1.friendlyArchetypeLabel.toUpperCase() : 'SELECT BELOW',
+                  assetPath: companion1?.customAvatarAsset ?? 'assets/images/iron_footman_idle.png',
+                  passiveText: p1 != null
+                      ? '🛡️ ${p1.retinuePassiveName} (${p1.retinuePassiveSummary}) • ★ ${p1.signatureSkillName}'
+                      : 'Tap a companion below to assign.',
+                  isSelectedSlot: _selectedCompanionSlot == 1,
+                  isCommander: false,
+                  onTap: () {
+                    setState(() {
+                      _selectedCompanionSlot = 1;
+                    });
+                  },
+                );
               },
             ),
           ),
@@ -274,20 +284,25 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
 
           // Slot 2: Companion B
           Expanded(
-            child: _buildSlotCard(
-              title: 'SLOT 3 • RETINUE COMPANION B',
-              unitName: companion2?.name ?? 'EMPTY SLOT',
-              roleText: companion2 != null ? companion2.archetype.name.toUpperCase() : 'SELECT BELOW',
-              assetPath: companion2?.customAvatarAsset ?? 'assets/images/grave_duelist.png',
-              passiveText: companion2 != null
-                  ? _getMinionPassiveTitle(companion2.speciesId)
-                  : 'Tap below to assign a minion.',
-              isSelectedSlot: _selectedCompanionSlot == 2,
-              isCommander: false,
-              onTap: () {
-                setState(() {
-                  _selectedCompanionSlot = 2;
-                });
+            child: Builder(
+              builder: (_) {
+                final p2 = companion2 != null ? _previewUnitState(companion2) : null;
+                return _buildSlotCard(
+                  title: 'SLOT 3 • RETINUE COMPANION B',
+                  unitName: companion2?.name ?? 'EMPTY SLOT',
+                  roleText: p2 != null ? p2.friendlyArchetypeLabel.toUpperCase() : 'SELECT BELOW',
+                  assetPath: companion2?.customAvatarAsset ?? 'assets/images/grave_duelist.png',
+                  passiveText: p2 != null
+                      ? '🛡️ ${p2.retinuePassiveName} (${p2.retinuePassiveSummary}) • ★ ${p2.signatureSkillName}'
+                      : 'Tap a companion below to assign.',
+                  isSelectedSlot: _selectedCompanionSlot == 2,
+                  isCommander: false,
+                  onTap: () {
+                    setState(() {
+                      _selectedCompanionSlot = 2;
+                    });
+                  },
+                );
               },
             ),
           ),
@@ -431,14 +446,15 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
           Expanded(
             child: GridView.builder(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isLandscapeMobile ? 4 : 2,
-                childAspectRatio: isLandscapeMobile ? 2.4 : 3.2,
+                crossAxisCount: isLandscapeMobile ? 3 : 2,
+                childAspectRatio: isLandscapeMobile ? 2.1 : 2.65,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
               itemCount: minions.length,
               itemBuilder: (context, idx) {
                 final minion = minions[idx];
+                final preview = _previewUnitState(minion);
                 final bool isDeployedInSlot1 = _squad.length > 1 && _squad[1].id == minion.id;
                 final bool isDeployedInSlot2 = _squad.length > 2 && _squad[2].id == minion.id;
                 final bool isDeployed = isDeployedInSlot1 || isDeployedInSlot2;
@@ -466,8 +482,8 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
                       children: [
                         // Minion Image
                         Container(
-                          width: 34,
-                          height: 48,
+                          width: 40,
+                          height: 58,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
                             color: Colors.black54,
@@ -476,15 +492,16 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(3),
                             child: Image.asset(
-                              minion.customAvatarAsset ?? 'assets/images/iron_footman_idle.png',
+                              preview.assetPath,
                               fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
                               errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white24, size: 16),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
 
-                        // Minion Meta & Sculptor Passive
+                        // Minion Role, Always-On Aura & Signature Skill
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,6 +514,19 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
                                       minion.name,
                                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
                                       overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1E293B),
+                                      borderRadius: BorderRadius.circular(2),
+                                      border: Border.all(color: const Color(0xFF80D8FF).withValues(alpha: 0.5), width: 0.6),
+                                    ),
+                                    child: Text(
+                                      preview.friendlyArchetypeLabel.toUpperCase(),
+                                      style: const TextStyle(fontSize: 6.2, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
                                     ),
                                   ),
                                   if (isDeployed)
@@ -514,20 +544,37 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
                                 ],
                               ),
                               Text(
-                                'HP ${minion.maxHp} • ATK ${minion.attack} • DEF ${minion.defense} • SPD ${minion.speed}',
-                                style: const TextStyle(fontSize: 7.5, color: Colors.white54),
+                                'HP ${minion.maxHp} • ATK ${minion.attack} • ARM ${minion.defense} • SPD ${minion.speed}',
+                                style: const TextStyle(fontSize: 7.2, color: Colors.white60),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Container(
+                                width: double.infinity,
                                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF261D12),
                                   borderRadius: BorderRadius.circular(3),
-                                  border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.5), width: 0.6),
+                                  border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.45), width: 0.6),
                                 ),
                                 child: Text(
-                                  _getMinionPassiveTitle(minion.speciesId) + ': ' + _getMinionPassiveDescription(minion.speciesId),
-                                  style: const TextStyle(fontSize: 7.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
+                                  '🛡️ AURA (${preview.retinuePassiveName}): ${preview.retinuePassiveSummary}',
+                                  style: const TextStyle(fontSize: 7.0, color: Color(0xFFFFE082), fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A1528),
+                                  borderRadius: BorderRadius.circular(3),
+                                  border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.45), width: 0.6),
+                                ),
+                                child: Text(
+                                  '★ SKILL (${preview.signatureSkillName}): ${preview.signatureShortEffect}',
+                                  style: const TextStyle(fontSize: 7.0, color: Color(0xFFFFCCBC), fontWeight: FontWeight.bold),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -561,8 +608,8 @@ class _CrucibleRetinueSquadDialogState extends State<CrucibleRetinueSquadDialog>
           const SizedBox(width: 6),
           const Expanded(
             child: Text(
-              'Retinue minions automatically grant active passive powers to the Ash Sculptor.',
-              style: TextStyle(fontSize: 8.5, color: Colors.white60),
+              'Companions auto-attack at 100% Timeline, grant always-on Aura Passives to the Ash Sculptor, and fire ★ Signature Skills every 3rd turn (or on command)!',
+              style: TextStyle(fontSize: 8.5, color: Colors.white70),
             ),
           ),
           ElevatedButton.icon(

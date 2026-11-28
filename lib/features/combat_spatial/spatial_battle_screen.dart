@@ -325,35 +325,37 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
   late final FocusNode _battlefieldFocusNode;
 
-  /// Resolves generic SFX names to visceral acoustic assets
+  /// Resolves any SFX name or raw GDC filename to web-safe bundled 16-bit PCM WAV assets in pubspec.yaml
   static String _resolveSfx(String sfxName) {
-    switch (sfxName) {
-      case 'sfx_block.wav':
-        return 'WEAPArmr_Metal Shield Block Hits_JSE_MW.wav';
-      case 'sfx_slash.wav':
-        return 'SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav';
-      case 'sfx_hit.wav':
-        return 'WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav';
-      case 'sfx_spell.wav':
-        return 'Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav';
-      case 'sfx_card.wav':
-        return 'SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav';
-      case 'sfx_summon.wav':
-        return 'CHAINMvmt_InsJ_Chains_Metal_Movement_Distant_Moderate_02-01.wav';
-      case 'sfx_crit.wav':
-        return 'GOREBone_Bone Breaks Celery 01_JSE_GMP.wav';
-      case 'sfx_blood.wav':
-        return 'GORESplt_Gore Splatter 01_JSE_GMP.wav';
-      case 'sfx_smite.wav':
-      case 'sfx_hammer.wav':
-        return 'Bluezone_BC0297_stone_impact_hammer_015.wav';
-      case 'sfx_shatter.wav':
-        return 'WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav';
-      case 'sfx_enrage.wav':
-        return 'Dinosaur Growl 3_Mono.wav';
-      default:
-        return sfxName;
+    final lower = sfxName.toLowerCase();
+    if (lower == 'sfx_block.wav' ||
+        lower == 'sfx_card.wav' ||
+        lower == 'sfx_hit.wav' ||
+        lower == 'sfx_slash.wav' ||
+        lower == 'sfx_spell.wav' ||
+        lower == 'sfx_victory.wav') {
+      return lower;
     }
+    if (lower.contains('victory')) return 'sfx_victory.wav';
+    if (lower.contains('shield') || lower.contains('armr') || lower.contains('block')) {
+      return 'sfx_block.wav';
+    }
+    if (lower.contains('slash') || lower.contains('swrd') || lower.contains('axe_whoosh')) {
+      return 'sfx_slash.wav';
+    }
+    if (lower.contains('fire') ||
+        lower.contains('magic') ||
+        lower.contains('spell') ||
+        lower.contains('glas') ||
+        lower.contains('chain') ||
+        lower.contains('growl') ||
+        lower.contains('enrage')) {
+      return 'sfx_spell.wav';
+    }
+    if (lower.contains('card') || lower.contains('swing') || lower.contains('whoosh')) {
+      return 'sfx_card.wav';
+    }
+    return 'sfx_hit.wav';
   }
 
   @override
@@ -408,9 +410,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
   Future<void> _initAudio() async {
     try {
-      if (kIsWeb) {
-        AudioCache.instance.prefix = '';
-      }
+      AudioLogger.logLevel = AudioLogLevel.none;
       final settings = SettingsService();
       _isMuted = !settings.bgmEnabled && !settings.sfxEnabled;
       _bgmPlayer = AudioPlayer();
@@ -422,7 +422,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         }
         _sfxPlayers.add(player);
       }
-      
+
       // Stop loop event spam on Windows native backend
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
       final bgmVol = _isMuted ? 0.0 : (settings.bgmVolume * 0.45);
@@ -447,10 +447,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       _sfxIndex = (_sfxIndex + 1) % _sfxPlayers.length;
 
       final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
-      player.setVolume(vol).catchError((_) {});
-      player.play(AssetSource('audio/$resolved')).catchError((_) {
-        // Silently ignore audio playback errors on web (404s/codecs)
-      });
+      player
+          .setVolume(vol)
+          .then((_) => player.play(AssetSource('audio/$resolved')))
+          .catchError((_) {});
     } catch (_) {
       // Silently ignore
     }
@@ -2534,7 +2534,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   // Tactical Synergy Combo Banner Overlay
                   if (_activeSynergyBannerText != null)
                     Positioned(
-                      top: 18,
+                      top: (_selectedUnitId != null || _selectedEnemyUnitId != null) ? 76 : 18,
                       left: 0,
                       right: 0,
                       child: Center(
@@ -3500,40 +3500,46 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
                 const SizedBox(width: 8),
 
-                // 3. Active Retinue Passives & Wave Indicator Ribbon
-                if (_engine.activeRetinuePassiveLabels.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF231D14), Color(0xFF17120C)],
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.groups,
-                          color: Color(0xFFFFD54F),
-                          size: 13,
+                // 3. Interactive Squad Roles & How Units Help Guide Button
+                Tooltip(
+                  message: 'Open Squad & Unit Guide: See how your companions auto-fight, buff the Ash Sculptor, and cast ★ Signature Skills',
+                  child: GestureDetector(
+                    onTap: _openSquadGuideDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF231D14), Color(0xFF17120C)],
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          'RETINUE: ${_engine.activeRetinuePassiveLabels.join(" • ")}',
-                          style: const TextStyle(
-                            color: Color(0xFFFFE082),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 8.5,
-                            letterSpacing: 0.4,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.help_outline_rounded,
+                            color: Color(0xFFFFD54F),
+                            size: 13,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 4),
+                          Text(
+                            'UNIT ROLES & GUIDE',
+                            style: TextStyle(
+                              color: Color(0xFFFFE082),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 8.5,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                ),
                 if (_engine.totalWaves > 1) ...[
                   const SizedBox(width: 8),
                   Container(
@@ -5400,12 +5406,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       } else if (_selectedUnitId != null) {
         final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
         if (unit != null) {
-          final isPlaced = unit.occupiedNodes.isNotEmpty;
-          message = isPlaced
-              ? '🎯 PRE-BATTLE: Drag or click any glowing tile to reposition/swap ${unit.name.toUpperCase()} • Drag to bottom dock to bench!'
-              : '📍 BENCH UNIT: Drag ${unit.name.toUpperCase()} from the reserve dock onto any grid tile to deploy!';
-          themeColor = const Color(0xFF00E5FF);
-          icon = Icons.gps_fixed;
+          return _buildSelectedAllyInspectionBanner(unit);
         }
       } else if (_selectedEnemyUnitId != null) {
         final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
@@ -5488,16 +5489,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     } else if (_selectedUnitId != null) {
       final unit = _engine.playerUnits.where((u) => u.id == _selectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
-        final apPct = (unit.currentAp / SpatialCombatEngine.tickThreshold * 100).round();
-        if (unit.canAffordMovement) {
-          message = '⚔️ ${unit.name.toUpperCase()} (AP: $apPct%): Drag to an open tile or tap [SHIFT] to reposition (Costs 50% AP).';
-          themeColor = const Color(0xFF00E676);
-          icon = Icons.directions_run;
-        } else {
-          message = '⚠️ ${unit.name.toUpperCase()} (AP: $apPct%): Needs 50% AP to reposition!';
-          themeColor = const Color(0xFFFF9100);
-          icon = Icons.hourglass_top;
-        }
+        return _buildSelectedAllyInspectionBanner(unit);
       }
     } else if (_selectedEnemyUnitId != null) {
       final enemy = _engine.enemyUnits.where((u) => u.id == _selectedEnemyUnitId && u.isAlive).firstOrNull;
@@ -6667,6 +6659,349 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
+  void _openSquadGuideDialog() {
+    final bool wasRunning = _engine.isRunning;
+    if (wasRunning) {
+      _engine.isRunning = false;
+    }
+    _playSfx('sfx_card.wav');
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.80),
+      builder: (ctx) {
+        final allies = _engine.playerUnits.where((u) => u.isAlive).toList();
+        final enemies = _engine.enemyUnits.where((u) => u.isAlive).toList();
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 740, maxHeight: 580),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10131C),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.8), width: 1.5),
+              boxShadow: const [
+                BoxShadow(color: Colors.black87, blurRadius: 24, spreadRadius: 4),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF171A26),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                    border: Border(bottom: BorderSide(color: Colors.white12)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.menu_book_rounded, color: Color(0xFFFFD54F), size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'HOW YOUR SQUAD & UNITS WORK IN BATTLE',
+                          style: TextStyle(
+                            color: Color(0xFFFFD54F),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Body
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 3-Pillar Combat Summary
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF161C28),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45), width: 0.9),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '⚔️ 3 WAYS YOUR UNITS HELP YOU WIN:',
+                                style: TextStyle(color: Color(0xFF80D8FF), fontSize: 10.0, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                '1. AUTO-COMBAT & COVER: Every unit fills its Timeline bar (0% → 100%) based on Speed and attacks automatically. Units placed in the FRONT row shield allies behind them in the same lane from direct attacks.',
+                                style: TextStyle(color: Colors.white70, fontSize: 9.2, height: 1.35),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                '2. ALWAYS-ON RETINUE AURAS: Each living companion grants a permanent passive buff (Armor, Crit, Lifesteal, Healing, or Armor Shred) to The Ash Sculptor & squad regardless of grid row.',
+                                style: TextStyle(color: Colors.white70, fontSize: 9.2, height: 1.35),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                '3. ★ SIGNATURE SKILLS & [CAST SKILL]: Companions unleash a powerful ★ Signature Skill every 3rd turn — OR you can trigger it immediately anytime [⚡ CAST SKILL] lights up in the Retinue bar!',
+                                style: TextStyle(color: Colors.white70, fontSize: 9.2, height: 1.35),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '🛡️ YOUR DEPLOYED SQUAD:',
+                          style: TextStyle(color: Color(0xFFFFD54F), fontSize: 10.0, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                        ),
+                        const SizedBox(height: 6),
+                        ...allies.map((u) => Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF151824),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: u.isAshSculptor ? const Color(0xFFFFD54F).withValues(alpha: 0.65) : const Color(0xFF69F0AE).withValues(alpha: 0.45),
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.asset(
+                                      u.assetPath,
+                                      width: 40,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                      alignment: Alignment.topCenter,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Colors.white54, size: 28),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                '${u.name}  •  ${u.friendlyArchetypeLabel}',
+                                                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900),
+                                              ),
+                                            ),
+                                            Text(
+                                              'HP ${u.hp}/${u.maxHp} • ATK ${u.attack} • SPD ${u.effectiveSpeed}',
+                                              style: const TextStyle(color: Colors.white54, fontSize: 8.5, fontFamily: 'monospace'),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          u.combatRoleHowItHelps,
+                                          style: const TextStyle(color: Color(0xFFB0BEC5), fontSize: 8.8),
+                                        ),
+                                        if (!u.isAshSculptor) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '🛡️ Passive Aura (${u.retinuePassiveName}): ${u.retinuePassiveSummary}',
+                                            style: const TextStyle(color: Color(0xFFFFE082), fontSize: 8.8, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '★ Signature Skill (${u.signatureSkillName}): ${u.signatureSkillDescription}',
+                                            style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 8.8, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                        if (enemies.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            '🎯 ENEMY THREATS IN THIS STAGE:',
+                            style: TextStyle(color: Color(0xFFFF8A80), fontSize: 10.0, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                          ),
+                          const SizedBox(height: 6),
+                          ...enemies.map((e) => Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1B1216),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.4), width: 0.8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${e.name} (${e.friendlyArchetypeLabel})  •  HP ${e.hp}/${e.maxHp}  •  🛡️ ${e.armor} Armor',
+                                            style: const TextStyle(color: Color(0xFFFFCCBC), fontSize: 9.5, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${e.combatRoleHowItHelps}  •  ★ ${e.signatureSkillName}: ${e.signatureShortEffect}',
+                                            style: const TextStyle(color: Colors.white60, fontSize: 8.3),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ).then((_) {
+      if (mounted && wasRunning && !_engine.isTurnExecutionPaused && !_engine.isPreBattlePhase) {
+        setState(() {
+          _engine.isRunning = true;
+        });
+      }
+    });
+  }
+
+  Widget _buildSelectedAllyInspectionBanner(CombatUnitState ally) {
+    final int apPct = (ally.currentAp / SpatialCombatEngine.tickThreshold * 100).round().clamp(0, 100);
+    final String moveHint = _engine.isPreBattlePhase
+        ? (ally.occupiedNodes.isNotEmpty ? 'Drag to any glowing tile to reposition (Free)' : 'Drag onto grid to deploy')
+        : (ally.canAffordMovement ? 'Drag to adjacent tile to reposition (25% AP)' : 'Needs 25% AP to reposition ($apPct% TM)');
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1622).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.85), width: 1.2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x3300E5FF), blurRadius: 8),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Image.asset(
+              ally.assetPath,
+              width: 32,
+              height: 36,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFF00E5FF), size: 20),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${ally.name.toUpperCase()}  •  ${ally.friendlyArchetypeLabel.toUpperCase()}',
+                        style: const TextStyle(
+                          color: Color(0xFF80D8FF),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10.5,
+                          letterSpacing: 0.4,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        moveHint,
+                        style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 8.0, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  ally.isAshSculptor
+                      ? ally.combatRoleHowItHelps
+                      : '🛡️ Aura (${ally.retinuePassiveName}): ${ally.retinuePassiveSummary}   •   ★ ${ally.signatureSkillName}: ${ally.signatureSkillDescription}',
+                  style: const TextStyle(
+                    color: Color(0xFFFFECB3),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => _openUnitInspectorDialog(ally),
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A2738),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFF80D8FF).withValues(alpha: 0.6), width: 0.8),
+              ),
+              child: const Text(
+                'SHEET',
+                style: TextStyle(color: Color(0xFF80D8FF), fontSize: 7.5, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedUnitId = null;
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 3),
+              child: Icon(Icons.close, color: Colors.white70, size: 15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSelectedEnemyInspectionBanner(CombatUnitState enemy) {
     final double hpRatio = enemy.maxHp > 0 ? (enemy.hp / enemy.maxHp).clamp(0.0, 1.0) : 0.0;
     final int apPct = (enemy.currentAp / SpatialCombatEngine.tickThreshold * 100).round().clamp(0, 100);
@@ -6674,8 +7009,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFF160B0E).withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(6),
@@ -6686,36 +7021,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       ),
       child: Row(
         children: [
-          const Icon(Icons.radar, color: Color(0xFFFF5252), size: 16),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'TARGET: ${enemy.name.toUpperCase()}',
-                style: const TextStyle(
-                  color: Color(0xFFFF8A80),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 11.0,
-                  letterSpacing: 0.5,
+          const Icon(Icons.radar, color: Color(0xFFFF5252), size: 15),
+          const SizedBox(width: 6),
+          Flexible(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'TARGET: ${enemy.name.toUpperCase()}',
+                  style: const TextStyle(
+                    color: Color(0xFFFF8A80),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10.5,
+                    letterSpacing: 0.4,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                '${enemy.archetype.name} • Row ${enemy.currentDepth.name.toUpperCase()} • ${enemy.effectiveSpeed} SPD ($apPct% TM)',
-                style: const TextStyle(
-                  color: Color(0xFFB0BEC5),
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w500,
+                Text(
+                  '${enemy.friendlyArchetypeLabel} • ${enemy.effectiveSpeed} SPD ($apPct% TM) • ★ ${enemy.signatureSkillName}',
+                  style: const TextStyle(
+                    color: Color(0xFFB0BEC5),
+                    fontSize: 8.2,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
 
           Expanded(
+            flex: 5,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFF230D12),
                 borderRadius: BorderRadius.circular(4),
@@ -6725,24 +7068,31 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '🎯 ${enemy.hp} HP TO KILL',
-                        style: const TextStyle(
-                          color: Color(0xFFFFD54F),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10.0,
-                          letterSpacing: 0.4,
+                      Flexible(
+                        child: Text(
+                          '🎯 ${enemy.hp}/${enemy.maxHp} HP',
+                          style: const TextStyle(
+                            color: Color(0xFFFFD54F),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 9.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        '${enemy.hp} / ${enemy.maxHp} HP  •  🛡️ ${enemy.armor} ARMOR',
-                        style: const TextStyle(
-                          color: Color(0xFFFFCCBC),
-                          fontSize: 9.0,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '🛡️ ${enemy.armor} ARM',
+                          style: const TextStyle(
+                            color: Color(0xFFFFCCBC),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -6782,13 +7132,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
             ),
           ),
-          const SizedBox(width: 10),
 
           if (badges.isNotEmpty) ...[
-            _buildOverheadStatusBadgesRow(badges),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 130),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: _buildOverheadStatusBadgesRow(badges),
+              ),
+            ),
           ],
 
+          const SizedBox(width: 4),
           GestureDetector(
             onTap: () {
               setState(() {
@@ -6796,8 +7152,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               });
             },
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(Icons.close, color: Colors.white70, size: 16),
+              padding: EdgeInsets.symmetric(horizontal: 3),
+              child: Icon(Icons.close, color: Colors.white70, size: 15),
             ),
           ),
         ],
@@ -8040,7 +8396,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     const Icon(Icons.auto_awesome, size: 11, color: Color(0xFFFFD54F)),
                     const SizedBox(width: 5),
                     const Text(
-                      'RETINUE SYNERGY:',
+                      'HOW COMPANIONS HELP:',
                       style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), letterSpacing: 0.5),
                     ),
                     const SizedBox(width: 6),
@@ -8051,26 +8407,34 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           children: [
                             ...livingAllies.where((u) => !u.isAshSculptor && u.occupiedNodes.isNotEmpty).map((comp) {
                               return Tooltip(
-                                message: '${comp.name}\nPassive: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\nSignature: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 5),
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1F2333),
-                                    borderRadius: BorderRadius.circular(3),
-                                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.45), width: 0.7),
-                                  ),
-                                  child: Text(
-                                    '${comp.retinuePassiveName.toUpperCase()} • ★ ${comp.signatureSkillName}',
-                                    style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFFFFECB3)),
+                                message: '${comp.name} (${comp.friendlyArchetypeLabel})\n${comp.combatRoleHowItHelps}\nAura: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\n★ Skill: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedUnitId = comp.id;
+                                      _selectedEnemyUnitId = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1F2333),
+                                      borderRadius: BorderRadius.circular(3),
+                                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.5), width: 0.7),
+                                    ),
+                                    child: Text(
+                                      '${comp.name}: 🛡️ ${comp.retinuePassiveSummary}  •  ★ ${comp.signatureSkillName} (${comp.signatureShortEffect})',
+                                      style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFFFFECB3)),
+                                    ),
                                   ),
                                 ),
                               );
                             }),
                             if (livingAllies.where((u) => !u.isAshSculptor && u.occupiedNodes.isNotEmpty).isEmpty)
                               const Text(
-                                'Deploy companions to activate Retinue Passives & Signature Skills • Frontline blocks column attacks',
-                                style: TextStyle(fontSize: 7.5, color: Colors.white54, fontStyle: FontStyle.italic),
+                                'Deploy companions onto the grid: they auto-attack at 100% Timeline, buff the Ash Sculptor, and cast ★ Signature Skills!',
+                                style: TextStyle(fontSize: 7.5, color: Colors.white60, fontStyle: FontStyle.italic),
                               ),
                           ],
                         ),
@@ -8228,7 +8592,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
     final Widget cardWidget = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      width: isLandscapeMobile ? 120 : 138,
+      width: isLandscapeMobile ? 140 : 182,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: isSelected
@@ -8315,33 +8679,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 const SizedBox(height: 1),
                 Text(
                   unit.isAshSculptor
-                      ? 'Sovereign Commander'
-                      : '${unit.retinuePassiveName} • ★ ${unit.signatureSkillName}',
+                      ? 'Commander • Casts Skills [1–5]'
+                      : '🛡️ ${unit.retinuePassiveSummary}',
                   style: const TextStyle(
-                    fontSize: 6.8,
+                    fontSize: 6.7,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFFFFE082),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Wrap(
-                  spacing: 4,
-                  children: [
-                    Text(
-                      'Lv.${unit.level}',
-                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'HP ${unit.maxHp}',
-                      style: const TextStyle(fontSize: 6.5, color: Color(0xFF81C784), fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'ATK ${unit.attack}',
-                      style: const TextStyle(fontSize: 6.5, color: Color(0xFFFF8A80), fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Text(
+                  unit.isAshSculptor
+                      ? 'Auto-attacks build 🔥 Cinders'
+                      : '★ ${unit.signatureSkillName}: ${unit.signatureShortEffect}',
+                  style: const TextStyle(
+                    fontSize: 6.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF80D8FF),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Row(
@@ -9183,83 +9541,32 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         ),
                       ),
                     ),
-                    if (_engine.isBulwarkOathActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1B2A20),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFF81C784).withValues(alpha: 0.6), width: 0.8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.shield, size: 9, color: Color(0xFF81C784)),
-                            SizedBox(width: 2),
-                            Text(
-                              'BULWARK (+25 ARM, -15% DMG)',
-                              style: TextStyle(fontSize: 7.2, color: Color(0xFFC8E6C9), fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (_engine.isStalkerKeenEdgeActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF2E1B20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)), SizedBox(width: 2), Text("STALKER (+15% CRIT, +4🔥)", style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold))]),
-                      ),
-                    if (_engine.isBloodhoundFrenzyActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF3E2010), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.whatshot, size: 9, color: Color(0xFFFFB74D)), SizedBox(width: 2), Text('FRENZY (+25% <50% HP, +BLEED)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFE0B2), fontWeight: FontWeight.bold))]),
-                      ),
-                    if (_engine.isVitaeBondActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF2E1224), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFF48FB1).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.water_drop, size: 9, color: Color(0xFFF48FB1)), SizedBox(width: 2), Text('VITAE (+18% LEECH, +3🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFCE4EC), fontWeight: FontWeight.bold))]),
-                      ),
-                    if (_engine.isAuraOfVitalityActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF102E20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF69F0AE).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.favorite, size: 9, color: Color(0xFF69F0AE)), SizedBox(width: 2), Text('CENSER (+8% TURN HEAL, +20% WARD)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE8F5E9), fontWeight: FontWeight.bold))]),
-                      ),
-                    if (_engine.isSiegeResonatorActive && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF3E1A10), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF7043).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.filter_hdr, size: 9, color: Color(0xFFFF7043)), SizedBox(width: 2), Text('SIEGE (+20% SKILL DMG, -ARMOR)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFEBE5), fontWeight: FontWeight.bold))]),
-                      ),
                     const Spacer(),
                     if (explicitTarget != null && !isNarrow)
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3E1E24),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.gps_fixed, size: 9, color: Color(0xFFFF8A80)),
-                            const SizedBox(width: 3),
-                            Text(
-                              explicitTarget.name,
-                              style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 8.0, fontWeight: FontWeight.bold),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      Flexible(
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3E1E24),
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.gps_fixed, size: 9, color: Color(0xFFFF8A80)),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  explicitTarget.name,
+                                  style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 8.0, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     InkWell(
@@ -9352,7 +9659,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
               ),
 
-              // Retinue Command Sub-Bar: Direct orders for player companions
+              // Retinue Command Sub-Bar: Clear Aura & Signature Skill breakdown + Direct Cast button
               if (companions.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(bottom: 6),
@@ -9364,15 +9671,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF263238),
+                      Tooltip(
+                        message: 'Tap to open Squad Roles & Unit Guide',
+                        child: InkWell(
+                          onTap: _openSquadGuideDialog,
                           borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text(
-                          'RETINUE',
-                          style: TextStyle(fontSize: 7.0, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E2B36),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(color: const Color(0xFF80D8FF).withValues(alpha: 0.45), width: 0.7),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.help_outline_rounded, size: 10, color: Color(0xFF80D8FF)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'COMPANIONS',
+                                  style: TextStyle(fontSize: 7.0, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -9382,134 +9704,158 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           child: Row(
                             children: companions.map((comp) {
                               final bool isSigReady = comp.signatureCooldown <= 0;
+                              final bool isSelectedAlly = _selectedUnitId == comp.id;
                               return Tooltip(
-                                message: '${comp.name}\nPassive: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\nSignature: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 6),
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.0),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF1D1B28), Color(0xFF12101A)],
-                                    ),
-                                    borderRadius: BorderRadius.circular(5),
-                                    border: Border.all(
-                                      color: isSigReady ? const Color(0xFFFFD54F) : Colors.white12,
-                                      width: isSigReady ? 1.2 : 0.8,
-                                    ),
-                                    boxShadow: isSigReady
-                                        ? [
-                                            BoxShadow(
-                                              color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
-                                              blurRadius: 6,
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(3),
-                                        child: Image.asset(
-                                          comp.assetPath,
-                                          width: 20,
-                                          height: 20,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 16, color: Colors.white70),
-                                        ),
+                                message: '${comp.name} (${comp.friendlyArchetypeLabel})\nHow it helps: ${comp.combatRoleHowItHelps}\nPassive Aura: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\n★ Signature Skill: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedUnitId = (_selectedUnitId == comp.id) ? null : comp.id;
+                                      _selectedEnemyUnitId = null;
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isSelectedAlly
+                                            ? const [Color(0xFF1B2B3C), Color(0xFF121C28)]
+                                            : const [Color(0xFF1D1B28), Color(0xFF12101A)],
                                       ),
-                                      const SizedBox(width: 5),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            '${comp.name} • ${comp.retinuePassiveName}',
-                                            style: const TextStyle(fontSize: 7.6, color: Colors.white, fontWeight: FontWeight.bold),
-                                          ),
-                                          Text(
-                                            '★ ${comp.signatureSkillName}',
-                                            style: TextStyle(
-                                              fontSize: 6.8,
-                                              fontWeight: FontWeight.w600,
-                                              color: isSigReady ? const Color(0xFFFFD54F) : Colors.white38,
-                                            ),
-                                          ),
-                                        ],
+                                      borderRadius: BorderRadius.circular(5),
+                                      border: Border.all(
+                                        color: isSelectedAlly
+                                            ? const Color(0xFF00E5FF)
+                                            : (isSigReady ? const Color(0xFFFFD54F) : Colors.white12),
+                                        width: isSelectedAlly || isSigReady ? 1.2 : 0.8,
                                       ),
-                                    const SizedBox(width: 6),
-                                    InkWell(
-                                      onTap: isSigReady
-                                          ? () {
-                                              setState(() {
-                                                _engine.executeCompanionSignature(comp.id, explicitTarget: explicitTarget);
-                                                _playSfx('WEAPArmr_Metal Shield Block Hits_JSE_MW.wav');
-                                                final bannerText = '⚡ ${comp.name.toUpperCase()}: ${comp.signatureSkillName.toUpperCase()} PRIMED!';
-                                                _unitFloatingPops[comp.id] = bannerText;
-                                                _floatingPops.add(_FloatingCombatText(
-                                                  id: 'pop_order_${comp.id}_${DateTime.now().millisecondsSinceEpoch}',
-                                                  unitId: comp.id,
-                                                  text: bannerText,
-                                                  color: const Color(0xFFFFD54F),
-                                                  borderColor: const Color(0xFFFF9100),
-                                                  fontSize: 10.5,
-                                                  isCrit: true,
-                                                  createdMs: DateTime.now().millisecondsSinceEpoch,
-                                                  durationMs: 1600,
-                                                  horizontalDrift: 0.0,
-                                                ));
-                                              });
-                                            }
+                                      boxShadow: isSigReady
+                                          ? [
+                                              BoxShadow(
+                                                color: const Color(0xFFFFD54F).withValues(alpha: 0.22),
+                                                blurRadius: 6,
+                                              ),
+                                            ]
                                           : null,
-                                      borderRadius: BorderRadius.circular(3),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          gradient: isSigReady
-                                              ? const LinearGradient(
-                                                  colors: [Color(0xFFFF6D00), Color(0xFFD84315)],
-                                                )
-                                              : null,
-                                          color: isSigReady ? null : const Color(0xFF263238),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ClipRRect(
                                           borderRadius: BorderRadius.circular(3),
-                                          border: Border.all(
-                                            color: isSigReady ? const Color(0xFFFFD54F) : Colors.white12,
-                                            width: 0.8,
+                                          child: Image.asset(
+                                            comp.assetPath,
+                                            width: 24,
+                                            height: 24,
+                                            fit: BoxFit.cover,
+                                            alignment: Alignment.topCenter,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 16, color: Colors.white70),
                                           ),
-                                          boxShadow: isSigReady
-                                              ? [
-                                                  BoxShadow(
-                                                    color: const Color(0xFFFF6D00).withValues(alpha: 0.5),
-                                                    blurRadius: 5,
-                                                  ),
-                                                ]
-                                              : null,
                                         ),
-                                        child: Row(
+                                        const SizedBox(width: 6),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            if (isSigReady) ...[
-                                              const Icon(Icons.flash_on, size: 9, color: Color(0xFFFFE082)),
-                                              const SizedBox(width: 2),
-                                            ],
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  comp.name,
+                                                  style: const TextStyle(fontSize: 7.8, color: Colors.white, fontWeight: FontWeight.w900),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '• 🛡️ ${comp.retinuePassiveSummary}',
+                                                  style: const TextStyle(fontSize: 7.2, color: Color(0xFF81C784), fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
                                             Text(
-                                              isSigReady ? 'ORDER' : '${comp.signatureCooldown}T CD',
+                                              '★ ${comp.signatureSkillName}: ${comp.signatureShortEffect}',
                                               style: TextStyle(
-                                                fontSize: 7.5,
-                                                fontWeight: FontWeight.w900,
-                                                color: isSigReady ? const Color(0xFFFFE082) : Colors.white38,
-                                                letterSpacing: 0.3,
+                                                fontSize: 6.9,
+                                                fontWeight: FontWeight.w700,
+                                                color: isSigReady ? const Color(0xFFFFE082) : Colors.white54,
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
+                                        const SizedBox(width: 7),
+                                        InkWell(
+                                          onTap: isSigReady
+                                              ? () {
+                                                  setState(() {
+                                                    _engine.executeCompanionSignature(comp.id, explicitTarget: explicitTarget);
+                                                    _playSfx('sfx_block.wav');
+                                                    final bannerText = '⚡ ${comp.name.toUpperCase()}: ${comp.signatureSkillName.toUpperCase()}!';
+                                                    _unitFloatingPops[comp.id] = bannerText;
+                                                    _floatingPops.add(_FloatingCombatText(
+                                                      id: 'pop_order_${comp.id}_${DateTime.now().millisecondsSinceEpoch}',
+                                                      unitId: comp.id,
+                                                      text: bannerText,
+                                                      color: const Color(0xFFFFD54F),
+                                                      borderColor: const Color(0xFFFF9100),
+                                                      fontSize: 10.5,
+                                                      isCrit: true,
+                                                      createdMs: DateTime.now().millisecondsSinceEpoch,
+                                                      durationMs: 1600,
+                                                      horizontalDrift: 0.0,
+                                                    ));
+                                                  });
+                                                }
+                                              : null,
+                                          borderRadius: BorderRadius.circular(3),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                                            decoration: BoxDecoration(
+                                              gradient: isSigReady
+                                                  ? const LinearGradient(
+                                                      colors: [Color(0xFFFF6D00), Color(0xFFD84315)],
+                                                    )
+                                                  : null,
+                                              color: isSigReady ? null : const Color(0xFF263238),
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(
+                                                color: isSigReady ? const Color(0xFFFFD54F) : Colors.white12,
+                                                width: 0.8,
+                                              ),
+                                              boxShadow: isSigReady
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: const Color(0xFFFF6D00).withValues(alpha: 0.5),
+                                                        blurRadius: 5,
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isSigReady) ...[
+                                                  const Icon(Icons.flash_on, size: 9, color: Color(0xFFFFE082)),
+                                                  const SizedBox(width: 2),
+                                                ],
+                                                Text(
+                                                  isSigReady ? 'CAST SKILL' : 'AUTO (${comp.signatureCooldown}T)',
+                                                  style: TextStyle(
+                                                    fontSize: 7.3,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: isSigReady ? const Color(0xFFFFE082) : Colors.white54,
+                                                    letterSpacing: 0.3,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),

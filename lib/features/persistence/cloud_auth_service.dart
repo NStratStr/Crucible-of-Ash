@@ -9,6 +9,8 @@ class CloudAuthService extends ChangeNotifier {
   factory CloudAuthService() => _instance;
   CloudAuthService._internal();
 
+  String? _permissionDeniedUid;
+
   bool get _isFirebaseAvailable {
     try {
       return Firebase.apps.isNotEmpty;
@@ -145,6 +147,7 @@ class CloudAuthService extends ChangeNotifier {
 
     final user = auth.currentUser;
     if (user == null) return false;
+    if (_permissionDeniedUid == user.uid) return false;
 
     try {
       final docRef = firestore.collection('users').doc(user.uid);
@@ -159,7 +162,12 @@ class CloudAuthService extends ChangeNotifier {
       }, SetOptions(merge: true));
       return true;
     } catch (e) {
-      debugPrint('[CloudAuthService] Firestore sync error: $e');
+      if (e.toString().contains('permission-denied')) {
+        _permissionDeniedUid = user.uid;
+        debugPrint('[CloudAuthService] Cloud sync disabled for session (permission-denied); using local storage.');
+      } else {
+        debugPrint('[CloudAuthService] Firestore sync error: $e');
+      }
       return false;
     }
   }
@@ -172,6 +180,7 @@ class CloudAuthService extends ChangeNotifier {
 
     final user = auth.currentUser;
     if (user == null) return null;
+    if (_permissionDeniedUid == user.uid) return null;
 
     try {
       final docSnap = await firestore.collection('users').doc(user.uid).get();
@@ -183,7 +192,12 @@ class CloudAuthService extends ChangeNotifier {
 
       return GameSaveData.fromJson(saveJson);
     } catch (e) {
-      debugPrint('[CloudAuthService] Firestore fetch error: $e');
+      if (e.toString().contains('permission-denied')) {
+        _permissionDeniedUid = user.uid;
+        debugPrint('[CloudAuthService] Cloud fetch disabled for session (permission-denied); using local storage.');
+      } else {
+        debugPrint('[CloudAuthService] Firestore fetch error: $e');
+      }
       return null;
     }
   }

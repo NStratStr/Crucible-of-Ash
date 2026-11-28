@@ -429,6 +429,95 @@ class CombatUnitState {
     }
   }
 
+  /// Clean player-facing archetype role title (never raw enum camelCase)
+  String get friendlyArchetypeLabel {
+    if (isAshSculptor) return 'Crucible Commander';
+    final pName = retinuePassiveName;
+    if (isPlayer) {
+      switch (pName) {
+        case 'Bulwark Oath':
+          return 'Frontline Tank';
+        case "Stalker's Edge":
+          return 'Crit Striker';
+        case 'Siege Resonator':
+          return 'Siege Marksman';
+        case 'Sanctified Censer':
+          return 'Combat Cleric';
+        case 'Bloodhound Frenzy':
+          return 'Pack Executor';
+        case 'Vitae Conduit':
+          return 'Blood Siphoner';
+      }
+    }
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Frontline Vanguard';
+      case UnitArchetype.reachMidline:
+        return 'Midline Skirmisher';
+      case UnitArchetype.backlineCaster:
+        return 'Backline Caster';
+      case UnitArchetype.colossusBehemoth:
+        return 'Colossus Boss';
+    }
+  }
+
+  /// Plain-English explanation of how this unit participates and helps in combat
+  String get combatRoleHowItHelps {
+    if (isAshSculptor) {
+      return 'Auto-strikes at 100% Timeline to generate 🔥 Cinders; cast your equipped Skills [1–5] below anytime.';
+    }
+    if (!isPlayer) {
+      if (archetype == UnitArchetype.colossusBehemoth) {
+        return '2x2 Boss Titan: Deplete its Armor & Stagger Break Bar with heavy skills to expose +50% Stagger damage!';
+      }
+      return 'Acts at 100% Timeline ($effectiveSpeed SPD) and unleashes ★ $signatureSkillName every 3rd turn.';
+    }
+    switch (retinuePassiveName) {
+      case 'Bulwark Oath':
+        return 'Auto-attacks on Timeline, blocks enemy column attacks when placed in Front row, and buffs squad defense.';
+      case "Stalker's Edge":
+        return 'Fast auto-striker that boosts your Crit Chance, feeds extra 🔥 Cinders on crits, and detonates Bleeds.';
+      case 'Siege Resonator':
+        return 'Ranged marksman that pierces rows, shreds enemy Armor, and amplifies all Ash Sculptor Skill/AoE damage.';
+      case 'Sanctified Censer':
+        return 'Support cleric that heals your lowest-HP ally on every turn and boosts all Shield & Healing effects.';
+      case 'Bloodhound Frenzy':
+        return 'Aggressive hunter that inflicts Bleed on hit and boosts squad damage by +25% against foes below 50% HP.';
+      case 'Vitae Conduit':
+        return 'Sanguine caster that grants the Sculptor +18% Lifesteal, feeds 🔥 Cinders on Bleed, and drains enemy HP.';
+      default:
+        return 'Fights automatically at 100% Timeline, grants an always-on Aura, and fires ★ $signatureSkillName.';
+    }
+  }
+
+  /// Short scannable Signature Skill summary for live HUD companion cards
+  String get signatureShortEffect {
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
+    if (key.contains('vladislav')) return '160% Cleave, 2 Bleed & 35% Lifesteal';
+    if (key.contains('valeria')) return '145% Strike, -25% Armor & +25 Squad Shield';
+    if (key.contains('malakor')) return '160% Holy DMG, Burn & Vulnerable';
+    if (key.contains('morrigan')) return '145% Blight, 3 Poison & Vulnerable';
+    if (key.contains('iron_footman') || key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      return '1.5s Stun, Heavy Stagger & +40 Shield';
+    }
+    if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
+      return '185% Crit, Detonates Bleed & +12🔥';
+    }
+    if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      return 'Row Pierce, -35% Armor & Vulnerable';
+    }
+    if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
+      return '165% Execute (<50% HP), 3 Bleed & Haste';
+    }
+    if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      return '130% Holy, +45 Squad Heal & +30 Shield';
+    }
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist') || key.contains('blood_initiate')) {
+      return '155% Siphon, +45 Ally Heal & +8🔥';
+    }
+    return '150% Power Signature Strike';
+  }
+
   /// Always-on Retinue Passive Name granted while this companion is alive
   String get retinuePassiveName {
     if (isAshSculptor) return 'Crucible Sovereign';

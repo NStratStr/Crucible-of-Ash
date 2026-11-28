@@ -22,57 +22,45 @@ class GlobalAudioService {
   String? _currentBgmAsset;
   bool _isInitialized = false;
 
-  /// Standard ambient BGM tracks verified in assets/audio/
-  static const String bgmSanctuary = 'audio/AMBUndr_CaveDesign01_InMotionAudio_CaveDesign.wav';
+  /// Standard ambient BGM tracks bundled in pubspec.yaml
+  static const String bgmSanctuary = 'audio/combat_bgm_ambient.mp3';
   static const String bgmCombat = 'audio/combat_bgm_ambient.mp3';
 
-  /// Resolves generic/arcade SFX identifiers to visceral acoustic dark fantasy assets
+  /// Resolves any SFX identifier or raw GDC filename to web-safe bundled 16-bit PCM WAV assets in pubspec.yaml
   static String resolveSfxAsset(String sfxName) {
-    switch (sfxName) {
-      case 'sfx_block.wav':
-        return 'WEAPArmr_Metal Shield Block Hits_JSE_MW.wav';
-      case 'sfx_slash.wav':
-        return 'SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav';
-      case 'sfx_hit.wav':
-        return 'WEAPAxe_Long Two-Handed Axe Flesh Hit_JSE_MW.wav';
-      case 'sfx_spell.wav':
-        return 'Bluezone_BC0261_mountain_dweller_texture_fire_whoosh_003.wav';
-      case 'sfx_card.wav':
-        return 'SWSH_Swing 3 Large 03_DDUMAIS_NONE.wav';
-      case 'sfx_summon.wav':
-        return 'CHAINMvmt_InsJ_Chains_Metal_Movement_Distant_Moderate_02-01.wav';
-      case 'sfx_crit.wav':
-        return 'GOREBone_Bone Breaks Celery 01_JSE_GMP.wav';
-      case 'sfx_blood.wav':
-        return 'GORESplt_Gore Splatter 01_JSE_GMP.wav';
-      case 'sfx_smite.wav':
-      case 'sfx_hammer.wav':
-      case 'sfx_upgrade':
-        return 'Bluezone_BC0297_stone_impact_hammer_015.wav';
-      case 'sfx_shatter.wav':
-        return 'WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav';
-      case 'sfx_enrage.wav':
-        return 'Dinosaur Growl 3_Mono.wav';
-      case 'sfx_ui_click':
-        return 'Bluezone_BC0297_stone_impact_015.wav';
-      case 'sfx_ui_tab':
-        return 'WHSH_Whoosh Short 06_JSE_TW1.wav';
-      case 'sfx_forge':
-        return 'METLImpt_Metal Impact-03_MWSFX_TM.wav';
-      case 'sfx_equip':
-        return 'WEAPSwrd_Weapon 03 Slow Scrapes_JSE_MW.wav';
-      case 'sfx_ritual':
-      case 'sfx_fusion':
-        return 'MagicPack2_ElectricitySpells_Spell2-002.wav';
-      case 'sfx_summon_pull':
-        return 'GLASMisc_Reverse Glass Effect_04_MWSFX_GL.wav';
-      case 'sfx_victory':
-        return 'sfx_victory.wav';
-      case 'sfx_defeat':
-        return 'THUN_InsJ_Thunder_Distant_01_EQ.wav';
-      default:
-        return sfxName;
+    final lower = sfxName.toLowerCase();
+    if (lower == 'sfx_block.wav' ||
+        lower == 'sfx_card.wav' ||
+        lower == 'sfx_hit.wav' ||
+        lower == 'sfx_slash.wav' ||
+        lower == 'sfx_spell.wav' ||
+        lower == 'sfx_victory.wav') {
+      return lower;
     }
+    if (lower.contains('victory')) return 'sfx_victory.wav';
+    if (lower.contains('shield') || lower.contains('armr') || lower.contains('block') || lower.contains('equip')) {
+      return 'sfx_block.wav';
+    }
+    if (lower.contains('slash') || lower.contains('swrd') || lower.contains('axe_whoosh')) {
+      return 'sfx_slash.wav';
+    }
+    if (lower.contains('fire') ||
+        lower.contains('magic') ||
+        lower.contains('spell') ||
+        lower.contains('glas') ||
+        lower.contains('ritual') ||
+        lower.contains('fusion') ||
+        lower.contains('summon') ||
+        lower.contains('chain') ||
+        lower.contains('thun') ||
+        lower.contains('growl') ||
+        lower.contains('enrage')) {
+      return 'sfx_spell.wav';
+    }
+    if (lower.contains('card') || lower.contains('swing') || lower.contains('whoosh') || lower.contains('tab') || lower.contains('click')) {
+      return 'sfx_card.wav';
+    }
+    return 'sfx_hit.wav';
   }
 
   Future<void> init() async {
@@ -80,9 +68,7 @@ class GlobalAudioService {
     _isInitialized = true;
 
     try {
-      if (kIsWeb) {
-        AudioCache.instance.prefix = '';
-      }
+      AudioLogger.logLevel = AudioLogLevel.none;
       _bgmPlayer = AudioPlayer();
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
 
@@ -214,13 +200,12 @@ class GlobalAudioService {
       _sfxIndex = (_sfxIndex + 1) % _sfxPlayers.length;
 
       final vol = (settings.sfxVolume * volumeMultiplier).clamp(0.0, 1.0);
-      player.setVolume(vol).then((_) {
-        player.play(AssetSource('audio/$resolved'));
-      }).catchError((e) {
-        debugPrint('Error playing SFX $resolved: $e');
-      });
-    } catch (e) {
-      debugPrint('Error playing SFX $sfxName: $e');
+      player
+          .setVolume(vol)
+          .then((_) => player.play(AssetSource('audio/$resolved')))
+          .catchError((_) {});
+    } catch (_) {
+      // Silently ignore unsupported audio sources
     }
   }
 }
