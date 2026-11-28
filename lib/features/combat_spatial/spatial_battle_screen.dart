@@ -10257,15 +10257,17 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           ),
         );
       }
-      final int staggerMs = (unit.id.hashCode.abs() % 5) * 110;
+      final int staggerMs = (unit.id.hashCode.abs() % 7) * 140;
+      final double phaseOffset = (unit.id.hashCode.abs() % 97) / 97.0;
       return SpriteSheetAnimation(
         key: ValueKey('unit_idle_${unit.id}_${animSet.idleSheet}'),
         assetPath: animSet.idleSheet,
         columns: animSet.columns,
         rows: animSet.rows,
         totalFrames: animSet.totalFrames,
-        duration: Duration(milliseconds: 2200 + staggerMs),
+        duration: Duration(milliseconds: 2300 + staggerMs),
         loop: true,
+        initialPhase: phaseOffset,
         fit: BoxFit.contain,
         fallback: fallbackImg,
       );

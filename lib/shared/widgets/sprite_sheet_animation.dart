@@ -25,6 +25,7 @@ class SpriteSheetAnimation extends StatefulWidget {
   final int totalFrames;
   final Duration duration;
   final bool loop;
+  final double initialPhase;
   final VoidCallback? onComplete;
   final BoxFit fit;
   final BlendMode? blendMode;
@@ -39,6 +40,7 @@ class SpriteSheetAnimation extends StatefulWidget {
     int? totalFrames,
     this.duration = const Duration(milliseconds: 500),
     this.loop = false,
+    this.initialPhase = 0.0,
     this.onComplete,
     this.fit = BoxFit.contain,
     this.blendMode,
@@ -149,7 +151,9 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final double progress = _controller.value;
+        final double progress = widget.loop
+            ? (_controller.value + widget.initialPhase) % 1.0
+            : _controller.value;
         final int currentFrame = (progress * widget.totalFrames).floor().clamp(0, widget.totalFrames - 1);
 
         final int col = currentFrame % widget.columns;
