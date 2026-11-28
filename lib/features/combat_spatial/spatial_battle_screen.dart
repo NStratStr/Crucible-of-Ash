@@ -2029,15 +2029,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             },
           ),
           const SizedBox(width: 4),
-          // Browser / Device Fullscreen Toggle
+          // Browser / Device Fullscreen Toggle (with smart iOS Safari Home-Screen PWA fallback)
           IconButton(
             icon: const Icon(Icons.fullscreen, color: Color(0xFF00E5FF), size: 22),
             padding: const EdgeInsets.symmetric(horizontal: 4),
             constraints: const BoxConstraints(),
             tooltip: 'Toggle Fullscreen Mode',
-            onPressed: () {
-              PlatformFullscreen.toggleFullscreen();
-            },
+            onPressed: _handleFullscreenToggle,
           ),
           // Subtle Dev / Debug Menu (Restart always available; Step/T135/Trial Switchers behind kDebugMode)
           PopupMenuButton<String>(
@@ -2322,11 +2320,13 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         alignment: isDesktop ? Alignment.bottomCenter : Alignment.center,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          alignment: Alignment.bottomCenter,
+                          alignment: isLandscapeMobile ? Alignment.center : Alignment.bottomCenter,
                           child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 20.0 : 6.0,
-                              vertical: 0.0,
+                            padding: EdgeInsets.only(
+                              left: isDesktop ? 20.0 : 6.0,
+                              right: isDesktop ? 20.0 : 6.0,
+                              top: isLandscapeMobile ? 34.0 : 18.0,
+                              bottom: isLandscapeMobile ? 6.0 : 2.0,
                             ),
                             child: _is2DGridView
                                 ? RankAndRite2DBattlefield(
@@ -3041,10 +3041,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             // Option 1: Clean Turn-Based Hero HUD
             // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Turn Action Tray & Pacing Bar
             if (_engine.isPreBattlePhase)
-              Transform.translate(
-                offset: const Offset(0, -10.0),
-                child: _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile),
-              )
+              _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
             else ...[
               // Always-visible Crucible Commander Cinders Tray during active interval combat
               if (_engine.playerUnits.isNotEmpty)
@@ -3459,6 +3456,26 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
+  void _handleFullscreenToggle() {
+    final bool supported = PlatformFullscreen.toggleFullscreen();
+    if (!supported && mounted) {
+      setState(() {
+        _isZenMode = !_isZenMode;
+      });
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF141824),
+          duration: Duration(seconds: 4),
+          content: Text(
+            '📱 iPhone Safari blocks tab fullscreen — tap Share (↑) → "Add to Home Screen" for 100% edge-to-edge full screen! (Toggled Zen Max-Arena view)',
+            style: TextStyle(color: Color(0xFF80D8FF), fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildTopStatusRibbon(CombatUnitState? boss, {bool isLandscapeMobile = false}) {
     // Collect next impending turns sorted by closeness to 10,000 AP threshold
     final allLivingUnits = [..._engine.playerUnits, ..._engine.enemyUnits].where((u) => u.isAlive).toList();
@@ -3467,9 +3484,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final bTicksLeft = ((SpatialCombatEngine.tickThreshold - b.currentAp) / max(1, b.speed)).clamp(0.0, 999.0);
       return aTicksLeft.compareTo(bTicksLeft);
     });
+    final bool showTimeline = _timelineExpandedOverride ?? !isLandscapeMobile;
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 1 : 5),
+      padding: EdgeInsets.symmetric(horizontal: isLandscapeMobile ? 6 : 10, vertical: isLandscapeMobile ? 2 : 5),
       decoration: const BoxDecoration(
         color: Color(0xFF161622),
         border: Border(bottom: BorderSide(color: Color(0xFF282838), width: 1.0)),
@@ -3477,63 +3495,75 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // 1. Ashen Reckoning Phase Clock Pill (GDD Sec 7.1)
-                _buildAshenReckoningPill(),
-                const SizedBox(width: 8),
-
-                // 2. Top-Bar Crucible Skill Tree Shortcut (Always accessible)
+          Row(
+            children: [
+              if (isLandscapeMobile && widget.onBackToStandardCombat != null) ...[
                 GestureDetector(
-                  onTap: () {
-                    _playSfx('sfx_card.wav');
-                    CrucibleSkillTreeDialog.show(context, _engine).then((_) {
-                      setState(() {});
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF14241B), Color(0xFF0F1A13)],
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: const Color(0xFF69F0AE).withValues(alpha: 0.85),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
-                          blurRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.account_tree_rounded, color: Color(0xFF69F0AE), size: 13),
-                        const SizedBox(width: 4),
-                        Text(
-                          _engine.skillTreeState.availableSkillPoints > 0
-                              ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
-                              : 'SKILLS',
-                          style: const TextStyle(
-                            color: Color(0xFF69F0AE),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 9.0,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
+                  onTap: widget.onBackToStandardCombat,
+                  child: const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(Icons.arrow_back, color: Color(0xFFFFD54F), size: 17),
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      // 1. Ashen Reckoning Phase Clock Pill (GDD Sec 7.1)
+                      _buildAshenReckoningPill(),
+                      const SizedBox(width: 6),
 
-                // 3. Interactive Squad Roles & How Units Help Guide Button
+                      // 2. Top-Bar Crucible Skill Tree Shortcut (Always accessible)
+                      GestureDetector(
+                        onTap: () {
+                          _playSfx('sfx_card.wav');
+                          CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                            setState(() {});
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF14241B), Color(0xFF0F1A13)],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: const Color(0xFF69F0AE).withValues(alpha: 0.85),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.account_tree_rounded, color: Color(0xFF69F0AE), size: 13),
+                              const SizedBox(width: 4),
+                              Text(
+                                _engine.skillTreeState.availableSkillPoints > 0
+                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'SKILLS',
+                                style: const TextStyle(
+                                  color: Color(0xFF69F0AE),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 9.0,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // 3. Interactive Squad Roles & How Units Help Guide Button
                 Tooltip(
                   message: 'Open Squad & Unit Guide: See how your companions auto-fight, buff the Ash Sculptor, and cast ★ Signature Skills',
                   child: GestureDetector(
@@ -3696,47 +3726,95 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          if (boss != null && boss.isAlive && (boss.hasBreakBar || boss.hasKineticBastion || boss.isNecroticMireActive)) ...[
-            const SizedBox(height: 4),
-            _buildBossBreakBarHud(boss, isLandscapeMobile: isLandscapeMobile),
-          ],
-
-          // 4. Live Initiative Action Timeline (Auto-collapsed on <550px mobile landscape, 1-tap expandable)
-          if (!(_timelineExpandedOverride ?? !isLandscapeMobile))
-            Align(
-              alignment: Alignment.centerLeft,
-              child: GestureDetector(
-                onTap: () => setState(() => _timelineExpandedOverride = true),
-                child: Container(
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF14121A),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.35), width: 0.8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFFFD54F)),
-                      SizedBox(width: 4),
-                      Text('SHOW TIMELINE', style: TextStyle(fontSize: 7.5, color: Color(0xFFFFD54F), fontWeight: FontWeight.w900)),
-                      SizedBox(width: 2),
-                      Icon(Icons.expand_more, size: 12, color: Color(0xFFFFD54F)),
+                      if (!showTimeline) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () => setState(() => _timelineExpandedOverride = true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF14121A),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.45), width: 0.8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.hourglass_top_rounded, size: 10, color: Color(0xFFFFD54F)),
+                                SizedBox(width: 3),
+                                Text('TIMELINE', style: TextStyle(fontSize: 8.0, color: Color(0xFFFFD54F), fontWeight: FontWeight.w900)),
+                                Icon(Icons.expand_more, size: 12, color: Color(0xFFFFD54F)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
-            )
-          else
-          Container(
-            height: 34,
+              if (isLandscapeMobile) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => setState(() => _engine.cycleCombatSpeed()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E28),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: Colors.white24, width: 0.8),
+                    ),
+                    child: Text(
+                      '${_engine.combatPacingSpeed.toStringAsFixed(1)}×',
+                      style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 8.5, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: _toggleMute,
+                  child: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, color: _isMuted ? Colors.white38 : const Color(0xFFFFD54F), size: 17),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (_engine.isPreBattlePhase) {
+                        _engine.startBattle();
+                      } else {
+                        _engine.isRunning = !_engine.isRunning;
+                      }
+                    });
+                  },
+                  child: Icon(
+                    _engine.isRunning ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    color: _engine.isRunning ? const Color(0xFFFFD54F) : const Color(0xFF81C784),
+                    size: 19,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => setState(() => _isZenMode = !_isZenMode),
+                  child: Icon(Icons.visibility, color: _isZenMode ? const Color(0xFFFF9100) : Colors.white70, size: 17),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: _handleFullscreenToggle,
+                  child: const Icon(Icons.fullscreen, color: Color(0xFF00E5FF), size: 19),
+                ),
+              ],
+            ],
+          ),
+
+          if (boss != null && boss.isAlive && (boss.hasBreakBar || boss.hasKineticBastion || boss.isNecroticMireActive)) ...[
+            const SizedBox(height: 3),
+            _buildBossBreakBarHud(boss, isLandscapeMobile: isLandscapeMobile),
+          ],
+
+          // 4. Live Initiative Action Timeline (Auto-collapsed inline on <550px mobile landscape, 1-tap expandable)
+          if (showTimeline)
+            Container(
+              height: isLandscapeMobile ? 28 : 34,
             margin: const EdgeInsets.only(top: 3),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
             decoration: BoxDecoration(
@@ -8128,8 +8206,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   Widget _buildPreBattleStagingDock({bool isLandscapeMobile = false}) {
     final livingAllies = _engine.playerUnits.where((u) => u.isAlive).toList();
     final int deployedCount = livingAllies.where((u) => u.occupiedNodes.isNotEmpty).length;
-    final int totalCount = livingAllies.length;
-    final double dockHeight = isLandscapeMobile ? 48.0 : 78.0;
+    final double dockHeight = isLandscapeMobile ? 42.0 : 78.0;
 
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) => details.data.startsWith('unit:'),
@@ -8144,8 +8221,127 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       builder: (context, candidateData, rejectedData) {
         final bool isBenchDropTarget = candidateData.isNotEmpty;
 
+        // Ultra-slim single-row Pre-Battle Dock for Mobile Landscape (<550px height) so battlefield isn't crushed!
+        if (isLandscapeMobile) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: isBenchDropTarget ? const Color(0xFF1B2A38) : const Color(0xFF0F111A),
+              border: Border(
+                top: BorderSide(
+                  color: isBenchDropTarget ? const Color(0xFF00E5FF) : const Color(0xFF2A2D3D),
+                  width: 1.2,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 38,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        ...livingAllies.map((u) => Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: _buildPreBattleBenchUnitCard(u, isLandscapeMobile: true),
+                            )),
+                        if (livingAllies.length < _engine.maxDeployableUnits && _reserveUnits.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: _buildAddHeroBenchCard(isLandscapeMobile: true),
+                          ),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              _playSfx('sfx_card.wav');
+                              CrucibleRetinueSquadDialog.show(
+                                context,
+                                engine: _engine,
+                                currentSquadUnits: _currentSquadUnits,
+                                reserveUnits: _reserveUnits,
+                                relicService: widget.relicService,
+                                onSquadUpdated: (updatedSquad, updatedReserves) {
+                                  _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
+                                  setState(() {
+                                    _currentSquadUnits = updatedSquad;
+                                    _reserveUnits = updatedReserves;
+                                  });
+                                  widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+                                },
+                              );
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFF00E5FF), width: 0.9),
+                              ),
+                              child: const Text(
+                                '👥 SQUAD',
+                                style: TextStyle(fontSize: 8.5, color: Color(0xFF00E5FF), fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              _playSfx('sfx_card.wav');
+                              CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                                setState(() {});
+                              });
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF162B20),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFF69F0AE), width: 0.9),
+                              ),
+                              child: Text(
+                                _engine.skillTreeState.availableSkillPoints > 0
+                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'SKILLS',
+                                style: const TextStyle(fontSize: 8.5, color: Color(0xFF69F0AE), fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _playSfx('sfx_spell.wav');
+                    setState(() {
+                      _engine.startBattle();
+                    });
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 15),
+                  label: const Text(
+                    'ENGAGE',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 0.6),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD54F),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Container(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: isLandscapeMobile ? 3 : 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: isBenchDropTarget
                 ? const Color(0xFF1B2A38)
@@ -8169,225 +8365,124 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header Controls Row
+              // Header Controls Row: Scrollable utility buttons on left + Pinned [ENGAGE BATTLE] CTA on right (never clipped in Portrait!)
               Row(
                 children: [
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.group_work_rounded, color: Color(0xFF00E5FF), size: 14),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            'RESERVE SQUAD ($deployedCount/${_engine.maxDeployableUnits} MAX • $totalCount OWNED)',
-                            overflow: TextOverflow.ellipsis,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.group_work_rounded, color: Color(0xFF00E5FF), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            'SQUAD ($deployedCount/${_engine.maxDeployableUnits})',
                             style: const TextStyle(
-                              fontSize: 9.0,
+                              fontSize: 8.5,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
+                              letterSpacing: 0.6,
                               color: Color(0xFF00E5FF),
                               fontFamily: 'monospace',
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Quick Actions: Clear to Bench / Auto-Fill
-                  GestureDetector(
-                    onTap: () {
-                      _playSfx('sfx_block.wav');
-                      setState(() {
-                        _engine.clearAllUnitsToBench();
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: Colors.white24, width: 0.8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.undo_rounded, size: 10, color: Colors.white70),
-                          SizedBox(width: 3),
-                          Text('BENCH ALL', style: TextStyle(fontSize: 8, color: Colors.white70, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () {
-                      _playSfx('sfx_card.wav');
-                      setState(() {
-                        _engine.autoDeployAllFromBench();
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 0.8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.auto_awesome, size: 10, color: Color(0xFF80D8FF)),
-                          SizedBox(width: 3),
-                          Text('AUTO-DEPLOY', style: TextStyle(fontSize: 8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900)),
-                        ],
-                      ),
-                    ),
-                  ),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () {
-                        _playSfx('sfx_card.wav');
-                        CrucibleRetinueSquadDialog.show(
-                          context,
-                          engine: _engine,
-                          currentSquadUnits: _currentSquadUnits,
-                          reserveUnits: _reserveUnits,
-                          relicService: widget.relicService,
-                          onSquadUpdated: (updatedSquad, updatedReserves) {
-                            _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
-                            setState(() {
-                              _currentSquadUnits = updatedSquad;
-                              _reserveUnits = updatedReserves;
-                            });
-                            widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
-                          },
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.85),
-                            width: 0.9,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.group_add_rounded,
-                              size: 11,
-                              color: Color(0xFF00E5FF),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '👥 CHOOSE SQUAD',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                color: Color(0xFF00E5FF),
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.4,
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () {
+                              _playSfx('sfx_card.wav');
+                              CrucibleRetinueSquadDialog.show(
+                                context,
+                                engine: _engine,
+                                currentSquadUnits: _currentSquadUnits,
+                                reserveUnits: _reserveUnits,
+                                relicService: widget.relicService,
+                                onSquadUpdated: (updatedSquad, updatedReserves) {
+                                  _engine.updateRetinueSquad(updatedSquad, relicService: widget.relicService);
+                                  setState(() {
+                                    _currentSquadUnits = updatedSquad;
+                                    _reserveUnits = updatedReserves;
+                                  });
+                                  widget.onSquadUpdated?.call(List<UnitEntity>.unmodifiable(_currentSquadUnits));
+                                },
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.85), width: 0.9),
+                              ),
+                              child: const Text(
+                                '👥 SQUAD',
+                                style: TextStyle(fontSize: 8.2, color: Color(0xFF00E5FF), fontWeight: FontWeight.w900),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () {
-                      _playSfx('sfx_card.wav');
-                      CrucibleSkillTreeDialog.show(context, _engine).then((_) {
-                        setState(() {});
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF162B20),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: const Color(0xFF69F0AE).withValues(alpha: 0.85),
-                          width: 0.8,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF69F0AE).withValues(alpha: 0.25),
-                            blurRadius: 4,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.account_tree_rounded, size: 11, color: Color(0xFF69F0AE)),
-                          const SizedBox(width: 3),
-                          Text(
-                            _engine.skillTreeState.availableSkillPoints > 0
-                                ? 'SKILL TREE (${_engine.skillTreeState.availableSkillPoints}★)'
-                                : 'SKILL TREE',
-                            style: const TextStyle(
-                              fontSize: 8,
-                              color: Color(0xFF69F0AE),
-                              fontWeight: FontWeight.w900,
+                          const SizedBox(width: 5),
+                          InkWell(
+                            onTap: () {
+                              _playSfx('sfx_card.wav');
+                              CrucibleSkillTreeDialog.show(context, _engine).then((_) {
+                                setState(() {});
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF162B20),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: const Color(0xFF69F0AE).withValues(alpha: 0.85), width: 0.8),
+                              ),
+                              child: Text(
+                                _engine.skillTreeState.availableSkillPoints > 0
+                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'SKILLS',
+                                style: const TextStyle(fontSize: 8.2, color: Color(0xFF69F0AE), fontWeight: FontWeight.w900),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          GestureDetector(
+                            onTap: () {
+                              _playSfx('sfx_card.wav');
+                              setState(() {
+                                _engine.autoDeployAllFromBench();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.6), width: 0.8),
+                              ),
+                              child: const Text('AUTO-DEPLOY', style: TextStyle(fontSize: 7.8, color: Color(0xFF80D8FF), fontWeight: FontWeight.w900)),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          GestureDetector(
+                            onTap: () {
+                              _playSfx('sfx_block.wav');
+                              setState(() {
+                                _engine.clearAllUnitsToBench();
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: Colors.white24, width: 0.8),
+                              ),
+                              child: const Text('BENCH ALL', style: TextStyle(fontSize: 7.8, color: Colors.white70, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (kDebugMode) ...[
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () {
-                        _playSfx('sfx_card.wav');
-                        CrucibleDebugSandboxDialog.show(
-                          context,
-                          engine: _engine,
-                          onStateChanged: () => setState(() {}),
-                          onUnlockAllUnits: _debugUnlockAllRetinueUnits,
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF261D12),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: const Color(0xFFFFD54F).withValues(alpha: 0.85),
-                            width: 0.8,
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.build_circle, size: 11, color: Color(0xFFFFD54F)),
-                            SizedBox(width: 3),
-                            Text(
-                              'DEV SANDBOX',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Color(0xFFFFD54F),
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -8398,7 +8493,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     },
                     icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 15),
                     label: const Text(
-                      'ENGAGE BATTLE',
+                      'ENGAGE',
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.w900,
@@ -8408,7 +8503,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD54F),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       elevation: 3,
                       shadowColor: const Color(0xFFFFD54F).withValues(alpha: 0.5),
                     ),
@@ -8553,8 +8650,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        width: isLandscapeMobile ? 110 : 125,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        width: isLandscapeMobile ? 105 : 125,
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: isLandscapeMobile ? 3 : 6),
         decoration: BoxDecoration(
           color: const Color(0xFF0F1520),
           borderRadius: BorderRadius.circular(6),
@@ -8570,44 +8667,56 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
-                border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+        child: isLandscapeMobile
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_circle_outline, color: Color(0xFF00E5FF), size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    '+ ALLY',
+                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF00E5FF)),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                      border: Border.all(color: const Color(0xFF00E5FF), width: 1.0),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Color(0xFF00E5FF),
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '+ ASSIGN ALLY',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF00E5FF),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '${_engine.playerUnits.length}/${_engine.maxDeployableUnits} DEPLOYED',
+                    style: const TextStyle(
+                      fontSize: 6.5,
+                      color: Colors.white54,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Color(0xFF00E5FF),
-                size: 16,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '+ ASSIGN ALLY',
-              style: TextStyle(
-                fontSize: 8.5,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF00E5FF),
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              '${_engine.playerUnits.length}/${_engine.maxDeployableUnits} DEPLOYED',
-              style: const TextStyle(
-                fontSize: 6.5,
-                color: Colors.white54,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -8654,8 +8763,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           Stack(
             children: [
               Container(
-                width: isLandscapeMobile ? 26 : 40,
-                height: isLandscapeMobile ? 36 : 56,
+                width: isLandscapeMobile ? 24 : 40,
+                height: isLandscapeMobile ? 28 : 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: Colors.white24, width: 0.8),
@@ -8667,14 +8776,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     unit.assetPath,
                     fit: BoxFit.cover,
                     alignment: Alignment.topCenter,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: Colors.white38, size: 20),
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: Colors.white38, size: 16),
                   ),
                 ),
               ),
               // Deployed Checkmark / Unplaced Pulse
               Positioned(
-                top: 2,
-                right: 2,
+                top: 1,
+                right: 1,
                 child: Container(
                   padding: const EdgeInsets.all(1.5),
                   decoration: BoxDecoration(
@@ -8683,14 +8792,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ),
                   child: Icon(
                     isPlaced ? Icons.check : Icons.arrow_upward,
-                    size: 8,
+                    size: 7,
                     color: Colors.black,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
 
           // Unit Meta
           Expanded(
@@ -8701,7 +8810,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 Text(
                   unit.name.toUpperCase(),
                   style: TextStyle(
-                    fontSize: isLandscapeMobile ? 8.0 : 8.5,
+                    fontSize: isLandscapeMobile ? 7.8 : 8.5,
                     fontWeight: FontWeight.w900,
                     color: isSelected ? const Color(0xFF00E5FF) : Colors.white,
                     letterSpacing: 0.3,
@@ -8709,91 +8818,105 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 1),
-                Text(
-                  unit.isAshSculptor
-                      ? 'Commander • Casts Skills [1–5]'
-                      : '🛡️ ${unit.retinuePassiveSummary}',
-                  style: const TextStyle(
-                    fontSize: 6.7,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFFFE082),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  unit.isAshSculptor
-                      ? 'Auto-attacks build 🔥 Cinders'
-                      : '★ ${unit.signatureSkillName}: ${unit.signatureShortEffect}',
-                  style: const TextStyle(
-                    fontSize: 6.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF80D8FF),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(2),
-                          border: Border.all(color: statusColor.withValues(alpha: 0.6), width: 0.5),
-                        ),
-                        child: Text(
-                          placementText,
-                          style: TextStyle(
-                            fontSize: 6.5,
-                            fontWeight: FontWeight.w900,
-                            color: statusColor,
-                            fontFamily: 'monospace',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                if (isLandscapeMobile)
+                  Text(
+                    placementText,
+                    style: TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.bold,
+                      color: statusColor,
+                      fontFamily: 'monospace',
                     ),
-                    if (_reserveUnits.isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () {
-                          _playSfx('sfx_card.wav');
-                          _openRosterSwapSheet(unit);
-                        },
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                else ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    unit.isAshSculptor
+                        ? 'Commander • Casts Skills [1–5]'
+                        : '🛡️ ${unit.retinuePassiveSummary}',
+                    style: const TextStyle(
+                      fontSize: 6.7,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFFE082),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    unit.isAshSculptor
+                        ? 'Auto-attacks build 🔥 Cinders'
+                        : '★ ${unit.signatureSkillName}: ${unit.signatureShortEffect}',
+                    style: const TextStyle(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF80D8FF),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                            color: statusColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(2),
-                            border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.8), width: 0.6),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.6), width: 0.5),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.swap_horiz, size: 8, color: Color(0xFFFFD54F)),
-                              SizedBox(width: 1.5),
-                              Text(
-                                'SWAP',
-                                style: TextStyle(
-                                  fontSize: 6.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFFFFD54F),
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            placementText,
+                            style: TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: FontWeight.w900,
+                              color: statusColor,
+                              fontFamily: 'monospace',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
+                      if (_reserveUnits.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            _playSfx('sfx_card.wav');
+                            _openRosterSwapSheet(unit);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5A93C).withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFE5A93C).withValues(alpha: 0.8), width: 0.6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.swap_horiz, size: 8, color: Color(0xFFFFD54F)),
+                                SizedBox(width: 1.5),
+                                Text(
+                                  'SWAP',
+                                  style: TextStyle(
+                                    fontSize: 6.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFFFD54F),
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -9477,7 +9600,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         final companions = _engine.playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor' && u.isAlive).toList();
 
         return Container(
-          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 12, vertical: isNarrow ? 5 : 8),
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 6 : 12, vertical: isLandscapeMobile ? 2 : (isNarrow ? 5 : 8)),
           decoration: BoxDecoration(
             color: const Color(0xFF1B1926),
             border: Border(
@@ -9498,110 +9621,127 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header Status Row: Avatar + Discipline Name + Cinder Gauge + Target + Controls
+              // Header Status Row: Scrollable Commander + Cinders on left, Pinned TREE/UPGRADE/LOG on right (never overflows in Portrait!)
               Padding(
-                padding: const EdgeInsets.only(bottom: 5),
+                padding: EdgeInsets.only(bottom: isLandscapeMobile ? 2 : 5),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.asset(
-                        unit.assetPath,
-                        width: isNarrow ? 22 : 28,
-                        height: isNarrow ? 22 : 28,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFFFFD54F), size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: disc.primaryColor,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: const Text(
-                        'COMMANDER',
-                        style: TextStyle(fontSize: 7.0, color: Colors.black, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      disc.title,
-                      style: TextStyle(
-                        color: disc.primaryColor,
-                        fontSize: isNarrow ? 9.5 : 11.0,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Sculptor Level & XP: Leveling up grants +1★ Skill Point! Higher levels + Great Crucible (Castle) upgrades unlock Tier 2/3/Apex skills.',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF141E2B),
-                          borderRadius: BorderRadius.circular(3),
-                          border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.5), width: 0.8),
-                        ),
-                        child: Text(
-                          'LV.${_engine.skillTreeState.sculptorLevel} (${_engine.skillTreeState.sculptorXp}/${_engine.skillTreeState.xpToNextLevel} XP)',
-                          style: const TextStyle(
-                            fontSize: 8.0,
-                            color: Colors.cyanAccent,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    buildCinderMeter(),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF141824),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 0.8),
-                      ),
-                      child: Text(
-                        '⚔️ AUTO +4🔥 ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
-                        style: const TextStyle(
-                          fontSize: 7.5,
-                          color: Color(0xFF80D8FF),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    if (explicitTarget != null && !isNarrow)
-                      Flexible(
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF3E1E24),
-                            borderRadius: BorderRadius.circular(3),
-                            border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.6), width: 0.8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.gps_fixed, size: 9, color: Color(0xFFFF8A80)),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  explicitTarget.name,
-                                  style: const TextStyle(color: Color(0xFFFF8A80), fontSize: 8.0, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.asset(
+                                unit.assetPath,
+                                width: isLandscapeMobile ? 18 : (isNarrow ? 22 : 28),
+                                height: isLandscapeMobile ? 18 : (isNarrow ? 22 : 28),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.shield, color: Color(0xFFFFD54F), size: 16),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            if (!isLandscapeMobile) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: disc.primaryColor,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: const Text(
+                                  'COMMANDER',
+                                  style: TextStyle(fontSize: 7.0, color: Colors.black, fontWeight: FontWeight.w900),
                                 ),
                               ),
+                              const SizedBox(width: 5),
                             ],
-                          ),
+                            Text(
+                              disc.title,
+                              style: TextStyle(
+                                color: disc.primaryColor,
+                                fontSize: isLandscapeMobile ? 8.8 : (isNarrow ? 9.5 : 11.0),
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141E2B),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.5), width: 0.8),
+                              ),
+                              child: Text(
+                                'LV.${_engine.skillTreeState.sculptorLevel}',
+                                style: const TextStyle(
+                                  fontSize: 8.0,
+                                  color: Colors.cyanAccent,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            buildCinderMeter(),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141824),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 0.8),
+                              ),
+                              child: Text(
+                                '⚔️ ${(unit.currentAp / 100.0).clamp(0.0, 100.0).round()}%',
+                                style: const TextStyle(
+                                  fontSize: 7.5,
+                                  color: Color(0xFF80D8FF),
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            if (isLandscapeMobile && companions.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              ...companions.map((comp) {
+                                final bool isSigReady = comp.signatureCooldown <= 0;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: InkWell(
+                                    onTap: isSigReady
+                                        ? () {
+                                            setState(() {
+                                              _engine.executeCompanionSignature(comp.id, explicitTarget: explicitTarget);
+                                              _playSfx('sfx_block.wav');
+                                            });
+                                          }
+                                        : () {
+                                            setState(() {
+                                              _selectedUnitId = (_selectedUnitId == comp.id) ? null : comp.id;
+                                            });
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSigReady ? const Color(0xFFD84315) : const Color(0xFF1E2230),
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(color: isSigReady ? const Color(0xFFFFD54F) : Colors.white24, width: 0.8),
+                                      ),
+                                      child: Text(
+                                        isSigReady ? '⚡ ${comp.name}' : '${comp.name} (${comp.signatureCooldown}T)',
+                                        style: TextStyle(fontSize: 7.2, fontWeight: FontWeight.w900, color: isSigReady ? const Color(0xFFFFE082) : Colors.white60),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
                         ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
                     InkWell(
                       onTap: () {
                         CrucibleSkillTreeDialog.show(context, _engine).then((_) {
@@ -9692,8 +9832,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
               ),
 
-              // Retinue Command Sub-Bar: Clear Aura & Signature Skill breakdown + Direct Cast button
-              if (companions.isNotEmpty)
+              // Retinue Command Sub-Bar: Clear Aura & Signature Skill breakdown + Direct Cast button (inlined into top Commander row on compact mobile landscape)
+              if (companions.isNotEmpty && !isLandscapeMobile)
                 Container(
                   margin: const EdgeInsets.only(bottom: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
@@ -9901,7 +10041,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (slotIdx) {
                   final skill = _engine.skillTreeState.getSkillInSlot(slotIdx);
-                  final double slotSize = isNarrow ? 50.0 : 58.0;
+                  final double slotSize = isLandscapeMobile ? 38.0 : (isNarrow ? 50.0 : 58.0);
                   if (skill == null) {
                     return Padding(
                       padding: EdgeInsets.only(right: slotIdx < 4 ? 8.0 : 0.0),

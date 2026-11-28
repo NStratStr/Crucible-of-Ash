@@ -1,12 +1,12 @@
 import 'dart:js_interop';
 
 @JS('toggleBrowserFullscreen')
-external void _toggleBrowserFullscreen();
+external bool _toggleBrowserFullscreen();
 
-void toggleBrowserFullscreen() {
+bool toggleBrowserFullscreen() {
   try {
-    _toggleBrowserFullscreen();
+    return _toggleBrowserFullscreen();
   } catch (e) {
-    // Graceful fallback
+    return false;
   }
 }

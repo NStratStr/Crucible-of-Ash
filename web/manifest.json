@@ -1,8 +1,9 @@
 {
-    "name": "ashen_crucible",
-    "short_name": "ashen_crucible",
+    "name": "Crucible of Ash",
+    "short_name": "Crucible",
     "start_url": ".",
-    "display": "fullscreen",
+    "display": "standalone",
+    "display_override": ["fullscreen", "standalone"],
     "background_color": "#0D0D14",
     "theme_color": "#0D0D14",
     "description": "Crucible of Ash tactical dark fantasy wargame.",

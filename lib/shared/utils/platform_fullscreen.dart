@@ -5,12 +5,14 @@ import 'platform_fullscreen_stub.dart'
     if (dart.library.js_interop) 'platform_fullscreen_web.dart' as platform_impl;
 
 class PlatformFullscreen {
-  static void toggleFullscreen() {
+  /// Returns true if native/browser fullscreen was toggled, or false if blocked (e.g. iOS Safari browser tab).
+  static bool toggleFullscreen() {
     if (kIsWeb) {
-      platform_impl.toggleBrowserFullscreen();
+      return platform_impl.toggleBrowserFullscreen();
     } else {
       // Mobile native fallback (Android/iOS SystemChrome)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      return true;
     }
   }
 }

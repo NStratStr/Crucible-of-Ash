@@ -49,21 +49,29 @@
     }
   </style>
   <script>
-    // Fullscreen Toggle Helper callable from Flutter web
+    // Fullscreen Toggle Helper callable from Flutter web (returns true if native/DOM fullscreen API is available)
     window.toggleBrowserFullscreen = function() {
+      var isStandalone = (window.navigator.standalone === true) ||
+        (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
       if (!document.fullscreenElement && !document.webkitFullscreenElement) {
         var el = document.documentElement;
         if (el.requestFullscreen) {
           el.requestFullscreen().catch(function(err) {});
+          return true;
         } else if (el.webkitRequestFullscreen) {
           el.webkitRequestFullscreen();
+          return true;
         }
+        return isStandalone;
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen().catch(function(err) {});
+          return true;
         } else if (document.webkitExitFullscreen) {
           document.webkitExitFullscreen();
+          return true;
         }
+        return isStandalone;
       }
     };
   </script>

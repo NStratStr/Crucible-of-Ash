@@ -43,13 +43,18 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
     final engine = widget.engine;
     final minions = engine.playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor').toList();
     final sculptor = engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+    final mq = MediaQuery.of(context);
+    final bool isPhone = mq.size.width < 640 || mq.size.height < 540;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isPhone ? 6 : 16,
+        vertical: isPhone ? 6 : 20,
+      ),
       child: Container(
-        width: 720,
-        height: 600,
+        width: isPhone ? mq.size.width : 720,
+        height: isPhone ? mq.size.height : 600,
         decoration: BoxDecoration(
           color: const Color(0xFF13111A),
           borderRadius: BorderRadius.circular(10),
@@ -65,9 +70,9 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
         ),
         child: Column(
           children: [
-            // Header Bar: Title + Crypt Currencies + Close
+            // Header Bar: Scrollable Title + Currencies on left, Close pinned on right
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: isPhone ? 10 : 16, vertical: isPhone ? 7 : 10),
               decoration: BoxDecoration(
                 color: const Color(0xFF1B1926),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
@@ -77,80 +82,88 @@ class _CrucibleSanctuaryUpgradeDialogState extends State<CrucibleSanctuaryUpgrad
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_fix_high, color: Color(0xFFFFD54F), size: 18),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'CRUCIBLE FORGE SANCTUARY',
-                    style: TextStyle(
-                      color: Color(0xFFFFD54F),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const Spacer(),
-
-                  // Currencies / Drops Counter (Unified Gold / Cursed Ore / Sigils)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0C0A12),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.4), width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.monetization_on, size: 12, color: Color(0xFFFFD54F)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${engine.unboundAshWallet} GOLD',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFFFE082)),
-                        ),
-                      ],
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.auto_fix_high, color: Color(0xFFFFD54F), size: 17),
+                          const SizedBox(width: 6),
+                          Text(
+                            isPhone ? 'SANCTUARY UPGRADES' : 'CRUCIBLE FORGE SANCTUARY',
+                            style: TextStyle(
+                              color: const Color(0xFFFFD54F),
+                              fontWeight: FontWeight.w900,
+                              fontSize: isPhone ? 11.5 : 13,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0C0A12),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.4), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.monetization_on, size: 12, color: Color(0xFFFFD54F)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${engine.unboundAshWallet} GOLD',
+                                  style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFFFFE082)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0C0A12),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.4), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.diamond_outlined, size: 12, color: Color(0xFF80CBC4)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${engine.distilledVitaeWallet} ORE',
+                                  style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFF80CBC4)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0C0A12),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFFF80AB).withValues(alpha: 0.4), width: 0.8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.military_tech, size: 12, color: Color(0xFFFF80AB)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${engine.petrifiedPlinthsWallet} SIGILS',
+                                  style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFFFF80AB)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0C0A12),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.4), width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.diamond_outlined, size: 12, color: Color(0xFF80CBC4)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${engine.distilledVitaeWallet} ORE',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF80CBC4)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0C0A12),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFF80AB).withValues(alpha: 0.4), width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.military_tech, size: 12, color: Color(0xFFFF80AB)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${engine.petrifiedPlinthsWallet} SIGILS',
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFFF80AB)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   InkWell(
                     onTap: () {
                       Navigator.of(context).pop();
