@@ -3337,87 +3337,40 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
                 const SizedBox(width: 8),
 
-                // 3. 2D / 2.5D View Mode Toggle
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _is2DGridView = !_is2DGridView;
-                    });
-                  },
-                  child: Container(
+                // 3. Active Retinue Passives & Wave Indicator Ribbon
+                if (_engine.activeRetinuePassiveLabels.isNotEmpty)
+                  Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _is2DGridView
-                            ? [const Color(0xFF2C1E4A), const Color(0xFF1D1432)]
-                            : [const Color(0xFF1E212B), const Color(0xFF14161E)],
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF231D14), Color(0xFF17120C)],
                       ),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: _is2DGridView ? const Color(0xFFB388FF) : Colors.white24,
-                        width: 1.1,
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.8),
+                        width: 1.0,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          _is2DGridView ? Icons.view_column : Icons.layers,
-                          color: _is2DGridView ? const Color(0xFFD1C4E9) : Colors.white70,
+                        const Icon(
+                          Icons.groups,
+                          color: Color(0xFFFFD54F),
                           size: 13,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Text(
-                          _is2DGridView ? '2D LANES' : '2.5D ISO',
-                          style: TextStyle(
-                            color: _is2DGridView ? const Color(0xFFD1C4E9) : Colors.white70,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 9.0,
-                            letterSpacing: 0.5,
+                          'RETINUE: ${_engine.activeRetinuePassiveLabels.join(" • ")}',
+                          style: const TextStyle(
+                            color: Color(0xFFFFE082),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                            letterSpacing: 0.4,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-
-                // 4. Active Commander Aura & Wave Indicator Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: _engine.isValeriaInFrontline
-                          ? [const Color(0xFF2D2513), const Color(0xFF1D180B)]
-                          : [const Color(0xFF23173B), const Color(0xFF160E27)],
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _engine.isValeriaInFrontline ? Icons.shield : Icons.auto_fix_high,
-                        color: _engine.isValeriaInFrontline ? const Color(0xFFFFD54F) : const Color(0xFFB388FF),
-                        size: 13,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _engine.commandService != null
-                            ? 'AURA: ${_engine.activeCommanderAuraLabel.split(" (").first.toUpperCase()}'
-                            : (_engine.isValeriaInFrontline ? 'BASTION (+25 ARMOR)' : 'REARGUARD (+20% WARD)'),
-                        style: TextStyle(
-                          color: _engine.isValeriaInFrontline ? const Color(0xFFFFE082) : const Color(0xFFD1C4E9),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 8.5,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 if (_engine.totalWaves > 1) ...[
                   const SizedBox(width: 8),
                   Container(
@@ -3446,50 +3399,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                     ),
                   ),
                 ],
-                const SizedBox(width: 8),
-
-                // 5. Tactical Attack Trajectory Lines Overlay Toggle ("ALL VECTORS")
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showAllTrajectories = !_showAllTrajectories;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _showAllTrajectories
-                            ? [const Color(0xFF003840), const Color(0xFF001F24)]
-                            : [const Color(0xFF1E212B), const Color(0xFF14161E)],
-                      ),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white24,
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _showAllTrajectories ? Icons.visibility : Icons.visibility_outlined,
-                          color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
-                          size: 13,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _showAllTrajectories ? 'VECTORS: ON' : 'ALL VECTORS',
-                          style: TextStyle(
-                            color: _showAllTrajectories ? const Color(0xFF00E5FF) : Colors.white70,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 8.5,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                 const SizedBox(width: 8),
 
                 // 6. Crucible Dev Sandbox Button
@@ -3938,57 +3847,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final double srcY = originY + (srcCol + srcGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
       final Offset sourceOffset = Offset(srcX, srcY);
 
-      // Vanguard in Backline converts basic attack to Braced Bulwark on allies ahead
-      if (srcLocalRow == 2 && unit.archetype == UnitArchetype.vanguardMelee) {
-        final allyAhead = _engine.playerUnits
-            .where((u) => u.isAlive && u.id != unit.id && u.occupiedNodes.any((n) => n.column == srcCol && n.row < 2))
-            .firstOrNull;
-        if (allyAhead != null && allyAhead.occupiedNodes.isNotEmpty) {
-          final allyNode = allyAhead.occupiedNodes.first;
-          final int allyGRow = 4 + allyNode.row;
-          final double tgtX = originX + (allyNode.column - allyGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-          final double tgtY = originY + (allyNode.column + allyGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-          trajectories.add(_TrajectoryData(
-            sourceOffset: sourceOffset,
-            targetOffset: Offset(tgtX, tgtY),
-            skillName: 'Braced Bulwark (+25🛡️ Armor)',
-            targetName: allyAhead.name,
-            color: const Color(0xFFFFD54F),
-            showLabel: isPrimaryInspected,
-          ));
-          return;
-        }
-      }
-
       final target = _engine.resolveProjectedTarget(unit, simulatedCol: srcCol);
       if (target != null && target.occupiedNodes.isNotEmpty) {
         final Offset targetOffset = _getUnitCenterIsometricOffset(target, tileWidth: tileWidth, tileHeight: tileHeight);
 
-        // Flank detection: Midliner or off-column angle against uncovered target
-        final bool isFlanking = (unit.archetype == UnitArchetype.reachMidline || srcCol != target.occupiedNodes.first.column) &&
-            !_engine.isCoveredByVanguard(target, trajectory: AttackTrajectory.flanking);
-
-        // Adaptive Posture Color & Damage Estimate
-        Color trajColor = const Color(0xFF00E5FF);
-        double mult = 1.0;
-        if (isFlanking) {
-          trajColor = const Color(0xFFB388FF); // Violet Flank Attack
-          mult = 1.20; // +20% Flank Crit Bonus
-        } else if (unit.archetype == UnitArchetype.vanguardMelee && srcLocalRow == 1) {
-          trajColor = const Color(0xFFFFB74D); // Midline Advancing Tremor (60%)
-          mult = 0.60;
-        } else if (unit.archetype == UnitArchetype.vanguardMelee && srcLocalRow == 0 && unit.hasStanceBonusReady) {
-          mult = 1.35;
-        } else if (unit.id == 'sanguine_blade' && (unit.hasStanceBonusReady || target.bleedStacks > 0)) {
-          mult = 1.40;
-        } else if (unit.archetype == UnitArchetype.backlineCaster && srcLocalRow == 0) {
-          trajColor = const Color(0xFFFF9100); // Point-Blank Panic Discharge
-          mult = 0.85;
-        }
-
-        final int estDmg = (unit.attack * mult * (1.0 - (target.armor / 100.0).clamp(0.0, 0.75))).round();
+        // Clean Target Color & Damage Estimate (no row-stance nerfs or flank clutter)
+        const Color trajColor = Color(0xFF00E5FF);
+        final int estDmg = (unit.attack * (1.0 - (target.armor / 100.0).clamp(0.0, 0.75))).round();
         final baseSkillDesc = _getUnitBasicAttackDescription(unit, srcCol, srcLocalRow);
-        final String prefix = isFlanking ? '⚡ FLANK (+20% CRIT)' : '🎯 TARGET';
+        const String prefix = '🎯 TARGET';
         final skillDesc = '$baseSkillDesc [~$estDmg DMG]';
 
         trajectories.add(_TrajectoryData(
@@ -4040,41 +3907,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final unit = _engine.playerUnits.where((u) => u.id == inspectedUnitId && u.isAlive).firstOrNull;
       if (unit != null) {
         addPlayerUnitTrajectory(unit, isPrimaryInspected: true);
-      }
-    }
-
-    // Vanguard Protective Cover Cords (Row 0 Vanguard protects Column Allies in Row 1 & Row 2)
-    final vanguardRow0 = _engine.playerUnits.where(
-      (u) => u.isAlive && u.archetype == UnitArchetype.vanguardMelee && u.occupiedNodes.any((n) => n.row == 0),
-    );
-    for (final vg in vanguardRow0) {
-      final vgNode = vg.occupiedNodes.firstWhere((n) => n.row == 0);
-      final int vgCol = vgNode.column;
-      final int vgGRow = 4 + 0;
-      final double vgX = originX + (vgCol - vgGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-      final double vgY = originY + (vgCol + vgGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-      final Offset vgOffset = Offset(vgX, vgY);
-
-      final coveredAllies = _engine.playerUnits.where(
-        (u) => u.isAlive && u.id != vg.id && u.occupiedNodes.any((n) => n.column == vgCol && n.row > 0),
-      );
-      for (final ally in coveredAllies) {
-        final aNode = ally.occupiedNodes.firstWhere((n) => n.column == vgCol && n.row > 0);
-        final int aGRow = 4 + aNode.row;
-        final double aX = originX + (aNode.column - aGRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
-        final double aY = originY + (aNode.column + aGRow) * (tileHeight * 0.5) + (tileHeight * 0.40);
-        final Offset allyOffset = Offset(aX, aY);
-
-        trajectories.add(_TrajectoryData(
-          sourceOffset: vgOffset,
-          targetOffset: allyOffset,
-          skillName: 'Vanguard Aegis',
-          targetName: ally.name,
-          color: const Color(0xFF00E5FF),
-          isCoverCord: true,
-          showLabel: true,
-          labelPrefix: '🛡️ COVER -25%',
-        ));
       }
     }
 
@@ -4601,33 +4433,35 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
 
   /// Calculates dynamic skill description for unit basic action based on physical depth/archetype
   String _getUnitBasicAttackDescription(CombatUnitState unit, int simulatedCol, int simulatedRow) {
-    if (unit.id == 'sanguine_blade') {
+    if (unit.isAshSculptor) {
+      return 'Cinder Cleave (+Cinders)';
+    }
+    final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}_${unit.name.toLowerCase()}';
+    if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      return 'Armor-Piercing Bolt (-12 Armor)';
+    }
+    if (key.contains('duelist') || key.contains('sanguine_blade') || key.contains('flayer')) {
       return 'Flensing Thrust (Crit & Bleed)';
     }
-    if (unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest')) {
-      return simulatedRow == 2 ? 'Armor-Piercing Bolt (Crit)' : 'Heavy Crossbow Volley';
+    if (key.contains('warhound') || key.contains('hound') || key.contains('cerberus')) {
+      return 'Rending Bite (Bleed & Execute)';
     }
-    if (unit.templateId == 'grave_duelist' || unit.name.toLowerCase().contains('duelist')) {
-      return 'Dueling Thrust (Bleed & Crit)';
+    if (key.contains('cleric') || key.contains('alchemist') || key.contains('medicus') || key.contains('sun_smith')) {
+      return 'Radiant Sear (+Turn Mend)';
+    }
+    if (key.contains('scribe') || key.contains('sorcerer') || key.contains('cinder_witch') || key.contains('blood_initiate')) {
+      return 'Sanguine Bolt (+Cinders)';
+    }
+    if (key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut')) {
+      return 'Shield Bash (-12 Armor & Aegis)';
     }
     if (unit.archetype == UnitArchetype.reachMidline) {
-      return 'Skirmish Thrust (Reach Impact)';
+      return 'Skirmish Thrust (Bleed)';
     }
-    if (unit.id == 'sun_smith' || unit.archetype == UnitArchetype.backlineCaster) {
-      return simulatedRow == 2 ? 'Aetheric Piercing Beam (+1 Focus)' : 'Arcane Bolt Volley';
+    if (unit.archetype == UnitArchetype.backlineCaster) {
+      return 'Arcane Bolt';
     }
-    if (unit.archetype == UnitArchetype.vanguardMelee) {
-      if (simulatedRow == 0) {
-        return unit.id == 'lady_valeria'
-            ? 'Sunbrand Slash (100% Impact)'
-            : (unit.id == 'iron_footman' ? 'Shield Bash (100% + Stun)' : 'Vanguard Cleave (100% Impact)');
-      } else if (simulatedRow == 1) {
-        return 'Shockwave Tremor (60% Dmg + Poise)';
-      } else {
-        return 'Braced Bulwark (+25 Column Armor)';
-      }
-    }
-    return 'Basic Strike';
+    return 'Vanguard Strike';
   }
 
   /// Calculates predicted phantom damage or buff for a unit given the hovered Ultimate
@@ -8082,7 +7916,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                   ),
                 ],
               ),
-              // Tactical Formation Presets & Synergy Metrics Strip
+              // Active Retinue Passives & Companion Signature Strategy Strip
               Container(
                 margin: const EdgeInsets.only(top: 4, bottom: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -8093,85 +7927,44 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4), width: 0.7),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.shield_outlined, size: 10, color: Color(0xFF00E5FF)),
-                          const SizedBox(width: 3),
-                          Text(
-                            'COVER: ${_engine.coveredAlliesCount}',
-                            style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Color(0xFF00E5FF), fontFamily: 'monospace'),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const Icon(Icons.auto_awesome, size: 11, color: Color(0xFFFFD54F)),
                     const SizedBox(width: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFB388FF).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: const Color(0xFFB388FF).withValues(alpha: 0.4), width: 0.7),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.flash_on, size: 10, color: Color(0xFFB388FF)),
-                          const SizedBox(width: 3),
-                          Text(
-                            'FLANK: ${_engine.flankingAlliesCount}',
-                            style: const TextStyle(fontSize: 8.0, fontWeight: FontWeight.w900, color: Color(0xFFB388FF), fontFamily: 'monospace'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
                     const Text(
-                      'PRESETS:',
-                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w800, color: Colors.white54, letterSpacing: 0.5),
+                      'RETINUE SYNERGY:',
+                      style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w900, color: Color(0xFFFFD54F), letterSpacing: 0.5),
                     ),
-                    const SizedBox(width: 5),
-                    _buildPresetChip(
-                      label: '🛡️ BASTION',
-                      accentColor: const Color(0xFF00E5FF),
-                      tooltip: 'Frontline Vanguards provide -25% cover to backline',
-                      onTap: () {
-                        _playSfx('sfx_block.wav');
-                        setState(() {
-                          _engine.applyFormationPreset('bastion');
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    _buildPresetChip(
-                      label: '⚔️ FLANK',
-                      accentColor: const Color(0xFFB388FF),
-                      tooltip: 'Wings deployed for +20% Flank Crits',
-                      onTap: () {
-                        _playSfx('sfx_card.wav');
-                        setState(() {
-                          _engine.applyFormationPreset('flank');
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                    _buildPresetChip(
-                      label: '💥 PUNCH',
-                      accentColor: const Color(0xFFFFB74D),
-                      tooltip: 'Concentrated Center Column 2 Penetration',
-                      onTap: () {
-                        _playSfx('sfx_slash.wav');
-                        setState(() {
-                          _engine.applyFormationPreset('punch');
-                        });
-                      },
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ...livingAllies.where((u) => !u.isAshSculptor && u.occupiedNodes.isNotEmpty).map((comp) {
+                              return Tooltip(
+                                message: '${comp.name}\nPassive: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\nSignature: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1F2333),
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.45), width: 0.7),
+                                  ),
+                                  child: Text(
+                                    '${comp.retinuePassiveName.toUpperCase()} • ★ ${comp.signatureSkillName}',
+                                    style: const TextStyle(fontSize: 7.5, fontWeight: FontWeight.bold, color: Color(0xFFFFECB3)),
+                                  ),
+                                ),
+                              );
+                            }),
+                            if (livingAllies.where((u) => !u.isAshSculptor && u.occupiedNodes.isNotEmpty).isEmpty)
+                              const Text(
+                                'Deploy companions to activate Retinue Passives & Signature Skills • Frontline blocks column attacks',
+                                style: TextStyle(fontSize: 7.5, color: Colors.white54, fontStyle: FontStyle.italic),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                     if (_engine.isBossEncounterFlag) ...[
                       const SizedBox(width: 8),
@@ -8411,14 +8204,16 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                 ),
                 const SizedBox(height: 1),
                 Text(
-                  unit.archetype == UnitArchetype.vanguardMelee
-                      ? 'Vanguard'
-                      : (unit.archetype == UnitArchetype.reachMidline ? 'Skirmisher' : 'Caster'),
-                  style: TextStyle(
-                    fontSize: 7.0,
+                  unit.isAshSculptor
+                      ? 'Sovereign Commander'
+                      : '${unit.retinuePassiveName} • ★ ${unit.signatureSkillName}',
+                  style: const TextStyle(
+                    fontSize: 6.8,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white60,
+                    color: Color(0xFFFFE082),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Wrap(
@@ -9304,35 +9099,35 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(color: const Color(0xFF2E1B20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF8A80).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)), SizedBox(width: 2), Text('STALKER (+15% CRIT, +4🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold))]),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.flash_on, size: 9, color: Color(0xFFFF8A80)), SizedBox(width: 2), Text("STALKER (+15% CRIT, +4🔥)", style: TextStyle(fontSize: 7.2, color: Color(0xFFFFCDD2), fontWeight: FontWeight.bold))]),
                       ),
-                    if (_engine.isReaverFerocityActive && !isNarrow)
+                    if (_engine.isBloodhoundFrenzyActive && !isNarrow)
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(color: const Color(0xFF3E2010), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.whatshot, size: 9, color: Color(0xFFFFB74D)), SizedBox(width: 2), Text('REAVER (+20% ATK, +8🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFE0B2), fontWeight: FontWeight.bold))]),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.whatshot, size: 9, color: Color(0xFFFFB74D)), SizedBox(width: 2), Text('FRENZY (+25% <50% HP, +BLEED)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFE0B2), fontWeight: FontWeight.bold))]),
                       ),
-                    if (_engine.isGraveCarapaceActive && !isNarrow)
+                    if (_engine.isVitaeBondActive && !isNarrow)
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(color: const Color(0xFF10282E), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF4DD0E1).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.shield, size: 9, color: Color(0xFF4DD0E1)), SizedBox(width: 2), Text('SENTINEL (+35% AEGIS)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE0F7FA), fontWeight: FontWeight.bold))]),
+                        decoration: BoxDecoration(color: const Color(0xFF2E1224), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFF48FB1).withValues(alpha: 0.6), width: 0.8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.water_drop, size: 9, color: Color(0xFFF48FB1)), SizedBox(width: 2), Text('VITAE (+18% LEECH, +3🔥)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFCE4EC), fontWeight: FontWeight.bold))]),
                       ),
                     if (_engine.isAuraOfVitalityActive && !isNarrow)
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(color: const Color(0xFF102E20), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF69F0AE).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.favorite, size: 9, color: Color(0xFF69F0AE)), SizedBox(width: 2), Text('MEDICUS (+25% HEAL, +3% REGEN)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE8F5E9), fontWeight: FontWeight.bold))]),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.favorite, size: 9, color: Color(0xFF69F0AE)), SizedBox(width: 2), Text('CENSER (+8% TURN HEAL, +20% WARD)', style: TextStyle(fontSize: 7.2, color: Color(0xFFE8F5E9), fontWeight: FontWeight.bold))]),
                       ),
                     if (_engine.isSiegeResonatorActive && !isNarrow)
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(color: const Color(0xFF3E1A10), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFFFF7043).withValues(alpha: 0.6), width: 0.8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.filter_hdr, size: 9, color: Color(0xFFFF7043)), SizedBox(width: 2), Text('ARBALEST (+25% AOE)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFEBE5), fontWeight: FontWeight.bold))]),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: const [Icon(Icons.filter_hdr, size: 9, color: Color(0xFFFF7043)), SizedBox(width: 2), Text('SIEGE (+20% SKILL DMG, -ARMOR)', style: TextStyle(fontSize: 7.2, color: Color(0xFFFFEBE5), fontWeight: FontWeight.bold))]),
                       ),
                     const Spacer(),
                     if (explicitTarget != null && !isNarrow)
@@ -9477,59 +9272,61 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           child: Row(
                             children: companions.map((comp) {
                               final bool isSigReady = comp.signatureCooldown <= 0;
-                              return Container(
-                                margin: const EdgeInsets.only(right: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.0),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF1D1B28), Color(0xFF12101A)],
+                              return Tooltip(
+                                message: '${comp.name}\nPassive: ${comp.retinuePassiveName} (${comp.retinuePassiveSummary})\nSignature: ${comp.signatureSkillName} — ${comp.signatureSkillDescription}',
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.0),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF1D1B28), Color(0xFF12101A)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(
+                                      color: isSigReady ? const Color(0xFFFFD54F) : Colors.white12,
+                                      width: isSigReady ? 1.2 : 0.8,
+                                    ),
+                                    boxShadow: isSigReady
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
+                                              blurRadius: 6,
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                  borderRadius: BorderRadius.circular(5),
-                                  border: Border.all(
-                                    color: isSigReady ? const Color(0xFFFFD54F) : Colors.white12,
-                                    width: isSigReady ? 1.2 : 0.8,
-                                  ),
-                                  boxShadow: isSigReady
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFFFFD54F).withValues(alpha: 0.25),
-                                            blurRadius: 6,
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(3),
-                                      child: Image.asset(
-                                        comp.assetPath,
-                                        width: 20,
-                                        height: 20,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 16, color: Colors.white70),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(3),
+                                        child: Image.asset(
+                                          comp.assetPath,
+                                          width: 20,
+                                          height: 20,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 16, color: Colors.white70),
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          comp.name,
-                                          style: const TextStyle(fontSize: 8.0, color: Colors.white, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          comp.signatureSkillName,
-                                          style: TextStyle(
-                                            fontSize: 6.8,
-                                            fontWeight: FontWeight.w600,
-                                            color: isSigReady ? const Color(0xFFFFD54F) : Colors.white38,
+                                      const SizedBox(width: 5),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${comp.name} • ${comp.retinuePassiveName}',
+                                            style: const TextStyle(fontSize: 7.6, color: Colors.white, fontWeight: FontWeight.bold),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                          Text(
+                                            '★ ${comp.signatureSkillName}',
+                                            style: TextStyle(
+                                              fontSize: 6.8,
+                                              fontWeight: FontWeight.w600,
+                                              color: isSigReady ? const Color(0xFFFFD54F) : Colors.white38,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     const SizedBox(width: 6),
                                     InkWell(
                                       onTap: isSigReady
@@ -9600,8 +9397,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                     ),
                                   ],
                                 ),
-                              );
-                            }).toList(),
+                              ),
+                            );
+                          }).toList(),
                           ),
                         ),
                       ),

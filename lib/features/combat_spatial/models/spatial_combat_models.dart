@@ -414,28 +414,75 @@ class CombatUnitState {
     return RowDepth.back;
   }
 
-  /// Dynamic posture label based on archetype and current row depth
+  /// Archetype combat role label (grid row no longer swaps or nerfs companion kits)
   String get postureLabel {
-    if (archetype == UnitArchetype.vanguardMelee) {
-      switch (currentDepth) {
-        case RowDepth.front:
-          return 'Brawl Stance (100% Melee)';
-        case RowDepth.mid:
-          return 'Advancing Stride (Shockwave 60%)';
-        case RowDepth.back:
-          return 'Braced Bulwark (Guard +25 Armor)';
-      }
-    } else if (archetype == UnitArchetype.backlineCaster) {
-      switch (currentDepth) {
-        case RowDepth.front:
-          return 'Point-Blank Panic (Knockback Blast)';
-        case RowDepth.mid:
-          return 'Midline Channel (Standard Reach)';
-        case RowDepth.back:
-          return 'Guarded Sanctuary (+20% Defense)';
-      }
+    if (isAshSculptor) return 'Sovereign Commander';
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Vanguard Bulwark (100% Kit)';
+      case UnitArchetype.reachMidline:
+        return 'Skirmisher Striker (100% Kit)';
+      case UnitArchetype.backlineCaster:
+        return 'Arcane Channeler (100% Kit)';
+      case UnitArchetype.colossusBehemoth:
+        return 'Colossus Titan';
     }
-    return 'Standard Stance';
+  }
+
+  /// Always-on Retinue Passive Name granted while this companion is alive
+  String get retinuePassiveName {
+    if (isAshSculptor) return 'Crucible Sovereign';
+    final key = '${id.toLowerCase()}_${templateId.toLowerCase()}_${name.toLowerCase()}';
+    if (key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought') || key.contains('valeria')) {
+      return 'Bulwark Oath';
+    }
+    if (key.contains('duelist') || key.contains('sanguine_blade') || key.contains('flayer')) {
+      return "Stalker's Edge";
+    }
+    if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      return 'Siege Resonator';
+    }
+    if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
+      return 'Sanctified Censer';
+    }
+    if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound') || key.contains('reaver')) {
+      return 'Bloodhound Frenzy';
+    }
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('blood_initiate')) {
+      return 'Vitae Conduit';
+    }
+    switch (archetype) {
+      case UnitArchetype.vanguardMelee:
+        return 'Bulwark Oath';
+      case UnitArchetype.reachMidline:
+        return "Stalker's Edge";
+      case UnitArchetype.backlineCaster:
+        return 'Vitae Conduit';
+      case UnitArchetype.colossusBehemoth:
+        return 'Titan Presence';
+    }
+  }
+
+  /// Concise Retinue Passive summary for tooltips & deployment cards
+  String get retinuePassiveSummary {
+    if (isAshSculptor) return 'Commands Cinder Skills & Retinue Signatures';
+    final pName = retinuePassiveName;
+    switch (pName) {
+      case 'Bulwark Oath':
+        return '+25 Squad Armor & -15% Damage Taken';
+      case "Stalker's Edge":
+        return '+15% Crit Chance & +4 Cinders on Crit';
+      case 'Siege Resonator':
+        return '+20% Skill/AoE DMG & -12 Armor Shred';
+      case 'Sanctified Censer':
+        return 'Heals lowest ally on turn & +20% Heal/Aegis';
+      case 'Bloodhound Frenzy':
+        return '+25% DMG vs <50% HP & +1 Bleed on hit';
+      case 'Vitae Conduit':
+        return '+18% Sculptor Lifesteal & +3 Cinders on Bleed';
+      default:
+        return 'Empowers the Ash Sculptor & Squad';
+    }
   }
 
   /// GDD Sec 3.1 & 7.1: Effective Health (EHP) calculation for sudden death tiebreaking
@@ -615,7 +662,7 @@ class CombatUnitState {
     if (key.contains('valeria')) return 'Aegis of the Iron Legion';
     if (key.contains('malakor')) return 'Solar Judgment';
     if (key.contains('morrigan')) return 'Blighted Miasma Hex';
-    if (key.contains('void_bound') || key.contains('sentinel') || key.contains('obsidian_sentinel')) {
+    if (key.contains('void_bound') || (key.contains('sentinel') && key.contains('obsidian'))) {
       return 'Rift Shockwave Pulse';
     }
     if (key.contains('shadow_flayer') || key.contains('void_ripper') || key.contains('ripper')) {
@@ -630,32 +677,32 @@ class CombatUnitState {
     if (key.contains('chanter') || key.contains('dark_gate')) {
       return 'Dimensional Rift Surge';
     }
-    if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
-      return 'Concussive Shield Slam';
+    if (key.contains('iron_footman') || key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      return 'Concussive Shield Bash';
     }
     if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
-      return 'Lacerating Cross-Slash';
+      return 'Crimson Riposte';
     }
     if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
-      return 'Armor-Piercing Volley';
+      return 'Sundering Bolt';
     }
     if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
-      return 'Savage Fang Maul';
+      return 'Throat Rip';
     }
     if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
-      return 'Sanctified Vitae Surge';
+      return 'Ember Benediction';
     }
-    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
-      return 'Abyssal Soul Bolt';
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist') || key.contains('blood_initiate')) {
+      return 'Sanguine Exsanguination';
     }
 
     switch (archetype) {
       case UnitArchetype.vanguardMelee:
-        return 'Crushing Vanguard Slam';
+        return 'Concussive Shield Bash';
       case UnitArchetype.reachMidline:
-        return 'Rending Flank Strike';
+        return 'Crimson Riposte';
       case UnitArchetype.backlineCaster:
-        return 'Arcane Conduit Surge';
+        return 'Sanguine Exsanguination';
       case UnitArchetype.colossusBehemoth:
         return 'Tectonic Crush';
     }
@@ -668,7 +715,7 @@ class CombatUnitState {
       return '160% ATK cleave + 2 Bleed stacks + drains 35% of damage dealt as HP.';
     }
     if (key.contains('valeria')) {
-      return '145% ATK strike + shreds 25% Armor + grants +25 Aegis Shield to Frontline allies.';
+      return '145% ATK strike + shreds 25% Armor + grants +25 Aegis Shield to squad.';
     }
     if (key.contains('malakor')) {
       return '160% Holy DMG + inflicts 3s Solar Burn and Vulnerable.';
@@ -676,7 +723,7 @@ class CombatUnitState {
     if (key.contains('morrigan')) {
       return '145% Nature DMG + inflicts 3 Poison stacks and Vulnerable.';
     }
-    if (key.contains('void_bound') || key.contains('sentinel') || key.contains('obsidian_sentinel')) {
+    if (key.contains('void_bound') || (key.contains('sentinel') && key.contains('obsidian'))) {
       return '135% ATK slam + converts 20% incoming damage into retaliatory arcane shockwave.';
     }
     if (key.contains('shadow_flayer') || key.contains('void_ripper') || key.contains('ripper')) {
@@ -691,25 +738,25 @@ class CombatUnitState {
     if (key.contains('chanter') || key.contains('dark_gate')) {
       return 'Dimensional Anchor granting +3,000 AP and +35 Aegis to the lowest-AP ally.';
     }
-    if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
-      return '135% ATK bash + shreds 15 Armor, staggers -1,500 AP, and grants +25 Aegis Shield.';
+    if (key.contains('iron_footman') || key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+      return '145% ATK bash + 1.5s Stun, heavy Boss Stagger break, and +40 Aegis to self & Sculptor.';
     }
     if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
-      return '150% ATK twin slash + inflicts 2 Bleed stacks and +15% Crit surge.';
+      return '185% ATK high-crit strike + detonates active Bleeds and channels +12 Cinders.';
     }
     if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
-      return '155% ATK piercing shot ignoring 50% Armor + inflicts Vulnerable (3s).';
+      return '160% ATK row-piercing bolt + shreds 35% Armor, heavy Stagger, and Vulnerable (3s).';
     }
     if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
-      return '150% ATK lunging bite + 2 Bleed stacks and grants Haste (3s).';
+      return '165% ATK lunging execute (+35% vs <50% HP) + 3 Bleed stacks and Haste (3s).';
     }
     if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
-      return '130% Magic burst + heals lowest-HP ally for 40 HP and grants +20 Aegis Shield.';
+      return '130% Holy burst + heals squad for 45 HP and grants +30 Aegis Barrier.';
     }
-    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
-      return '155% Arcane burst + inflicts 2 Bleed/Burn and siphons +1 Global Focus.';
+    if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist') || key.contains('blood_initiate')) {
+      return '155% Sanguine siphon + 2 Bleed, heals lowest ally for 45 HP, and channels +8 Cinders.';
     }
-    return 'Unleashes a 145% power signature strike every 3rd turn (+25% Ultimate Charge).';
+    return 'Unleashes a 150% power signature skill (3-turn cooldown).';
   }
 
   /// Human-readable Grafted Trait label for Crucible-bred lineages

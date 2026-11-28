@@ -185,5 +185,111 @@ void main() {
       expect(customEngine.enemyUnits.length, equals(1));
       expect(customEngine.enemyUnits.first.name, equals('Ash Raider'));
     });
+
+    test('Companion Retinue Passives, Signature Skills, and row-independent kits work across rows', () {
+      const protagonist = UnitEntity(
+        id: 'ash_sculptor',
+        name: 'The Ash Sculptor',
+        speciesId: 'ash_sculptor',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.front1,
+        level: 5,
+        maxLevel: 20,
+        currentHp: 900,
+        maxHp: 900,
+        attack: 85,
+        defense: 45,
+        speed: 55,
+        nativeTraitId: 'ash_sculptor_core',
+        lineageAncestors: [],
+      );
+      const footman = UnitEntity(
+        id: 'iron_footman_1',
+        name: 'Iron Footman',
+        speciesId: 'iron_footman',
+        generation: 1,
+        archetype: Archetype.juggernaut,
+        slot: FormationSlot.back1,
+        level: 5,
+        maxLevel: 20,
+        currentHp: 680,
+        maxHp: 680,
+        attack: 65,
+        defense: 40,
+        speed: 50,
+        nativeTraitId: 'iron_bastion',
+        lineageAncestors: [],
+      );
+      const cleric = UnitEntity(
+        id: 'cleric_1',
+        name: 'Sun-Scorched Cleric',
+        speciesId: 'sun_scorched_cleric',
+        generation: 1,
+        archetype: Archetype.support,
+        slot: FormationSlot.front2,
+        level: 5,
+        maxLevel: 20,
+        currentHp: 520,
+        maxHp: 520,
+        attack: 55,
+        defense: 25,
+        speed: 52,
+        nativeTraitId: 'sanctified_censer',
+        lineageAncestors: [],
+      );
+      const enemy = UnitEntity(
+        id: 'enemy_1',
+        name: 'Ash Raider',
+        speciesId: 'ash_raider',
+        generation: 1,
+        archetype: Archetype.skirmisher,
+        slot: FormationSlot.front1,
+        level: 5,
+        maxLevel: 20,
+        currentHp: 1200,
+        maxHp: 1200,
+        attack: 50,
+        defense: 30,
+        speed: 45,
+        nativeTraitId: 'none',
+        lineageAncestors: [],
+      );
+
+      final customEngine = SpatialCombatEngine(
+        initialPlayerEntities: const [protagonist, footman, cleric],
+        initialEnemyEntities: const [enemy],
+      );
+      customEngine.isPreBattlePhase = false;
+
+      expect(customEngine.isBulwarkOathActive, isTrue);
+      expect(customEngine.isAuraOfVitalityActive, isTrue);
+      expect(customEngine.activeRetinuePassiveLabels, containsAll(['BULWARK OATH', 'SANCTIFIED CENSER']));
+
+      final footmanState = customEngine.playerUnits.firstWhere((u) => u.id == 'iron_footman_1');
+      final raiderState = customEngine.enemyUnits.first;
+      expect(footmanState.retinuePassiveName, equals('Bulwark Oath'));
+      expect(footmanState.signatureSkillName, equals('Concussive Shield Bash'));
+
+      // Place Footman in Backline (row 2): should still execute full Signature & basic damage (no 0-DMG Braced Bulwark)
+      footmanState.occupiedNodes = [const GridNode(column: 0, row: 2, occupantUnitId: 'iron_footman_1')];
+      expect(footmanState.isSignatureReady, isTrue);
+
+      final hpBeforeSig = raiderState.hp;
+      customEngine.executeCompanionSignature('iron_footman_1');
+      expect(raiderState.hp, lessThan(hpBeforeSig));
+      expect(raiderState.stunDuration, greaterThan(0));
+      expect(footmanState.signatureCooldown, equals(3));
+
+      // Ordering again while on cooldown is a safe no-op
+      final hpDuringCd = raiderState.hp;
+      customEngine.executeCompanionSignature('iron_footman_1');
+      expect(raiderState.hp, equals(hpDuringCd));
+
+      // Basic attack from Backline deals real damage and ticks down signatureCooldown
+      customEngine.executeUnitAction(footmanState, actionType: 'basic');
+      expect(raiderState.hp, lessThan(hpDuringCd));
+      expect(footmanState.signatureCooldown, equals(2));
+    });
   });
 }

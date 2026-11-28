@@ -167,14 +167,64 @@ class SpatialCombatEngine extends ChangeNotifier {
   // ==========================================
   // RETINUE PASSIVES & CRYPT WALLET SYSTEM
   // ==========================================
-  bool get isBulwarkOathActive => playerUnits.any((u) => (u.id.contains('footman') || u.templateId.contains('footman') || u.name.toLowerCase().contains('footman')) && u.isAlive);
-  bool get isStalkerKeenEdgeActive => playerUnits.any((u) => (u.id.contains('duelist') || u.templateId.contains('duelist') || u.name.toLowerCase().contains('duelist')) && u.isAlive);
-  bool get isReaverFerocityActive => playerUnits.any((u) => (u.id.contains('reaver') || u.templateId.contains('reaver') || u.name.toLowerCase().contains('reaver')) && u.isAlive);
-  bool get isGraveCarapaceActive => playerUnits.any((u) => (u.id.contains('sentinel') || u.templateId.contains('sentinel') || u.name.toLowerCase().contains('sentinel')) && u.isAlive);
-  bool get isVitaeBondActive => playerUnits.any((u) => (u.id.contains('scribe') || u.templateId.contains('scribe') || u.name.toLowerCase().contains('scribe')) && u.isAlive);
-  bool get isTemporalWeftActive => playerUnits.any((u) => (u.id.contains('chanter') || u.templateId.contains('chanter') || u.name.toLowerCase().contains('chanter')) && u.isAlive);
-  bool get isAuraOfVitalityActive => playerUnits.any((u) => (u.id.contains('medicus') || u.templateId.contains('medicus') || u.name.toLowerCase().contains('medicus')) && u.isAlive);
-  bool get isSiegeResonatorActive => playerUnits.any((u) => (u.id.contains('arbalest') || u.templateId.contains('arbalest') || u.name.toLowerCase().contains('arbalest')) && u.isAlive);
+  bool _matchesLivingCompanion(List<String> keywords) {
+    return playerUnits.any((u) {
+      if (!u.isAlive || u.isAshSculptor) return false;
+      final key = '${u.id.toLowerCase()}_${u.templateId.toLowerCase()}_${u.name.toLowerCase()}';
+      return keywords.any((kw) => key.contains(kw));
+    });
+  }
+
+  bool get isBulwarkOathActive => _matchesLivingCompanion(const ['footman', 'sentinel', 'juggernaut', 'dreadnought', 'valeria']);
+  bool get isStalkerKeenEdgeActive => _matchesLivingCompanion(const ['duelist', 'sanguine_blade', 'flayer']);
+  bool get isReaverFerocityActive => _matchesLivingCompanion(const ['reaver']);
+  bool get isGraveCarapaceActive => _matchesLivingCompanion(const ['sentinel', 'juggernaut', 'dreadnought']);
+  bool get isVitaeBondActive => _matchesLivingCompanion(const ['scribe', 'sorcerer', 'archon', 'blood_initiate', 'cinder_witch']);
+  bool get isTemporalWeftActive => _matchesLivingCompanion(const ['chanter']);
+  bool get isAuraOfVitalityActive => _matchesLivingCompanion(const ['medicus', 'cleric', 'alchemist', 'priestess', 'sun_smith']);
+  bool get isSiegeResonatorActive => _matchesLivingCompanion(const ['arbalest', 'marksman', 'archer']);
+  bool get isBloodhoundFrenzyActive => _matchesLivingCompanion(const ['warhound', 'hound', 'cerberus', 'reaver']);
+
+  double get retinueHealShieldMultiplier => isAuraOfVitalityActive ? 1.20 : 1.0;
+
+  List<String> get activeRetinuePassiveLabels {
+    final labels = <String>[];
+    if (isBulwarkOathActive) labels.add('BULWARK OATH');
+    if (isStalkerKeenEdgeActive) labels.add("STALKER'S EDGE");
+    if (isSiegeResonatorActive) labels.add('SIEGE RESONATOR');
+    if (isAuraOfVitalityActive) labels.add('SANCTIFIED CENSER');
+    if (isBloodhoundFrenzyActive) labels.add('BLOODHOUND FRENZY');
+    if (isVitaeBondActive) labels.add('VITAE CONDUIT');
+    return labels;
+  }
+
+  void _applySanctifiedCenserTurnHeal(CombatUnitState caster) {
+    if (!caster.isPlayer || !isAuraOfVitalityActive) return;
+    final key = '${caster.id.toLowerCase()}_${caster.templateId.toLowerCase()}_${caster.name.toLowerCase()}';
+    final isSupportHealer = key.contains('cleric') ||
+        key.contains('alchemist') ||
+        key.contains('medicus') ||
+        key.contains('priestess') ||
+        key.contains('sun_smith');
+    if (!isSupportHealer) return;
+
+    final allies = playerUnits.where((u) => u.isAlive).toList()
+      ..sort((a, b) => (a.hp / max(1, a.maxHp)).compareTo(b.hp / max(1, b.maxHp)));
+    final lowestAlly = allies.firstOrNull;
+    if (lowestAlly == null) return;
+
+    final int healAmt = max(14, (lowestAlly.maxHp * 0.08 * retinueHealShieldMultiplier).round());
+    final int beforeHp = lowestAlly.hp;
+    lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + healAmt);
+    final int restored = lowestAlly.hp - beforeHp;
+    if (restored > 0) {
+      totalHealingDone += restored;
+      addLog('  ✨ [SANCTIFIED CENSER] ${caster.name} mends ${lowestAlly.name} for +$restored HP (${lowestAlly.hp}/${lowestAlly.maxHp}).');
+    } else {
+      lowestAlly.aegisShield += 12;
+      lowestAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+    }
+  }
 
   void _triggerFontOfRebirth(int cindersSpent) {
     if (!skillTreeState.isFontOfRebirthActive || cindersSpent <= 0) return;
@@ -1332,19 +1382,13 @@ class SpatialCombatEngine extends ChangeNotifier {
       if (sculptor != null) sculptor.crucibleCinders = 100;
     }
 
-    // Apply Active Minion Retinue Passives & Keystone: Slag Fortress
+    // Apply Active Minion Retinue Passives (Bulwark Oath: -15% Squad DMG Taken) & Keystone: Slag Fortress
     final bool hasLivingMinion = playerUnits.any((u) => !u.isAshSculptor && u.isAlive);
     final bool isSlagFortress = skillTreeState.isSlagFortressActive && hasLivingMinion;
+    final double bulwarkMult = isBulwarkOathActive ? 0.85 : 1.0;
+    final double fortressMult = isSlagFortress ? 0.80 : 1.0;
     for (final p in playerUnits.where((u) => u.isAlive)) {
-      if (p.isAshSculptor) {
-        final double bulwarkMult = isBulwarkOathActive ? 0.85 : 1.0;
-        final double fortressMult = isSlagFortress ? 0.80 : 1.0;
-        p.damageReductionMultiplier = bulwarkMult * fortressMult;
-      } else if (isSlagFortress) {
-        p.damageReductionMultiplier = 0.80;
-      } else {
-        p.damageReductionMultiplier = 1.0;
-      }
+      p.damageReductionMultiplier = bulwarkMult * fortressMult;
     }
 
     // Keystone: Molten Overdrive (+15 Cinders & +2,500 AP when enemy is slain)
@@ -1468,6 +1512,12 @@ class SpatialCombatEngine extends ChangeNotifier {
           final bleedDmg = (unit.bleedStacks * 18 * reckoningDamageMultiplier).round();
           unit.takeDamage(bleedDmg, ignoreArmor: true, isPhysical: true);
           addLog('${unit.name} suffers $bleedDmg Bleed damage (${unit.hp}/${unit.maxHp} HP).');
+          if (!unit.isPlayer && isVitaeBondActive) {
+            final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+            if (sculptor != null) {
+              sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 3);
+            }
+          }
           dispatchAction(SpatialActionEvent(
             id: 'bleed_${currentTick}_${unit.id}',
             attackerId: 'status_bleed',
@@ -1926,11 +1976,35 @@ class SpatialCombatEngine extends ChangeNotifier {
       return 0;
     }
     double finalDmg = rawDamage.toDouble();
-    final int? effectiveAttackerRow = attackerRow ?? attacker?.occupiedNodes.firstOrNull?.row;
-    if (isCoveredByVanguard(target, trajectory: trajectory, attackerRow: effectiveAttackerRow)) {
-      finalDmg *= 0.75; // -25% damage from Cover (Rank & Rite Spec Sec 3)
-      addLog('🛡️ VANGUARD COVER: ${target.name} takes -25% damage behind Vanguard line!');
+
+    // Retinue Passive: Bulwark Oath (+25 Squad Armor mitigation vs physical/non-piercing hits)
+    if (target.isPlayer && isBulwarkOathActive && !ignoreArmor) {
+      finalDmg *= (100.0 / 125.0);
     }
+
+    // Retinue Passive: Siege Resonator (+20% Sculptor Skill/Strike DMG & Arbalest Armor Shred)
+    if (attacker != null && attacker.isPlayer && isSiegeResonatorActive) {
+      if (attacker.isAshSculptor) {
+        finalDmg *= 1.20;
+      } else {
+        final aKey = '${attacker.id.toLowerCase()}_${attacker.templateId.toLowerCase()}_${attacker.name.toLowerCase()}';
+        if (aKey.contains('arbalest') || aKey.contains('marksman') || aKey.contains('archer')) {
+          target.armor = max(0, target.armor - 12);
+        }
+      }
+    }
+
+    // Retinue Passive: Bloodhound Frenzy (+25% DMG to foes <50% HP & Warhound applies +1 Bleed)
+    if (attacker != null && attacker.isPlayer && isBloodhoundFrenzyActive) {
+      if (target.maxHp > 0 && (target.hp / target.maxHp) < 0.50) {
+        finalDmg *= 1.25;
+      }
+      final aKey = '${attacker.id.toLowerCase()}_${attacker.templateId.toLowerCase()}_${attacker.name.toLowerCase()}';
+      if (aKey.contains('warhound') || aKey.contains('hound') || aKey.contains('cerberus')) {
+        target.bleedStacks += 1;
+      }
+    }
+
     if (attacker != null && attacker.armorPenetrationBonus > 0 && !ignoreArmor && target.armor > 0) {
       finalDmg *= (1.0 + attacker.armorPenetrationBonus * 0.5);
     }
@@ -1965,8 +2039,11 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
     }
     final applied = target.takeDamage(finalDmg.round(), ignoreArmor: ignoreArmor, isPhysical: isPhysical);
-    if (attacker != null && attacker.isAlive && attacker.lifestealBonus > 0 && applied > 0) {
-      final int lsHeal = max(1, (applied * attacker.lifestealBonus).round());
+    final double effectiveLifesteal = (attacker != null && attacker.isAlive)
+        ? attacker.lifestealBonus + ((attacker.isAshSculptor && isVitaeBondActive) ? 0.18 : 0.0)
+        : 0.0;
+    if (attacker != null && attacker.isAlive && effectiveLifesteal > 0 && applied > 0) {
+      final int lsHeal = max(1, (applied * effectiveLifesteal * retinueHealShieldMultiplier).round());
       attacker.hp = min(attacker.maxHp, attacker.hp + lsHeal);
       if (attacker.isPlayer) totalHealingDone += lsHeal;
     }
@@ -2810,75 +2887,117 @@ class SpatialCombatEngine extends ChangeNotifier {
       }
       pattern = TargetPattern.stAshlarCross;
       addLog('★ SIGNATURE SKILL: ${unit.name} opens $skillName for $dmg DMG and grants +3,000 AP & +35 Aegis to ${lowestApAlly?.name ?? unit.name}!');
-    } else if (key.contains('iron_footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
+    } else if (key.contains('iron_footman') || key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut') || key.contains('dreadnought')) {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
       dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       target.armor = max(0, target.armor - 20);
-      target.currentAp = max(0, target.currentAp - 2000);
-      unit.aegisShield += 40;
+      target.currentAp = max(0, target.currentAp - 2500);
+      target.stunDuration = max(target.stunDuration, 45); // 1.5s Concussive Stun
+      if (target.hasBreakBar && !target.isStaggered) {
+        if (target.damageStagger(35)) {
+          lastBannerMessage = '⚡ ${target.name.toUpperCase()} STAGGERED BY SHIELD BASH!';
+          resetPhaseTimer('Boss Stagger Break');
+        }
+      }
+      final int wardAmt = (40 * (unit.isPlayer ? retinueHealShieldMultiplier : 1.0)).round();
+      unit.aegisShield += wardAmt;
       unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
-      // Bastion's Aegis: also shields the Ash Sculptor!
-      final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
-      if (sculptor != null) {
-        sculptor.aegisShield += 40;
-        sculptor.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      if (unit.isPlayer) {
+        final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sculptor != null) {
+          sculptor.aegisShield += wardAmt;
+          sculptor.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        }
       }
-      addLog('★ SIGNATURE SKILL: ${unit.name} [BASTION\'S AEGIS] slams ${target.name} for $dmg DMG (-20 Armor, -2,000 AP) and shields both himself AND the Ash Sculptor (+40 Aegis)!');
-      lastBannerMessage = '🛡️ BASTION\'S AEGIS: Iron Footman warded the Ash Sculptor (+40 Aegis)!';
+      addLog('★ SIGNATURE SKILL: ${unit.name} [$skillName] stuns ${target.name} for $dmg DMG (1.5s Stun, +35 Stagger) and shields self & Sculptor (+$wardAmt Aegis)!');
+      lastBannerMessage = '🛡️ CONCUSSIVE SHIELD BASH: ${unit.name} stunned ${target.name} & warded the Sculptor!';
     } else if (key.contains('sanguine_blade') || key.contains('duelist') || key.contains('flayer')) {
-      final rawDmg = (unit.effectiveAttack * 1.85).round();
+      final int existingBleed = target.bleedStacks;
+      final int bleedDetonation = existingBleed > 0 ? existingBleed * 22 : 0;
+      if (existingBleed > 0) target.bleedStacks = 0;
+      final rawDmg = (unit.effectiveAttack * 1.85).round() + bleedDetonation;
       dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, isPhysical: true);
-      appliedBleed = 3;
-      target.bleedStacks += appliedBleed;
-      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2500);
-      // Phantom Ambush: channels +12 Cinders directly to the Ash Sculptor!
-      final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
-      if (sculptor != null) {
-        sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 12);
-      }
-      pattern = TargetPattern.reachMidToFront;
-      addLog('★ SIGNATURE SKILL: ${unit.name} [PHANTOM AMBUSH] crits ${target.name} for $dmg DMG (+3 Bleed) and channels +12 Cinders to the Ash Sculptor!');
-      lastBannerMessage = '🗡️ PHANTOM AMBUSH: Grave Duelist channeled +12 Cinders to the Sculptor!';
-    } else if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
-      final rawDmg = (unit.effectiveAttack * 1.55).round();
-      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, ignoreArmor: true, isPhysical: true);
-      target.vulnerableDuration = max(target.vulnerableDuration, 90);
-      pattern = TargetPattern.piercingColumnSkewer;
-      addLog('★ SIGNATURE SKILL: ${unit.name} fires $skillName piercing ${target.name} for $dmg True DMG & Vulnerable (3s)!');
-    } else if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
-      final rawDmg = (unit.effectiveAttack * 1.50).round();
-      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
       appliedBleed = 2;
       target.bleedStacks += appliedBleed;
+      unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2500);
+      if (unit.isPlayer) {
+        final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sculptor != null) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 12);
+        }
+      }
+      pattern = TargetPattern.reachMidToFront;
+      addLog('★ SIGNATURE SKILL: ${unit.name} [$skillName] crits ${target.name} for $dmg DMG (detonated $existingBleed Bleeds) and channels +12 Cinders!');
+      lastBannerMessage = '🗡️ CRIMSON RIPOSTE: ${unit.name} detonated Bleeds & channeled +12 Cinders!';
+    } else if (key.contains('arbalest') || key.contains('marksman') || key.contains('archer')) {
+      final rawDmg = (unit.effectiveAttack * 1.60).round();
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.flanking, ignoreArmor: true, isPhysical: true);
+      target.sunderArmor(0.35);
+      target.vulnerableDuration = max(target.vulnerableDuration, 90);
+      if (target.hasBreakBar && !target.isStaggered) {
+        target.damageStagger(30);
+      }
+      final targetRow = target.occupiedNodes.firstOrNull?.row;
+      if (targetRow != null) {
+        for (final rowFoe in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == targetRow))) {
+          final pierceDmg = applyDamageToTarget(rowFoe, (rawDmg * 0.75).round(), attacker: unit, trajectory: AttackTrajectory.flanking, ignoreArmor: true, isPhysical: true);
+          rowFoe.sunderArmor(0.25);
+          secondaryHits[rowFoe.id] = pierceDmg;
+        }
+      }
+      pattern = TargetPattern.piercingColumnSkewer;
+      addLog('★ SIGNATURE SKILL: ${unit.name} fires $skillName piercing ${target.name} for $dmg DMG (-35% Armor Shred & 3s Vulnerable)!');
+    } else if (key.contains('hound') || key.contains('cerberus') || key.contains('warhound')) {
+      final bool isLowHpExecute = target.maxHp > 0 && (target.hp / target.maxHp) < 0.50;
+      final rawDmg = (unit.effectiveAttack * (isLowHpExecute ? 2.20 : 1.65)).round();
+      dmg = applyDamageToTarget(target, rawDmg, attacker: unit, isPhysical: true);
+      appliedBleed = 3;
+      target.bleedStacks += appliedBleed;
       unit.hasteDuration = max(unit.hasteDuration, 90);
-      addLog('★ SIGNATURE SKILL: ${unit.name} mauls ${target.name} with $skillName for $dmg DMG (+2 Bleed & 3s Haste)!');
+      addLog('★ SIGNATURE SKILL: ${unit.name} executes $skillName on ${target.name} for $dmg DMG (+3 Bleed & 3s Haste)!');
     } else if (key.contains('sun_smith') || key.contains('cleric') || key.contains('medicus') || key.contains('priestess') || key.contains('alchemist')) {
       final rawDmg = (unit.effectiveAttack * 1.30).round();
       dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
-      final allies = friendlySquad.where((u) => u.isAlive).toList()
-        ..sort((a, b) => (a.hp / a.maxHp).compareTo(b.hp / b.maxHp));
-      final lowestAlly = allies.firstOrNull;
-      if (lowestAlly != null) {
-        lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + 40);
-        lowestAlly.aegisShield += 20; lowestAlly.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
-        if (unit.isPlayer) totalHealingDone += 40;
+      final double mult = unit.isPlayer ? retinueHealShieldMultiplier : 1.0;
+      final int healAmt = (45 * mult).round();
+      final int shieldAmt = (30 * mult).round();
+      for (final ally in friendlySquad.where((u) => u.isAlive)) {
+        final int before = ally.hp;
+        ally.hp = min(ally.maxHp, ally.hp + healAmt);
+        ally.aegisShield += shieldAmt;
+        ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+        if (unit.isPlayer) totalHealingDone += (ally.hp - before);
       }
       if (unit.isPlayer && focus < maxFocus) {
         focus = min(maxFocus, focus + 1);
       }
       pattern = TargetPattern.stAshlarCross;
-      addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName for $dmg DMG and restores +40 HP & +20 Aegis to ${lowestAlly?.name ?? unit.name}!');
-    } else if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist')) {
+      addLog('★ SIGNATURE SKILL: ${unit.name} channels $skillName for $dmg Holy DMG, healing squad (+$healAmt HP) & granting +$shieldAmt Aegis Barrier!');
+      lastBannerMessage = '✨ EMBER BENEDICTION: ${unit.name} healed & shielded the squad!';
+    } else if (key.contains('cinder_witch') || key.contains('scribe') || key.contains('sorcerer') || key.contains('archon') || key.contains('occultist') || key.contains('blood_initiate')) {
       final rawDmg = (unit.effectiveAttack * 1.55).round();
       dmg = applyDamageToTarget(target, rawDmg, attacker: unit, trajectory: AttackTrajectory.lobbedMagic, isPhysical: false);
       target.burnDuration = max(target.burnDuration, 60);
-      appliedBleed = 1;
+      appliedBleed = 2;
       target.bleedStacks += appliedBleed;
-      if (unit.isPlayer && focus < maxFocus) {
-        focus = min(maxFocus, focus + 1);
+      final allies = friendlySquad.where((u) => u.isAlive).toList()
+        ..sort((a, b) => (a.hp / max(1, a.maxHp)).compareTo(b.hp / max(1, b.maxHp)));
+      final lowestAlly = allies.firstOrNull;
+      final int siphonHeal = (45 * (unit.isPlayer ? retinueHealShieldMultiplier : 1.0)).round();
+      if (lowestAlly != null) {
+        final int before = lowestAlly.hp;
+        lowestAlly.hp = min(lowestAlly.maxHp, lowestAlly.hp + siphonHeal);
+        if (unit.isPlayer) totalHealingDone += (lowestAlly.hp - before);
+      }
+      if (unit.isPlayer) {
+        final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sculptor != null) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 8);
+        }
+        if (focus < maxFocus) focus = min(maxFocus, focus + 1);
       }
       pattern = TargetPattern.piercingColumnSkewer;
-      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg Arcane DMG (+2s Burn, +1 Focus)!');
+      addLog('★ SIGNATURE SKILL: ${unit.name} unleashes $skillName on ${target.name} for $dmg DMG (+2 Bleed, healed ${lowestAlly?.name ?? unit.name} +$siphonHeal HP, +8 Cinders)!');
     } else {
       final rawDmg = (unit.effectiveAttack * 1.45).round();
       final bool isPhysicalHit = unit.archetype != UnitArchetype.backlineCaster;
@@ -2966,41 +3085,41 @@ class SpatialCombatEngine extends ChangeNotifier {
       unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
       unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
 
-      // Flanking Momentum / Marksman Precision check:
-      // Triggered if unit moved this turn cycle, target has active Bleed, or Marksman shooting from Backline
-      final bool isBacklineMarksman = unit.currentDepth == RowDepth.back;
-      final bool isFlankingBonus = unit.hasStanceBonusReady || target.bleedStacks > 0 || isBacklineMarksman;
-      final int baseDmg = isFlankingBonus ? (unit.effectiveAttack * 1.4).round() : unit.effectiveAttack;
+      // Archetype Precision & Stalker's Edge check (row-independent for player companions!)
+      final bool isMarksman = unit.templateId.contains('arbalest') ||
+          unit.templateId.contains('marksman') ||
+          unit.name.toLowerCase().contains('arbalest') ||
+          unit.name.toLowerCase().contains('marksman');
+      final bool stalkerCritProc = unit.isPlayer && isStalkerKeenEdgeActive && (Random().nextDouble() < 0.15);
+      if (stalkerCritProc) {
+        final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sculptor != null) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
+        }
+      }
+      final bool isPrecisionCrit = target.bleedStacks > 0 || stalkerCritProc;
+      final int baseDmg = isPrecisionCrit ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
       final dmg = applyDamageToTarget(
         target,
         baseDmg,
         attacker: unit,
-        trajectory: isFlankingBonus ? AttackTrajectory.flanking : AttackTrajectory.directPhysical,
+        trajectory: AttackTrajectory.directPhysical,
         isPhysical: true,
       );
 
-      // Skirmishers / Assassins inflict bleed (4 on Flanking crit, 2 on basic hit); Marksmen inflict 1
-      final bool isMarksman = unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest');
-      final int appliedBleed = isMarksman ? (isFlankingBonus ? 2 : 1) : (isFlankingBonus ? 4 : 2);
+      final int appliedBleed = isMarksman ? 1 : (isPrecisionCrit ? 3 : 2);
       target.bleedStacks += appliedBleed;
 
       // Ultimate charge: +15% per basic action
       unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-          if (unit.isPlayer && !unit.isAshSculptor && skillTreeState.isCrucibleSymbiosisActive) {
-            final sc = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
-            if (sc != null) {
-              sc.crucibleCinders = min(100, sc.crucibleCinders + 3);
-              addLog('⚡ [CRUCIBLE SYMBIOSIS] ${unit.name} strike channels +3 Cinders to the Sculptor (-> ${sc.crucibleCinders}/100)!');
-            }
-          }
 
       String skillName;
       if (unit.id == 'sanguine_blade') {
-        skillName = isFlankingBonus ? 'Flanking Evisceration' : 'Flensing Thrust';
-      } else if (unit.templateId == 'iron_arbalest' || unit.name.toLowerCase().contains('arbalest')) {
-        skillName = isBacklineMarksman ? 'Armor-Piercing Bolt' : 'Heavy Crossbow Volley';
+        skillName = isPrecisionCrit ? 'Crimson Evisceration' : 'Flensing Thrust';
+      } else if (isMarksman) {
+        skillName = 'Armor-Piercing Bolt';
       } else if (unit.templateId == 'grave_duelist' || unit.name.toLowerCase().contains('duelist')) {
-        skillName = isFlankingBonus ? 'Riposte Evisceration' : 'Flensing Twin-Thrust';
+        skillName = isPrecisionCrit ? 'Riposte Evisceration' : 'Flensing Twin-Thrust';
         if (target.bleedStacks > appliedBleed) {
           final bonusDmg = (dmg * 0.30).round();
           applyDamageToTarget(target, bonusDmg, attacker: unit, trajectory: AttackTrajectory.flanking, isPhysical: true);
@@ -3008,16 +3127,14 @@ class SpatialCombatEngine extends ChangeNotifier {
           addLog('🗡️ GRAVE DUELIST [FLENSING RIPOSTE] exploits bleeding flesh for +$bonusDmg CRIT DMG & +1,500 AP tempo!');
         }
       } else {
-        skillName = isFlankingBonus ? 'Flanking Strike' : 'Skirmish Thrust';
+        skillName = isPrecisionCrit ? 'Rending Strike' : 'Skirmish Thrust';
       }
 
-      if (isFlankingBonus) {
-        // Refund 3,000 AP (initiating next attack cadence 30% faster)
-        unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 3000);
+      if (isPrecisionCrit) {
+        unit.currentAp = min(SpatialCombatEngine.tickThreshold, unit.currentAp + 2000);
         unit.hasStanceBonusReady = false;
         unit.movedSinceLastTurn = false;
-        addLog('${unit.name} [FLANKING MOMENTUM] crits ${target.name} for $dmg DMG with $skillName! Refunds +3,000 AP!');
-        lastBannerMessage = '⚡ FLANKING MOMENTUM: ${unit.name} dealt $dmg CRIT & refunded 3,000 AP!';
+        addLog('${unit.name} crits ${target.name} for $dmg DMG with $skillName (+$appliedBleed Bleed)!');
       } else {
         addLog('${unit.name} executes $skillName on ${target.name} for $dmg DMG & $appliedBleed BLEED stacks.');
       }
@@ -3041,9 +3158,9 @@ class SpatialCombatEngine extends ChangeNotifier {
         targetName: target.name,
         damage: dmg,
         bleedStacks: appliedBleed,
-        isCrit: isFlankingBonus,
+        isCrit: isPrecisionCrit,
         isPlayerAttacker: unit.isPlayer,
-        pattern: isBacklineMarksman ? TargetPattern.piercingColumnSkewer : TargetPattern.reachMidToFront,
+        pattern: isMarksman ? TargetPattern.piercingColumnSkewer : TargetPattern.reachMidToFront,
         timestampMs: DateTime.now().millisecondsSinceEpoch,
         graftedTraitProc: graftProc,
       ));
@@ -3839,8 +3956,8 @@ class SpatialCombatEngine extends ChangeNotifier {
 
   /// Direct Retinue Command: Order a companion to immediately unleash their unique signature skill
   void executeCompanionSignature(String companionId, {CombatUnitState? explicitTarget}) {
-    final companion = playerUnits.where((u) => u.id == companionId && u.isAlive).firstOrNull;
-    if (companion == null) return;
+    final companion = playerUnits.where((u) => u.id == companionId && u.isAlive && !u.isAshSculptor).firstOrNull;
+    if (companion == null || !companion.isSignatureReady) return;
     final opposingSquad = enemyUnits;
     final target = (explicitTarget != null && explicitTarget.isAlive)
         ? explicitTarget
@@ -3873,324 +3990,158 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
   void _executeVanguardAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
+    if (unit.occupiedNodes.isEmpty) return;
     final col = unit.occupiedNodes.first.column;
     final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
     final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
-    switch (unit.currentDepth) {
-      case RowDepth.front:
-        // [ FRONT ROW ] ───► BRAWL STANCE (Default)
-        // Stance Mastery: "Hold the Line" (Steadfast Anchor)
-        // If unmoving for 2 consecutive cycles on Frontline:
-        // -> Gains +30% Armor (PRR) & Stagger Immunity
-        // -> Next strike becomes Earth-Shattering Bash (cleaves laterally across Row 0, resets 1,500 AP on targets)
-        if (unit.movedSinceLastTurn) {
-          unit.consecutiveTurnsStationary = 0;
-          unit.hasStanceBonusReady = false;
-          unit.movedSinceLastTurn = false;
-        } else {
-          unit.consecutiveTurnsStationary++;
-          if (unit.consecutiveTurnsStationary >= 2) {
-            unit.hasStanceBonusReady = true;
-          }
-        }
 
-        final bool hasHoldTheLineBonus = unit.hasStanceBonusReady;
-        final target = validExplicit ??
-            _resolveColumnTarget(unitCol: validExplicit?.occupiedNodes.firstOrNull?.column ?? col, targetingPlayers: !unit.isPlayer) ??
-            opposingSquad.where((u) => u.isAlive).firstOrNull;
-        if (target != null) {
-          final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
-          if (shouldSignature && !hasHoldTheLineBonus) {
-            _executeSignatureSkill(unit, target);
-            break;
-          }
-          unit.actionCycleCount++;
-          unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
-          unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
+    // Player companions keep 100% of their Vanguard kit on every row (no Midline 60% or Backline 0-DMG nerfs)
+    final target = validExplicit ??
+        _resolveColumnTarget(unitCol: validExplicit?.occupiedNodes.firstOrNull?.column ?? col, targetingPlayers: !unit.isPlayer) ??
+        opposingSquad.where((u) => u.isAlive).firstOrNull;
+    if (target == null) return;
 
-          final int baseDmg = hasHoldTheLineBonus ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
-          final dmg = applyDamageToTarget(target, baseDmg, attacker: unit, isPhysical: true);
-          final skillName = hasHoldTheLineBonus
-              ? (unit.id == 'lady_valeria' ? 'Solar Sunder Cleave' : 'Earth-Shattering Bash')
-              : (unit.id == 'lady_valeria' ? 'Sunbrand Slash' : (unit.id == 'iron_footman' ? 'Shield Bash' : 'Vanguard Sunder'));
-
-          final Map<String, int> lateralHits = {};
-
-          if (hasHoldTheLineBonus) {
-            // Earth-Shattering Bash cleaves laterally and resets 1,500 AP on targets hit
-            target.currentAp = max(0, target.currentAp - 1500);
-
-            // Lateral cleave across adjacent enemies in Row 0
-            final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
-            for (final neighbor in opposingSquad.where((u) => u.isAlive && u.id != target.id && u.occupiedNodes.any((n) => n.row == 0 && (n.column - col).abs() <= 1))) {
-              final cleaveDmg = applyDamageToTarget(neighbor, (baseDmg * 0.60).round(), attacker: unit, isPhysical: true);
-              neighbor.currentAp = max(0, neighbor.currentAp - 1500);
-              lateralHits[neighbor.id] = cleaveDmg;
-              addLog('  Lateral Cleave: ${neighbor.name} struck for $cleaveDmg DMG (-1,500 AP reset)!');
-            }
-
-            unit.hasStanceBonusReady = false; // Consumed
-            addLog('${unit.name} [HOLD THE LINE] unleashes $skillName for $dmg DMG, resetting 1,500 AP!');
-            lastBannerMessage = '🛡️ HOLD THE LINE: ${unit.name} unleashed $skillName cleaving frontline!';
-          } else if (unit.id == 'iron_footman' || unit.templateId == 'iron_footman') {
-            target.armor = max(0, target.armor - 12);
-            unit.aegisShield += 15;
-            unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
-            addLog('🛡️ ${unit.name} [SHIELDBASH CLEAVE] strikes ${target.name} for $dmg DMG (-12 Armor Shred, +15 Aegis Barrier to self)!');
-          } else {
-            addLog('${unit.name} [BRAWL STANCE] strikes ${target.name} for $dmg DMG (100% Impact).');
-          }
-
-          // Basic attack grants +15% Ultimate gauge
-          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-          final graftProc = _applyGraftedTraitProc(unit, target, dmg);
-          _applyStatusSynergies(
-            unit,
-            target,
-            dmg,
-            isPhysical: true,
-            isHolyOrMagic: unit.id == 'lady_valeria' || hasHoldTheLineBonus,
-          );
-
-          dispatchAction(SpatialActionEvent(
-            id: 'act_${currentTick}_${unit.id}',
-            attackerId: unit.id,
-            attackerName: unit.name,
-            skillName: skillName,
-            targetId: target.id,
-            targetName: target.name,
-            damage: dmg,
-            isCrit: hasHoldTheLineBonus,
-            isPlayerAttacker: unit.isPlayer,
-            pattern: hasHoldTheLineBonus ? TargetPattern.horizontalRowScythe : TargetPattern.singleTarget,
-            secondaryTargetHits: lateralHits,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-            graftedTraitProc: graftProc,
-          ));
-        }
-        break;
-
-      case RowDepth.mid:
-        // [ MID ROW ] ───► ADVANCING / RECOVERY STRIDE
-        // Reset Hold the Line stationary counter
-        unit.consecutiveTurnsStationary = 0;
-        unit.hasStanceBonusReady = false;
-
-        // Shockwave / Tremor Slam: 60% Dmg + minor stagger / 15 armor chip down column.
-        // If front tile in column is empty, unit automatically steps forward to reclaim the Frontline!
-        final target = validExplicit ??
-            _resolveColumnTarget(unitCol: validExplicit?.occupiedNodes.firstOrNull?.column ?? col, targetingPlayers: !unit.isPlayer) ??
-            opposingSquad.where((u) => u.isAlive).firstOrNull;
-        final shockwaveDmg = (unit.attack * 0.60).round();
-        if (target != null) {
-          final dmg = applyDamageToTarget(target, shockwaveDmg, attacker: unit, isPhysical: true);
-          // Apply 15 armor chip / stagger
-          target.armor = max(0, target.armor - 15);
-          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-          addLog('${unit.name} [ADVANCING STRIDE] slams ground with Shockwave Tremor for $dmg DMG (60%) & chips 15 Armor from ${target.name}!');
-          dispatchAction(SpatialActionEvent(
-            id: 'act_${currentTick}_${unit.id}',
-            attackerId: unit.id,
-            attackerName: unit.name,
-            skillName: 'Shockwave Tremor',
-            targetId: target.id,
-            targetName: target.name,
-            damage: dmg,
-            isPlayerAttacker: unit.isPlayer,
-            pattern: TargetPattern.piercingColumnSkewer,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-          ));
-        }
-
-        // Automated Advancing Step: Reclaim Frontline (row 0) if vacant
-        final squad = unit.isPlayer ? playerUnits : enemyUnits;
-        final isFrontOccupied = squad.any((u) => u.isAlive && u.occupies(col, 0));
-        if (!isFrontOccupied) {
-          unit.occupiedNodes.clear();
-          unit.occupiedNodes.add(GridNode(column: col, row: 0, occupantUnitId: unit.id));
-          addLog('${unit.name} advances stride forward into the Frontline (Col ${col + 1}, Row 0)!');
-          lastBannerMessage = '⚔️ RECLAIMED FRONTLINE: ${unit.name} stepped up to Row 0!';
-        }
-        break;
-
-      case RowDepth.back:
-        // [ BACK ROW ] ───► OUT OF FORMATION (Braced Bulwark)
-        unit.consecutiveTurnsStationary = 0;
-        unit.hasStanceBonusReady = false;
-
-        // 0 kinetic damage dealt to enemy.
-        // Slams shield into ground: grants temporary +25 Armor & +30 Aegis Shield to allied units
-        // ahead of it in that column (Row 0 & 1).
-        // Fills +20% Ultimate gauge.
-        final squad = unit.isPlayer ? playerUnits : enemyUnits;
-        final alliesAhead = squad.where((u) => u.isAlive && u.id != unit.id && u.occupiedNodes.any((n) => n.column == col && n.row < 2)).toList();
-        for (final ally in alliesAhead) {
-          ally.armor = min(ally.maxArmor + 35, ally.armor + 25);
-          ally.aegisShield += 30; ally.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
-          addLog('${unit.name} [BRACED BULWARK] shields ${ally.name} ahead (+25 Armor, +30 Aegis)!');
-        }
-        unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
-        addLog('${unit.name} [BRACED BULWARK] braces defense! (+20% Ultimate: ${unit.ultimateGauge}%)');
-        lastBannerMessage = '🛡️ BRACED BULWARK: ${unit.name} granted +25 Armor & +30 Aegis to column allies!';
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Braced Bulwark',
-          targetId: alliesAhead.isNotEmpty ? alliesAhead.first.id : unit.id,
-          targetName: alliesAhead.isNotEmpty ? alliesAhead.first.name : unit.name,
-          damage: 0,
-          isPlayerAttacker: unit.isPlayer,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-        break;
+    final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
+    if (shouldSignature) {
+      _executeSignatureSkill(unit, target);
+      return;
     }
+
+    unit.actionCycleCount++;
+    unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+    unit.ultimateCooldown = max(0, unit.ultimateCooldown - 1);
+
+    final bool stalkerCrit = unit.isPlayer && isStalkerKeenEdgeActive && (Random().nextDouble() < 0.15);
+    if (stalkerCrit) {
+      final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+      if (sculptor != null) {
+        sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
+      }
+    }
+    final int baseDmg = stalkerCrit ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
+    final dmg = applyDamageToTarget(target, baseDmg, attacker: unit, isPhysical: true);
+    final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}_${unit.name.toLowerCase()}';
+    final bool isFootmanOrSentinel = key.contains('footman') || key.contains('sentinel') || key.contains('juggernaut');
+    final bool isWarhound = key.contains('warhound') || key.contains('hound') || key.contains('cerberus');
+    final String skillName = unit.id == 'lady_valeria'
+        ? 'Sunbrand Slash'
+        : (isFootmanOrSentinel
+            ? 'Shield Bash'
+            : (isWarhound ? 'Rending Bite' : 'Vanguard Strike'));
+
+    if (isFootmanOrSentinel) {
+      target.armor = max(0, target.armor - 12);
+      final int ward = (15 * (unit.isPlayer ? retinueHealShieldMultiplier : 1.0)).round();
+      unit.aegisShield += ward;
+      unit.shieldAppliedMs = DateTime.now().millisecondsSinceEpoch;
+      addLog('🛡️ ${unit.name} [$skillName] strikes ${target.name} for $dmg DMG (-12 Armor Shred, +$ward Aegis Barrier)!');
+    } else if (isWarhound) {
+      target.bleedStacks += 1;
+      addLog('🐺 ${unit.name} [$skillName] savages ${target.name} for $dmg DMG (+1 Bleed)!');
+    } else {
+      addLog('${unit.name} strikes ${target.name} for $dmg DMG.');
+    }
+
+    unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+    if (unit.isPlayer && !unit.isAshSculptor && skillTreeState.isCrucibleSymbiosisActive) {
+      final sc = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+      if (sc != null) {
+        sc.crucibleCinders = min(100, sc.crucibleCinders + 3);
+      }
+    }
+    final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+    _applyStatusSynergies(
+      unit,
+      target,
+      dmg,
+      isPhysical: true,
+      isHolyOrMagic: unit.id == 'lady_valeria',
+    );
+
+    dispatchAction(SpatialActionEvent(
+      id: 'act_${currentTick}_${unit.id}',
+      attackerId: unit.id,
+      attackerName: unit.name,
+      skillName: skillName,
+      targetId: target.id,
+      targetName: target.name,
+      damage: dmg,
+      isCrit: stalkerCrit,
+      isPlayerAttacker: unit.isPlayer,
+      pattern: TargetPattern.singleTarget,
+      timestampMs: DateTime.now().millisecondsSinceEpoch,
+      graftedTraitProc: graftProc,
+    ));
   }
 
-  /// Adaptive Posture System: Resolves action for Backline Casters
+  /// Resolves action for Support & Arcane Casters (full kit on every row, plus Sanctified Censer turn heal)
   void _executeCasterAction(CombatUnitState unit, {CombatUnitState? explicitTarget, String actionType = 'auto'}) {
-    if (unit.id == 'blood_scribe') _channelRetinueCinders(unit);
+    if (unit.occupiedNodes.isEmpty) return;
+    if (unit.id.contains('scribe') || unit.templateId.contains('scribe')) {
+      _channelRetinueCinders(unit);
+    }
+    _applySanctifiedCenserTurnHeal(unit);
+
     final validExplicit = (explicitTarget != null && explicitTarget.isAlive) ? explicitTarget : null;
-    if (unit.currentDepth == RowDepth.front) {
-      // Point-Blank Vulnerability:
-      // Basic spell becomes Panic Discharge: radial blast with high knockback pushing enemy Vanguard back
-      final enemySquad = unit.isPlayer ? enemyUnits : playerUnits;
-      final frontEnemies = enemySquad.where((u) => u.isAlive && u.occupies(unit.occupiedNodes.first.column, 0)).toList();
-      final target = validExplicit ?? frontEnemies.firstOrNull ?? _resolveColumnTarget(unitCol: unit.occupiedNodes.first.column, targetingPlayers: !unit.isPlayer);
-      if (target != null) {
-        final rawDmg = (unit.effectiveAttack * 1.1).round();
-        final dmg = applyDamageToTarget(
-          target,
-          rawDmg,
-          attacker: unit,
-          trajectory: AttackTrajectory.lobbedMagic,
-          isPhysical: false,
-        );
-        unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-        // Rank & Rite Spec Sec 4: Apply 1-row Knockback with Kinetic Splat
-        applyKnockback(target, 1, baseImpactDamage: dmg);
-        addLog('${unit.name} [PANIC DISCHARGE] point-blank detonation blasts ${target.name} for $dmg DMG!');
-        lastBannerMessage = '💥 PANIC DISCHARGE: ${unit.name} blasted enemy away!';
-        dispatchAction(SpatialActionEvent(
-          id: 'act_${currentTick}_${unit.id}',
-          attackerId: unit.id,
-          attackerName: unit.name,
-          skillName: 'Panic Discharge',
-          targetId: target.id,
-          targetName: target.name,
-          damage: dmg,
-          isPlayerAttacker: unit.isPlayer,
-          pattern: TargetPattern.singleTarget,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ));
-      }
-    } else {
-      // Midline / Backline
-      // Stance Mastery: "Aetheric Alignment" (Spell Weave)
-      // When casting from Backline (Row 2):
-      // -> Strike pierces straight down column (Row 0, 1, 2)
-      // -> Generates +1 Global Focus for Gauntlet reservoir
-      final bool isAethericBonus = unit.currentDepth == RowDepth.back;
-      final explicitCol = validExplicit?.occupiedNodes.firstOrNull?.column;
-      final targetCol = explicitCol ?? unit.occupiedNodes.first.column;
-      final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
-      final primaryColumnTarget = validExplicit ??
-          _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
-          opposingSquad.where((u) => u.isAlive).firstOrNull;
+    final explicitCol = validExplicit?.occupiedNodes.firstOrNull?.column;
+    final targetCol = explicitCol ?? unit.occupiedNodes.first.column;
+    final opposingSquad = unit.isPlayer ? enemyUnits : playerUnits;
+    final primaryColumnTarget = validExplicit ??
+        _resolveColumnTarget(unitCol: targetCol, targetingPlayers: !unit.isPlayer) ??
+        opposingSquad.where((u) => u.isAlive).firstOrNull;
 
-      final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
-      if (shouldSignature && primaryColumnTarget != null) {
-        _executeSignatureSkill(unit, primaryColumnTarget);
-        return;
-      }
+    final bool shouldSignature = actionType == 'signature' || (actionType == 'auto' && unit.isSignatureReady);
+    if (shouldSignature && primaryColumnTarget != null) {
+      _executeSignatureSkill(unit, primaryColumnTarget);
+      return;
+    }
 
-      unit.actionCycleCount++;
-      unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
+    unit.actionCycleCount++;
+    unit.signatureCooldown = max(0, unit.signatureCooldown - 1);
 
-      if (isAethericBonus) {
-        // Piercing strike hitting entire column
-        int hitCount = 0;
-        int primaryDmg = 0;
-        CombatUnitState? primaryTarget;
-        final Map<String, int> pierceHits = {};
-
-        for (int r = 0; r <= 2; r++) {
-          final occupant = opposingSquad.where((u) => u.isAlive && u.occupies(targetCol, r)).firstOrNull;
-          if (occupant != null) {
-            final dmg = applyDamageToTarget(
-              occupant,
-              unit.effectiveAttack,
-              attacker: unit,
-              trajectory: AttackTrajectory.lobbedMagic,
-              isPhysical: false,
-            );
-            hitCount++;
-            if (primaryTarget == null) {
-              primaryTarget = occupant;
-              primaryDmg = dmg;
-            } else {
-              pierceHits[occupant.id] = dmg;
-            }
-            addLog('${unit.name} [AETHERIC ALIGNMENT] beam pierces ${occupant.name} for $dmg DMG (Hit #$hitCount)!');
-          }
-        }
-
-        // Generate +1 Global Focus
-        if (unit.isPlayer && focus < maxFocus) {
-          focus = min(maxFocus, focus + 1);
-          addLog('${unit.name} [AETHERIC ALIGNMENT] weaves aetheric resonance: +1 Global Focus (Pool: $focus)!');
-        }
-
-        unit.ultimateGauge = min(100, unit.ultimateGauge + 20);
-        lastBannerMessage = '✨ AETHERIC ALIGNMENT: ${unit.name} column beam pierced enemies & granted +1 Focus!';
-
-        if (primaryTarget != null) {
-          final graftProc = _applyGraftedTraitProc(unit, primaryTarget, primaryDmg);
-          _applyStatusSynergies(unit, primaryTarget, primaryDmg, isPhysical: false, isHolyOrMagic: true);
-          dispatchAction(SpatialActionEvent(
-            id: 'act_${currentTick}_${unit.id}',
-            attackerId: unit.id,
-            attackerName: unit.name,
-            skillName: 'Aetheric Piercing Beam',
-            targetId: primaryTarget.id,
-            targetName: primaryTarget.name,
-            damage: primaryDmg,
-            secondaryTargetHits: pierceHits,
-            isPlayerAttacker: unit.isPlayer,
-            pattern: TargetPattern.piercingColumnSkewer,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-            graftedTraitProc: graftProc,
-          ));
-        }
-      } else {
-        final target = validExplicit ?? opposingSquad.where((u) => u.isAlive).firstOrNull;
-        if (target != null) {
-          final dmg = applyDamageToTarget(
-            target,
-            unit.attack,
-            attacker: unit,
-            trajectory: AttackTrajectory.lobbedMagic,
-            isPhysical: false,
-          );
-          unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
-          addLog('${unit.name} fires Sun-Bolts at ${target.name} for $dmg DMG.');
-          final graftProc = _applyGraftedTraitProc(unit, target, dmg);
-          dispatchAction(SpatialActionEvent(
-            id: 'act_${currentTick}_${unit.id}',
-            attackerId: unit.id,
-            attackerName: unit.name,
-            skillName: 'Sun-Bolt Volley',
-            targetId: target.id,
-            targetName: target.name,
-            damage: dmg,
-            isPlayerAttacker: unit.isPlayer,
-            pattern: TargetPattern.singleTarget,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-            graftedTraitProc: graftProc,
-          ));
+    final target = primaryColumnTarget;
+    if (target != null) {
+      final bool stalkerCrit = unit.isPlayer && isStalkerKeenEdgeActive && (Random().nextDouble() < 0.15);
+      if (stalkerCrit) {
+        final sculptor = playerUnits.where((u) => u.isAshSculptor && u.isAlive).firstOrNull;
+        if (sculptor != null) {
+          sculptor.crucibleCinders = min(100, sculptor.crucibleCinders + 4);
         }
       }
+      final int rawDmg = stalkerCrit ? (unit.effectiveAttack * 1.35).round() : unit.effectiveAttack;
+      final dmg = applyDamageToTarget(
+        target,
+        rawDmg,
+        attacker: unit,
+        trajectory: AttackTrajectory.lobbedMagic,
+        isPhysical: false,
+      );
+      unit.ultimateGauge = min(100, unit.ultimateGauge + 15);
+      if (unit.isPlayer && focus < maxFocus) {
+        focus = min(maxFocus, focus + 1);
+      }
+      final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}_${unit.name.toLowerCase()}';
+      final String spellName = (key.contains('cleric') || key.contains('sun_smith') || key.contains('medicus'))
+          ? 'Radiant Sear'
+          : 'Sanguine Bolt';
+      addLog('${unit.name} casts $spellName on ${target.name} for $dmg DMG.');
+      final graftProc = _applyGraftedTraitProc(unit, target, dmg);
+      _applyStatusSynergies(unit, target, dmg, isPhysical: false, isHolyOrMagic: true);
+      dispatchAction(SpatialActionEvent(
+        id: 'act_${currentTick}_${unit.id}',
+        attackerId: unit.id,
+        attackerName: unit.name,
+        skillName: spellName,
+        targetId: target.id,
+        targetName: target.name,
+        damage: dmg,
+        isCrit: stalkerCrit,
+        isPlayerAttacker: unit.isPlayer,
+        pattern: TargetPattern.singleTarget,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+        isHolyOrMagic: true,
+        graftedTraitProc: graftProc,
+      ));
     }
   }
 
