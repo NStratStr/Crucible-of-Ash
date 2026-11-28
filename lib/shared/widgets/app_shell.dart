@@ -2853,7 +2853,7 @@ class _AppShellState extends State<AppShell> {
         bottom: !hideBottomBar,
         child: Column(
           children: [
-            if (_currentIndex != 1)
+            if (_currentIndex != 1 && MediaQuery.of(context).size.height >= 480)
               FtueGuidanceBanner(
                 ftueService: _ftueService,
                 onLaunchStageAction: _handleLaunchFtueStageAction,

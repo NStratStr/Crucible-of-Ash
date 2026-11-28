@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/features/campaign/safe_teleport_modal.dart';
+import 'package:ashen_crucible/shared/widgets/app_shell.dart';
 import 'package:ashen_crucible/main.dart';
 
 void main() {
@@ -124,5 +125,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('STAGE 1-1'), findsOneWidget);
+  });
+
+  testWidgets('Phone held in portrait (393x852) automatically loads and locks UI in landscape (852x393)', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(RotatedBox), findsWidgets);
+    final shellContext = tester.element(find.byType(AppShell));
+    final mqSize = MediaQuery.of(shellContext).size;
+    expect(mqSize.width, equals(852));
+    expect(mqSize.height, equals(393));
   });
 }

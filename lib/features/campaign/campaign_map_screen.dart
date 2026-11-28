@@ -337,6 +337,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
+        toolbarHeight: MediaQuery.of(context).size.height < 520 ? 40 : kToolbarHeight,
         backgroundColor: const Color(0xFF12121A),
         elevation: 0,
         shape: const Border(
@@ -628,7 +629,9 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
       body: Column(
         children: [
           if (widget.activeBoons.isNotEmpty) _buildActiveBoonsBanner(),
-          if (widget.onLaunchGorgorothBoss != null || widget.onLaunchMvpSkirmish != null) _buildMvpSkirmishBanner(),
+          if ((widget.onLaunchGorgorothBoss != null || widget.onLaunchMvpSkirmish != null) &&
+              MediaQuery.of(context).size.height >= 520)
+            _buildMvpSkirmishBanner(),
           Expanded(
             child: _viewMode == CampaignViewMode.linearLadder
                 ? _buildLinearCampaignView(context, theme)
@@ -768,25 +771,29 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
             children: [
               // Header ribbon
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: MediaQuery.of(context).size.height < 520 ? 4 : 8,
+                ),
                 color: Colors.black45,
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
+                    Flexible(
+                      flex: 2,
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.linear_scale, color: Color(0xFFE5A93C), size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
+                          const SizedBox(width: 6),
+                          Flexible(
                             child: Text(
                               'CAMPAIGN STORY TRACK: ${CampaignMapScreen.chapterTitle(widget.currentChapter)}',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Color(0xFFFFD54F),
-                                fontSize: 11,
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
+                                letterSpacing: 0.8,
                               ),
                             ),
                           ),
@@ -794,106 +801,116 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left, color: Color(0xFFFFD54F), size: 18),
-                          tooltip: 'Scroll Stages Left',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
-                          onPressed: () => _scrollStagesBy(-488),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right, color: Color(0xFFFFD54F), size: 18),
-                          tooltip: 'Scroll to Next Stages',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
-                          onPressed: () => _scrollStagesBy(488),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$_completedLinearStages/${stages.length} CLEARED',
-                          style: const TextStyle(
-                            color: Color(0xFF81C784),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        if (widget.onOpenSculptorStatus != null) ...[
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Ash Sculptor Stats, Skills & Equipped Relics',
-                            child: ElevatedButton.icon(
-                              onPressed: widget.onOpenSculptorStatus,
-                              icon: const Icon(Icons.shield_moon, size: 13),
-                              label: const Text('SCULPTOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2B1B12),
-                                foregroundColor: const Color(0xFFFFB74D),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                side: const BorderSide(color: Color(0xFFFFB74D), width: 1.0),
+                    Expanded(
+                      flex: 3,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left, color: Color(0xFFFFD54F), size: 18),
+                                tooltip: 'Scroll Stages Left',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
+                                onPressed: () => _scrollStagesBy(-488),
                               ),
-                            ),
-                          ),
-                        ],
-                        if (widget.onOpenSummoning != null) ...[
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Hospice Summoning Gates — Recruit Companions',
-                            child: ElevatedButton.icon(
-                              onPressed: widget.onOpenSummoning,
-                              icon: const Icon(Icons.auto_awesome, size: 13),
-                              label: const Text('SUMMON', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E1418),
-                                foregroundColor: const Color(0xFFFF8A80),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                side: const BorderSide(color: Color(0xFFE53935), width: 1.0),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right, color: Color(0xFFFFD54F), size: 18),
+                                tooltip: 'Scroll to Next Stages',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
+                                onPressed: () => _scrollStagesBy(488),
                               ),
-                            ),
-                          ),
-                        ],
-                        if (widget.onOpenCatacombDelves != null) ...[
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Ashen Tower: 5-Floor Roguelike Climb',
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.explore, size: 14),
-                              label: const Text('ASHEN TOWER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0F1A24),
-                                foregroundColor: const Color(0xFF00E5FF),
-                                side: const BorderSide(color: Color(0xFF00E5FF), width: 1.0),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              const SizedBox(width: 6),
+                              Text(
+                                '$_completedLinearStages/${stages.length} CLEARED',
+                                style: const TextStyle(
+                                  color: Color(0xFF81C784),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                ),
                               ),
-                              onPressed: widget.onOpenCatacombDelves,
-                            ),
+                              if (widget.onOpenSculptorStatus != null) ...[
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Ash Sculptor Stats, Skills & Equipped Relics',
+                                  child: ElevatedButton.icon(
+                                    onPressed: widget.onOpenSculptorStatus,
+                                    icon: const Icon(Icons.shield_moon, size: 13),
+                                    label: const Text('SCULPTOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2B1B12),
+                                      foregroundColor: const Color(0xFFFFB74D),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      side: const BorderSide(color: Color(0xFFFFB74D), width: 1.0),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (widget.onOpenSummoning != null) ...[
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Hospice Summoning Gates — Recruit Companions',
+                                  child: ElevatedButton.icon(
+                                    onPressed: widget.onOpenSummoning,
+                                    icon: const Icon(Icons.auto_awesome, size: 13),
+                                    label: const Text('SUMMON', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2E1418),
+                                      foregroundColor: const Color(0xFFFF8A80),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      side: const BorderSide(color: Color(0xFFE53935), width: 1.0),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (widget.onOpenCatacombDelves != null) ...[
+                                const SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Ashen Tower: 5-Floor Roguelike Climb',
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.explore, size: 14),
+                                    label: const Text('ASHEN TOWER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0F1A24),
+                                      foregroundColor: const Color(0xFF00E5FF),
+                                      side: const BorderSide(color: Color(0xFF00E5FF), width: 1.0),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    onPressed: widget.onOpenCatacombDelves,
+                                  ),
+                                ),
+                              ],
+                              if (widget.onOpenEndgameGauntlet != null) ...[
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.workspace_premium, size: 14),
+                                  label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1E1E28),
+                                    foregroundColor: const Color(0xFFE5A93C),
+                                    side: const BorderSide(color: Color(0xFFE5A93C), width: 1.0),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: widget.onOpenEndgameGauntlet,
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                        if (widget.onOpenEndgameGauntlet != null) ...[
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.workspace_premium, size: 14),
-                            label: const Text('ENDGAME GAUNTLET', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1E1E28),
-                              foregroundColor: const Color(0xFFE5A93C),
-                              side: const BorderSide(color: Color(0xFFE5A93C), width: 1.0),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: widget.onOpenEndgameGauntlet,
-                          ),
-                        ],
-                      ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -910,7 +927,10 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                   child: ListView.separated(
                     controller: _linearStagesScrollController,
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: MediaQuery.of(context).size.height < 520 ? 6 : 16,
+                    ),
                     itemCount: stages.length,
                   separatorBuilder: (_, __) => Center(
                     child: Container(
@@ -979,31 +999,35 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(11),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Stage Thumbnail Header
-            Stack(
+        child: LayoutBuilder(
+          builder: (context, cardConstraints) {
+            final bool isCompactCard = cardConstraints.maxHeight < 195;
+            final double thumbHeight = isCompactCard ? 58.0 : 85.0;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: 85,
-                  width: double.infinity,
-                  child: Image.asset(
-                    stage.thumbnailAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E1E28)),
-                  ),
-                ),
-                Container(
-                  height: 85,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xE614141E)],
+                // Stage Thumbnail Header
+                Stack(
+                  children: [
+                    SizedBox(
+                      height: thumbHeight,
+                      width: double.infinity,
+                      child: Image.asset(
+                        stage.thumbnailAsset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1E1E28)),
+                      ),
                     ),
-                  ),
-                ),
+                    Container(
+                      height: thumbHeight,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0xE614141E)],
+                        ),
+                      ),
+                    ),
                 // Stage Code Badge (e.g. 1-1)
                 Positioned(
                   top: 8,
@@ -1189,6 +1213,8 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               ),
             ),
           ],
+        );
+        },
         ),
       ),
     );

@@ -49,6 +49,20 @@
     }
   </style>
   <script>
+    // Clear any stale Flutter service workers & caches so mobile Safari / Home Screen PWAs immediately load the latest landscape build
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].unregister();
+        }
+      });
+    }
+
+    // Attempt Web Screen Orientation lock when supported (Android PWA / Fullscreen browsers)
+    if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+      window.screen.orientation.lock('landscape').catch(function() {});
+    }
+
     // Fullscreen Toggle Helper callable from Flutter web (returns true if native/DOM fullscreen API is available)
     window.toggleBrowserFullscreen = function() {
       var isStandalone = (window.navigator.standalone === true) ||
