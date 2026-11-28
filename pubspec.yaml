@@ -107,6 +107,7 @@ flutter:
     - assets/audio/sfx_victory.wav
     - assets/animations/
     - assets/animations/vfx/
+    - assets/animations/units/
     - assets/images/backgrounds/
 
   # An image asset can refer to one or more resolution-specific "variants", see

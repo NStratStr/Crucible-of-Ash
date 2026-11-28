@@ -115,6 +115,23 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation> with Single
     if (widget.duration != oldWidget.duration) {
       _controller.duration = widget.duration;
     }
+    if (widget.assetPath != oldWidget.assetPath) {
+      _controller.stop();
+      _controller.reset();
+      final cached = _globalImageCache[widget.assetPath];
+      if (cached != null) {
+        _image = cached;
+        _isLoading = false;
+        _startPlayback();
+      } else {
+        _isLoading = true;
+        _loadSpriteSheet();
+      }
+    } else if (widget.loop != oldWidget.loop) {
+      _controller.stop();
+      _controller.reset();
+      _startPlayback();
+    }
   }
 
   @override

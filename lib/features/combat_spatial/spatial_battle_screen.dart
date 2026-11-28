@@ -258,6 +258,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   int _activeAttackSequenceId = 0;
   String? _attackingUnitId;
   String? _attackingSkillName;
+  bool _attackingIsSignatureSkill = false;
   final Map<String, String> _activeImpactSlashUnits = {};
   final Map<String, int> _visualUnitHp = {};
   final Map<String, int> _lastCommittedUnitHp = {};
@@ -399,6 +400,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       _visualUnitHp[u.id] = u.hp;
       _lastCommittedUnitHp[u.id] = u.hp;
     }
+    _precacheActiveUnitSheets();
     _engine.addListener(_onEngineUpdate);
     _startLoop();
     _initAudio();
@@ -670,6 +672,114 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     final double screenX = originX + (col - gRow) * (tileWidth * 0.5) + (tileWidth * 0.5);
     final double screenY = originY + (col + gRow) * (tileHeight * 0.5) + (tileHeight * 0.35);
     return Offset(screenX, screenY);
+  }
+
+  void _precacheActiveUnitSheets() {
+    for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
+      final animSet = _resolveUnitAnimSet(u);
+      if (animSet != null) {
+        SpriteSheetAnimation.precache(animSet.idleSheet);
+        SpriteSheetAnimation.precache(animSet.attackSheet);
+        SpriteSheetAnimation.precache(animSet.skillSheet);
+      }
+    }
+  }
+
+  _UnitAnimSet? _resolveUnitAnimSet(CombatUnitState unit) {
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor') return null;
+    final key = '${unit.id.toLowerCase()}_${unit.templateId.toLowerCase()}_${unit.assetPath.toLowerCase()}';
+    if (key.contains('gorgoroth') || key.contains('chapter_titan')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/gorgoroth_idle_sheet.png',
+        attackSheet: 'assets/animations/units/gorgoroth_attack_sheet.png',
+        skillSheet: 'assets/animations/units/gorgoroth_skill_sheet.png',
+      );
+    }
+    if (key.contains('ashen_huskarl') || key.contains('huskarl') || key.contains('rotting_husk')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/ashen_huskarl_idle_sheet.png',
+        attackSheet: 'assets/animations/units/ashen_huskarl_attack_sheet.png',
+        skillSheet: 'assets/animations/units/ashen_huskarl_skill_sheet.png',
+      );
+    }
+    if (key.contains('ashfire_skirmisher') || key.contains('pyre_zealot')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/ashfire_skirmisher_idle_sheet.png',
+        attackSheet: 'assets/animations/units/ashfire_skirmisher_attack_sheet.png',
+        skillSheet: 'assets/animations/units/ashfire_skirmisher_skill_sheet.png',
+      );
+    }
+    if (key.contains('pyre_sentry')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/pyre_sentry_idle_sheet.png',
+        attackSheet: 'assets/animations/units/pyre_sentry_attack_sheet.png',
+        skillSheet: 'assets/animations/units/pyre_sentry_skill_sheet.png',
+      );
+    }
+    if (key.contains('blood_initiate') || key.contains('cinder_witch')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/blood_initiate_idle_sheet.png',
+        attackSheet: 'assets/animations/units/blood_initiate_attack_sheet.png',
+        skillSheet: 'assets/animations/units/blood_initiate_skill_sheet.png',
+      );
+    }
+    if (key.contains('flayed_butcher')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/flayed_butcher_idle_sheet.png',
+        attackSheet: 'assets/animations/units/flayed_butcher_attack_sheet.png',
+        skillSheet: 'assets/animations/units/flayed_butcher_skill_sheet.png',
+      );
+    }
+    if (key.contains('grave_ghoul') || key.contains('decayed_ghoul')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/grave_ghoul_idle_sheet.png',
+        attackSheet: 'assets/animations/units/grave_ghoul_attack_sheet.png',
+        skillSheet: 'assets/animations/units/grave_ghoul_skill_sheet.png',
+      );
+    }
+    if (key.contains('grave_duelist') || key.contains('duelist')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/grave_duelist_idle_sheet.png',
+        attackSheet: 'assets/animations/units/grave_duelist_attack_sheet.png',
+        skillSheet: 'assets/animations/units/grave_duelist_skill_sheet.png',
+      );
+    }
+    if (key.contains('marksman_base') || key.contains('iron_arbalest') || key.contains('arbalest')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/iron_arbalest_idle_sheet.png',
+        attackSheet: 'assets/animations/units/iron_arbalest_attack_sheet.png',
+        skillSheet: 'assets/animations/units/iron_arbalest_skill_sheet.png',
+      );
+    }
+    if (key.contains('sun_scorched_cleric') || key.contains('cleric') || key.contains('sun_smith')) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/sun_scorched_cleric_idle_sheet.png',
+        attackSheet: 'assets/animations/units/sun_scorched_cleric_attack_sheet.png',
+        skillSheet: 'assets/animations/units/sun_scorched_cleric_skill_sheet.png',
+      );
+    }
+    if (key.contains('feral_warhound') || key.contains('warhound') || (key.contains('hound') && !key.contains('cerberus'))) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/units/feral_warhound_idle_sheet.png',
+        attackSheet: 'assets/animations/units/feral_warhound_attack_sheet.png',
+        skillSheet: 'assets/animations/units/feral_warhound_skill_sheet.png',
+      );
+    }
+    if (unit.isPlayer && (key.contains('iron_footman') || key.contains('footman') || key.contains('tombstone_sentinel'))) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/iron_footman_idle_sheet.png',
+        attackSheet: 'assets/animations/units/iron_footman_attack_sheet.png',
+        skillSheet: 'assets/animations/units/iron_footman_skill_sheet.png',
+      );
+    }
+    if (key.contains('blood_scribe') || (key.contains('scribe') && !key.contains('grave_ripper'))) {
+      return const _UnitAnimSet(
+        idleSheet: 'assets/animations/blood_scribe_idle_sheet.png',
+        attackSheet: 'assets/animations/units/blood_scribe_attack_sheet.png',
+        skillSheet: 'assets/animations/units/blood_scribe_skill_sheet.png',
+      );
+    }
+    return null;
   }
 
   bool _isNativelyLeftFacingSprite(String assetPath) {
@@ -1025,6 +1135,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         _lungingUnitId = event.attackerId;
         _lungeTargetDeltaY = targetLaneDeltaY;
         _attackingSkillName = impactSkillName;
+        _attackingIsSignatureSkill = isSignature || isUltimate || impactSkillName.startsWith('★') || (isBossStrike && hasNamedSkill);
       });
 
       // Smoothly return attacker from forward strike lunge shortly after impact so it never freezes mid-step
@@ -1431,6 +1542,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           setState(() {
             _attackingUnitId = null;
             _attackingSkillName = null;
+            _attackingIsSignatureSkill = false;
             _unitFloatingPops.remove(event.targetId);
             if (event.secondaryTargetHits.isNotEmpty) {
               for (final sId in event.secondaryTargetHits.keys) {
@@ -1682,6 +1794,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       _visualUnitHp[u.id] = u.hp;
       _lastCommittedUnitHp[u.id] = u.hp;
     }
+    _precacheActiveUnitSheets();
     _engine.addListener(_onEngineUpdate);
     setState(() {});
   }
@@ -7015,68 +7128,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                                 alignment: Alignment.bottomCenter,
                                               ),
                                             )))
-                              : (!visuallyDowned &&
-                                      (unit.id.contains('scribe') ||
-                                          unit.templateId.contains('scribe') ||
-                                          unit.assetPath.toLowerCase().contains('scribe')))
-                                  ? SpriteSheetAnimation(
-                                      assetPath: 'assets/animations/blood_scribe_idle_sheet.png',
-                                      columns: 3,
-                                      rows: 2,
-                                      totalFrames: 6,
-                                      duration: Duration(milliseconds: isAttacking ? 1300 : 2500),
-                                      loop: true,
-                                      fit: BoxFit.contain,
-                                      fallback: Image.asset(
-                                        'assets/images/blood_scribe_idle.png',
-                                        fit: BoxFit.contain,
-                                        alignment: Alignment.bottomCenter,
-                                      ),
-                                    )
-                              : (unit.isPlayer &&
-                                      !visuallyDowned &&
-                                      (unit.id.contains('footman') ||
-                                          unit.id.contains('tombstone_sentinel') ||
-                                          unit.templateId.contains('footman') ||
-                                          unit.templateId.contains('tombstone_sentinel') ||
-                                          unit.assetPath.toLowerCase().contains('iron_footman')))
-                                  ? SpriteSheetAnimation(
-                                      assetPath: 'assets/animations/iron_footman_idle_sheet.png',
-                                      columns: 3,
-                                      rows: 2,
-                                      totalFrames: 6,
-                                      duration: Duration(milliseconds: isAttacking ? 1200 : 2600),
-                                      loop: true,
-                                      fit: BoxFit.contain,
-                                      fallback: Image.asset(
-                                        'assets/images/iron_footman_idle.png',
-                                        fit: BoxFit.contain,
-                                        alignment: Alignment.bottomCenter,
-                                      ),
-                                    )
-                              : ValueListenableBuilder<int>(
-                                  valueListenable: _visualFrameTick,
-                                  builder: (context, _, child) {
-                                    if (visuallyDowned || isDragging) return child!;
-                                    final double phase = (DateTime.now().millisecondsSinceEpoch / 460.0) + (unit.id.hashCode % 17) * 0.45;
-                                    final double breath = sin(phase);
-                                    return Transform(
-                                      alignment: Alignment.bottomCenter,
-                                      transform: Matrix4.diagonal3Values(1.0 - breath * 0.008, 1.0 + breath * 0.017, 1.0),
-                                      child: child,
-                                    );
-                                  },
-                                  child: Image.asset(
-                                    unit.assetPath,
-                                    fit: BoxFit.contain,
-                                    alignment: Alignment.bottomCenter,
-                                    filterQuality: FilterQuality.medium,
-                                    errorBuilder: (context, error, stackTrace) => Icon(
-                                      unit.isPlayer ? Icons.shield : Icons.security,
-                                      color: factionColor,
-                                      size: isBoss ? 48 : 36,
-                                    ),
-                                  ),
+                              : _buildResolvedUnitSprite(
+                                  unit,
+                                  isAttacking: isAttacking,
+                                  visuallyDowned: visuallyDowned,
+                                  isDragging: isDragging,
+                                  isBoss: isBoss,
+                                  modelWidth: modelWidth,
+                                  modelHeight: modelHeight,
+                                  factionColor: factionColor,
                                 ),
                             ),
                           ),
@@ -10153,4 +10213,97 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     );
   }
 
+  Widget _buildResolvedUnitSprite(
+    CombatUnitState unit, {
+    required bool isAttacking,
+    required bool visuallyDowned,
+    required bool isDragging,
+    required bool isBoss,
+    required double modelWidth,
+    required double modelHeight,
+    required Color factionColor,
+  }) {
+    final fallbackImg = Image.asset(
+      unit.assetPath,
+      fit: BoxFit.contain,
+      alignment: Alignment.bottomCenter,
+      filterQuality: FilterQuality.medium,
+      errorBuilder: (context, error, stackTrace) => Icon(
+        unit.isPlayer ? Icons.shield : Icons.security,
+        color: factionColor,
+        size: isBoss ? 48 : 36,
+      ),
+    );
+
+    final animSet = !visuallyDowned ? _resolveUnitAnimSet(unit) : null;
+    if (animSet != null) {
+      if (isAttacking) {
+        final bool useSkill = _attackingIsSignatureSkill;
+        final String sheetPath = useSkill ? animSet.skillSheet : animSet.attackSheet;
+        return OverflowBox(
+          maxWidth: modelWidth * (isBoss ? 1.32 : 1.42),
+          maxHeight: modelHeight * 1.16,
+          alignment: Alignment.bottomCenter,
+          child: SpriteSheetAnimation(
+            key: ValueKey('unit_act_${unit.id}_${_activeAttackSequenceId}_$useSkill'),
+            assetPath: sheetPath,
+            columns: animSet.columns,
+            rows: animSet.rows,
+            totalFrames: animSet.totalFrames,
+            duration: Duration(milliseconds: _scaledMs(useSkill ? 840 : 720)),
+            loop: false,
+            fit: BoxFit.contain,
+            fallback: fallbackImg,
+          ),
+        );
+      }
+      final int staggerMs = (unit.id.hashCode.abs() % 5) * 110;
+      return SpriteSheetAnimation(
+        key: ValueKey('unit_idle_${unit.id}_${animSet.idleSheet}'),
+        assetPath: animSet.idleSheet,
+        columns: animSet.columns,
+        rows: animSet.rows,
+        totalFrames: animSet.totalFrames,
+        duration: Duration(milliseconds: 2200 + staggerMs),
+        loop: true,
+        fit: BoxFit.contain,
+        fallback: fallbackImg,
+      );
+    }
+
+    return ValueListenableBuilder<int>(
+      valueListenable: _visualFrameTick,
+      builder: (context, _, child) {
+        if (visuallyDowned || isDragging) return child!;
+        final double phase = (DateTime.now().millisecondsSinceEpoch / 460.0) + (unit.id.hashCode % 17) * 0.45;
+        final double breath = sin(phase);
+        return Transform(
+          alignment: Alignment.bottomCenter,
+          transform: Matrix4.diagonal3Values(1.0 - breath * 0.008, 1.0 + breath * 0.017, 1.0),
+          child: child,
+        );
+      },
+      child: fallbackImg,
+    );
+  }
+}
+
+class _UnitAnimSet {
+  static const int defaultColumns = 3;
+  static const int defaultRows = 2;
+  static const int defaultTotalFrames = 6;
+
+  final String idleSheet;
+  final String attackSheet;
+  final String skillSheet;
+
+  int get columns => defaultColumns;
+  int get rows => defaultRows;
+  int get totalFrames => defaultTotalFrames;
+
+  const _UnitAnimSet({
+    required this.idleSheet,
+    required this.attackSheet,
+    required this.skillSheet,
+  });
 }
