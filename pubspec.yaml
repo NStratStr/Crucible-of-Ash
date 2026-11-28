@@ -99,11 +99,19 @@ flutter:
     - assets/images/UI/Skull Shield Icon Transparent.png
     - assets/images/UI/Solar Inquisitor - ASH - 02 -  ASN - G3 Tansparent.png
     - assets/audio/combat_bgm_ambient.mp3
+    - assets/audio/sfx_arrow.wav
     - assets/audio/sfx_block.wav
+    - assets/audio/sfx_blood.wav
     - assets/audio/sfx_card.wav
+    - assets/audio/sfx_crit.wav
+    - assets/audio/sfx_enrage.wav
+    - assets/audio/sfx_forge.wav
+    - assets/audio/sfx_hammer.wav
     - assets/audio/sfx_hit.wav
+    - assets/audio/sfx_shatter.wav
     - assets/audio/sfx_slash.wav
     - assets/audio/sfx_spell.wav
+    - assets/audio/sfx_summon.wav
     - assets/audio/sfx_victory.wav
     - assets/animations/
     - assets/animations/vfx/

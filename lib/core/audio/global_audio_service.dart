@@ -26,35 +26,62 @@ class GlobalAudioService {
   static const String bgmSanctuary = 'audio/combat_bgm_ambient.mp3';
   static const String bgmCombat = 'audio/combat_bgm_ambient.mp3';
 
-  /// Resolves any SFX identifier or raw GDC filename to web-safe bundled 16-bit PCM WAV assets in pubspec.yaml
+  /// Resolves any SFX identifier or raw GDC filename to mastered 44.1kHz 16-bit dark-fantasy WAVs in pubspec.yaml
   static String resolveSfxAsset(String sfxName) {
     final lower = sfxName.toLowerCase();
-    if (lower == 'sfx_block.wav' ||
-        lower == 'sfx_card.wav' ||
-        lower == 'sfx_hit.wav' ||
-        lower == 'sfx_slash.wav' ||
-        lower == 'sfx_spell.wav' ||
-        lower == 'sfx_victory.wav') {
-      return lower;
-    }
+    const bundled = {
+      'sfx_arrow.wav',
+      'sfx_block.wav',
+      'sfx_blood.wav',
+      'sfx_card.wav',
+      'sfx_crit.wav',
+      'sfx_enrage.wav',
+      'sfx_forge.wav',
+      'sfx_hammer.wav',
+      'sfx_hit.wav',
+      'sfx_shatter.wav',
+      'sfx_slash.wav',
+      'sfx_spell.wav',
+      'sfx_summon.wav',
+      'sfx_victory.wav',
+    };
+    if (bundled.contains(lower)) return lower;
     if (lower.contains('victory')) return 'sfx_victory.wav';
+    if (lower.contains('growl') || lower.contains('enrage')) return 'sfx_enrage.wav';
+    if (lower.contains('gorebone') || lower.contains('heavy body crunch') || lower.contains('crit')) {
+      return 'sfx_crit.wav';
+    }
+    if (lower.contains('goresplt') || lower.contains('blood') || lower.contains('siphon')) {
+      return 'sfx_blood.wav';
+    }
+    if (lower.contains('hammer') || lower.contains('stone_impact') || lower.contains('smite')) {
+      return 'sfx_hammer.wav';
+    }
+    if (lower.contains('woodcrsh') || lower.contains('shatter') || lower.contains('debris') || lower.contains('glasbrk')) {
+      return 'sfx_shatter.wav';
+    }
+    if (lower.contains('axe_whoosh') || lower.contains('arrow') || lower.contains('bolt')) {
+      return 'sfx_arrow.wav';
+    }
+    if (lower.contains('chain') || lower.contains('summon') || lower.contains('glasmisc')) {
+      return 'sfx_summon.wav';
+    }
+    if (lower.contains('metlimpt') || lower.contains('forge') || lower.contains('upgrade')) {
+      return 'sfx_forge.wav';
+    }
     if (lower.contains('shield') || lower.contains('armr') || lower.contains('block') || lower.contains('equip')) {
       return 'sfx_block.wav';
     }
-    if (lower.contains('slash') || lower.contains('swrd') || lower.contains('axe_whoosh')) {
+    if (lower.contains('slash') || lower.contains('swrd')) {
       return 'sfx_slash.wav';
     }
     if (lower.contains('fire') ||
         lower.contains('magic') ||
         lower.contains('spell') ||
-        lower.contains('glas') ||
         lower.contains('ritual') ||
         lower.contains('fusion') ||
-        lower.contains('summon') ||
-        lower.contains('chain') ||
         lower.contains('thun') ||
-        lower.contains('growl') ||
-        lower.contains('enrage')) {
+        lower.contains('defeat')) {
       return 'sfx_spell.wav';
     }
     if (lower.contains('card') || lower.contains('swing') || lower.contains('whoosh') || lower.contains('tab') || lower.contains('click')) {
