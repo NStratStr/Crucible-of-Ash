@@ -1510,7 +1510,7 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
         return 'assets/images/ironclad_dreadnought.jpg';
       case 1:
       default:
-        return 'assets/images/flayed_butcher.jpg';
+        return 'assets/images/gorgoroth_the_flayed.png';
     }
   }
 

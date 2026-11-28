@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ashen_crucible/features/combat_spatial/models/spatial_combat_models.dart';
 import 'package:ashen_crucible/features/combat_spatial/spatial_combat_engine.dart';
 import 'package:ashen_crucible/shared/models/unit_entity.dart';
+import 'package:ashen_crucible/shared/data/starter_brigades.dart';
 import 'package:ashen_crucible/core/combat_math.dart';
 
 void main() {
@@ -290,6 +291,26 @@ void main() {
       customEngine.executeUnitAction(footmanState, actionType: 'basic');
       expect(raiderState.hp, lessThan(hpDuringCd));
       expect(footmanState.signatureCooldown, equals(2));
+    });
+
+    test('Stage 1-1 spawns varied new-style enemy patrol and Chapter 1 Boss uses dedicated Gorgoroth sprite', () {
+      final stage1Enemies = StarterBrigades.createEnemiesForStage(chapter: 1, stageNumber: 1);
+      expect(stage1Enemies.length, equals(3));
+      expect(
+        stage1Enemies.map((e) => e.customAvatarAsset),
+        containsAll([
+          'assets/images/ashen_huskarl.png',
+          'assets/images/ashfire_skirmisher.png',
+          'assets/images/pyre_sentry_arbalest.png',
+        ]),
+      );
+
+      final ch1BossSquad = StarterBrigades.createChapterBossEnemies(1);
+      expect(ch1BossSquad.first.customAvatarAsset, equals('assets/images/gorgoroth_the_flayed.png'));
+      expect(
+        engine.enemyUnits.firstWhere((u) => u.id == 'gorgoroth_boss').assetPath,
+        equals('assets/images/gorgoroth_the_flayed.png'),
+      );
     });
   });
 }

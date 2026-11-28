@@ -173,15 +173,15 @@ class CampaignMapGenerator {
         depth: 4,
         verticalRatio: 0.50,
         type: CampaignNodeType.boss,
-        name: 'Gorgoroth the Flayed',
-        description: 'The Chapter World Titan towering over the Ashen Rift in a raging fire vortex.',
+        name: 'Gorgoroth, Sovereign of the Pyre',
+        description: 'The Slag-Armored Chapter Warlord towering over the Ashen Rift in a raging fire vortex.',
         nextNodeIds: [],
         rewardIchor: 800,
         rewardOre: 120,
         rewardSigils: 2,
         scoutedAffinities: [Archetype.juggernaut, Archetype.occultist, Archetype.assassin],
         hazard: CampaignHazardType.ashenEmberStorm,
-        customThumbnailAsset: 'assets/images/flayed_butcher.jpg',
+        customThumbnailAsset: 'assets/images/gorgoroth_the_flayed.png',
       ),
     ];
   }

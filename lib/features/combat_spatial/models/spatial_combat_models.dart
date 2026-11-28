@@ -569,7 +569,16 @@ class CombatUnitState {
     }
     final key = '${id.toLowerCase()}_${templateId.toLowerCase()}';
     if (key.contains('gorgoroth') || key.contains('chapter_titan') || key.contains('world_titan')) {
-      return 'assets/images/flayed_butcher.png';
+      return 'assets/images/gorgoroth_the_flayed.png';
+    }
+    if (key.contains('huskarl') || key.contains('rotting_husk') || key.contains('ash_raider')) {
+      return 'assets/images/ashen_huskarl.png';
+    }
+    if (key.contains('ashfire_skirmisher')) {
+      return 'assets/images/ashfire_skirmisher.png';
+    }
+    if (key.contains('pyre_sentry')) {
+      return 'assets/images/pyre_sentry_arbalest.png';
     }
     if (key.contains('ash_sculptor') || key.contains('grave_warden')) {
       return 'assets/images/ash_sculptor_idle.png';
@@ -617,7 +626,7 @@ class CombatUnitState {
       return 'assets/images/blood_initiate.png';
     }
     if (key.contains('cinder_witch')) {
-      return 'assets/images/Crypt Stalkers/CRY-04-MAG-G1 Blood Scribe.png';
+      return 'assets/images/blood_initiate.png';
     }
     if (key.contains('ghoul')) {
       return 'assets/images/grave_ghoul_g1.png';
@@ -635,7 +644,7 @@ class CombatUnitState {
       return 'assets/images/ironclad_dreadnought.png';
     }
     if (key.contains('pyre_zealot')) {
-      return 'assets/images/Crypt Stalkers/CRY-01-VAN-G1 Tombstone Sentinel.png';
+      return 'assets/images/ashfire_skirmisher.png';
     }
     if (key.contains('valeria')) {
       return 'assets/images/Ash Legion/lady_valeria_g1.png';

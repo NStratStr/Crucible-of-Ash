@@ -679,6 +679,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         p.contains('flayed_butcher') ||
         p.contains('ashfire_skirmisher') ||
         p.contains('pyre_sentry_arbalest') ||
+        p.contains('ashen_huskarl') ||
+        p.contains('gorgoroth_the_flayed') ||
         p.contains('sanguine_flayer') ||
         p.contains('tombstone sentinel') ||
         p.contains('magma_golem') ||
