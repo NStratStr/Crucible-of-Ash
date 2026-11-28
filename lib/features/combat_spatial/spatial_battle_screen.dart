@@ -669,6 +669,27 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     return Offset(screenX, screenY);
   }
 
+  bool _isNativelyLeftFacingSprite(String assetPath) {
+    final p = assetPath.toLowerCase();
+    return p.contains('blood_initiate') ||
+        p.contains('grave_ghoul') ||
+        p.contains('flayed_butcher') ||
+        p.contains('ashfire_skirmisher') ||
+        p.contains('pyre_sentry_arbalest') ||
+        p.contains('sanguine_flayer') ||
+        p.contains('tombstone sentinel') ||
+        p.contains('magma_golem') ||
+        p.contains('gorgoroth');
+  }
+
+  bool _shouldMirrorUnitSprite(CombatUnitState unit) {
+    // Ash Sculptor is always on the player side and natively faces right
+    if (unit.isAshSculptor || unit.id == 'ash_sculptor') return false;
+    final bool nativelyLeft = _isNativelyLeftFacingSprite(unit.assetPath);
+    // Player units (left side) face right (+X); Enemy units (right side) face left (-X).
+    return unit.isPlayer ? nativelyLeft : !nativelyLeft;
+  }
+
   int _hitStopRemainingMs = 0;
 
   void _triggerHitStop({int durationMs = 70}) {
@@ -6930,9 +6951,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                       alignment: Alignment.bottomCenter,
                       clipBehavior: Clip.none,
                       children: [
-                        // Main Character Sprite (with Stone Petrification / Hit-Flash color filter)
+                        // Main Character Sprite (with side-aware facing mirror + Stone Petrification / Hit-Flash color filter)
                         Positioned.fill(
-                          child: ColorFiltered(
+                          child: Transform.flip(
+                            flipX: _shouldMirrorUnitSprite(unit),
+                            child: ColorFiltered(
                           colorFilter: visuallyDowned
                               ? const ColorFilter.matrix(<double>[
                                   0.2126, 0.7152, 0.0722, 0, 10,
@@ -7160,6 +7183,7 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                       size: isBoss ? 48 : 36,
                                     ),
                                   ),
+                            ),
                           ),
                         ),
 
