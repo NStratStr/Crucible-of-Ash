@@ -274,6 +274,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
   Color _activeSynergyBannerColor = const Color(0xFFFFD54F);
   String? _damagedUnitId;
   final Set<String> _damagedUnitIds = {};
+  final Set<String> _recoilingUnitIds = {};
+  String? _lungingUnitId;
+  double _lungeTargetDeltaY = 0.0;
   String? _activeSkillName;
   String? _activeSkillCasterName;
   CombatUnitState? _activeSkillCaster;
@@ -750,11 +753,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     // Brief, punchy skill/ultimate herald that scales with combat speed.
     int bannerDurationMs = 0;
     if (isUltimate && caster != null && caster.isPlayer) {
-      bannerDurationMs = _scaledMs(480);
+      bannerDurationMs = _scaledMs(360);
     } else if (isSignature && caster != null) {
-      bannerDurationMs = _scaledMs(380);
+      bannerDurationMs = _scaledMs(260);
     } else if (hasNamedSkill) {
-      bannerDurationMs = _scaledMs(300);
+      bannerDurationMs = _scaledMs(170);
     }
 
     void executePhysicalImpact() {
@@ -1001,7 +1004,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       final bool isSculptorStrike = event.attackerId == 'ash_sculptor' || event.skillName.contains('Cinder') || event.skillName.contains('Sundering') || event.skillName.contains('Bastion') || event.skillName.contains('Pyre') || event.skillName.contains('Cataclysmic');
       final bool isApexStrike = event.skillName.contains('Cataclysmic') || event.skillName.contains('Pyre');
       final bool isHeavyImpact = event.isCrit || isBossStrike || isUltimate || isBloodnova || isSculptorStrike || hasNamedSkill || event.skillName.contains('Smite') || event.secondaryTargetHits.length >= 2;
-      final int impactDelayMs = _scaledMs((isUltimate || isSignature) ? 450 : 380);
+      final int impactDelayMs = _scaledMs((isUltimate || isSignature) ? 380 : 320);
+
+      // Compute directional lane angle so attacker steps naturally toward the target's row/lane
+      double targetLaneDeltaY = -4.0;
+      if (caster != null && target != null && caster.occupiedNodes.isNotEmpty && target.occupiedNodes.isNotEmpty) {
+        final int cLane = caster.occupiedNodes.first.column;
+        final int tLane = target.occupiedNodes.first.column;
+        targetLaneDeltaY = ((tLane - cLane) * 14.0).clamp(-22.0, 22.0) - 3.0;
+      }
 
       // Start attacker windup + traveling spell/projectile animation effects FIRST before damage is revealed
       setState(() {
@@ -1009,8 +1020,21 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           _activeVfx.add(newVfx);
         }
         _attackingUnitId = event.attackerId;
+        _lungingUnitId = event.attackerId;
+        _lungeTargetDeltaY = targetLaneDeltaY;
         _attackingSkillName = impactSkillName;
       });
+
+      // Smoothly return attacker from forward strike lunge shortly after impact so it never freezes mid-step
+      final tLungeReturn = Timer(Duration(milliseconds: impactDelayMs + _scaledMs(125)), () {
+        if (mounted && _activeAttackSequenceId == seqId) {
+          setState(() {
+            _lungingUnitId = null;
+            _lungeTargetDeltaY = 0.0;
+          });
+        }
+      });
+      _animTimers.add(tLungeReturn);
 
       final List<String> impactCreatedVfxIds = [];
 
@@ -1142,6 +1166,10 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           _damagedUnitId = event.targetId;
           _damagedUnitIds.clear();
           _damagedUnitIds.add(event.targetId);
+          _recoilingUnitIds
+            ..clear()
+            ..add(event.targetId)
+            ..addAll(event.secondaryTargetHits.keys);
           if (event.secondaryTargetHits.isNotEmpty) {
             _damagedUnitIds.addAll(event.secondaryTargetHits.keys);
           }
@@ -1357,7 +1385,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           _animTimers.add(tEndReveal);
         }
 
-        // Fast visceral hit-flash reset (110ms normal, 150ms crit) so character art stays crisp
+        // Fast visceral hit-flash reset (110ms normal, 150ms crit) so character art stays crisp,
+        // while knockback recoil eases back smoothly over 240ms!
         final tFlash = Timer(Duration(milliseconds: _scaledMs(event.isCrit ? 150 : 110)), () {
           if (mounted && _activeAttackSequenceId == seqId) {
             setState(() {
@@ -1367,6 +1396,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
           }
         });
         _animTimers.add(tFlash);
+
+        final tRecoil = Timer(Duration(milliseconds: _scaledMs(240)), () {
+          if (mounted && _activeAttackSequenceId == seqId) {
+            setState(() {
+              _recoilingUnitIds.clear();
+            });
+          }
+        });
+        _animTimers.add(tRecoil);
       });
       _animTimers.add(tImpact);
 
@@ -1385,8 +1423,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       });
       _animTimers.add(tVfx);
 
-      // Reset visual lunge & unit banner pop after full attack sprite-sheet playback
-      final t1 = Timer(Duration(milliseconds: _scaledMs(1150)), () {
+      // Reset attack sprite-sheet state & unit banner pop after playback
+      final t1 = Timer(Duration(milliseconds: _scaledMs(920)), () {
         if (mounted && _activeAttackSequenceId == seqId) {
           setState(() {
             _attackingUnitId = null;
@@ -1402,15 +1440,15 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       });
       _animTimers.add(t1);
 
-      // Conclude action sequence and advance to next event (floating numbers continue fading asynchronously)
+      // Conclude action sequence smoothly and advance to next event without dead air
       final int animRestMs = _scaledMs(
-        (isUltimate || isSignature) ? 900 : (event.isAssistStrike || event.isKnockback ? 740 : 800),
+        (isUltimate || isSignature) ? 760 : (event.isAssistStrike || event.isKnockback ? 580 : 630),
       );
       final t2 = Timer(Duration(milliseconds: animRestMs), () {
         if (mounted) {
           _isActionSequenceRunning = false;
           if (_actionEventQueue.isNotEmpty) {
-            final tNext = Timer(Duration(milliseconds: _scaledMs(40)), () {
+            final tNext = Timer(Duration(milliseconds: _scaledMs(24)), () {
               if (mounted) _drainNextCombatEvent();
             });
             _animTimers.add(tNext);
@@ -1614,6 +1652,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     _visualAliveOverrideIds.clear();
     _holdEndOfBattleOverlay = false;
     _lastKnown2DUnitOffsets.clear();
+    _recoilingUnitIds.clear();
+    _lungingUnitId = null;
+    _lungeTargetDeltaY = 0.0;
     _hasBossEnraged = false;
     _wasBossStaggered = false;
 
@@ -6593,7 +6634,9 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
             ),
             child: Stack(
               children: [
-                FractionallySizedBox(
+                AnimatedFractionallySizedBox(
+                  duration: const Duration(milliseconds: 115),
+                  curve: Curves.linear,
                   alignment: Alignment.centerLeft,
                   widthFactor: apRatio,
                   child: Container(
@@ -6779,16 +6822,19 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
     final Color factionColor = unit.isPlayer ? const Color(0xFFFFD54F) : const Color(0xFFFF5252);
 
     final bool isAttacking = _attackingUnitId == unit.id;
+    final bool isLunging = _lungingUnitId == unit.id;
     final bool isDamaged = _damagedUnitId == unit.id || _damagedUnitIds.contains(unit.id);
+    final bool isRecoiling = isDamaged || _recoilingUnitIds.contains(unit.id);
     final String? floatingPop = _unitFloatingPops[unit.id];
 
-    // Subtle forward step during attack so the sprite animation plays cleanly in the open clash space
-    // without crossing over or hiding behind the enemy squad!
-    final double lungeY = _is2DGridView ? (isAttacking ? -4.0 : 0.0) : (isAttacking ? (unit.isPlayer ? -14.0 : 14.0) : 0.0);
-    final double lungeX = _is2DGridView && isAttacking ? (unit.isPlayer ? 22.0 : -22.0) : 0.0;
-    // Directional knockback recoil when taking a hit (pushed backward away from enemy strike)
-    final double hitRecoilX = isDamaged ? (unit.isPlayer ? -20.0 : 20.0) : 0.0;
-    final double hitShakeY = isDamaged ? -6.0 : 0.0;
+    // Directional strike lunge angled toward target lane, followed by smooth ease-out recovery
+    final double lungeY = _is2DGridView
+        ? (isLunging ? _lungeTargetDeltaY : 0.0)
+        : (isLunging ? (unit.isPlayer ? -14.0 : 14.0) : 0.0);
+    final double lungeX = _is2DGridView && isLunging ? (unit.isPlayer ? 26.0 : -26.0) : 0.0;
+    // Decoupled smooth knockback recoil when absorbing a hit
+    final double hitRecoilX = isRecoiling ? (unit.isPlayer ? -18.0 : 18.0) : 0.0;
+    final double hitShakeY = isRecoiling ? -4.5 : 0.0;
 
     // Normalization multipliers:
     // Valeria's sprite fills 100% of her canvas, whereas Footman, Ghoul, Sanguine Blade have
@@ -6835,12 +6881,12 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         clipBehavior: Clip.none,
         children: [
           AnimatedScale(
-            scale: isAttacking ? 1.09 : (isDamaged ? 0.93 : 1.0),
-            duration: const Duration(milliseconds: 95),
-            curve: Curves.easeOutBack,
+            scale: isLunging ? 1.08 : (isRecoiling ? 0.94 : 1.0),
+            duration: Duration(milliseconds: isLunging ? 135 : 210),
+            curve: isLunging ? Curves.easeOutBack : Curves.easeOutCubic,
             child: AnimatedContainer(
-              duration: Duration(milliseconds: (isAttacking && !isDamaged) ? 95 : 175),
-              curve: (isAttacking && !isDamaged) ? Curves.easeOutCubic : Curves.easeOut,
+              duration: Duration(milliseconds: isLunging ? 140 : 230),
+              curve: Curves.easeOutCubic,
               transform: Matrix4.translationValues(hitRecoilX + lungeX, lungeY + hitShakeY, 0),
               child: SizedBox(
               width: isBoss ? bossSpanWidth : tileWidth,
@@ -7172,17 +7218,30 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         alignment: Alignment.bottomCenter,
                                       ),
                                     )
-                              : Image.asset(
-                                  unit.assetPath,
-                                  fit: BoxFit.contain,
-                                  alignment: Alignment.bottomCenter,
-                                  filterQuality: FilterQuality.medium,
+                              : ValueListenableBuilder<int>(
+                                  valueListenable: _visualFrameTick,
+                                  builder: (context, _, child) {
+                                    if (visuallyDowned || isDragging) return child!;
+                                    final double phase = (DateTime.now().millisecondsSinceEpoch / 460.0) + (unit.id.hashCode % 17) * 0.45;
+                                    final double breath = sin(phase);
+                                    return Transform(
+                                      alignment: Alignment.bottomCenter,
+                                      transform: Matrix4.diagonal3Values(1.0 - breath * 0.008, 1.0 + breath * 0.017, 1.0),
+                                      child: child,
+                                    );
+                                  },
+                                  child: Image.asset(
+                                    unit.assetPath,
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.bottomCenter,
+                                    filterQuality: FilterQuality.medium,
                                     errorBuilder: (context, error, stackTrace) => Icon(
                                       unit.isPlayer ? Icons.shield : Icons.security,
                                       color: factionColor,
                                       size: isBoss ? 48 : 36,
                                     ),
                                   ),
+                                ),
                             ),
                           ),
                         ),

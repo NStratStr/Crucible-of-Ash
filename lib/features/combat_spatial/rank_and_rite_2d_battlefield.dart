@@ -950,6 +950,16 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                           isSelected: isSelected,
                         ),
                       );
+                      final Widget slidUnitWidget = _SmoothGridUnitSlide(
+                        key: ValueKey('slide_${occupant.id}_${col}_$row'),
+                        unitId: occupant.id,
+                        col: col,
+                        row: row,
+                        isPlayer: isPlayer,
+                        tileWidth: tileWidth,
+                        tileHeight: tileHeight,
+                        child: unitWidget,
+                      );
                       if (isPlayer && occupant.isAlive && !occupant.isDisplacementImmune) {
                         return Draggable<String>(
                           data: 'unit:${occupant.id}',
@@ -977,11 +987,11 @@ class RankAndRite2DBattlefield extends StatelessWidget {
                               ),
                             ),
                           ),
-                          childWhenDragging: Opacity(opacity: 0.3, child: unitWidget),
-                          child: unitWidget,
+                          childWhenDragging: Opacity(opacity: 0.3, child: slidUnitWidget),
+                          child: slidUnitWidget,
                         );
                       }
-                      return unitWidget;
+                      return slidUnitWidget;
                     },
                   ),
                 )
@@ -1236,4 +1246,62 @@ class _2DTacticalIntentVectorPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _2DTacticalIntentVectorPainter oldDelegate) => true;
+}
+
+class _SmoothGridUnitSlide extends StatefulWidget {
+  final String unitId;
+  final int col;
+  final int row;
+  final bool isPlayer;
+  final double tileWidth;
+  final double tileHeight;
+  final Widget child;
+
+  const _SmoothGridUnitSlide({
+    super.key,
+    required this.unitId,
+    required this.col,
+    required this.row,
+    required this.isPlayer,
+    required this.tileWidth,
+    required this.tileHeight,
+    required this.child,
+  });
+
+  @override
+  State<_SmoothGridUnitSlide> createState() => _SmoothGridUnitSlideState();
+}
+
+class _SmoothGridUnitSlideState extends State<_SmoothGridUnitSlide> {
+  static final Map<String, (int, int)> _lastPosByUnit = {};
+  Offset _startDelta = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    final prev = _lastPosByUnit[widget.unitId];
+    _lastPosByUnit[widget.unitId] = (widget.col, widget.row);
+    if (prev != null && (prev.$1 != widget.col || prev.$2 != widget.row)) {
+      final int prevVisualCol = widget.isPlayer ? (2 - prev.$2) : prev.$2;
+      final int newVisualCol = widget.isPlayer ? (2 - widget.row) : widget.row;
+      final double dx = (prevVisualCol - newVisualCol) * widget.tileWidth;
+      final double dy = (prev.$1 - widget.col) * widget.tileHeight;
+      _startDelta = Offset(dx.clamp(-widget.tileWidth * 2.2, widget.tileWidth * 2.2), dy.clamp(-widget.tileHeight * 2.2, widget.tileHeight * 2.2));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_startDelta == Offset.zero) return widget.child;
+    return TweenAnimationBuilder<Offset>(
+      tween: Tween<Offset>(begin: _startDelta, end: Offset.zero),
+      duration: const Duration(milliseconds: 225),
+      curve: Curves.easeOutCubic,
+      builder: (context, offset, child) => Transform.translate(
+        offset: offset,
+        child: child,
+      ),
+      child: widget.child,
+    );
+  }
 }
