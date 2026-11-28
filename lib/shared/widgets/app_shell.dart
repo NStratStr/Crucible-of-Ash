@@ -2647,6 +2647,40 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  void _applyPersistedUnitStatUpgrade(
+    String unitId, {
+    required int hpBonus,
+    required int atkBonus,
+    required int defBonus,
+    required int levelBonus,
+  }) {
+    bool updatedAny = false;
+    UnitEntity upgradeEntity(UnitEntity u) {
+      final bool isMatch = u.id == unitId ||
+          (unitId == 'ash_sculptor' &&
+              (u.id == 'ash_sculptor' || u.speciesId.contains('ash_sculptor') || u.name.contains('Sculptor')));
+      if (!isMatch) return u;
+      updatedAny = true;
+      return u.copyWith(
+        level: u.level + levelBonus,
+        maxHp: u.maxHp + hpBonus,
+        currentHp: min(u.maxHp + hpBonus, u.currentHp + hpBonus),
+        attack: u.attack + atkBonus,
+        defense: u.defense + defBonus,
+      );
+    }
+
+    final updatedAllies = _tickManager.allies.map(upgradeEntity).toList();
+    final updatedInventory = _inventory.map(upgradeEntity).toList();
+    if (updatedAny) {
+      setState(() {
+        _tickManager.updateSquads(allies: updatedAllies);
+        _inventory = updatedInventory;
+      });
+      _saveCurrentState();
+    }
+  }
+
   SpatialCombatEngine _createPreviewSpatialEngine() {
     return SpatialCombatEngine(
       initialPlayerEntities: _tickManager.allies,
@@ -2655,6 +2689,17 @@ class _AppShellState extends State<AppShell> {
       commandService: _commandService,
       plinthService: _plinthService,
       skillTreeState: _crucibleSkillTreeState,
+      initialGold: _totalIchor,
+      initialOre: _cursedOre,
+      initialSigils: _bloodlineSigils,
+      onSpendCurrencies: (goldDelta, oreDelta) {
+        setState(() {
+          _totalIchor = max(0, _totalIchor + goldDelta);
+          _cursedOre = max(0, _cursedOre + oreDelta);
+        });
+        _saveCurrentState();
+      },
+      onUnitStatUpgraded: _applyPersistedUnitStatUpgrade,
     );
   }
 
@@ -2897,6 +2942,17 @@ class _AppShellState extends State<AppShell> {
                     relicService: _relicService,
                     plinthService: _plinthService,
                     skillTreeState: _crucibleSkillTreeState,
+                    initialGold: _totalIchor,
+                    initialOre: _cursedOre,
+                    initialSigils: _bloodlineSigils,
+                    onSpendCurrencies: (goldDelta, oreDelta) {
+                      setState(() {
+                        _totalIchor = max(0, _totalIchor + goldDelta);
+                        _cursedOre = max(0, _cursedOre + oreDelta);
+                      });
+                      _saveCurrentState();
+                    },
+                    onUnitStatUpgraded: _applyPersistedUnitStatUpgrade,
                     onOpenPlinthSculptory: _openPlinthSculptorySheet,
                     onBackToStandardCombat: () {
                       setState(() {

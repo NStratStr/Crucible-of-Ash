@@ -1,20 +1,35 @@
 import 'package:flutter/material.dart';
 import 'models/crucible_skill_tree_models.dart';
+import 'models/spatial_combat_models.dart';
 import 'spatial_combat_engine.dart';
+
+enum CrucibleHubTab {
+  skillTree,
+  unitUpgrades,
+}
 
 class CrucibleSkillTreeDialog extends StatefulWidget {
   final SpatialCombatEngine engine;
+  final CrucibleHubTab initialTab;
 
   const CrucibleSkillTreeDialog({
     super.key,
     required this.engine,
+    this.initialTab = CrucibleHubTab.skillTree,
   });
 
-  static Future<void> show(BuildContext context, SpatialCombatEngine engine) {
+  static Future<void> show(
+    BuildContext context,
+    SpatialCombatEngine engine, {
+    CrucibleHubTab initialTab = CrucibleHubTab.skillTree,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => CrucibleSkillTreeDialog(engine: engine),
+      builder: (ctx) => CrucibleSkillTreeDialog(
+        engine: engine,
+        initialTab: initialTab,
+      ),
     );
   }
 
@@ -23,12 +38,14 @@ class CrucibleSkillTreeDialog extends StatefulWidget {
 }
 
 class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
+  late CrucibleHubTab _activeHubTab;
   CrucibleSkillBranch _selectedBranch = CrucibleSkillBranch.wrath;
   String? _selectedSkillId;
 
   @override
   void initState() {
     super.initState();
+    _activeHubTab = widget.initialTab;
     final state = widget.engine.skillTreeState;
     final unlocked = state.allSkills.values.where((s) => s.isUnlocked).toList();
     final visibleBranches = state.visibleBranchesForActiveClass;
@@ -142,85 +159,71 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
         ),
         child: Column(
           children: [
-            // Header Bar
+            // Unified Header Bar (Mode Switcher + SP/Gold/Ore Wallet + Respec + Close)
             _buildHeader(state, isPhone: isPhone),
 
-            // 5 Equipped Slots Bar (compact & scrollable on mobile)
-            if (mq.size.height >= 420)
-              _buildEquippedSlotsRow(state, isPhone: isPhone),
+            if (_activeHubTab == CrucibleHubTab.unitUpgrades)
+              Expanded(
+                child: _buildUnifiedWarbandUpgradesView(isCompact: isPhone),
+              )
+            else ...[
+              // 5 Equipped Slots Bar (compact & scrollable on mobile)
+              if (mq.size.height >= 360)
+                _buildEquippedSlotsRow(state, isPhone: isPhone),
 
-            if (_isFirstSkillTutorial(state) && mq.size.height >= 500)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10241C),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF69F0AE), width: 1.2),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.auto_fix_high, color: Color(0xFF69F0AE), size: 15),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Select a glowing skill below and tap [UNLOCK / UPGRADE] to equip your next Skill Slot!',
-                        style: TextStyle(
-                          color: Color(0xFF69F0AE),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+              if (_isFirstSkillTutorial(state) && mq.size.height >= 500)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10241C),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF69F0AE), width: 1.2),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.auto_fix_high, color: Color(0xFF69F0AE), size: 15),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Select a glowing skill below and tap [UNLOCK / UPGRADE] to equip your next Skill Slot!',
+                          style: TextStyle(
+                            color: Color(0xFF69F0AE),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+
+              // Branch Archetype Tabs + Crown Apex
+              _buildBranchTabs(state),
+
+              // Main Body: Branch Pathway & Keystone + Skill Inspector
+              Expanded(
+                child: Row(
+                  children: [
+                    // Left: Branch Skills & Keystone Card
+                    Expanded(
+                      flex: 5,
+                      child: _buildBranchSkillPathway(skillsInBranch, state),
+                    ),
+
+                    // Divider
+                    Container(width: 1, color: Colors.white12),
+
+                    // Right: Skill Detail Inspector & Upgrade / Equip Panel
+                    Expanded(
+                      flex: 4,
+                      child: _buildSkillDetailInspector(selectedSkill, state, isCompact: isPhone),
                     ),
                   ],
                 ),
               ),
-
-            // Branch Archetype Tabs + Crown Apex
-            _buildBranchTabs(state),
-
-            // Main Body: Branch Pathway & Keystone + Skill Inspector (responsive for mobile portrait & landscape)
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final bool isCompactPortrait = constraints.maxWidth < 620 && constraints.maxHeight >= constraints.maxWidth;
-                  if (isCompactPortrait) {
-                    return Column(
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: _buildBranchSkillPathway(skillsInBranch, state),
-                        ),
-                        Container(height: 1, color: Colors.white12),
-                        Expanded(
-                          flex: 5,
-                          child: _buildSkillDetailInspector(selectedSkill, state, isCompact: true),
-                        ),
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      // Left: Branch Skills & Keystone Card
-                      Expanded(
-                        flex: 5,
-                        child: _buildBranchSkillPathway(skillsInBranch, state),
-                      ),
-
-                      // Divider
-                      Container(width: 1, color: Colors.white12),
-
-                      // Right: Skill Detail Inspector & Upgrade / Equip Panel
-                      Expanded(
-                        flex: 4,
-                        child: _buildSkillDetailInspector(selectedSkill, state, isCompact: isPhone),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -228,8 +231,10 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
   }
 
   Widget _buildHeader(CrucibleSkillTreeState state, {bool isPhone = false}) {
+    final engine = widget.engine;
+    final bool isSkillsTab = _activeHubTab == CrucibleHubTab.skillTree;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: isPhone ? 10 : 16, vertical: isPhone ? 6 : 10),
+      padding: EdgeInsets.symmetric(horizontal: isPhone ? 10 : 16, vertical: isPhone ? 6 : 9),
       decoration: const BoxDecoration(
         color: Color(0xFF161822),
         borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
@@ -243,41 +248,89 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.account_tree, color: _getBranchColor(_selectedBranch), size: 16),
-                  const SizedBox(width: 6),
-                  Text(
-                    isPhone ? 'SKILL GRIMOIRE' : 'CRUCIBLE ARCHETYPE SKILL GRIMOIRE',
-                    style: TextStyle(
-                      fontSize: isPhone ? 11.0 : 12.5,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFFFFD54F),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A222D),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.45), width: 1),
-                    ),
-                    child: Text(
-                      'LV.${state.sculptorLevel} • T${state.castleCrucibleTier}',
-                      style: const TextStyle(
-                        fontSize: 9.0,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.cyanAccent,
+                  // Unified Mode Pill 1: Commander Skill Tree
+                  InkWell(
+                    onTap: () => setState(() => _activeHubTab = CrucibleHubTab.skillTree),
+                    borderRadius: BorderRadius.circular(5),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                      decoration: BoxDecoration(
+                        color: isSkillsTab ? const Color(0xFF162B20) : const Color(0xFF10121A),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: isSkillsTab ? const Color(0xFF69F0AE) : Colors.white24,
+                          width: isSkillsTab ? 1.3 : 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.account_tree_rounded,
+                            size: 13,
+                            color: isSkillsTab ? const Color(0xFF69F0AE) : Colors.white54,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            state.availableSkillPoints > 0
+                                ? 'SKILL TREE (${state.availableSkillPoints}★)'
+                                : 'SKILL TREE',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: isSkillsTab ? const Color(0xFF69F0AE) : Colors.white70,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
+                  // Unified Mode Pill 2: Commander & Unit Stat Upgrades
+                  InkWell(
+                    onTap: () => setState(() => _activeHubTab = CrucibleHubTab.unitUpgrades),
+                    borderRadius: BorderRadius.circular(5),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                      decoration: BoxDecoration(
+                        color: !isSkillsTab ? const Color(0xFF2D1E12) : const Color(0xFF10121A),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: !isSkillsTab ? const Color(0xFFFFAB40) : Colors.white24,
+                          width: !isSkillsTab ? 1.3 : 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.shield_rounded,
+                            size: 13,
+                            color: !isSkillsTab ? const Color(0xFFFFAB40) : Colors.white54,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'UNIT & STAT UPGRADES',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w900,
+                              color: !isSkillsTab ? const Color(0xFFFFAB40) : Colors.white70,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Shared Currencies: SP + GOLD + ORE
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFF263238),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFFFD54F), width: 1),
+                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.9),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -285,9 +338,9 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                         const Icon(Icons.stars, color: Color(0xFFFFD54F), size: 12),
                         const SizedBox(width: 3),
                         Text(
-                          'SP: ${state.availableSkillPoints}',
+                          '${state.availableSkillPoints} SP',
                           style: const TextStyle(
-                            fontSize: 10.0,
+                            fontSize: 9.2,
                             fontWeight: FontWeight.w900,
                             color: Color(0xFFFFD54F),
                           ),
@@ -295,36 +348,78 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF37474F),
-                      foregroundColor: const Color(0xFFFFD54F),
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                        side: const BorderSide(color: Color(0xFFFFD54F), width: 0.8),
-                      ),
+                  const SizedBox(width: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0C0A12),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFFFFD54F).withValues(alpha: 0.45), width: 0.8),
                     ),
-                    icon: const Icon(Icons.restart_alt, size: 12, color: Color(0xFFFFD54F)),
-                    label: const Text(
-                      'RESPEC',
-                      style: TextStyle(fontSize: 8.8, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        state.respecAllPoints();
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Crucible points refunded! Rebuild your archetype freely.'),
-                          duration: Duration(seconds: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.monetization_on, size: 12, color: Color(0xFFFFD54F)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${engine.unboundAshWallet} GOLD',
+                          style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFFFFE082)),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0C0A12),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF80CBC4).withValues(alpha: 0.5), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.diamond_outlined, size: 12, color: Color(0xFF80CBC4)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${engine.distilledVitaeWallet} ORE',
+                          style: const TextStyle(fontSize: 9.0, fontWeight: FontWeight.bold, color: Color(0xFF80CBC4)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSkillsTab) ...[
+                    const SizedBox(width: 6),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF37474F),
+                        foregroundColor: const Color(0xFFFFD54F),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          side: const BorderSide(color: Color(0xFFFFD54F), width: 0.8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.restart_alt, size: 12, color: Color(0xFFFFD54F)),
+                      label: const Text(
+                        'RESPEC',
+                        style: TextStyle(fontSize: 8.8, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          engine.respecSkillsWithRefund();
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Skill points & invested Gold/Ore refunded!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1065,49 +1160,67 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
 
           const SizedBox(height: 6),
 
-          // Pinned Action Buttons: Unlock/Upgrade (auto-equips into next empty slot!) & Slot Picker 1..5
-          SizedBox(
-            width: double.infinity,
-            height: isCompact ? 34 : 38,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: state.canUpgradeSkill(skill.id)
-                    ? const Color(0xFFFF6D00)
-                    : const Color(0xFF263238),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-              ),
-              onPressed: state.canUpgradeSkill(skill.id)
-                  ? () {
-                      setState(() {
-                        final bool wasLocked = !skill.isUnlocked;
-                        state.upgradeSkill(skill.id);
-                        // Auto-equip newly unlocked active skill into the first open slot for effortless mobile UX!
-                        if (wasLocked && !skill.isPassive && !state.equippedSkillIds.contains(skill.id)) {
-                          final openIdx = state.equippedSkillIds.indexWhere((id) => id.isEmpty);
-                          if (openIdx != -1) {
-                            state.equipSkill(openIdx, skill.id);
-                          }
+          // Pinned Action Buttons: Unlock/Upgrade (requires SP + Gold + Ore, auto-equips into next empty slot!) & Slot Picker 1..5
+          Builder(
+            builder: (context) {
+              final engine = widget.engine;
+              final int goldCost = engine.getSkillGoldCost(skill);
+              final int oreCost = engine.getSkillOreCost(skill);
+              final bool canAffordAll = engine.canAffordSkillWithResources(skill.id);
+              final String costLabel = oreCost > 0
+                  ? '1★ SP • $goldCost GOLD • $oreCost ORE'
+                  : '1★ SP • $goldCost GOLD';
+
+              String buttonLabel;
+              if (!state.isSkillPrerequisiteMet(skill.id)) {
+                buttonLabel = '🔒 LOCKED (CHECK REQUIREMENTS)';
+              } else if (!skill.canUpgrade) {
+                buttonLabel = 'MAX RANK REACHED';
+              } else if (state.availableSkillPoints <= 0) {
+                buttonLabel = 'NEED 1★ SP ($costLabel)';
+              } else if (engine.unboundAshWallet < goldCost || engine.distilledVitaeWallet < oreCost) {
+                buttonLabel = 'NEED RESOURCES ($costLabel)';
+              } else if (!skill.isUnlocked) {
+                buttonLabel = 'UNLOCK ($costLabel)';
+              } else {
+                buttonLabel = 'RANK ${skill.rank + 1} ($costLabel)';
+              }
+
+              return SizedBox(
+                width: double.infinity,
+                height: isCompact ? 34 : 38,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: canAffordAll
+                        ? const Color(0xFFFF6D00)
+                        : const Color(0xFF263238),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                  ),
+                  onPressed: canAffordAll
+                      ? () {
+                          setState(() {
+                            final bool wasLocked = !skill.isUnlocked;
+                            engine.upgradeSkillWithResources(skill.id);
+                            if (wasLocked && !skill.isPassive && !state.equippedSkillIds.contains(skill.id)) {
+                              final openIdx = state.equippedSkillIds.indexWhere((id) => id.isEmpty);
+                              if (openIdx != -1) {
+                                state.equipSkill(openIdx, skill.id);
+                              }
+                            }
+                          });
                         }
-                      });
-                    }
-                  : null,
-              child: Text(
-                !state.isSkillPrerequisiteMet(skill.id)
-                    ? '🔒 LOCKED (CHECK REQUIREMENTS)'
-                    : (!skill.isUnlocked
-                        ? (state.availableSkillPoints > 0 ? 'UNLOCK SKILL (1 SP)' : 'NEED 1 SP TO UNLOCK')
-                        : (skill.canUpgrade
-                            ? (state.availableSkillPoints > 0
-                                ? 'UPGRADE (1 SP) [Rank ${skill.rank + 1}]'
-                                : 'NEED 1 SP TO UPGRADE')
-                            : 'MAX RANK REACHED')),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-              ),
-            ),
+                      : null,
+                  child: Text(
+                    buttonLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 6),
@@ -1208,6 +1321,223 @@ class _CrucibleSkillTreeDialogState extends State<CrucibleSkillTreeDialog> {
                       ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnifiedWarbandUpgradesView({bool isCompact = false}) {
+    final engine = widget.engine;
+    final sculptor = engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
+    final minions = engine.playerUnits.where((u) => !u.isAshSculptor && u.id != 'ash_sculptor').toList();
+    final bool canAscend = engine.unboundAshWallet >= SpatialCombatEngine.sculptorAscendGoldCost &&
+        engine.distilledVitaeWallet >= SpatialCombatEngine.sculptorAscendOreCost;
+
+    return ListView(
+      padding: EdgeInsets.all(isCompact ? 10 : 14),
+      children: [
+        if (sculptor != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1622),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFF6D00), width: 1.2),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    sculptor.assetPath,
+                    width: 42,
+                    height: 42,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(Icons.shield, color: Color(0xFFFF6D00), size: 30),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'THE ASH SCULPTOR (COMMANDER FURNACE)',
+                        style: TextStyle(color: Color(0xFFFF6D00), fontWeight: FontWeight.w900, fontSize: 12),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'HP ${sculptor.hp}/${sculptor.maxHp}  •  ATK ${sculptor.attack}  •  ARM ${sculptor.armor}  •  SPD ${sculptor.speed}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Permanent Commander Stat Ascension: +200 Max HP & +30 ATK. (Upgrade Commander Skills in the [SKILL TREE] tab.)',
+                        style: TextStyle(color: Colors.white60, fontSize: 8.8),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.whatshot, size: 14),
+                  label: const Text(
+                    'ASCEND\n(200 GOLD • 20 ORE)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: canAscend ? const Color(0xFFFF6D00) : const Color(0xFF2E241E),
+                    foregroundColor: canAscend ? Colors.white : Colors.white38,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                  ),
+                  onPressed: canAscend
+                      ? () {
+                          setState(() {
+                            engine.upgradeSculptorFurnace();
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Text(
+            'DEPLOYED RETINUE COMPANIONS (PERMANENT STAT REFORGING)',
+            style: TextStyle(
+              color: Color(0xFFFFD54F),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.7,
+            ),
+          ),
+        ),
+        if (minions.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161822),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: const Text(
+              'No Retinue Companions currently in active squad. Use [SQUAD] on the Staging Dock to assign companions.',
+              style: TextStyle(color: Colors.white60, fontSize: 10.5),
+            ),
+          )
+        else
+          ...minions.map(_buildCompanionUpgradeCard),
+      ],
+    );
+  }
+
+  Widget _buildCompanionUpgradeCard(CombatUnitState minion) {
+    final engine = widget.engine;
+    final bool canUpgrade = engine.unboundAshWallet >= SpatialCombatEngine.minionUpgradeGoldCost &&
+        engine.distilledVitaeWallet >= SpatialCombatEngine.minionUpgradeOreCost;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFF181622),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12, width: 0.9),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  minion.assetPath,
+                  width: 38,
+                  height: 38,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Icon(Icons.person, color: Colors.white, size: 26),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            minion.name.toUpperCase(),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD54F).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            'LV. ${minion.level}',
+                            style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.bold, fontSize: 8.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'HP ${minion.hp}/${minion.maxHp}  •  ATK ${minion.attack}  •  ARM ${minion.armor}  •  SPD ${minion.speed}',
+                      style: const TextStyle(color: Color(0xFF80D8FF), fontSize: 9.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.upgrade, size: 14),
+                label: const Text(
+                  'REFORGE\n(120 GOLD • 8 ORE)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canUpgrade ? const Color(0xFFFF6D00) : const Color(0xFF2E241E),
+                  foregroundColor: canUpgrade ? Colors.white : Colors.white38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                ),
+                onPressed: canUpgrade
+                    ? () {
+                        setState(() {
+                          engine.upgradeMinion(minion.id);
+                        });
+                      }
+                    : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              Text(
+                '🛡️ Aura: ${minion.retinuePassiveName} (${minion.retinuePassiveSummary})',
+                style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 8.8, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '★ Signature (3T): ${minion.signatureSkillName} (${minion.signatureShortEffect})',
+                style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 8.8, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
         ],
       ),

@@ -254,9 +254,19 @@ class SpatialCombatEngine extends ChangeNotifier {
   }
 
 
-  int unboundAshWallet = 0;
-  int distilledVitaeWallet = 0;
-  int petrifiedPlinthsWallet = 0;
+  int unboundAshWallet;
+  int distilledVitaeWallet;
+  int petrifiedPlinthsWallet;
+  int _spentSkillGold = 0;
+  int _spentSkillOre = 0;
+  final void Function(int goldDelta, int oreDelta)? onSpendCurrencies;
+  final void Function(
+    String unitId, {
+    required int hpBonus,
+    required int atkBonus,
+    required int defBonus,
+    required int levelBonus,
+  })? onUnitStatUpgraded;
   bool hasClaimedEncounterVictoryLoot = false;
 
   void claimVictoryRewards() {
@@ -270,51 +280,132 @@ class SpatialCombatEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Gold cost required alongside 1★ SP to unlock or rank up a Commander Skill
+  int getSkillGoldCost(CrucibleSkillNode skill) {
+    final unlockedCount = skillTreeState.allSkills.values.where((s) => s.isUnlocked).length;
+    if (!skill.isUnlocked && unlockedCount <= 1) {
+      return 25; // Accessible starter tutorial unlock
+    }
+    if (!skill.isUnlocked) {
+      return (skill.tier >= 3 || skill.branch == CrucibleSkillBranch.apex) ? 60 : 35;
+    }
+    if (skill.rank == 1) return 65;
+    return 100;
+  }
+
+  /// Cursed Ore cost required alongside 1★ SP to unlock or rank up a Commander Skill
+  int getSkillOreCost(CrucibleSkillNode skill) {
+    final unlockedCount = skillTreeState.allSkills.values.where((s) => s.isUnlocked).length;
+    if (!skill.isUnlocked && unlockedCount <= 1) {
+      return 0; // First skill unlock only requires 1★ SP + 25 Gold
+    }
+    if (!skill.isUnlocked) {
+      return (skill.tier >= 3 || skill.branch == CrucibleSkillBranch.apex) ? 10 : 5;
+    }
+    if (skill.rank == 1) return 10;
+    return 15;
+  }
+
+  bool canAffordSkillWithResources(String skillId) {
+    final skill = skillTreeState.allSkills[skillId];
+    if (skill == null) return false;
+    if (!skillTreeState.canUpgradeSkill(skillId)) return false;
+    return unboundAshWallet >= getSkillGoldCost(skill) &&
+        distilledVitaeWallet >= getSkillOreCost(skill);
+  }
+
+  bool upgradeSkillWithResources(String skillId) {
+    final skill = skillTreeState.allSkills[skillId];
+    if (skill == null || !canAffordSkillWithResources(skillId)) return false;
+    final int goldCost = getSkillGoldCost(skill);
+    final int oreCost = getSkillOreCost(skill);
+    if (!skillTreeState.upgradeSkill(skillId)) return false;
+
+    unboundAshWallet -= goldCost;
+    distilledVitaeWallet -= oreCost;
+    _spentSkillGold += goldCost;
+    _spentSkillOre += oreCost;
+    onSpendCurrencies?.call(-goldCost, -oreCost);
+    addLog('✨ SKILL FORGED: ${skill.name} upgraded to Rank ${skill.rank} (-1★ SP, -$goldCost Gold${oreCost > 0 ? ", -$oreCost Ore" : ""})!');
+    notifyListeners();
+    return true;
+  }
+
+  void respecSkillsWithRefund() {
+    skillTreeState.respecAllPoints();
+    if (_spentSkillGold > 0 || _spentSkillOre > 0) {
+      final int refundGold = _spentSkillGold;
+      final int refundOre = _spentSkillOre;
+      unboundAshWallet += refundGold;
+      distilledVitaeWallet += refundOre;
+      _spentSkillGold = 0;
+      _spentSkillOre = 0;
+      onSpendCurrencies?.call(refundGold, refundOre);
+    }
+    notifyListeners();
+  }
+
+  static const int minionUpgradeGoldCost = 120;
+  static const int minionUpgradeOreCost = 8;
+
   bool upgradeMinion(String minionId) {
-    const int costAsh = 120;
-    if (unboundAshWallet < costAsh) return false;
+    if (unboundAshWallet < minionUpgradeGoldCost || distilledVitaeWallet < minionUpgradeOreCost) {
+      return false;
+    }
     final unit = playerUnits.where((u) => u.id == minionId).firstOrNull;
     if (unit == null) return false;
 
-    unboundAshWallet -= costAsh;
+    unboundAshWallet -= minionUpgradeGoldCost;
+    distilledVitaeWallet -= minionUpgradeOreCost;
+    unit.level += 1;
     unit.maxHp += 150;
     unit.hp = min(unit.maxHp, unit.hp + 150);
     unit.attack += 25;
     unit.maxArmor += 10;
     unit.armor += 10;
-    addLog('⚒️ RETINUE REFORGED: ${unit.name} upgraded to Lv.${unit.level + 1} (+150 HP, +25 ATK, +10 Armor)!');
+    onSpendCurrencies?.call(-minionUpgradeGoldCost, -minionUpgradeOreCost);
+    onUnitStatUpgraded?.call(
+      unit.id,
+      hpBonus: 150,
+      atkBonus: 25,
+      defBonus: 10,
+      levelBonus: 1,
+    );
+    addLog('⚒️ RETINUE REFORGED: ${unit.name} upgraded to Lv.${unit.level} (+150 HP, +25 ATK, +10 Armor)!');
     notifyListeners();
     return true;
   }
 
+  static const int sculptorAscendGoldCost = 200;
+  static const int sculptorAscendOreCost = 20;
+
   bool upgradeSculptorFurnace() {
-    const int costAsh = 200;
-    const int costVitae = 20;
-    if (unboundAshWallet < costAsh || distilledVitaeWallet < costVitae) return false;
-    final sculptor = playerUnits.where((u) => u.isAshSculptor).firstOrNull;
+    if (unboundAshWallet < sculptorAscendGoldCost || distilledVitaeWallet < sculptorAscendOreCost) {
+      return false;
+    }
+    final sculptor = playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull;
     if (sculptor == null) return false;
 
-    unboundAshWallet -= costAsh;
-    distilledVitaeWallet -= costVitae;
+    unboundAshWallet -= sculptorAscendGoldCost;
+    distilledVitaeWallet -= sculptorAscendOreCost;
     sculptor.attack += 30;
     sculptor.maxHp += 200;
     sculptor.hp = min(sculptor.maxHp, sculptor.hp + 200);
+    onSpendCurrencies?.call(-sculptorAscendGoldCost, -sculptorAscendOreCost);
+    onUnitStatUpgraded?.call(
+      sculptor.id,
+      hpBonus: 200,
+      atkBonus: 30,
+      defBonus: 0,
+      levelBonus: 0,
+    );
     addLog('🔥 FORGE CRUCIBLE ASCENSION: The Ash Sculptor ascended (+30 ATK, +200 HP)!');
     notifyListeners();
     return true;
   }
 
   bool upgradeCommanderSkill(String skillId) {
-    const int costVitae = 15;
-    if (distilledVitaeWallet < costVitae) return false;
-    final skill = skillTreeState.allSkills[skillId];
-    if (skill == null || !skill.canUpgrade) return false;
-
-    distilledVitaeWallet -= costVitae;
-    skill.rank++;
-    addLog('⚡ SKILL TRANSCENDENCE: ${skill.name} upgraded to Rank ${skill.rank}!');
-    notifyListeners();
-    return true;
+    return upgradeSkillWithResources(skillId);
   }
 
   /// GDD Section 7.1 & 7.2: The Ashen Reckoning & Pacing Enrage Engine
@@ -413,7 +504,15 @@ class SpatialCombatEngine extends ChangeNotifier {
     CrucibleSkillTreeState? skillTreeState,
     this.maxDeployableUnits = 2,
     this.spindleTier = 1,
-  })  : skillTreeState = skillTreeState ?? CrucibleSkillTreeState(),
+    int? initialGold,
+    int? initialOre,
+    int? initialSigils,
+    this.onSpendCurrencies,
+    this.onUnitStatUpgraded,
+  })  : unboundAshWallet = initialGold ?? 150,
+        distilledVitaeWallet = initialOre ?? 50,
+        petrifiedPlinthsWallet = initialSigils ?? 0,
+        skillTreeState = skillTreeState ?? CrucibleSkillTreeState(),
         encounterTitle = title ?? 'The Sunder at Ashen Gate',
         encounterDescription = description ?? 'Encounter 4: Tabletop Colossus Battle' {
     final waves = (enemyWaves != null && enemyWaves.isNotEmpty)

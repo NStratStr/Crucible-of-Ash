@@ -234,7 +234,7 @@ class CombatUnitState {
   List<GridNode> occupiedNodes;
   final bool isDisplacementImmune;
   final int moveRange;
-  final int level;
+  int level;
   int currentAp; // 0 to 10,000 threshold (Turn Meter / Action Point)
   int get currentTm => currentAp;
   set currentTm(int val) => currentAp = val;

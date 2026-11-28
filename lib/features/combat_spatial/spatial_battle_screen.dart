@@ -53,6 +53,17 @@ class SpatialBattleScreen extends StatefulWidget {
   final VoidCallback? onOpenPlinthSculptory;
   final int maxDeployableUnits;
   final int spindleTier;
+  final int? initialGold;
+  final int? initialOre;
+  final int? initialSigils;
+  final void Function(int goldDelta, int oreDelta)? onSpendCurrencies;
+  final void Function(
+    String unitId, {
+    required int hpBonus,
+    required int atkBonus,
+    required int defBonus,
+    required int levelBonus,
+  })? onUnitStatUpgraded;
 
   const SpatialBattleScreen({
     super.key,
@@ -74,6 +85,11 @@ class SpatialBattleScreen extends StatefulWidget {
     this.onOpenPlinthSculptory,
     this.maxDeployableUnits = 2,
     this.spindleTier = 1,
+    this.initialGold,
+    this.initialOre,
+    this.initialSigils,
+    this.onSpendCurrencies,
+    this.onUnitStatUpgraded,
   });
 
   @override
@@ -423,6 +439,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       skillTreeState: widget.skillTreeState,
       maxDeployableUnits: widget.maxDeployableUnits,
       spindleTier: widget.spindleTier,
+      initialGold: widget.initialGold,
+      initialOre: widget.initialOre,
+      initialSigils: widget.initialSigils,
+      onSpendCurrencies: widget.onSpendCurrencies,
+      onUnitStatUpgraded: widget.onUnitStatUpgraded,
     );
     _engine.isActionPauseEnabled = true;
     for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
@@ -1869,6 +1890,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
       skillTreeState: widget.skillTreeState,
       maxDeployableUnits: widget.maxDeployableUnits,
       spindleTier: widget.spindleTier,
+      initialGold: widget.initialGold,
+      initialOre: widget.initialOre,
+      initialSigils: widget.initialSigils,
+      onSpendCurrencies: widget.onSpendCurrencies,
+      onUnitStatUpgraded: widget.onUnitStatUpgraded,
     );
     _engine.isActionPauseEnabled = true;
     for (final u in [..._engine.playerUnits, ..._engine.enemyUnits]) {
@@ -2155,14 +2181,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
         ],
       ),
       body: SafeArea(
+        left: false,
+        right: false,
         top: !isLandscapeMobile,
         bottom: !isLandscapeMobile,
         child: Column(
           children: [
-            // Top HUD: Status Banner, Focus Bar & Boss Telemetry (hidden in Zen mode)
+            // Top HUD: Status Banner, Focus Bar & Boss Telemetry (edge-to-edge bar with Dynamic Island horizontal SafeArea)
             if (!_isZenMode)
-              RepaintBoundary(
-                child: _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
+              ColoredBox(
+                color: const Color(0xFF161622),
+                child: SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: RepaintBoundary(
+                    child: _buildTopStatusRibbon(gorgoroth, isLandscapeMobile: isLandscapeMobile),
+                  ),
+                ),
               ),
 
             // Live Tactical Battlefield (Enemy 3-Rows + Clash Line + Player 3-Rows)
@@ -2323,10 +2358,11 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                           alignment: isLandscapeMobile ? Alignment.center : Alignment.bottomCenter,
                           child: Padding(
                             padding: EdgeInsets.only(
-                              left: isDesktop ? 20.0 : 6.0,
-                              right: isDesktop ? 20.0 : 6.0,
-                              top: isLandscapeMobile ? 34.0 : 18.0,
-                              bottom: isLandscapeMobile ? 6.0 : 2.0,
+                              left: isDesktop ? 24.0 : 14.0,
+                              right: isDesktop ? 24.0 : 14.0,
+                              // Full top clearance for Row 0 standing models (1.62*tileH) + overhead Armor/HP badges so nothing clips into the Top Ribbon!
+                              top: _is2DGridView ? ((tile2DHeight * 0.64) + 44.0) : 28.0,
+                              bottom: isLandscapeMobile ? 10.0 : 6.0,
                             ),
                             child: _is2DGridView
                                 ? RankAndRite2DBattlefield(
@@ -2959,8 +2995,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                         _buildGothicActionButton(
                                           icon: Icons.account_tree_rounded,
                                           label: _engine.skillTreeState.availableSkillPoints > 0
-                                              ? 'SKILL TREE (${_engine.skillTreeState.availableSkillPoints}★)'
-                                              : 'SKILL TREE',
+                                              ? 'SKILLS & UPGRADES (${_engine.skillTreeState.availableSkillPoints}★)'
+                                              : 'SKILLS & UPGRADES',
                                           onPressed: () {
                                             CrucibleSkillTreeDialog.show(context, _engine).then((_) {
                                               setState(() {});
@@ -2970,19 +3006,6 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                                           borderColor: const Color(0xFF69F0AE),
                                           textColor: const Color(0xFFE0F2F1),
                                           glowColor: const Color(0x5500E676),
-                                        ),
-                                        _buildGothicActionButton(
-                                          icon: Icons.auto_fix_high,
-                                          label: 'SQUAD & STAT UPGRADES',
-                                          onPressed: () {
-                                            CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
-                                              setState(() {});
-                                            });
-                                          },
-                                          gradientColors: const [Color(0xFFE65100), Color(0xFFBF360C)],
-                                          borderColor: const Color(0xFFFFAB40),
-                                          textColor: Colors.white,
-                                          glowColor: const Color(0x66FF6D00),
                                         ),
                                       ],
                                       if (_engine.isVictory && widget.onVictory != null)
@@ -3038,21 +3061,23 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
               ),
             ),
 
-            // Option 1: Clean Turn-Based Hero HUD
-            // Pre-Battle Staging Reserve Dock (Deployment Phase) vs Live Turn Action Tray & Pacing Bar
-            if (_engine.isPreBattlePhase)
-              _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
-            else ...[
-              // Always-visible Crucible Commander Cinders Tray during active interval combat
-              if (_engine.playerUnits.isNotEmpty)
-                _buildSculptorCommanderTray(
-                  _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ??
-                      _engine.playerUnits.first,
-                  isLandscapeMobile: isLandscapeMobile,
-                )
-              else
-                _buildCombatPacingStatusTray(isLandscapeMobile: isLandscapeMobile),
-            ],
+            // Option 1: Clean Turn-Based Hero HUD (edge-to-edge dark bar with horizontal SafeArea for Dynamic Island)
+            ColoredBox(
+              color: _engine.isPreBattlePhase ? const Color(0xFF0F111A) : const Color(0xFF1B1926),
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                child: _engine.isPreBattlePhase
+                    ? _buildPreBattleStagingDock(isLandscapeMobile: isLandscapeMobile)
+                    : (_engine.playerUnits.isNotEmpty
+                        ? _buildSculptorCommanderTray(
+                            _engine.playerUnits.where((u) => u.isAshSculptor || u.id == 'ash_sculptor').firstOrNull ??
+                                _engine.playerUnits.first,
+                            isLandscapeMobile: isLandscapeMobile,
+                          )
+                        : _buildCombatPacingStatusTray(isLandscapeMobile: isLandscapeMobile)),
+              ),
+            ),
 
             // Slide-up Combat Chronicle Log Drawer (On-demand inspection overlay)
             if (_isLogDrawerVisible)
@@ -3548,8 +3573,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                               const SizedBox(width: 4),
                               Text(
                                 _engine.skillTreeState.availableSkillPoints > 0
-                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
-                                    : 'SKILLS',
+                                    ? 'SKILLS & UPGRADES (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'SKILLS & UPGRADES',
                                 style: const TextStyle(
                                   color: Color(0xFF69F0AE),
                                   fontWeight: FontWeight.w900,
@@ -8304,8 +8329,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                               ),
                               child: Text(
                                 _engine.skillTreeState.availableSkillPoints > 0
-                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
-                                    : 'SKILLS',
+                                    ? 'UPGRADES (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'UPGRADES',
                                 style: const TextStyle(fontSize: 8.5, color: Color(0xFF69F0AE), fontWeight: FontWeight.w900),
                               ),
                             ),
@@ -8437,8 +8462,8 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                               ),
                               child: Text(
                                 _engine.skillTreeState.availableSkillPoints > 0
-                                    ? 'SKILLS (${_engine.skillTreeState.availableSkillPoints}★)'
-                                    : 'SKILLS',
+                                    ? 'UPGRADES (${_engine.skillTreeState.availableSkillPoints}★)'
+                                    : 'UPGRADES',
                                 style: const TextStyle(fontSize: 8.2, color: Color(0xFF69F0AE), fontWeight: FontWeight.w900),
                               ),
                             ),
@@ -9763,45 +9788,14 @@ class _SpatialBattleScreenState extends State<SpatialBattleScreen> with TickerPr
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.account_tree, size: 9.5, color: Color(0xFF69F0AE)),
-                            SizedBox(width: 3),
+                          children: [
+                            const Icon(Icons.account_tree, size: 9.5, color: Color(0xFF69F0AE)),
+                            const SizedBox(width: 3),
                             Text(
-                              'TREE',
-                              style: TextStyle(color: Color(0xFF69F0AE), fontSize: 8.0, fontWeight: FontWeight.w900, letterSpacing: 0.4),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () {
-                        CrucibleSanctuaryUpgradeDialog.show(context, _engine).then((_) {
-                          setState(() {});
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.0),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2E241E), Color(0xFF1E1712)],
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: const Color(0xFFFFAB40).withValues(alpha: 0.85), width: 1.0),
-                          boxShadow: [
-                            BoxShadow(color: const Color(0xFFFFAB40).withValues(alpha: 0.2), blurRadius: 4),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.auto_fix_high, size: 9.5, color: Color(0xFFFFAB40)),
-                            SizedBox(width: 3),
-                            Text(
-                              'UPGRADE',
-                              style: TextStyle(color: Color(0xFFFFAB40), fontSize: 8.0, fontWeight: FontWeight.w900, letterSpacing: 0.4),
+                              _engine.skillTreeState.availableSkillPoints > 0
+                                  ? 'UPGRADES (${_engine.skillTreeState.availableSkillPoints}★)'
+                                  : 'UPGRADES',
+                              style: const TextStyle(color: Color(0xFF69F0AE), fontSize: 8.0, fontWeight: FontWeight.w900, letterSpacing: 0.4),
                             ),
                           ],
                         ),

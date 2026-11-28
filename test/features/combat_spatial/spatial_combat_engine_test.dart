@@ -344,5 +344,56 @@ void main() {
         expect(alchEngine.enemyUnits[i].poisonStacks, greaterThanOrEqualTo(2));
       }
     });
+
+    test('Unified skill and unit upgrades consume SP + Gold + Ore and refund on respec', () {
+      int syncedGoldDelta = 0;
+      int syncedOreDelta = 0;
+      int upgradedHpBonus = 0;
+
+      final testEngine = SpatialCombatEngine(
+        initialGold: 500,
+        initialOre: 60,
+        onSpendCurrencies: (g, o) {
+          syncedGoldDelta += g;
+          syncedOreDelta += o;
+        },
+        onUnitStatUpgraded: (id, {required hpBonus, required atkBonus, required defBonus, required levelBonus}) {
+          upgradedHpBonus += hpBonus;
+        },
+      );
+      testEngine.skillTreeState.sculptorLevel = 2;
+      testEngine.skillTreeState.availableSkillPoints = 2;
+
+      // Unlock first tutorial skill (1 SP + 25 Gold)
+      expect(testEngine.canAffordSkillWithResources('ash_whirlwind'), isTrue);
+      expect(testEngine.upgradeSkillWithResources('ash_whirlwind'), isTrue);
+      expect(testEngine.unboundAshWallet, equals(475));
+      expect(testEngine.skillTreeState.availableSkillPoints, equals(1));
+
+      // Rank 2 requires SP + 65 Gold + 10 Ore
+      expect(testEngine.upgradeSkillWithResources('ash_whirlwind'), isTrue);
+      expect(testEngine.unboundAshWallet, equals(410));
+      expect(testEngine.distilledVitaeWallet, equals(50));
+
+      // Respec refunds both SP and invested Gold/Ore
+      testEngine.respecSkillsWithRefund();
+      expect(testEngine.skillTreeState.availableSkillPoints, equals(2));
+      expect(testEngine.unboundAshWallet, equals(500));
+      expect(testEngine.distilledVitaeWallet, equals(60));
+      expect(syncedGoldDelta, equals(0));
+      expect(syncedOreDelta, equals(0));
+
+      // Companion & Commander stat upgrades consume Gold + Ore and fire persistence callback
+      final companion = testEngine.playerUnits.firstWhere((u) => !u.isAshSculptor);
+      expect(testEngine.upgradeMinion(companion.id), isTrue);
+      expect(testEngine.unboundAshWallet, equals(380));
+      expect(testEngine.distilledVitaeWallet, equals(52));
+      expect(upgradedHpBonus, equals(150));
+
+      expect(testEngine.upgradeSculptorFurnace(), isTrue);
+      expect(testEngine.unboundAshWallet, equals(180));
+      expect(testEngine.distilledVitaeWallet, equals(32));
+      expect(upgradedHpBonus, equals(350));
+    });
   });
 }

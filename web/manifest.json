@@ -7,7 +7,7 @@
     "background_color": "#0D0D14",
     "theme_color": "#0D0D14",
     "description": "Crucible of Ash tactical dark fantasy wargame.",
-    "orientation": "any",
+    "orientation": "landscape",
     "prefer_related_applications": false,
     "icons": [
         {
