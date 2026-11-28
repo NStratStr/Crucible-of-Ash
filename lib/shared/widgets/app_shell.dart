@@ -2849,6 +2849,8 @@ class _AppShellState extends State<AppShell> {
 
     return Scaffold(
       body: SafeArea(
+        left: false,
+        right: false,
         top: !hideBottomBar,
         bottom: !hideBottomBar,
         child: Column(
@@ -2961,50 +2963,66 @@ class _AppShellState extends State<AppShell> {
                     },
                   ),
                   // Tab 2: Crucible Altar
-                  CrucibleScreen(
-                    availableInventory: allPlayerUnits,
-                    totalIchor: _totalIchor,
-                    bloodlineSigils: _bloodlineSigils,
-                    onIchorChanged: (val) {
-                      setState(() => _totalIchor = val);
-                      _saveCurrentState();
-                    },
-                    onSigilsChanged: (val) {
-                      setState(() => _bloodlineSigils = val);
-                      _saveCurrentState();
-                    },
-                    onFusionExecuted: _onFusionExecuted,
-                    onFusionComplete: _onFusionComplete,
-                    onUnitLeveled: (updatedUnit, cost) => _levelUpUnit(
-                      unitId: updatedUnit.id,
-                      xpAmount: cost,
-                      ichorCost: cost,
-                      replacementUnit: updatedUnit,
+                  SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: CrucibleScreen(
+                      availableInventory: allPlayerUnits,
+                      totalIchor: _totalIchor,
+                      bloodlineSigils: _bloodlineSigils,
+                      onIchorChanged: (val) {
+                        setState(() => _totalIchor = val);
+                        _saveCurrentState();
+                      },
+                      onSigilsChanged: (val) {
+                        setState(() => _bloodlineSigils = val);
+                        _saveCurrentState();
+                      },
+                      onFusionExecuted: _onFusionExecuted,
+                      onFusionComplete: _onFusionComplete,
+                      onUnitLeveled: (updatedUnit, cost) => _levelUpUnit(
+                        unitId: updatedUnit.id,
+                        xpAmount: cost,
+                        ichorCost: cost,
+                        replacementUnit: updatedUnit,
+                      ),
+                      crucibleTier: _crucibleTier,
                     ),
-                    crucibleTier: _crucibleTier,
                   ),
                   // Tab 3: Relic Forge
-                  RelicForgeScreen(
-                    relicService: _relicService,
-                    brigadeUnits: allPlayerUnits,
-                    totalIchor: _totalIchor,
-                    cursedOre: _cursedOre,
-                    onIchorChanged: (val) {
-                      setState(() => _totalIchor = val);
-                      _saveCurrentState();
-                    },
-                    onOreChanged: (val) {
-                      setState(() => _cursedOre = val);
-                      _saveCurrentState();
-                    },
-                    currentChapter: _currentChapter,
-                    completedLinearStages: _completedLinearStages,
-                    forgeTier: _forgeTier,
+                  SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: RelicForgeScreen(
+                      relicService: _relicService,
+                      brigadeUnits: allPlayerUnits,
+                      totalIchor: _totalIchor,
+                      cursedOre: _cursedOre,
+                      onIchorChanged: (val) {
+                        setState(() => _totalIchor = val);
+                        _saveCurrentState();
+                      },
+                      onOreChanged: (val) {
+                        setState(() => _cursedOre = val);
+                        _saveCurrentState();
+                      },
+                      currentChapter: _currentChapter,
+                      completedLinearStages: _completedLinearStages,
+                      forgeTier: _forgeTier,
+                    ),
                   ),
                   // Tab 4: Brigade Roster
-                  _buildRosterScreen(allPlayerUnits),
+                  SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: _buildRosterScreen(allPlayerUnits),
+                  ),
                   // Tab 5: Codices
-                  _buildCodexView(),
+                  SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: _buildCodexView(),
+                  ),
                 ],
               ),
             ),
@@ -3015,16 +3033,17 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: hideBottomBar
           ? null
           : Container(
-              color: Colors.transparent,
-              padding: const EdgeInsets.only(bottom: 4, left: 8, right: 8),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xEB12121A),
-                  border: Border(
-                    top: BorderSide(color: Color(0xFF282836), width: 1.2),
-                  ),
+              decoration: const BoxDecoration(
+                color: Color(0xF212121A),
+                border: Border(
+                  top: BorderSide(color: Color(0xFF282836), width: 1.2),
                 ),
-                child: BottomNavigationBar(
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: BottomNavigationBar(
                   currentIndex: _currentIndex >= 5 ? 0 : _currentIndex + 1,
                   type: BottomNavigationBarType.fixed,
                   elevation: 0,
@@ -3100,6 +3119,7 @@ class _AppShellState extends State<AppShell> {
                       label: 'Roster',
                     ),
                   ],
+                  ),
                 ),
               ),
             ),

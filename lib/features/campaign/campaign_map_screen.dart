@@ -764,18 +764,25 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
           ),
         ),
 
-        // Horizontal Story Progression Stage Ladder
+        // Horizontal Story Progression Stage Ladder (edge-to-edge background & scroll track, with SafeArea padding inside)
         SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header ribbon
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: MediaQuery.of(context).size.height < 520 ? 4 : 8,
-                ),
-                color: Colors.black45,
+          left: false,
+          right: false,
+          child: Builder(
+            builder: (context) {
+              final mqPad = MediaQuery.of(context).padding;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header ribbon
+                  Container(
+                    padding: EdgeInsets.only(
+                      left: mqPad.left + 14,
+                      right: mqPad.right + 14,
+                      top: MediaQuery.of(context).size.height < 520 ? 4 : 8,
+                      bottom: MediaQuery.of(context).size.height < 520 ? 4 : 8,
+                    ),
+                    color: Colors.black45,
                 child: Row(
                   children: [
                     Flexible(
@@ -927,9 +934,11 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
                   child: ListView.separated(
                     controller: _linearStagesScrollController,
                     scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: MediaQuery.of(context).size.height < 520 ? 6 : 16,
+                    padding: EdgeInsets.only(
+                      left: mqPad.left + 18,
+                      right: mqPad.right + 20,
+                      top: MediaQuery.of(context).size.height < 520 ? 6 : 16,
+                      bottom: MediaQuery.of(context).size.height < 520 ? 6 : 16,
                     ),
                     itemCount: stages.length,
                   separatorBuilder: (_, __) => Center(
@@ -954,6 +963,8 @@ class _CampaignMapScreenState extends State<CampaignMapScreen> {
               ),
               ),
             ],
+          );
+            },
           ),
         ),
       ],

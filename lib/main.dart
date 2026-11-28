@@ -43,12 +43,17 @@ class AshenCrucibleApp extends StatelessWidget {
   final bool enableAutoBattle;
   const AshenCrucibleApp({super.key, this.enableAutoBattle = true});
 
-  static EdgeInsets _rotateInsetsClockwise(EdgeInsets insets) {
+  static EdgeInsets _rotateInsetsClockwise(EdgeInsets insets, {double extraTopClearance = 0.0}) {
+    // RotatedBox(quarterTurns: 1) rotates child 90° clockwise:
+    //   Child Left   (x = 0) -> Physical Top    (insets.top: Dynamic Island / status bar)
+    //   Child Right  (x = W) -> Physical Bottom (insets.bottom: Home indicator)
+    //   Child Top    (y = 0) -> Physical Right  (insets.right)
+    //   Child Bottom (y = H) -> Physical Left   (insets.left)
     return EdgeInsets.only(
-      left: insets.bottom,
-      top: insets.left,
-      right: insets.top,
-      bottom: insets.right,
+      left: insets.top > 0 ? insets.top + extraTopClearance : 0.0,
+      top: insets.right,
+      right: insets.bottom,
+      bottom: insets.left,
     );
   }
 
@@ -77,24 +82,41 @@ class AshenCrucibleApp extends StatelessWidget {
         // with matching swapped dimensions and SafeArea insets so players immediately turn
         // their phone sideways and never land in a broken portrait layout.
         if (mq.size.width > 0 && mq.size.width < mq.size.height) {
+          final double physicalTopInset = mq.padding.top;
           final landscapeMq = mq.copyWith(
             size: Size(mq.size.height, mq.size.width),
-            padding: _rotateInsetsClockwise(mq.padding),
-            viewPadding: _rotateInsetsClockwise(mq.viewPadding),
+            padding: _rotateInsetsClockwise(mq.padding, extraTopClearance: 6.0),
+            viewPadding: _rotateInsetsClockwise(mq.viewPadding, extraTopClearance: 6.0),
             viewInsets: _rotateInsetsClockwise(mq.viewInsets),
           );
           return ColoredBox(
             color: const Color(0xFF0D0D14),
-            child: RotatedBox(
-              quarterTurns: 1,
-              child: MediaQuery(
-                data: landscapeMq,
-                child: SizedBox(
-                  width: landscapeMq.size.width,
-                  height: landscapeMq.size.height,
-                  child: child,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                RotatedBox(
+                  quarterTurns: 1,
+                  child: MediaQuery(
+                    data: landscapeMq,
+                    child: SizedBox(
+                      width: landscapeMq.size.width,
+                      height: landscapeMq.size.height,
+                      child: child,
+                    ),
+                  ),
                 ),
-              ),
+                // Clean solid status-bar cap on upright iOS phones so iOS's status-bar blur never smears scrolled cards
+                if (physicalTopInset > 0)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: physicalTopInset,
+                    child: const IgnorePointer(
+                      child: ColoredBox(color: Color(0xFF0D0D14)),
+                    ),
+                  ),
+              ],
             ),
           );
         }

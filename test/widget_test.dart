@@ -130,15 +130,24 @@ void main() {
   testWidgets('Phone held in portrait (393x852) automatically loads and locks UI in landscape (852x393)', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(393, 852);
     tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetPadding();
+      tester.view.resetViewPadding();
+    });
 
     await tester.pumpWidget(const AshenCrucibleApp(enableAutoBattle: false));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byType(RotatedBox), findsWidgets);
     final shellContext = tester.element(find.byType(AppShell));
-    final mqSize = MediaQuery.of(shellContext).size;
-    expect(mqSize.width, equals(852));
-    expect(mqSize.height, equals(393));
+    final mq = MediaQuery.of(shellContext);
+    expect(mq.size.width, equals(852));
+    expect(mq.size.height, equals(393));
+    // Physical top (59px Dynamic Island) maps to Landscape Left (+6px clearance), Physical bottom (34px) maps to Landscape Right
+    expect(mq.padding.left, equals(65));
+    expect(mq.padding.right, equals(34));
   });
 }
